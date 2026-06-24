@@ -287,6 +287,11 @@ function RankingTV() {
         .sale-pop { animation: sale-pop-rise 5s cubic-bezier(.22,.61,.36,1) forwards; }
         .sale-ring { animation: sale-ring 1.4s ease-out forwards; }
         .sale-coin { animation: sale-coin 1.6s ease-out forwards; }
+        .tv-scroll { scrollbar-width: thin; scrollbar-color: rgba(245,158,11,.35) transparent; }
+        .tv-scroll::-webkit-scrollbar { width: 6px; }
+        .tv-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,.02); border-radius: 8px; }
+        .tv-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(245,158,11,.55), rgba(245,158,11,.25)); border-radius: 8px; }
+        .tv-scroll::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,.7); }
       `}</style>
 
       {/* Background sóbrio */}
@@ -444,7 +449,7 @@ function RankingTV() {
               </h2>
               <span className="text-[0.55rem] uppercase tracking-[0.2em] text-neutral-600">mês atual</span>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 tv-scroll">
               {metasColetivas.slice(0, 4).map((m) => (
                 <ColetivaRow key={m.expert} m={m} />
               ))}
@@ -524,7 +529,7 @@ function RankingTV() {
                 #4 — #{Math.min(15, 3 + rest.length)}
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 tv-scroll">
               {rest.map((v, i) => (
                 <ListRow key={v.utm} item={v} position={i + 4} />
               ))}
@@ -545,7 +550,7 @@ function RankingTV() {
                 {hitCount} batidas
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 tv-scroll">
               {metaLogs.map((log) => (
                 <MetaLogRow key={log.utm} log={log} />
               ))}
