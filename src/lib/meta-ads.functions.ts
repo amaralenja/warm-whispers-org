@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -133,9 +132,9 @@ async function hashOrNull(value: string | null): Promise<string | null> {
   return value ? sha256Hex(value) : null;
 }
 
-function getClientIp(): string | null {
-  const forwarded = getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || getRequestHeader("cf-connecting-ip") || getRequestHeader("x-real-ip") || null;
+function getClientIp(getHeader: (name: string) => string | undefined): string | null {
+  const forwarded = getHeader("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || getHeader("cf-connecting-ip") || getHeader("x-real-ip") || null;
 }
 
 function qualityScore(input: {
@@ -209,12 +208,13 @@ export const sendMetaEvent = createServerFn({ method: "POST" })
       throw new Error("Informe o valor da venda em BRL.");
     }
 
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
     const email = normalizeEmail(data.email || undefined);
     const phone = normalizePhone(data.phone);
     const firstName = normalizeName(data.firstName);
     const lastName = normalizeName(data.lastName);
     const externalId = data.externalId?.trim() || email || phone || null;
-    const clientIp = getClientIp();
+    const clientIp = getClientIp(getRequestHeader);
     const userAgent = getRequestHeader("user-agent") || null;
 
     const [emailHash, phoneHash, firstNameHash, lastNameHash, externalIdHash, clientIpHash] = await Promise.all([
