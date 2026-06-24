@@ -68,8 +68,14 @@ export function DashboardConfigProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const NOOP_CTX: Ctx = {
+  config: DEFAULTS,
+  update: () => {},
+  setShare: () => {},
+  getShare: () => 100,
+};
+
 export function useDashboardConfig() {
   const ctx = useContext(DashboardConfigContext);
-  if (!ctx) throw new Error("useDashboardConfig must be used within DashboardConfigProvider");
-  return ctx;
+  return ctx ?? NOOP_CTX;
 }
