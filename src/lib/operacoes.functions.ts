@@ -244,16 +244,30 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const ticketMedioGeral = totalVendas ? totalFaturamento / totalVendas : 0;
     const saldoEstimado = totalFaturamento - gastosMes;
 
+    const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
+      idVenda: String(r["ID da Venda"] ?? ""),
+      produto: r["Produto"] ?? null,
+      cliente: r["Nome do Cliente"] ?? null,
+      valor: parseTicket(r["Valor Base do Produto"]),
+      dataVenda: r["Data da Venda"] ?? null,
+      dataReembolso: r["Data do Reembolso"] ?? null,
+      expert: vendaToExpert.get(String(r["ID da Venda"])) ?? null,
+    })).sort((a, b) => (b.dataReembolso ?? "").localeCompare(a.dataReembolso ?? ""));
+
+    const totalValorReembolsado = reembolsosList.reduce((a, r) => a + r.valor, 0);
+
     return {
       experts: expertStats,
       totalFaturamento,
       totalVendas,
       totalReembolsos,
+      totalValorReembolsado,
       ticketMedioGeral,
       gastosMes,
       saldoEstimado,
       vendedores,
       serieDiaria,
+      reembolsos: reembolsosList,
     };
   });
 
