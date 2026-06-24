@@ -1,8 +1,8 @@
-import { createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useRouteContext } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDashboardStats } from "@/lib/dashboard.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MULTIUM" }] }),
