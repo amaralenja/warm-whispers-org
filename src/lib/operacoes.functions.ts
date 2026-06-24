@@ -49,16 +49,28 @@ export type VendedorStat = {
 
 export type SerieDiaria = { data: string; total: number; vendas: number };
 
+export type ReembolsoItem = {
+  idVenda: string;
+  produto: string | null;
+  cliente: string | null;
+  valor: number;
+  dataVenda: string | null;
+  dataReembolso: string | null;
+  expert: string | null;
+};
+
 export type OperacoesPayload = {
   experts: ExpertStats[];
   totalFaturamento: number;
   totalVendas: number;
   totalReembolsos: number;
+  totalValorReembolsado: number;
   ticketMedioGeral: number;
   gastosMes: number;
   saldoEstimado: number;
   vendedores: VendedorStat[];
   serieDiaria: SerieDiaria[];
+  reembolsos: ReembolsoItem[];
 };
 
 export type DateRange = { from?: string | null; to?: string | null; expert?: string | null };
@@ -94,7 +106,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
-        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso"').range(from, to),
+        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
@@ -232,16 +244,30 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const ticketMedioGeral = totalVendas ? totalFaturamento / totalVendas : 0;
     const saldoEstimado = totalFaturamento - gastosMes;
 
+    const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
+      idVenda: String(r["ID da Venda"] ?? ""),
+      produto: r["Produto"] ?? null,
+      cliente: r["Nome do Cliente"] ?? null,
+      valor: parseTicket(r["Valor Base do Produto"]),
+      dataVenda: r["Data da Venda"] ?? null,
+      dataReembolso: r["Data do Reembolso"] ?? null,
+      expert: vendaToExpert.get(String(r["ID da Venda"])) ?? null,
+    })).sort((a, b) => (b.dataReembolso ?? "").localeCompare(a.dataReembolso ?? ""));
+
+    const totalValorReembolsado = reembolsosList.reduce((a, r) => a + r.valor, 0);
+
     return {
       experts: expertStats,
       totalFaturamento,
       totalVendas,
       totalReembolsos,
+      totalValorReembolsado,
       ticketMedioGeral,
       gastosMes,
       saldoEstimado,
       vendedores,
       serieDiaria,
+      reembolsos: reembolsosList,
     };
   });
 

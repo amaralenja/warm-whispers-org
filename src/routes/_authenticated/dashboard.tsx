@@ -10,6 +10,7 @@ import { DashboardConfigDialog } from "@/components/dashboard-config-dialog";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 import { ParticipacaoVendedores } from "@/components/participacao-vendedores";
 import { DesempenhoDiario } from "@/components/desempenho-diario";
+import { ReembolsosList } from "@/components/reembolsos-list";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -223,6 +224,13 @@ function Dashboard() {
 
             {/* Participação por vendedor */}
             <ParticipacaoVendedores vendedores={data?.vendedores ?? []} loading={isLoading} />
+
+            {/* Vendas Reembolsadas */}
+            <ReembolsosList
+              reembolsos={data?.reembolsos ?? []}
+              totalValor={data?.totalValorReembolsado ?? 0}
+              loading={isLoading}
+            />
           </TabsContent>
         </Tabs>
       </div>
