@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { DateRange as RDPRange } from "react-day-picker";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -64,6 +65,18 @@ export function DateRangeFilter({
   onChange: (v: DateRangeValue) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<RDPRange | undefined>(() => ({
+    from: parseISO(value.from),
+    to: parseISO(value.to),
+  }));
+
+  // Sincroniza quando abre o popover ou quando value muda externamente
+  useEffect(() => {
+    if (open) {
+      setPending({ from: parseISO(value.from), to: parseISO(value.to) });
+    }
+  }, [open, value.from, value.to]);
+
 
   const subtitle = useMemo(() => {
     if (!value.from || !value.to) return "Selecione um período";
@@ -113,19 +126,46 @@ export function DateRangeFilter({
             <Calendar
               mode="range"
               numberOfMonths={2}
-              defaultMonth={parseISO(value.from)}
-              selected={{ from: parseISO(value.from), to: parseISO(value.to) }}
-              onSelect={(r) => {
-                if (!r?.from) return;
-                const from = iso(r.from);
-                const to = iso(r.to ?? r.from);
-                onChange({ preset: "custom", from, to });
-                if (r.to) setOpen(false);
-              }}
+              defaultMonth={pending?.from ?? parseISO(value.from)}
+              selected={pending}
+              onSelect={(r) => setPending(r)}
               className="pointer-events-auto p-3"
             />
+            <div className="flex items-center justify-between gap-2 border-t border-border p-2">
+              <button
+                type="button"
+                onClick={() => setPending(undefined)}
+                className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/50"
+              >
+                Limpar
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!pending?.from}
+                  onClick={() => {
+                    if (!pending?.from) return;
+                    const from = iso(pending.from);
+                    const to = iso(pending.to ?? pending.from);
+                    onChange({ preset: "custom", from, to });
+                    setOpen(false);
+                  }}
+                  className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:brightness-110 disabled:opacity-40"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
           </PopoverContent>
         </Popover>
+
       </div>
       <div className="text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">
         {subtitle}
