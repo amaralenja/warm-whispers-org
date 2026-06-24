@@ -268,7 +268,7 @@ function RankingTV() {
   }, [pulse]);
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#0a0a0c] text-neutral-100">
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#0a0a0c] text-neutral-100">
       <style>{`
         @keyframes balloon-rise { 0% { transform: translate3d(0,110vh,0) rotate(-4deg); opacity:0; } 8% { opacity:1; } 92% { opacity:1; } 100% { transform: translate3d(0,-25vh,0) rotate(8deg); opacity:0; } }
         @keyframes confetti-fall { 0% { transform: translate3d(0,-15vh,0) rotate(0deg); opacity:0; } 10% { opacity:1; } 90% { opacity:1; } 100% { transform: translate3d(0,110vh,0) rotate(720deg); opacity:0; } }
@@ -397,7 +397,7 @@ function RankingTV() {
       )}
 
       {/* HEADER sóbrio */}
-      <header className={`relative z-10 flex h-[80px] items-center justify-between border-b border-white/[.04] px-10 ${pulseFlash ? "header-pulse" : ""}`}>
+      <header className={`relative z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-white/[.04] px-8 ${pulseFlash ? "header-pulse" : ""}`}>
         <div className="flex items-center gap-4">
           <div className="flex h-11 w-11 items-center justify-center rounded-md bg-amber-500/90">
             <Trophy className="h-5 w-5 text-neutral-900" fill="currentColor" />
@@ -426,14 +426,15 @@ function RankingTV() {
       </header>
 
       {/* STATS sóbrios */}
-      <div className="relative z-10 grid grid-cols-3 gap-4 border-b border-white/[.04] px-10 py-5">
+      <div className="relative z-10 grid shrink-0 grid-cols-3 gap-3 border-b border-white/[.04] px-8 py-2.5">
         <StatCard label="Faturamento hoje" value={BRL(data?.totalFaturamento ?? 0)} tone="emerald" icon={<Zap className="h-3.5 w-3.5" />} />
         <StatCard label="Vendas aprovadas" value={String(data?.totalVendas ?? 0)} tone="amber" icon={<Flame className="h-3.5 w-3.5" />} />
         <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="neutral" icon={<Sparkles className="h-3.5 w-3.5" />} />
       </div>
 
       {/* MAIN GRID — 12 colunas */}
-      <main className="relative z-10 grid h-[calc(100vh-80px-92px-32px)] grid-cols-12 gap-3 px-6 py-4">
+      <main className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-hidden px-5 py-3">
+
         {/* COL ESQUERDA — Metas Coletivas + Hall of Fame */}
         <aside className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
           <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
@@ -443,7 +444,7 @@ function RankingTV() {
               </h2>
               <span className="text-[0.55rem] uppercase tracking-[0.2em] text-neutral-600">mês atual</span>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {metasColetivas.slice(0, 4).map((m) => (
                 <ColetivaRow key={m.expert} m={m} />
               ))}
@@ -523,7 +524,7 @@ function RankingTV() {
                 #4 — #{Math.min(15, 3 + rest.length)}
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
               {rest.map((v, i) => (
                 <ListRow key={v.utm} item={v} position={i + 4} />
               ))}
@@ -544,7 +545,7 @@ function RankingTV() {
                 {hitCount} batidas
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
               {metaLogs.map((log) => (
                 <MetaLogRow key={log.utm} log={log} />
               ))}
@@ -559,7 +560,7 @@ function RankingTV() {
       </main>
 
       {/* FOOTER */}
-      <footer className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-10 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
+      <footer className="relative z-10 flex h-7 shrink-0 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-8 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
         <span>MULTIUM OS V2.0 · RANKING ENGINE</span>
         <span className="flex items-center gap-2">
           <span className="live-dot inline-block h-1 w-1 rounded-full bg-emerald-500" />
