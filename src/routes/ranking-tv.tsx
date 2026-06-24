@@ -426,44 +426,98 @@ function RankingTV() {
         <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="neutral" icon={<Sparkles className="h-3.5 w-3.5" />} />
       </div>
 
-      {/* MAIN GRID */}
-      <main className="relative z-10 grid h-[calc(100vh-80px-92px)] grid-cols-12 gap-4 px-10 py-5">
-        {/* PODIUM */}
-        <section className="col-span-8 flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-6">
-          <header className="mb-2 flex items-center justify-between">
-            <div>
-              <h2 className="text-[0.58rem] font-semibold uppercase tracking-[0.34em] text-neutral-500">o pódio</h2>
-              <p className="mt-1.5 text-xl font-semibold text-neutral-100">Top performers de hoje</p>
+      {/* MAIN GRID — 12 colunas */}
+      <main className="relative z-10 grid h-[calc(100vh-80px-92px-32px)] grid-cols-12 gap-3 px-6 py-4">
+        {/* COL ESQUERDA — Metas Coletivas + Hall of Fame */}
+        <aside className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
+                <Target className="h-3 w-3 text-emerald-500" /> Metas coletivas
+              </h2>
+              <span className="text-[0.55rem] uppercase tracking-[0.2em] text-neutral-600">mês atual</span>
+            </header>
+            <div className="min-h-0 flex-1 space-y-2 overflow-hidden">
+              {metasColetivas.slice(0, 4).map((m) => (
+                <ColetivaRow key={m.expert} m={m} />
+              ))}
+              {metasColetivas.length === 0 && (
+                <p className="py-6 text-center text-[0.65rem] uppercase tracking-widest text-neutral-700">Sem dados</p>
+              )}
             </div>
-            <div className="rounded border border-white/[.06] bg-white/[.02] px-3 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.24em] text-neutral-400">
-              {data?.vendedoresAtivos ?? 0} vendedores
-            </div>
-          </header>
+          </section>
 
-          <div className="flex flex-1 items-end justify-center gap-5 pb-2 pt-6">
-            {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[70%]" />}
-            {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[90%]" />}
-            {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[58%]" />}
-            {top3.length === 0 && (
-              <div className="flex h-full w-full items-center justify-center text-neutral-600">
-                <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
+          <section className="flex flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-2 flex items-center gap-2 border-b border-white/[.04] pb-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
+              <Trophy className="h-3 w-3 text-amber-500" /> Hall of fame
+              <span className="ml-auto text-[0.52rem] tracking-[0.18em] text-neutral-600">destaques</span>
+            </header>
+            <div className="space-y-2">
+              <HallCard label="Lobo do X1" sub="Maior ticket médio" item={hallOfFame.lobo} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} />
+              <HallCard label="Rainha do X1" sub="Mais vendas no dia" item={hallOfFame.rainha} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} />
+            </div>
+          </section>
+        </aside>
+
+        {/* COL CENTRO — Pódio + Meta dos Balões */}
+        <section className="col-span-6 grid min-h-0 grid-rows-[1fr_auto] gap-3">
+          <div className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
+            <header className="mb-1 flex items-center justify-between">
+              <div>
+                <h2 className="text-[0.56rem] font-semibold uppercase tracking-[0.32em] text-neutral-500">o pódio</h2>
+                <p className="mt-1 text-lg font-semibold text-neutral-100">Top performers de hoje</p>
               </div>
-            )}
+              <div className="rounded border border-white/[.06] bg-white/[.02] px-3 py-1 text-[0.56rem] font-semibold uppercase tracking-[0.22em] text-neutral-400">
+                <Users className="mr-1 inline h-3 w-3" />
+                {data?.vendedoresAtivos ?? 0} vendedores
+              </div>
+            </header>
+
+            <div className="flex flex-1 items-end justify-center gap-4 pb-1 pt-4">
+              {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[70%]" />}
+              {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[90%]" />}
+              {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[58%]" />}
+              {top3.length === 0 && (
+                <div className="flex h-full w-full items-center justify-center text-neutral-600">
+                  <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Meta dos Balões */}
+          <div className="rounded-lg border border-white/[.04] bg-white/[.012] p-3">
+            <header className="mb-2 flex items-center justify-between px-1">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
+                <MapPin className="h-3 w-3 text-rose-400" /> Meta dos balões
+                <span className="text-[0.5rem] tracking-[0.16em] text-neutral-600">PREMIAÇÃO DA CAMPANHA</span>
+              </h2>
+              <div className="flex items-center gap-2 text-[0.55rem] font-mono">
+                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-400">{totaisPremios.premio}× prêmio</span>
+                <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-400">{totaisPremios.pix}× pix</span>
+                <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-semibold text-rose-400">{totaisPremios.vale}× vale</span>
+              </div>
+            </header>
+            <div className="grid grid-cols-7 gap-1.5">
+              {baloes.map((b, i) => (
+                <BalaoSlot key={i} index={i + 1} balao={b} aberto={i < baloesAbertos} />
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* RIGHT */}
-        <aside className="col-span-4 grid min-h-0 grid-rows-2 gap-4">
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
-            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
-              <h2 className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-400">
+        {/* COL DIREITA — Próximos + Metas Individuais */}
+        <aside className="col-span-3 grid min-h-0 grid-rows-2 gap-3">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-2 flex items-center justify-between border-b border-white/[.04] pb-2">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
                 <Trophy className="h-3 w-3 text-amber-500" /> Próximos no pódio
               </h2>
-              <span className="font-mono text-[0.6rem] font-semibold text-neutral-500">
+              <span className="font-mono text-[0.56rem] font-semibold text-neutral-500">
                 #4 — #{Math.min(15, 3 + rest.length)}
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
               {rest.map((v, i) => (
                 <ListRow key={v.utm} item={v} position={i + 4} />
               ))}
@@ -475,12 +529,12 @@ function RankingTV() {
             </div>
           </section>
 
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
-            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
-              <h2 className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-400">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-2 flex items-center justify-between border-b border-white/[.04] pb-2">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
                 <Target className="h-3 w-3 text-emerald-500" /> Metas individuais
               </h2>
-              <span className="rounded border border-emerald-500/20 bg-emerald-500/[.06] px-2 py-0.5 font-mono text-[0.58rem] font-semibold text-emerald-400">
+              <span className="rounded border border-emerald-500/20 bg-emerald-500/[.06] px-2 py-0.5 font-mono text-[0.55rem] font-semibold text-emerald-400">
                 {hitCount} batidas
               </span>
             </header>
@@ -497,6 +551,15 @@ function RankingTV() {
           </section>
         </aside>
       </main>
+
+      {/* FOOTER */}
+      <footer className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-10 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
+        <span>MULTIUM OS V2.0 · RANKING ENGINE</span>
+        <span className="flex items-center gap-2">
+          <span className="live-dot inline-block h-1 w-1 rounded-full bg-emerald-500" />
+          Sincronizado · pulse {pulse}
+        </span>
+      </footer>
     </div>
   );
 }
