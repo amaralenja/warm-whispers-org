@@ -42,23 +42,41 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2 py-4">
         <SidebarGroup>
           {!collapsed && (
-            <SidebarGroupLabel className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+            <SidebarGroupLabel className="mb-2 px-2 text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
               Navegação
             </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1.5">
               {items.map((item) => {
                 const active = pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={active}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      tooltip={item.title}
+                      className={[
+                        "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+                        active
+                          ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                          : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                      ].join(" ")}
+                    >
                       <Link to={item.url} className="flex items-center gap-3">
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
+                        {active && (
+                          <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+                        )}
+                        <item.icon
+                          className={[
+                            "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                            active ? "text-accent" : "",
+                          ].join(" ")}
+                        />
+                        {!collapsed && <span className="truncate">{item.title}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -72,8 +90,12 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              tooltip="Sair"
+              className="group/menu h-12 rounded-lg px-3 text-[0.95rem] font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
               {!collapsed && <span>Sair</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
