@@ -99,11 +99,12 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    const [expertsRes, vendedoresRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
+      supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       fetchAll<any>((from, to) =>
-        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM"').range(from, to),
+        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
         supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto"').range(from, to),
@@ -112,6 +113,15 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
       ),
     ]);
+
+    // Mapa produto -> { expert, tipo } — vendas com produto NÃO mapeado são descartadas (igual ao dashboard antigo)
+    const produtoMap = new Map<string, { expert: string; tipo: string }>();
+    for (const p of (produtosMapRes.data ?? []) as any[]) {
+      const key = String(p.nome_produto ?? "").trim().toLowerCase();
+      if (key) produtoMap.set(key, { expert: p.nome_expert, tipo: String(p.tipo_produto ?? "main").toLowerCase() });
+    }
+    const lookupProduto = (v: any) => produtoMap.get(String(v.Produto ?? "").trim().toLowerCase()) ?? null;
+
 
     const experts = expertsRes.data ?? [];
     const vendedoresRaw = vendedoresRes.data ?? [];
