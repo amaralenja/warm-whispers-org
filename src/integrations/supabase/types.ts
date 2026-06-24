@@ -305,6 +305,7 @@ export type Database = {
           drive_url: string | null
           foto_url: string | null
           id: number
+          meta_mensal: number
           nome: string
         }
         Insert: {
@@ -313,6 +314,7 @@ export type Database = {
           drive_url?: string | null
           foto_url?: string | null
           id?: never
+          meta_mensal?: number
           nome: string
         }
         Update: {
@@ -321,6 +323,7 @@ export type Database = {
           drive_url?: string | null
           foto_url?: string | null
           id?: never
+          meta_mensal?: number
           nome?: string
         }
         Relationships: []
@@ -918,6 +921,7 @@ export type Database = {
     }
     Functions: {
       get_hall_of_fame_mes: { Args: never; Returns: Json }
+      get_metas_coletivas_mes: { Args: never; Returns: Json }
       get_ranking_tv_stats: {
         Args: { _from?: string; _to?: string }
         Returns: Json
