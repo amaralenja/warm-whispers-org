@@ -53,6 +53,17 @@ type RankingTvPayload = {
   metaDia: number;
 };
 
+type HallEntry = { utm: string; nome: string; expert: string | null; fotoUrl: string | null; faturamento: number; vendas: number; meta: number };
+type HallProx = { nome: string; faturamento: number; meta: number };
+type HallOfFamePayload = {
+  lobo: HallEntry | null;
+  rainha: HallEntry | null;
+  metaLobo: number;
+  metaRainha: number;
+  proxLobo: HallProx | null;
+  proxRainha: HallProx | null;
+};
+
 function todayISO() {
   const d = new Date();
   const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
