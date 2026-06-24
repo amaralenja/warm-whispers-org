@@ -92,6 +92,8 @@ export type MetaEventLog = {
   currency: string;
   hasEmail: boolean;
   hasPhone: boolean;
+  hasFirstName: boolean;
+  hasLastName: boolean;
   matchQualityScore: number;
   eventsReceived: number | null;
   fbtraceId: string | null;
