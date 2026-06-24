@@ -13,12 +13,14 @@ type Props = {
 };
 
 function accentFor(name: string): string {
-  const base = BASE_WORKSPACES.find((b) => b.nome === name);
+  const bases = BASE_WORKSPACES ?? [];
+  const base = bases.find((b) => b.nome === name);
   if (base) return base.accent.hex;
-  // fallback determinístico
+  const accents = ACCENTS ?? [];
+  if (accents.length === 0) return "#e94560";
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return ACCENTS[h % ACCENTS.length].hex;
+  return accents[h % accents.length].hex;
 }
 
 export function DashboardConfigDialog({ open, onOpenChange, experts, scoped, scopedName }: Props) {
