@@ -67,13 +67,17 @@ type Celebration = {
   faturamento: number;
 };
 
+type SalePop = { id: number; nome: string; expert: string | null; avatar: string; ticket: number; left: number };
+
 function RankingTV() {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const [confetti, setConfetti] = useState<{ id: number; left: number; color: string; delay: number; size: number; kind: "balloon" | "confetti" }[]>([]);
+  const [salePops, setSalePops] = useState<SalePop[]>([]);
   const celebratedRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
+  const rankingRef = useRef<PublicRankingItem[]>([]);
   const [pulse, setPulse] = useState(0); // flash pulse on new sale
 
   useEffect(() => {
@@ -101,16 +105,35 @@ function RankingTV() {
     refetchInterval: 15_000,
   });
 
-  // Realtime: invalida a query quando entra venda nova
+  // Realtime: invalida a query quando entra venda nova + dispara pop
   useEffect(() => {
     const channel = supabase
       .channel("ranking-tv-vendas")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "vendas" },
-        () => {
+        (payload) => {
           setPulse((p) => p + 1);
           queryClient.invalidateQueries({ queryKey });
+          const row = (payload.new ?? {}) as Record<string, unknown>;
+          const evento = String(row.Evento ?? "");
+          if (!/aprov|purchase_approved/i.test(evento)) return;
+          const utm = String(row.UTM ?? "").trim().toUpperCase();
+          const ticketRaw = String(row.Ticket ?? "0").replace(/[^0-9,.-]/g, "").replace(",", ".");
+          const ticket = parseFloat(ticketRaw) || 0;
+          const seller = rankingRef.current.find((r) => r.utm?.toUpperCase() === utm);
+          const nome = seller?.nome ?? "Nova venda";
+          const expert = seller?.expert ?? null;
+          const avatar = seller?.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=0a0a0c&color=e5e5e5&size=200&bold=true`;
+          const pop: SalePop = {
+            id: Date.now() + Math.random(),
+            nome, expert, avatar, ticket,
+            left: 20 + Math.random() * 60,
+          };
+          setSalePops((prev) => [...prev, pop]);
+          setTimeout(() => {
+            setSalePops((prev) => prev.filter((p) => p.id !== pop.id));
+          }, 5200);
         }
       )
       .on(
@@ -128,6 +151,7 @@ function RankingTV() {
   }, []);
 
   const ranking = data?.ranking ?? [];
+  useEffect(() => { rankingRef.current = ranking; }, [ranking]);
   const top3 = ranking.slice(0, 3);
   const rest = ranking.slice(3, 15);
   const metaLogs = data?.metaLogs ?? [];
@@ -194,6 +218,12 @@ function RankingTV() {
         .header-pulse { animation: border-pulse 900ms ease-out; }
         .corp-grid { background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); background-size: 72px 72px; }
         .celebrate-card { animation: celebration-pop 6s ease forwards; }
+        @keyframes sale-pop-rise { 0% { transform: translateY(60vh) scale(.4); opacity: 0; } 12% { opacity: 1; transform: translateY(40vh) scale(1.08); } 22% { transform: translateY(38vh) scale(1); } 78% { transform: translateY(38vh) scale(1); opacity: 1; } 100% { transform: translateY(-30vh) scale(.85); opacity: 0; } }
+        @keyframes sale-ring { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.4); opacity: 0; } }
+        @keyframes sale-coin { 0% { transform: translate(0,0) scale(.3); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--cx), var(--cy)) scale(1) rotate(540deg); opacity: 0; } }
+        .sale-pop { animation: sale-pop-rise 5s cubic-bezier(.22,.61,.36,1) forwards; }
+        .sale-ring { animation: sale-ring 1.4s ease-out forwards; }
+        .sale-coin { animation: sale-coin 1.6s ease-out forwards; }
       `}</style>
 
       {/* Background sóbrio */}
@@ -253,6 +283,53 @@ function RankingTV() {
               {BRL(celebration.faturamento)} <span className="text-neutral-500">/ {BRL(celebration.meta)}</span>
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Pops de venda em tempo real */}
+      {salePops.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-[205] overflow-hidden">
+          {salePops.map((p) => (
+            <div
+              key={p.id}
+              className="sale-pop absolute"
+              style={{ left: `${p.left}%`, top: 0, transform: "translateX(-50%)" }}
+            >
+              <div className="relative -translate-x-1/2 flex flex-col items-center">
+                {/* Anéis */}
+                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-emerald-400/70" />
+                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-emerald-400/40" style={{ animationDelay: "0.25s" }} />
+                {/* Moedas */}
+                {Array.from({ length: 8 }).map((_, i) => {
+                  const angle = (i / 8) * Math.PI * 2;
+                  const dist = 90;
+                  const cx = Math.cos(angle) * dist;
+                  const cy = Math.sin(angle) * dist - 20;
+                  return (
+                    <span
+                      key={i}
+                      className="sale-coin absolute top-10 h-3 w-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,.8)]"
+                      style={{ ["--cx" as string]: `${cx}px`, ["--cy" as string]: `${cy}px`, animationDelay: `${i * 0.04}s` } as React.CSSProperties}
+                    />
+                  );
+                })}
+                {/* Avatar */}
+                <div className="relative">
+                  <img
+                    src={p.avatar}
+                    alt={p.nome}
+                    className="relative h-20 w-20 rounded-full object-cover ring-4 ring-emerald-500 ring-offset-4 ring-offset-[#0a0a0c] shadow-[0_0_30px_rgba(16,185,129,.6)]"
+                  />
+                </div>
+                {/* Label */}
+                <div className="mt-3 rounded-md border border-emerald-500/40 bg-[#0d1411]/95 px-3 py-1.5 text-center shadow-[0_8px_30px_-8px_rgba(16,185,129,.5)] backdrop-blur-sm">
+                  <p className="text-[0.55rem] font-bold uppercase tracking-[0.28em] text-emerald-400">+ venda</p>
+                  <p className="font-mono text-base font-bold text-emerald-300">{BRL(p.ticket)}</p>
+                  <p className="mt-0.5 truncate text-[0.65rem] font-semibold text-neutral-200">{p.nome}</p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
