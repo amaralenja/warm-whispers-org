@@ -439,6 +439,8 @@ function MetaAdsPage() {
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <span>Email: {log.hasEmail ? "hash enviado" : "—"}</span>
                       <span>Telefone: {log.hasPhone ? "hash enviado" : "—"}</span>
+                      <span>Nome: {log.hasFirstName ? "hash enviado" : "—"}</span>
+                      <span>Sobrenome: {log.hasLastName ? "hash enviado" : "—"}</span>
                       <span>Recebidos: {log.eventsReceived ?? "—"}</span>
                       <span>ID: {log.eventId.slice(0, 8)}…</span>
                     </div>
