@@ -124,8 +124,19 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return true;
     };
 
-    // Filtra vendas pelo período + expert
-    const vendasPeriodo = vendasAll.filter((v: any) => inRange(parseDataField(v.Data)));
+    // IDs de TODAS as vendas reembolsadas (independente do período do reembolso)
+    const reembolsadasIds = new Set<string>(
+      (reembolsosAll as any[])
+        .map((r) => String(r["ID da Venda"] ?? ""))
+        .filter(Boolean),
+    );
+    const isReembolsada = (v: any) =>
+      reembolsadasIds.has(String(v["ID de Referência"] ?? ""));
+
+    // Filtra vendas pelo período + expert + remove reembolsadas
+    const vendasPeriodo = vendasAll.filter(
+      (v: any) => inRange(parseDataField(v.Data)) && !isReembolsada(v),
+    );
     const vendasScoped = expertFilter
       ? vendasPeriodo.filter((v: any) => v.nome_expert === expertFilter)
       : vendasPeriodo;
