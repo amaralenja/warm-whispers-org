@@ -36,15 +36,6 @@ export const saveMetaAdsConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => saveSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const update: Record<string, string> = {
-      user_id: context.userId,
-      pixel_id: data.pixelId,
-      test_event_code: data.testEventCode ?? "",
-    };
-    if (data.accessToken && data.accessToken.length > 0) {
-      update.access_token = data.accessToken;
-    }
-
     const { data: existing } = await context.supabase
       .from("meta_ads_config")
       .select("id")
@@ -52,6 +43,13 @@ export const saveMetaAdsConfig = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (existing) {
+      const update: { pixel_id: string; test_event_code: string; access_token?: string } = {
+        pixel_id: data.pixelId,
+        test_event_code: data.testEventCode ?? "",
+      };
+      if (data.accessToken && data.accessToken.length > 0) {
+        update.access_token = data.accessToken;
+      }
       const { error } = await context.supabase
         .from("meta_ads_config")
         .update(update)
@@ -60,7 +58,12 @@ export const saveMetaAdsConfig = createServerFn({ method: "POST" })
     } else {
       const { error } = await context.supabase
         .from("meta_ads_config")
-        .insert({ ...update, access_token: update.access_token ?? "" });
+        .insert({
+          user_id: context.userId,
+          pixel_id: data.pixelId,
+          test_event_code: data.testEventCode ?? "",
+          access_token: data.accessToken ?? "",
+        });
       if (error) throw new Error(error.message);
     }
     return { ok: true };
