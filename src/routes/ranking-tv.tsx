@@ -218,6 +218,12 @@ function RankingTV() {
         .header-pulse { animation: border-pulse 900ms ease-out; }
         .corp-grid { background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); background-size: 72px 72px; }
         .celebrate-card { animation: celebration-pop 6s ease forwards; }
+        @keyframes sale-pop-rise { 0% { transform: translateY(60vh) scale(.4); opacity: 0; } 12% { opacity: 1; transform: translateY(40vh) scale(1.08); } 22% { transform: translateY(38vh) scale(1); } 78% { transform: translateY(38vh) scale(1); opacity: 1; } 100% { transform: translateY(-30vh) scale(.85); opacity: 0; } }
+        @keyframes sale-ring { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.4); opacity: 0; } }
+        @keyframes sale-coin { 0% { transform: translate(0,0) scale(.3); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--cx), var(--cy)) scale(1) rotate(540deg); opacity: 0; } }
+        .sale-pop { animation: sale-pop-rise 5s cubic-bezier(.22,.61,.36,1) forwards; }
+        .sale-ring { animation: sale-ring 1.4s ease-out forwards; }
+        .sale-coin { animation: sale-coin 1.6s ease-out forwards; }
       `}</style>
 
       {/* Background sóbrio */}
