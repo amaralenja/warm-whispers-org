@@ -185,6 +185,32 @@ function Financeiro() {
           </div>
         </div>
 
+        {/* Sub-tabs */}
+        <div className="mt-6 flex gap-1 border-b border-border">
+          {[
+            { id: "lancamentos", label: "Lançamentos", icon: ClipboardList },
+            { id: "relatorios", label: "Relatórios", icon: BarChart3 },
+            { id: "dre", label: "DRE — Lucro Líquido", icon: Gem },
+          ].map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id as typeof tab)}
+                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-semibold transition ${
+                  active ? "text-accent" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {t.label}
+                {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === "lancamentos" && (<>
         {/* KPIs */}
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
