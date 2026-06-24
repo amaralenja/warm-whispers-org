@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import logoMultium from "@/assets/logo-multium.webp.asset.json";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -91,6 +92,11 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <div className="px-2 pb-2">
+        {!collapsed && <WorkspaceSwitcher />}
+      </div>
+
 
       <SidebarFooter className="border-t border-border p-2">
         <SidebarMenu>
