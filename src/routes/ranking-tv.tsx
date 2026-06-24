@@ -721,3 +721,74 @@ function MetaLogRow({ log }: { log: MetaLog }) {
     </div>
   );
 }
+
+type ColetivaItem = { expert: string; faturamento: number; meta: number; vendas: number; pct: number; nivel: number; faltaProx: number };
+
+function ColetivaRow({ m }: { m: ColetivaItem }) {
+  const nivelColors = ["", "text-amber-400 border-amber-400/30", "text-emerald-400 border-emerald-400/30", "text-sky-400 border-sky-400/30", "text-violet-400 border-violet-400/30"];
+  return (
+    <div className="rounded border border-white/[.04] bg-white/[.012] p-2.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-neutral-200">{m.expert} MENSAL</p>
+          <p className="font-mono text-base font-light tabular-nums text-emerald-400">{BRL(m.faturamento)}</p>
+        </div>
+        <div className="text-right">
+          <span className={`inline-block rounded border px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider ${nivelColors[m.nivel]}`}>
+            Nível {m.nivel}
+          </span>
+          <p className="mt-1 font-mono text-[0.7rem] font-semibold text-amber-400">{m.pct.toFixed(0)}%</p>
+        </div>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[.06]">
+        <div className="h-full bg-emerald-500" style={{ width: `${m.pct}%` }} />
+      </div>
+      <p className="mt-1 text-[0.55rem] tracking-wide text-neutral-500">
+        {m.faltaProx > 0 ? <>Necessário p/ Nível {m.nivel + 1}: <span className="font-semibold text-neutral-300">{BRL(m.faltaProx)}</span></> : "Nível máximo!"}
+      </p>
+    </div>
+  );
+}
+
+function HallCard({ label, sub, item, highlight, icon }: { label: string; sub: string; item: PublicRankingItem | undefined; highlight: "amber" | "rose"; icon: React.ReactNode }) {
+  const tone = highlight === "amber" ? "text-amber-400 border-amber-400/30 bg-amber-400/[.04]" : "text-rose-400 border-rose-400/30 bg-rose-400/[.04]";
+  return (
+    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${tone}`}>
+      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${tone}`}>{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.58rem] font-bold uppercase tracking-[0.2em]">{label}</p>
+        <p className="truncate text-xs font-semibold text-neutral-100">{item?.nome ?? "—"}</p>
+        <p className="text-[0.55rem] uppercase tracking-wider text-neutral-500">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+type Balao = { premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" };
+
+function BalaoSlot({ index, balao, aberto }: { index: number; balao: Balao; aberto: boolean }) {
+  if (!aberto) {
+    return (
+      <div className="flex h-14 flex-col items-center justify-center rounded border border-white/[.05] bg-white/[.015] text-center">
+        <span className="font-mono text-[0.55rem] font-semibold text-neutral-600">{index}</span>
+        <Gift className="h-3.5 w-3.5 text-neutral-700" />
+      </div>
+    );
+  }
+  const tones: Record<Balao["tier"], string> = {
+    nada: "border-white/[.06] bg-white/[.02] text-neutral-500",
+    pix: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+    ouro: "border-amber-500/50 bg-amber-500/15 text-amber-300",
+    vale: "border-rose-500/40 bg-rose-500/10 text-rose-300",
+    extra: "border-sky-500/40 bg-sky-500/10 text-sky-300",
+  };
+  return (
+    <div className={`group relative flex h-14 flex-col items-center justify-center rounded border px-1 text-center ${tones[balao.tier]}`} title={`${balao.premio} — ${balao.sub}`}>
+      <span className="absolute left-1 top-0.5 font-mono text-[0.5rem] font-bold opacity-60">{index}</span>
+      <p className="line-clamp-2 text-[0.5rem] font-bold uppercase leading-tight tracking-tight">
+        {balao.tier === "nada" ? "✕ nada" : balao.premio}
+      </p>
+    </div>
+  );
+}
+
