@@ -328,7 +328,7 @@ function PodiumCard({ item, position, height }: { item: RankingItem; position: 1
 
   return (
     <div className={`relative flex w-full max-w-[260px] flex-col items-center ${height}`}>
-      <div className={`flex flex-1 flex-col items-center justify-end gap-3 rounded-t-3xl border border-white/10 bg-gradient-to-b ${cfg.bg} via-white/[0.03] to-transparent p-5 backdrop-blur-xl ${cfg.glow}`}>
+      <div className={`flex flex-1 flex-col items-center justify-start gap-3 rounded-t-3xl border border-white/10 bg-gradient-to-b ${cfg.bg} via-white/[0.03] to-transparent p-5 backdrop-blur-xl ${cfg.glow}`}>
         {/* Position badge */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2">
           <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/20 bg-black/80 backdrop-blur-xl ${cfg.labelColor}`}>
