@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import logoMultium from "@/assets/logo-multium.webp.asset.json";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
