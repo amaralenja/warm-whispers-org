@@ -36,7 +36,16 @@ function RankingTV() {
   const fetchStats = useServerFn(getRankingStats);
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
-  const [period, setPeriod] = useState<"hoje" | "mes">("mes");
+  const [period, setPeriod] = useState<"hoje" | "mes">("hoje");
+  const [metaHoje, setMetaHoje] = useState<number>(() => {
+    if (typeof window === "undefined") return 5000;
+    return Number(localStorage.getItem("rankingtv.meta.hoje")) || 5000;
+  });
+  const [metaMes, setMetaMes] = useState<number>(() => {
+    if (typeof window === "undefined") return 150000;
+    return Number(localStorage.getItem("rankingtv.meta.mes")) || 150000;
+  });
+  const [editMeta, setEditMeta] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   const navigate = useNavigate();
