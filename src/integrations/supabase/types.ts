@@ -610,6 +610,72 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_ads_event_logs: {
+        Row: {
+          client_ip_hash: string | null
+          created_at: string
+          currency: string
+          email_hash: string | null
+          error_message: string | null
+          event_id: string
+          event_name: string
+          event_source_url: string | null
+          events_received: number | null
+          external_id_hash: string | null
+          fbtrace_id: string | null
+          id: string
+          match_quality_score: number
+          phone_hash: string | null
+          status: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+          value: number | null
+        }
+        Insert: {
+          client_ip_hash?: string | null
+          created_at?: string
+          currency?: string
+          email_hash?: string | null
+          error_message?: string | null
+          event_id: string
+          event_name: string
+          event_source_url?: string | null
+          events_received?: number | null
+          external_id_hash?: string | null
+          fbtrace_id?: string | null
+          id?: string
+          match_quality_score?: number
+          phone_hash?: string | null
+          status?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+          value?: number | null
+        }
+        Update: {
+          client_ip_hash?: string | null
+          created_at?: string
+          currency?: string
+          email_hash?: string | null
+          error_message?: string | null
+          event_id?: string
+          event_name?: string
+          event_source_url?: string | null
+          events_received?: number | null
+          external_id_hash?: string | null
+          fbtrace_id?: string | null
+          id?: string
+          match_quality_score?: number
+          phone_hash?: string | null
+          status?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+          value?: number | null
+        }
+        Relationships: []
+      }
       produtos_map: {
         Row: {
           created_at: string
