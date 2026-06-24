@@ -6,6 +6,8 @@ import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Coins, ArrowUp
 import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
+import { ParticipacaoVendedores } from "@/components/participacao-vendedores";
+import { DesempenhoDiario } from "@/components/desempenho-diario";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MULTIUM" }] }),
@@ -29,9 +31,11 @@ function Dashboard() {
 
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
 
+  const expertFilter = workspace.id === "all" ? null : workspace.id;
+
   const { data, isLoading } = useQuery({
-    queryKey: ["operacoes-stats", range.from, range.to],
-    queryFn: () => fetchOps({ data: { from: range.from, to: range.to } }),
+    queryKey: ["operacoes-stats", range.from, range.to, expertFilter],
+    queryFn: () => fetchOps({ data: { from: range.from, to: range.to, expert: expertFilter } }),
   });
 
   const experts = data?.experts ?? [];
@@ -130,6 +134,13 @@ function Dashboard() {
             </div>
           )}
         </section>
+
+        {/* Participação por vendedor + Desempenho diário */}
+        <section className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <ParticipacaoVendedores vendedores={data?.vendedores ?? []} loading={isLoading} />
+          <DesempenhoDiario serie={data?.serieDiaria ?? []} loading={isLoading} />
+        </section>
+
 
         {/* Rodapé — Financeiro */}
         {workspace.id === "all" && (

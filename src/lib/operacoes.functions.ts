@@ -37,6 +37,18 @@ export type ExpertStats = {
   pctTotal: number; // 0..1 do faturamento total
 };
 
+export type VendedorStat = {
+  utm: string;
+  nome: string;
+  expert: string | null;
+  fotoUrl: string | null;
+  faturamento: number;
+  vendas: number;
+  pctTotal: number;
+};
+
+export type SerieDiaria = { data: string; total: number; vendas: number };
+
 export type OperacoesPayload = {
   experts: ExpertStats[];
   totalFaturamento: number;
@@ -45,19 +57,21 @@ export type OperacoesPayload = {
   ticketMedioGeral: number;
   gastosMes: number;
   saldoEstimado: number;
+  vendedores: VendedorStat[];
+  serieDiaria: SerieDiaria[];
 };
 
-export type DateRange = { from?: string | null; to?: string | null };
+export type DateRange = { from?: string | null; to?: string | null; expert?: string | null };
 
 export const getOperacoesStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: DateRange | undefined) => input ?? {})
   .handler(async ({ context, data }): Promise<OperacoesPayload> => {
     const { supabase } = context;
+    const expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
     const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
 
-    // Supabase retorna no máximo 1000 linhas por query — pagina pra pegar tudo
     async function fetchAll<T = any>(
       build: (from: number, to: number) => any,
     ): Promise<T[]> {
@@ -75,9 +89,9 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
 
     const [expertsRes, vendedoresRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
-      supabase.from("vendedores").select("expert, ativo").eq("ativo", true),
+      supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       fetchAll<any>((from, to) =>
-        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência"').range(from, to),
+        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
         supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso"').range(from, to),
@@ -88,7 +102,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     ]);
 
     const experts = expertsRes.data ?? [];
-    const vendedores = vendedoresRes.data ?? [];
+    const vendedoresRaw = vendedoresRes.data ?? [];
 
     const inRange = (t: number | null) => {
       if (fromTs == null && toTs == null) return true;
@@ -98,9 +112,12 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return true;
     };
 
-    const vendas = vendasAll.filter((v: any) => inRange(parseDataField(v.Data)));
+    // Filtra vendas pelo período + expert
+    const vendasPeriodo = vendasAll.filter((v: any) => inRange(parseDataField(v.Data)));
+    const vendasScoped = expertFilter
+      ? vendasPeriodo.filter((v: any) => v.nome_expert === expertFilter)
+      : vendasPeriodo;
 
-    // mapa idVenda -> nome_expert (de todas as vendas, pra cruzar reembolsos)
     const vendaToExpert = new Map<string, string>();
     for (const v of vendasAll as any[]) {
       if (v["ID de Referência"] && v.nome_expert) {
@@ -108,26 +125,32 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       }
     }
 
-    const reembolsos = reembolsosAll.filter((r: any) => inRange(parseDataField(r["Data do Reembolso"])));
+    const reembolsos = reembolsosAll.filter((r: any) => {
+      if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
+      if (!expertFilter) return true;
+      return vendaToExpert.get(String(r["ID da Venda"])) === expertFilter;
+    });
 
-    // mes atual pra gastos
     const now = new Date();
     const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
     const gastosMes = financeiroAll
       .filter((f: any) => (f.tipo === "saida" || f.tipo === "despesa") && String(f.data_ref ?? "").startsWith(ym))
       .reduce((acc, f: any) => acc + Number(f.valor ?? 0), 0);
 
-    const totalFaturamento = vendas.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
-    const totalVendas = vendas.length;
+    const totalFaturamento = vendasScoped.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
+    const totalVendas = vendasScoped.length;
 
+    // Stats por expert (sempre considera todas as vendas do período, sem o filtro de expert)
     const expertStats: ExpertStats[] = experts.map((e: any) => {
-      const vds = vendas.filter((v: any) => v.nome_expert === e.nome);
+      const vds = vendasPeriodo.filter((v: any) => v.nome_expert === e.nome);
       const faturamento = vds.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
       const vendasCount = vds.length;
-      const vendedoresCount = vendedores.filter((v: any) => v.expert === e.nome).length;
-      const reembolsosCount = reembolsos.filter(
-        (r: any) => vendaToExpert.get(String(r["ID da Venda"])) === e.nome,
-      ).length;
+      const vendedoresCount = vendedoresRaw.filter((vd: any) => vd.expert === e.nome && vd.ativo).length;
+      const reembolsosCount = reembolsosAll.filter((r: any) => {
+        if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
+        return vendaToExpert.get(String(r["ID da Venda"])) === e.nome;
+      }).length;
+      const totalFatPeriodo = vendasPeriodo.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
       return {
         id: e.id,
         nome: e.nome,
@@ -138,9 +161,72 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         vendas: vendasCount,
         ticketMedio: vendasCount ? faturamento / vendasCount : 0,
         reembolsos: reembolsosCount,
-        pctTotal: totalFaturamento > 0 ? faturamento / totalFaturamento : 0,
+        pctTotal: totalFatPeriodo > 0 ? faturamento / totalFatPeriodo : 0,
       };
     });
+
+    // Participação por vendedor (UTM)
+    const vendedorMap = new Map<string, VendedorStat>();
+    for (const vd of vendedoresRaw as any[]) {
+      if (!vd.utm) continue;
+      vendedorMap.set(String(vd.utm).toUpperCase(), {
+        utm: String(vd.utm).toUpperCase(),
+        nome: vd.nome ?? vd.utm,
+        expert: vd.expert ?? null,
+        fotoUrl: vd.foto_url || null,
+        faturamento: 0,
+        vendas: 0,
+        pctTotal: 0,
+      });
+    }
+    for (const v of vendasScoped as any[]) {
+      const rawUtm = v.UTM ? String(v.UTM).toUpperCase() : "";
+      if (!rawUtm) continue;
+      let entry = vendedorMap.get(rawUtm);
+      if (!entry) {
+        entry = { utm: rawUtm, nome: rawUtm, expert: null, fotoUrl: null, faturamento: 0, vendas: 0, pctTotal: 0 };
+        vendedorMap.set(rawUtm, entry);
+      }
+      entry.faturamento += parseTicket(v.Ticket);
+      entry.vendas += 1;
+    }
+    const vendedores = Array.from(vendedorMap.values())
+      .filter((v) => v.vendas > 0)
+      .map((v) => ({ ...v, pctTotal: totalFaturamento > 0 ? v.faturamento / totalFaturamento : 0 }))
+      .sort((a, b) => b.faturamento - a.faturamento);
+
+    // Série diária — agrupa por dia ISO
+    const serieMap = new Map<string, { total: number; vendas: number }>();
+    for (const v of vendasScoped as any[]) {
+      const t = parseDataField(v.Data);
+      if (t == null) continue;
+      const d = new Date(t);
+      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      const entry = serieMap.get(iso) ?? { total: 0, vendas: 0 };
+      entry.total += parseTicket(v.Ticket);
+      entry.vendas += 1;
+      serieMap.set(iso, entry);
+    }
+    // Preenche dias vazios entre from e to (ou min/max)
+    let startTs = fromTs;
+    let endTs = toTs;
+    if (startTs == null || endTs == null) {
+      const allTs = Array.from(serieMap.keys()).map((s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)));
+      if (allTs.length) {
+        startTs = startTs ?? Math.min(...allTs);
+        endTs = endTs ?? Math.max(...allTs);
+      }
+    }
+    const serieDiaria: SerieDiaria[] = [];
+    if (startTs != null && endTs != null) {
+      const DAY = 86400_000;
+      for (let t = startTs; t <= endTs; t += DAY) {
+        const d = new Date(t);
+        const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+        const entry = serieMap.get(iso) ?? { total: 0, vendas: 0 };
+        serieDiaria.push({ data: iso, total: entry.total, vendas: entry.vendas });
+      }
+    }
 
     const totalReembolsos = reembolsos.length;
     const ticketMedioGeral = totalVendas ? totalFaturamento / totalVendas : 0;
@@ -154,5 +240,8 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       ticketMedioGeral,
       gastosMes,
       saldoEstimado,
+      vendedores,
+      serieDiaria,
     };
   });
+
