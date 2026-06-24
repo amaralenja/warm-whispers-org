@@ -21,6 +21,7 @@ import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Relatórios", url: "/relatorios", icon: LineChart },
+  { title: "Ranking", url: "/ranking", icon: Trophy },
 ];
 
 export function AppSidebar() {
