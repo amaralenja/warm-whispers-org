@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { X, Check } from "lucide-react";
 import { useDashboardConfig, type DashboardConfig } from "@/lib/dashboard-config";
 import { ACCENTS, BASE_WORKSPACES } from "@/lib/workspace-context";
