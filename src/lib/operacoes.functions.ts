@@ -185,7 +185,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
 
     // Stats por expert (sempre considera todas as vendas do período, sem o filtro de expert)
     const expertStats: ExpertStats[] = experts.map((e: any) => {
-      const vds = vendasPeriodo.filter((v: any) => v.nome_expert === e.nome);
+      const vds = vendasPeriodo.filter((v: any) => v._expert === e.nome);
       const faturamento = vds.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
       const vendasCount = vds.length;
       const vendedoresCount = vendedoresRaw.filter((vd: any) => vd.expert === e.nome && vd.ativo).length;
