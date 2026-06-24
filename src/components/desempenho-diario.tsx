@@ -144,7 +144,7 @@ export function DesempenhoDiario({
             <svg
               viewBox={`0 0 ${W} ${H}`}
               className="h-64 w-full"
-              preserveAspectRatio="xMidYMid meet"
+              preserveAspectRatio="none"
               onMouseMove={handleMove}
               onMouseLeave={() => setHover(null)}
             >
