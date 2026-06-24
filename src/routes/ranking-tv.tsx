@@ -560,7 +560,7 @@ function RankingTV() {
       </main>
 
       {/* FOOTER */}
-      <footer className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-10 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
+      <footer className="relative z-10 flex h-7 shrink-0 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-8 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
         <span>MULTIUM OS V2.0 · RANKING ENGINE</span>
         <span className="flex items-center gap-2">
           <span className="live-dot inline-block h-1 w-1 rounded-full bg-emerald-500" />
