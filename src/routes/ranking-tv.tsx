@@ -444,7 +444,7 @@ function RankingTV() {
               </h2>
               <span className="text-[0.55rem] uppercase tracking-[0.2em] text-neutral-600">mês atual</span>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {metasColetivas.slice(0, 4).map((m) => (
                 <ColetivaRow key={m.expert} m={m} />
               ))}
@@ -524,7 +524,7 @@ function RankingTV() {
                 #4 — #{Math.min(15, 3 + rest.length)}
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
               {rest.map((v, i) => (
                 <ListRow key={v.utm} item={v} position={i + 4} />
               ))}
@@ -545,7 +545,7 @@ function RankingTV() {
                 {hitCount} batidas
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
               {metaLogs.map((log) => (
                 <MetaLogRow key={log.utm} log={log} />
               ))}
