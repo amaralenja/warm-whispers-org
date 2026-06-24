@@ -68,7 +68,7 @@ export function DashboardConfigDialog({ open, onOpenChange, experts, scoped, sco
     onOpenChange(false);
   }
 
-  return createPortal(
+  return (
     <div className="fixed inset-0 z-[100] flex">
       {/* backdrop */}
       <div
