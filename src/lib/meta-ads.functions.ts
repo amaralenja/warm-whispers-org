@@ -168,7 +168,7 @@ export const listMetaEventLogs = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<MetaEventLog[]> => {
     const { data: rows, error } = await context.supabase
       .from("meta_ads_event_logs")
-      .select("id,event_name,event_id,status,value,currency,email_hash,phone_hash,match_quality_score,events_received,fbtrace_id,error_message,created_at")
+      .select("id,event_name,event_id,status,value,currency,email_hash,phone_hash,first_name_hash,last_name_hash,match_quality_score,events_received,fbtrace_id,error_message,created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(data.limit ?? 20);
@@ -184,6 +184,8 @@ export const listMetaEventLogs = createServerFn({ method: "POST" })
       currency: row.currency ?? "BRL",
       hasEmail: Boolean(row.email_hash),
       hasPhone: Boolean(row.phone_hash),
+      hasFirstName: Boolean(row.first_name_hash),
+      hasLastName: Boolean(row.last_name_hash),
       matchQualityScore: Number(row.match_quality_score ?? 0),
       eventsReceived: row.events_received == null ? null : Number(row.events_received),
       fbtraceId: row.fbtrace_id ?? null,
