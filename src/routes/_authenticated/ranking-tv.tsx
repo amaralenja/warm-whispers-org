@@ -39,10 +39,18 @@ function RankingTV() {
   const [period, setPeriod] = useState<"hoje" | "mes">("mes");
   const [now, setNow] = useState(() => new Date());
 
+  const navigate = useNavigate();
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") navigate({ to: "/ranking" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navigate]);
 
   const range = useMemo(() => {
     const to = todayISO();
