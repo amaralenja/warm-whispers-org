@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import logoMultium from "@/assets/logo-multium.webp.asset.json";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -55,7 +56,7 @@ function AuthPage() {
            style={{ background: "radial-gradient(closest-side, var(--accent), transparent)" }} />
 
       <header className="relative z-10 flex items-center justify-between px-8 py-7">
-        <div className="font-display text-2xl tracking-tight">MULTIUM</div>
+        <img src={logoMultium.url} alt="MULTIUM" className="h-10 w-auto object-contain" />
         <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
           {mode === "signin" ? "Acesso" : "Cadastro"}
         </div>
