@@ -57,19 +57,38 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
     const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
 
-    const [expertsRes, vendedoresRes, vendasRes, reembolsosRes, financeiroRes] = await Promise.all([
+    // Supabase retorna no máximo 1000 linhas por query — pagina pra pegar tudo
+    async function fetchAll<T = any>(
+      build: (from: number, to: number) => any,
+    ): Promise<T[]> {
+      const PAGE = 1000;
+      const out: T[] = [];
+      for (let i = 0; ; i++) {
+        const { data, error } = await build(i * PAGE, i * PAGE + PAGE - 1);
+        if (error) throw error;
+        const rows = (data ?? []) as T[];
+        out.push(...rows);
+        if (rows.length < PAGE) break;
+      }
+      return out;
+    }
+
+    const [expertsRes, vendedoresRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("expert, ativo").eq("ativo", true),
-      supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência"'),
-      supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso"'),
-      supabase.from("financeiro").select("valor, tipo, data_ref"),
+      fetchAll<any>((from, to) =>
+        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência"').range(from, to),
+      ),
+      fetchAll<any>((from, to) =>
+        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso"').range(from, to),
+      ),
+      fetchAll<any>((from, to) =>
+        supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
+      ),
     ]);
 
     const experts = expertsRes.data ?? [];
     const vendedores = vendedoresRes.data ?? [];
-    const vendasAll = vendasRes.data ?? [];
-    const reembolsosAll = reembolsosRes.data ?? [];
-    const financeiroAll = financeiroRes.data ?? [];
 
     const inRange = (t: number | null) => {
       if (fromTs == null && toTs == null) return true;
