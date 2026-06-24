@@ -623,7 +623,9 @@ export type Database = {
           events_received: number | null
           external_id_hash: string | null
           fbtrace_id: string | null
+          first_name_hash: string | null
           id: string
+          last_name_hash: string | null
           match_quality_score: number
           phone_hash: string | null
           status: string
@@ -644,7 +646,9 @@ export type Database = {
           events_received?: number | null
           external_id_hash?: string | null
           fbtrace_id?: string | null
+          first_name_hash?: string | null
           id?: string
+          last_name_hash?: string | null
           match_quality_score?: number
           phone_hash?: string | null
           status?: string
@@ -665,7 +669,9 @@ export type Database = {
           events_received?: number | null
           external_id_hash?: string | null
           fbtrace_id?: string | null
+          first_name_hash?: string | null
           id?: string
+          last_name_hash?: string | null
           match_quality_score?: number
           phone_hash?: string | null
           status?: string
