@@ -67,13 +67,17 @@ type Celebration = {
   faturamento: number;
 };
 
+type SalePop = { id: number; nome: string; expert: string | null; avatar: string; ticket: number; left: number };
+
 function RankingTV() {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const [confetti, setConfetti] = useState<{ id: number; left: number; color: string; delay: number; size: number; kind: "balloon" | "confetti" }[]>([]);
+  const [salePops, setSalePops] = useState<SalePop[]>([]);
   const celebratedRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
+  const rankingRef = useRef<PublicRankingItem[]>([]);
   const [pulse, setPulse] = useState(0); // flash pulse on new sale
 
   useEffect(() => {
