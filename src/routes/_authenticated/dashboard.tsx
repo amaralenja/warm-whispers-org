@@ -226,6 +226,14 @@ function Dashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <DashboardConfigDialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        experts={experts.map((e) => ({ id: e.id, nome: e.nome }))}
+        scoped={workspace.id !== "all"}
+        scopedName={workspace.id !== "all" ? workspace.nome : undefined}
+      />
     </main>
   );
 }
