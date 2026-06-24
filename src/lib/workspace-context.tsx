@@ -100,14 +100,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }
 
   const baseWithOverrides = BASE_WORKSPACES.map(applyOverride);
-  const customResolved: Workspace[] = custom.map((p) => ({
-    id: p.id,
-    nome: p.nome,
-    accentIndex: p.accentIndex,
-    accent: ACCENTS[p.accentIndex % ACCENTS.length],
-    photo: p.photo ?? null,
-    custom: true,
-  }));
+  const customResolved: Workspace[] = (custom ?? [])
+    .filter((p) => p && typeof p.id === "string" && typeof p.nome === "string")
+    .map((p) => {
+      const idx = typeof p.accentIndex === "number" && p.accentIndex >= 0 ? p.accentIndex : 0;
+      return {
+        id: p.id,
+        nome: p.nome,
+        accentIndex: idx,
+        accent: ACCENTS[idx % ACCENTS.length] ?? ACCENTS[0],
+        photo: p.photo ?? null,
+        custom: true,
+      };
+    });
   const workspaces = [...baseWithOverrides, ...customResolved];
   const workspace = workspaces.find((w) => w.id === activeId) ?? workspaces[0];
 
