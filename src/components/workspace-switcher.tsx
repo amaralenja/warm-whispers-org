@@ -30,7 +30,7 @@ export function WorkspaceSwitcher() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="group flex items-center gap-3 rounded-lg border border-border bg-card/40 px-3 py-2 text-left transition-colors hover:bg-card"
+          className="group flex w-full items-center gap-3 rounded-lg border border-border bg-card/40 px-3 py-2 text-left transition-colors hover:bg-card"
         >
           <div
             className={`flex h-8 w-8 items-center justify-center rounded-md ${workspace.accent.bg} ${workspace.accent.text} ring-1 ${workspace.accent.ring} text-xs font-semibold`}
