@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getDashboardStats } from "@/lib/dashboard.functions";
+import { Wallet, AlertTriangle, Coins } from "lucide-react";
 import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
@@ -15,182 +15,292 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 const BRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-// Numeric values use Inter (font-sans) with tabular-nums for nice alignment.
 const NUM = "font-sans tabular-nums tracking-tight font-semibold";
+
+type ExpertTheme = {
+  bar: string;     // gradient or solid bar (top border)
+  glow: string;    // soft glow color
+  text: string;    // value text color
+  chip: string;    // chip bg
+  ring: string;    // ring
+  dot: string;     // dot bg
+};
+
+const THEMES: Record<string, ExpertTheme> = {
+  Caio:    { bar: "from-indigo-400 to-violet-500", glow: "shadow-[0_0_60px_-15px_rgba(139,92,246,0.55)]", text: "text-foreground", chip: "bg-violet-500/10", ring: "ring-violet-500/40", dot: "bg-violet-400" },
+  Gustavo: { bar: "from-amber-400 to-orange-500",  glow: "shadow-[0_0_60px_-15px_rgba(251,146,60,0.55)]", text: "text-foreground", chip: "bg-orange-500/10", ring: "ring-orange-500/40", dot: "bg-orange-400" },
+  Jessica: { bar: "from-emerald-400 to-teal-500",  glow: "shadow-[0_0_60px_-15px_rgba(16,185,129,0.55)]", text: "text-foreground", chip: "bg-emerald-500/10", ring: "ring-emerald-500/40", dot: "bg-emerald-400" },
+};
+const FALLBACK: ExpertTheme = {
+  bar: "from-accent to-accent", glow: "shadow-[0_0_60px_-15px_rgba(255,255,255,0.2)]",
+  text: "text-foreground", chip: "bg-accent/10", ring: "ring-accent/40", dot: "bg-accent",
+};
+const TOTAL_THEME: ExpertTheme = {
+  bar: "from-emerald-400 to-emerald-300",
+  glow: "shadow-[0_0_70px_-12px_rgba(52,211,153,0.55)]",
+  text: "text-emerald-400", chip: "bg-emerald-500/10", ring: "ring-emerald-500/40", dot: "bg-emerald-400",
+};
 
 function Dashboard() {
   const { user } = useRouteContext({ from: "/_authenticated" });
   const { workspace } = useWorkspace();
-  const fetchStats = useServerFn(getDashboardStats);
   const fetchOps = useServerFn(getOperacoesStats);
 
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-stats"],
-    queryFn: () => fetchStats(),
-  });
-
-  const { data: experts, isLoading: loadingExperts } = useQuery({
     queryKey: ["operacoes-stats", range.from, range.to],
     queryFn: () => fetchOps({ data: { from: range.from, to: range.to } }),
   });
 
+  const experts = data?.experts ?? [];
   const visibleExperts =
-    workspace.id === "all"
-      ? experts ?? []
-      : (experts ?? []).filter((e) => e.nome === workspace.id);
+    workspace.id === "all" ? experts : experts.filter((e) => e.nome === workspace.id);
+
+  // Quando filtra workspace, totais refletem só aquele expert.
+  const totalFat = workspace.id === "all"
+    ? data?.totalFaturamento ?? 0
+    : visibleExperts.reduce((a, e) => a + e.faturamento, 0);
+  const totalVendas = workspace.id === "all"
+    ? data?.totalVendas ?? 0
+    : visibleExperts.reduce((a, e) => a + e.vendas, 0);
+  const totalReemb = workspace.id === "all"
+    ? data?.totalReembolsos ?? 0
+    : visibleExperts.reduce((a, e) => a + e.reembolsos, 0);
+  const tmGeral = totalVendas ? totalFat / totalVendas : 0;
+  const gastosMes = data?.gastosMes ?? 0;
+  const saldoEstimado = totalFat - gastosMes;
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background bg-grain">
-      <div className="mx-auto max-w-7xl px-8 py-14">
-        <div className="flex items-end justify-between gap-6 border-b border-border pb-10">
+      <div className="mx-auto max-w-7xl px-8 py-12">
+        {/* Header */}
+        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-8">
           <div>
             <p className={`text-xs uppercase tracking-[0.25em] ${workspace.accent.text}`}>
               — {workspace.id === "all" ? "Visão geral" : `Operação · ${workspace.nome}`}
             </p>
-            <h1 className="mt-4 font-display text-5xl leading-tight text-balance">
-              Boa,{" "}
-              <em className="text-accent">{user?.email?.split("@")[0]}</em>
-              .
+            <h1 className="mt-3 font-display text-4xl leading-tight text-balance md:text-5xl">
+              Boa, <em className="text-accent">{user?.email?.split("@")[0]}</em>.
             </h1>
-            <p className="mt-3 max-w-xl text-muted-foreground">
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
               {workspace.id === "all"
-                ? "Resumo da operação. Tudo atualizado em tempo real."
-                : `Você está visualizando o squad da ${workspace.nome}.`}
+                ? "Resumo da operação · todos os squads."
+                : `Filtrando dados do squad ${workspace.nome}.`}
             </p>
           </div>
           <DateRangeFilter value={range} onChange={setRange} />
         </div>
 
-
-        {/* Operações — squads */}
-        <section className="mt-14">
-          <div className="flex items-baseline justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">— Operações</p>
-              <h2 className="mt-2 font-display text-3xl">
-                {workspace.id === "all" ? "Squads" : workspace.nome}
-              </h2>
-            </div>
-            <span className={`text-xs uppercase tracking-[0.2em] text-muted-foreground ${NUM}`}>
-              {visibleExperts.length} {visibleExperts.length === 1 ? "expert" : "experts"}
-            </span>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {loadingExperts && Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-72 animate-pulse rounded-2xl border border-border bg-card/40" />
-            ))}
-            {visibleExperts.map((e) => <ExpertCard key={e.id} expert={e} />)}
-          </div>
+        {/* Linha 1 — Total + por expert */}
+        <section className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <TotalCard
+            faturamento={totalFat}
+            vendas={totalVendas}
+            ticketMedio={tmGeral}
+            loading={isLoading}
+          />
+          {isLoading && Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-[200px] animate-pulse rounded-2xl border border-border bg-card/40" />
+          ))}
+          {!isLoading && visibleExperts.map((e) => (
+            <ExpertSummary key={e.id} expert={e} />
+          ))}
         </section>
 
-        {/* KPIs gerais — só faz sentido na visão "Geral" */}
-        {workspace.id === "all" && (
-          <>
-            <section className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-2 lg:grid-cols-4">
-              <Kpi label="Faturamento" value={isLoading ? "—" : BRL(data?.faturamento ?? 0)} hint="Bruto total" />
-              <Kpi label="Líquido" value={isLoading ? "—" : BRL(data?.liquido ?? 0)} hint="Após plataforma" />
-              <Kpi label="Ticket médio" value={isLoading ? "—" : BRL(data?.ticketMedio ?? 0)} hint={`${data?.totalVendas ?? 0} vendas`} />
-              <Kpi label="Comissões" value={isLoading ? "—" : BRL(data?.comissoes ?? 0)} hint="Pagas aos closers" accent />
-            </section>
+        {/* Linha 2 — Lucro por expert + Gastos do Mês */}
+        <section className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {!isLoading && visibleExperts.map((e) => (
+            <LucroCard key={`lucro-${e.id}`} expert={e} />
+          ))}
+          {workspace.id === "all" && (
+            <GastosCard gastos={gastosMes} loading={isLoading} />
+          )}
+        </section>
 
-            <section className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-              <MiniCard label="Leads" value={data?.totalLeads ?? 0} />
-              <MiniCard label="Vendas HT" value={data?.htVendasCount ?? 0} />
-              <MiniCard
-                label="Saldo financeiro"
-                value={data ? BRL(data.saldo) : "—"}
-                tone={data && data.saldo >= 0 ? "positive" : "negative"}
-              />
-            </section>
-          </>
+        {/* Linha 3 — Saldo Estimado */}
+        {workspace.id === "all" && (
+          <section className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <SaldoCard saldo={saldoEstimado} loading={isLoading} />
+            <div className="hidden xl:block" />
+            <div className="hidden xl:block" />
+            <ReembolsosCard total={totalReemb} loading={isLoading} />
+          </section>
         )}
       </div>
     </main>
   );
 }
 
-const EXPERT_THEME: Record<string, { ring: string; bar: string; text: string; bg: string; border: string }> = {
-  Caio:    { ring: "ring-blue-500/60",    bar: "bg-blue-500",    text: "text-blue-400",    bg: "bg-blue-500/10",    border: "border-blue-500/30" },
-  Gustavo: { ring: "ring-orange-500/60",  bar: "bg-orange-500",  text: "text-orange-400",  bg: "bg-orange-500/10",  border: "border-orange-500/30" },
-  Jessica: { ring: "ring-emerald-500/60", bar: "bg-emerald-500", text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
-};
+/* ----------------------------------------------------------- */
+/* Cards                                                       */
+/* ----------------------------------------------------------- */
 
-const DEFAULT_THEME = {
-  ring: "ring-accent/60", bar: "bg-accent", text: "text-accent", bg: "bg-accent/10", border: "border-accent/30",
-};
-
-function ExpertCard({ expert }: { expert: ExpertStats }) {
-  const theme = EXPERT_THEME[expert.nome] ?? DEFAULT_THEME;
-  const initials = expert.nome.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-
+function CardShell({
+  theme,
+  children,
+  className = "",
+}: {
+  theme: ExpertTheme;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card/40 transition-all hover:bg-card/60">
-      <div className={`h-[3px] w-full ${theme.bar}`} />
-
-      <div className="p-6">
-        <div className="flex items-center gap-3">
-          {expert.foto_url ? (
-            <img src={expert.foto_url} alt={expert.nome} className={`h-12 w-12 rounded-full object-cover ring-2 ${theme.ring}`} />
-          ) : (
-            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${theme.bg} ${theme.text} ring-2 ${theme.ring} font-sans text-sm font-semibold`}>
-              {initials}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-display text-lg text-foreground">{expert.nome}</div>
-            <div className={`text-xs text-muted-foreground ${NUM}`}>
-              {expert.vendedoresCount} {expert.vendedoresCount === 1 ? "vendedor" : "vendedores"} no squad
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-2 gap-y-5">
-          <Stat label="Faturamento" value={BRL(expert.faturamento)} valueClass={theme.text} />
-          <Stat label="Vendas" value={String(expert.vendas)} />
-          <Stat label="Ticket médio" value={BRL(expert.ticketMedio)} />
-          <Stat label="Vendedores" value={String(expert.vendedoresCount)} />
-        </div>
-
-        <div className={`mt-6 h-px w-full ${theme.bar} opacity-40`} />
-        <button
-          type="button"
-          className={`mt-4 inline-flex w-full items-center justify-center rounded-lg border ${theme.border} ${theme.bg} px-4 py-2.5 text-sm font-medium ${theme.text} transition-all hover:brightness-125`}
-        >
-          Ver Painel Detalhado →
-        </button>
-      </div>
+    <div
+      className={`group relative overflow-hidden rounded-2xl border border-border bg-card/60 backdrop-blur-sm transition-all hover:bg-card hover:${theme.glow} ${className}`}
+    >
+      <div className={`h-[2px] w-full bg-gradient-to-r ${theme.bar}`} />
+      <div className="p-5">{children}</div>
     </div>
   );
 }
 
-function Stat({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function CardHeader({ theme, label, accent }: { theme: ExpertTheme; label: string; accent?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} />
+      <span className={`text-[0.65rem] font-semibold uppercase tracking-[0.22em] ${accent ? theme.text : "text-muted-foreground"}`}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function TotalCard({
+  faturamento, vendas, ticketMedio, loading,
+}: { faturamento: number; vendas: number; ticketMedio: number; loading?: boolean }) {
+  return (
+    <CardShell theme={TOTAL_THEME}>
+      <CardHeader theme={TOTAL_THEME} label="Total Geral" accent />
+      <div className={`mt-3 text-4xl ${NUM} text-emerald-400`}>
+        {loading ? "—" : BRL(faturamento)}
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        Nosso lucro: <span className="text-emerald-400/80">{loading ? "—" : BRL(faturamento)}</span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-4">
+        <MicroStat label="Vendas" value={loading ? "—" : String(vendas)} />
+        <MicroStat label="Ticket médio (≥97)" value={loading ? "—" : BRL(ticketMedio)} valueClass="text-sky-400" />
+      </div>
+    </CardShell>
+  );
+}
+
+function ExpertSummary({ expert }: { expert: ExpertStats }) {
+  const theme = THEMES[expert.nome] ?? FALLBACK;
+  const pct = Math.round(expert.pctTotal * 100);
+  return (
+    <CardShell theme={theme}>
+      <CardHeader theme={theme} label={expert.nome} accent />
+      <div className={`mt-3 text-4xl ${NUM} text-foreground`}>{BRL(expert.faturamento)}</div>
+
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <MicroStat label="Vendas" value={String(expert.vendas)} />
+        <MicroStat
+          label="Reimb."
+          value={String(expert.reembolsos)}
+          valueClass={expert.reembolsos > 0 ? "text-rose-400" : "text-emerald-400"}
+        />
+        <MicroStat label="TM (≥97)" value={BRL(expert.ticketMedio)} valueClass="text-sky-400" />
+      </div>
+
+      <div className="mt-5">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary/60">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${theme.bar}`}
+            style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
+          />
+        </div>
+        <div className="mt-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">
+          {pct}% do total
+        </div>
+      </div>
+    </CardShell>
+  );
+}
+
+function LucroCard({ expert }: { expert: ExpertStats }) {
+  const theme = THEMES[expert.nome] ?? FALLBACK;
+  return (
+    <CardShell theme={theme}>
+      <div className="flex items-center gap-2">
+        <Wallet className={`h-3.5 w-3.5 ${theme.text === "text-foreground" ? "text-muted-foreground" : theme.text}`} />
+        <span className={`text-[0.65rem] font-semibold uppercase tracking-[0.22em] ${theme.text === "text-foreground" ? "text-muted-foreground" : theme.text}`}>
+          Nosso Lucro — {expert.nome}
+        </span>
+      </div>
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">
+        100% de <span className={NUM}>{BRL(expert.faturamento)}</span> bruto
+      </div>
+      <div className={`mt-4 text-4xl ${NUM} text-foreground`}>{BRL(expert.faturamento)}</div>
+    </CardShell>
+  );
+}
+
+function GastosCard({ gastos, loading }: { gastos: number; loading?: boolean }) {
+  const theme: ExpertTheme = {
+    bar: "from-rose-400 to-pink-500",
+    glow: "shadow-[0_0_60px_-15px_rgba(244,63,94,0.55)]",
+    text: "text-rose-400", chip: "bg-rose-500/10", ring: "ring-rose-500/40", dot: "bg-rose-400",
+  };
+  return (
+    <CardShell theme={theme}>
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+        <span className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-rose-400">
+          Gastos do Mês
+        </span>
+      </div>
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">Financeiro — mês atual</div>
+      <div className={`mt-4 text-4xl ${NUM} text-rose-400`}>{loading ? "—" : BRL(gastos)}</div>
+      <div className="mt-2 text-[0.7rem] text-muted-foreground">Ver detalhes →</div>
+    </CardShell>
+  );
+}
+
+function SaldoCard({ saldo, loading }: { saldo: number; loading?: boolean }) {
+  const positive = saldo >= 0;
+  const theme: ExpertTheme = {
+    bar: positive ? "from-emerald-400 to-teal-500" : "from-rose-400 to-pink-500",
+    glow: positive ? "shadow-[0_0_60px_-15px_rgba(16,185,129,0.55)]" : "shadow-[0_0_60px_-15px_rgba(244,63,94,0.55)]",
+    text: positive ? "text-emerald-400" : "text-rose-400",
+    chip: "", ring: "", dot: positive ? "bg-emerald-400" : "bg-rose-400",
+  };
+  return (
+    <CardShell theme={theme}>
+      <CardHeader theme={theme} label="Saldo Estimado" accent />
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">Lucro – gastos – reembolsos</div>
+      <div className={`mt-4 text-4xl ${NUM} ${theme.text}`}>{loading ? "—" : BRL(saldo)}</div>
+    </CardShell>
+  );
+}
+
+function ReembolsosCard({ total, loading }: { total: number; loading?: boolean }) {
+  const theme: ExpertTheme = {
+    bar: "from-sky-400 to-blue-500",
+    glow: "shadow-[0_0_60px_-15px_rgba(56,189,248,0.55)]",
+    text: "text-sky-400", chip: "", ring: "", dot: "bg-sky-400",
+  };
+  return (
+    <CardShell theme={theme}>
+      <div className="flex items-center gap-2">
+        <Coins className="h-3.5 w-3.5 text-sky-400" />
+        <span className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-sky-400">
+          Reembolsos no Período
+        </span>
+      </div>
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">Total contabilizado</div>
+      <div className={`mt-4 text-4xl ${NUM} text-foreground`}>{loading ? "—" : total}</div>
+    </CardShell>
+  );
+}
+
+function MicroStat({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
     <div>
-      <div className="text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
-      <div className={`mt-1 text-xl ${NUM} ${valueClass ?? "text-foreground"}`}>{value}</div>
-    </div>
-  );
-}
-
-function Kpi({ label, value, hint, accent }: { label: string; value: string | number; hint?: string; accent?: boolean }) {
-  return (
-    <div className="bg-background p-8 transition-colors hover:bg-card">
-      <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
-      <div className={`mt-4 text-4xl ${NUM} ${accent ? "text-accent" : "text-foreground"}`}>{value}</div>
-      {hint && <div className={`mt-2 text-xs text-muted-foreground ${NUM}`}>{hint}</div>}
-    </div>
-  );
-}
-
-function MiniCard({ label, value, tone }: { label: string; value: string | number; tone?: "positive" | "negative" }) {
-  const color = tone === "negative" ? "text-destructive" : tone === "positive" ? "text-[color:var(--success)]" : "text-foreground";
-  return (
-    <div className="rounded-2xl border border-border bg-card/40 p-6">
-      <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
-      <div className={`mt-3 text-3xl ${NUM} ${color}`}>{value}</div>
+      <div className="text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+      <div className={`mt-1 text-lg ${NUM} ${valueClass ?? "text-foreground"}`}>{value}</div>
     </div>
   );
 }
