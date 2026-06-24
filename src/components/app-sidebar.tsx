@@ -41,7 +41,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-border px-4 py-5">
         <div className="flex items-center justify-center">
           <img
-            src={logoMultium.url}
+            src={logoMultium}
             alt="MULTIUM"
             className={collapsed ? "h-8 w-8 object-contain" : "h-10 w-auto object-contain"}
           />
