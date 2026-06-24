@@ -9,16 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RankingTvRouteImport } from './routes/ranking-tv'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
-import { Route as AuthenticatedRankingTvRouteImport } from './routes/_authenticated/ranking-tv'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
+const RankingTvRoute = RankingTvRouteImport.update({
+  id: '/ranking-tv',
+  path: '/ranking-tv',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -36,11 +41,6 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRankingTvRoute = AuthenticatedRankingTvRouteImport.update({
-  id: '/ranking-tv',
-  path: '/ranking-tv',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRankingRoute = AuthenticatedRankingRouteImport.update({
@@ -67,21 +67,21 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/ranking-tv': typeof RankingTvRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/ranking': typeof AuthenticatedRankingRoute
-  '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/ranking-tv': typeof RankingTvRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/ranking': typeof AuthenticatedRankingRoute
-  '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRoutesById {
@@ -89,11 +89,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/ranking-tv': typeof RankingTvRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
-  '/_authenticated/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRouteTypes {
@@ -101,32 +101,32 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/ranking-tv'
     | '/dashboard'
     | '/financeiro'
     | '/meta-ads'
     | '/ranking'
-    | '/ranking-tv'
     | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/ranking-tv'
     | '/dashboard'
     | '/financeiro'
     | '/meta-ads'
     | '/ranking'
-    | '/ranking-tv'
     | '/relatorios'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/ranking-tv'
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
     | '/_authenticated/meta-ads'
     | '/_authenticated/ranking'
-    | '/_authenticated/ranking-tv'
     | '/_authenticated/relatorios'
   fileRoutesById: FileRoutesById
 }
@@ -134,10 +134,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  RankingTvRoute: typeof RankingTvRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/ranking-tv': {
+      id: '/ranking-tv'
+      path: '/ranking-tv'
+      fullPath: '/ranking-tv'
+      preLoaderRoute: typeof RankingTvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -164,13 +172,6 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ranking-tv': {
-      id: '/_authenticated/ranking-tv'
-      path: '/ranking-tv'
-      fullPath: '/ranking-tv'
-      preLoaderRoute: typeof AuthenticatedRankingTvRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ranking': {
@@ -209,7 +210,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
-  AuthenticatedRankingTvRoute: typeof AuthenticatedRankingTvRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
 }
 
@@ -218,7 +218,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
-  AuthenticatedRankingTvRoute: AuthenticatedRankingTvRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
 }
 
@@ -229,6 +228,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  RankingTvRoute: RankingTvRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Crown, Flame, Trophy, Medal, Sparkles, Radio, TrendingUp, ArrowLeft } from "lucide-react";
-import { getRankingStats, type RankingItem } from "@/lib/ranking.functions";
-import { useWorkspace } from "@/lib/workspace-context";
+import { Crown, Flame, Trophy, Medal, Sparkles, Radio, TrendingUp, Target } from "lucide-react";
+import { getRankingStatsPublic, type PublicRankingItem } from "@/lib/ranking-public.functions";
 
-export const Route = createFileRoute("/_authenticated/ranking-tv")({
+export const Route = createFileRoute("/ranking-tv")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Ranking TV — MULTIUM" },
-      { name: "description", content: "Modo TV intergaláctico do ranking de vendas em tempo real." },
+      { name: "description", content: "Ranking de vendas ao vivo em modo TV." },
     ],
   }),
   component: RankingTV,
@@ -32,34 +32,29 @@ function monthStartISO() {
 }
 
 function RankingTV() {
-  const { workspace } = useWorkspace();
-  const fetchStats = useServerFn(getRankingStats);
-  const expertFilter = workspace.id === "all" ? null : workspace.id;
+  const fetchStats = useServerFn(getRankingStatsPublic);
 
   const [period, setPeriod] = useState<"hoje" | "mes">("hoje");
-  const [metaHoje, setMetaHoje] = useState<number>(() => {
-    if (typeof window === "undefined") return 5000;
-    return Number(localStorage.getItem("rankingtv.meta.hoje")) || 5000;
-  });
-  const [metaMes, setMetaMes] = useState<number>(() => {
-    if (typeof window === "undefined") return 150000;
-    return Number(localStorage.getItem("rankingtv.meta.mes")) || 150000;
-  });
+  const [metaHoje, setMetaHoje] = useState<number>(5000);
+  const [metaMes, setMetaMes] = useState<number>(150000);
   const [editMeta, setEditMeta] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [balloons, setBalloons] = useState<{ id: number; left: number; color: string; delay: number }[]>([]);
+  const [hitFlash, setHitFlash] = useState(false);
+  const [lastHitKey, setLastHitKey] = useState<string | null>(null);
 
-  const navigate = useNavigate();
+  // hydrate metas after mount (avoids SSR hook mismatch)
+  useEffect(() => {
+    const h = Number(localStorage.getItem("rankingtv.meta.hoje"));
+    const m = Number(localStorage.getItem("rankingtv.meta.mes"));
+    if (h > 0) setMetaHoje(h);
+    if (m > 0) setMetaMes(m);
+  }, []);
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") navigate({ to: "/ranking" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [navigate]);
+    return () => clearInterval(t);
+  }, []);
 
   const range = useMemo(() => {
     const to = todayISO();
@@ -67,8 +62,8 @@ function RankingTV() {
   }, [period]);
 
   const { data } = useQuery({
-    queryKey: ["ranking-tv", range.from, range.to, expertFilter],
-    queryFn: () => fetchStats({ data: { from: range.from, to: range.to, expert: expertFilter } }),
+    queryKey: ["ranking-tv-public", range.from, range.to],
+    queryFn: () => fetchStats({ data: { from: range.from, to: range.to } }),
     refetchInterval: 30_000,
   });
 
@@ -76,8 +71,54 @@ function RankingTV() {
   const top3 = ranking.slice(0, 3);
   const rest = ranking.slice(3, 13);
 
+  const meta = period === "hoje" ? metaHoje : metaMes;
+  const setMeta = period === "hoje" ? setMetaHoje : setMetaMes;
+  const storageKey = period === "hoje" ? "rankingtv.meta.hoje" : "rankingtv.meta.mes";
+  const fat = data?.totalFaturamento ?? 0;
+  const pct = meta > 0 ? Math.min(100, (fat / meta) * 100) : 0;
+  const falta = Math.max(0, meta - fat);
+  const batido = fat >= meta && meta > 0;
+
+  // Trigger balloons when meta hit (once per period+meta combo)
+  useEffect(() => {
+    const key = `${period}-${meta}-${Math.floor(fat)}`;
+    if (batido && lastHitKey !== `${period}-${meta}`) {
+      setLastHitKey(`${period}-${meta}`);
+      setHitFlash(true);
+      const colors = ["#fbbf24", "#f472b6", "#34d399", "#60a5fa", "#a78bfa", "#fb7185"];
+      const next = Array.from({ length: 24 }, (_, i) => ({
+        id: Date.now() + i,
+        left: Math.random() * 100,
+        color: colors[i % colors.length],
+        delay: Math.random() * 2,
+      }));
+      setBalloons(next);
+      const t1 = setTimeout(() => setHitFlash(false), 1800);
+      const t2 = setTimeout(() => setBalloons([]), 9000);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+    if (!batido && lastHitKey === `${period}-${meta}`) {
+      setLastHitKey(null);
+    }
+  }, [batido, period, meta, fat, lastHitKey]);
+
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden bg-[#020206] text-white">
+      <style>{`
+        @keyframes float-up {
+          0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-20vh) rotate(15deg); opacity: 0; }
+        }
+        @keyframes flash-bg {
+          0%, 100% { background-color: rgba(16,185,129,0); }
+          50% { background-color: rgba(16,185,129,0.15); }
+        }
+        .balloon { animation: float-up 7s ease-in forwards; }
+        .flash-overlay { animation: flash-bg 1.6s ease-out; }
+      `}</style>
+
       {/* Ambient glow background */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-1/4 top-0 h-[60vh] w-[60vw] rounded-full bg-emerald-500/[0.06] blur-[140px]" />
@@ -93,17 +134,31 @@ function RankingTV() {
         />
       </div>
 
-      {/* Header */}
+      {/* Balloons overlay when meta hit */}
+      {balloons.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-[200] overflow-hidden">
+          {balloons.map((b) => (
+            <div
+              key={b.id}
+              className="balloon absolute"
+              style={{ left: `${b.left}%`, animationDelay: `${b.delay}s`, bottom: 0 }}
+            >
+              <svg width="48" height="64" viewBox="0 0 48 64">
+                <ellipse cx="24" cy="22" rx="20" ry="24" fill={b.color} opacity="0.95" />
+                <ellipse cx="18" cy="14" rx="6" ry="4" fill="white" opacity="0.35" />
+                <path d="M24 46 L22 50 L26 50 Z" fill={b.color} />
+                <path d="M24 50 Q22 56 24 64" stroke="white" strokeOpacity="0.4" strokeWidth="1" fill="none" />
+              </svg>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hitFlash && <div className="flash-overlay pointer-events-none absolute inset-0 z-[150]" />}
+
+      {/* Header (no back button — TV mode) */}
       <header className="relative z-10 flex items-center justify-between px-10 pt-6">
         <div className="flex items-center gap-4">
-          <Link
-            to="/ranking"
-            className="group flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-black uppercase tracking-[0.25em] text-white/60 backdrop-blur-xl transition hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-400"
-            title="Voltar (Esc)"
-          >
-            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-            Sair
-          </Link>
           <div className="relative">
             <div className="absolute inset-0 animate-pulse rounded-full bg-emerald-400/30 blur-xl" />
             <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 backdrop-blur-xl">
@@ -157,77 +212,64 @@ function RankingTV() {
 
       {/* Meta progress */}
       <div className="relative z-10 mx-10 mt-4">
-        {(() => {
-          const meta = period === "hoje" ? metaHoje : metaMes;
-          const setMeta = period === "hoje" ? setMetaHoje : setMetaMes;
-          const storageKey = period === "hoje" ? "rankingtv.meta.hoje" : "rankingtv.meta.mes";
-          const fat = data?.totalFaturamento ?? 0;
-          const pct = meta > 0 ? Math.min(100, (fat / meta) * 100) : 0;
-          const falta = Math.max(0, meta - fat);
-          const batido = fat >= meta && meta > 0;
-          return (
-            <div className={`rounded-2xl border p-4 backdrop-blur-xl ${batido ? "border-emerald-400/40 bg-emerald-400/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <Trophy className={`h-4 w-4 ${batido ? "text-emerald-400" : "text-white/40"}`} />
-                  <p className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-white/60">
-                    Meta {period === "hoje" ? "do dia" : "do mês"}
-                  </p>
-                  {batido && (
-                    <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[0.55rem] font-black uppercase tracking-widest text-emerald-300">
-                      Batida!
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 text-right">
-                  {editMeta ? (
-                    <input
-                      type="number"
-                      defaultValue={meta}
-                      autoFocus
-                      onBlur={(e) => {
-                        const v = Number(e.target.value) || 0;
-                        setMeta(v);
-                        localStorage.setItem(storageKey, String(v));
-                        setEditMeta(false);
-                      }}
-                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      className="w-32 rounded-lg border border-white/20 bg-black/40 px-2 py-1 text-right font-mono text-sm text-white"
-                    />
-                  ) : (
-                    <button
-                      onClick={() => setEditMeta(true)}
-                      className="font-mono text-sm font-black tabular-nums text-white/80 hover:text-emerald-300"
-                      title="Editar meta"
-                    >
-                      {BRL(fat)} <span className="text-white/30">/</span> {BRL(meta)}
-                    </button>
-                  )}
-                  <span className={`font-mono text-lg font-black tabular-nums ${batido ? "text-emerald-300" : "text-white"}`}>
-                    {pct.toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${batido ? "bg-gradient-to-r from-emerald-400 to-cyan-300 shadow-[0_0_20px_rgba(74,222,128,0.6)]" : "bg-gradient-to-r from-emerald-400 to-cyan-400"}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              {!batido && (
-                <p className="mt-2 text-[0.6rem] uppercase tracking-widest text-white/40">
-                  Faltam <span className="font-mono font-black text-white/70">{BRL(falta)}</span> para bater
-                </p>
+        <div className={`rounded-2xl border p-4 backdrop-blur-xl ${batido ? "border-emerald-400/50 bg-emerald-400/[0.08] shadow-[0_0_40px_rgba(74,222,128,0.25)]" : "border-white/10 bg-white/[0.02]"}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Target className={`h-4 w-4 ${batido ? "text-emerald-400" : "text-white/40"}`} />
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-white/60">
+                Meta {period === "hoje" ? "do dia" : "do mês"}
+              </p>
+              {batido && (
+                <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[0.55rem] font-black uppercase tracking-widest text-emerald-300 animate-pulse">
+                  🎈 Estourou o balão!
+                </span>
               )}
             </div>
-          );
-        })()}
+            <div className="flex items-center gap-3 text-right">
+              {editMeta ? (
+                <input
+                  type="number"
+                  defaultValue={meta}
+                  autoFocus
+                  onBlur={(e) => {
+                    const v = Number(e.target.value) || 0;
+                    setMeta(v);
+                    localStorage.setItem(storageKey, String(v));
+                    setEditMeta(false);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                  className="w-32 rounded-lg border border-white/20 bg-black/40 px-2 py-1 text-right font-mono text-sm text-white"
+                />
+              ) : (
+                <button
+                  onClick={() => setEditMeta(true)}
+                  className="font-mono text-sm font-black tabular-nums text-white/80 hover:text-emerald-300"
+                  title="Editar meta"
+                >
+                  {BRL(fat)} <span className="text-white/30">/</span> {BRL(meta)}
+                </button>
+              )}
+              <span className={`font-mono text-lg font-black tabular-nums ${batido ? "text-emerald-300" : "text-white"}`}>
+                {pct.toFixed(0)}%
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${batido ? "bg-gradient-to-r from-emerald-400 to-cyan-300 shadow-[0_0_20px_rgba(74,222,128,0.6)]" : "bg-gradient-to-r from-emerald-400 to-cyan-400"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {!batido && (
+            <p className="mt-2 text-[0.6rem] uppercase tracking-widest text-white/40">
+              Faltam <span className="font-mono font-black text-white/70">{BRL(falta)}</span> para estourar o balão
+            </p>
+          )}
+        </div>
       </div>
-
 
       {/* Podium + list */}
       <div className="relative z-10 grid flex-1 grid-cols-12 gap-6 px-10 pb-8 pt-6" style={{ height: "calc(100vh - 240px)" }}>
-        {/* Podium */}
         <section className="col-span-7 flex items-end justify-center gap-5">
           {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[55%]" />}
           {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[78%]" />}
@@ -239,7 +281,6 @@ function RankingTV() {
           )}
         </section>
 
-        {/* Lista */}
         <section className="col-span-5 flex flex-col gap-2 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur-xl">
           <header className="flex items-center justify-between px-2 pb-2">
             <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white/60">
@@ -293,7 +334,7 @@ function StatPill({
   );
 }
 
-function PodiumCard({ item, position, height }: { item: RankingItem; position: 1 | 2 | 3; height: string }) {
+function PodiumCard({ item, position, height }: { item: PublicRankingItem; position: 1 | 2 | 3; height: string }) {
   const cfg = {
     1: {
       ring: "ring-amber-400/60",
@@ -329,14 +370,12 @@ function PodiumCard({ item, position, height }: { item: RankingItem; position: 1
   return (
     <div className={`relative flex w-full max-w-[260px] flex-col items-center ${height}`}>
       <div className={`flex flex-1 flex-col items-center justify-start gap-3 rounded-t-3xl border border-white/10 bg-gradient-to-b ${cfg.bg} via-white/[0.03] to-transparent p-5 backdrop-blur-xl ${cfg.glow}`}>
-        {/* Position badge */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2">
           <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/20 bg-black/80 backdrop-blur-xl ${cfg.labelColor}`}>
             <span className="font-mono text-lg font-black">{position}</span>
           </div>
         </div>
 
-        {/* Avatar */}
         <div className={`relative mt-4 ${position === 1 ? "h-28 w-28" : "h-20 w-20"}`}>
           {position === 1 && (
             <div className="absolute -top-8 left-1/2 -translate-x-1/2 animate-bounce">{cfg.icon}</div>
@@ -349,7 +388,6 @@ function PodiumCard({ item, position, height }: { item: RankingItem; position: 1
           />
         </div>
 
-        {/* Info */}
         <div className="text-center">
           <p className={`text-[0.55rem] font-black uppercase tracking-[0.3em] ${cfg.labelColor}`}>
             {cfg.label}
@@ -364,7 +402,6 @@ function PodiumCard({ item, position, height }: { item: RankingItem; position: 1
           )}
         </div>
 
-        {/* Fat */}
         <div className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-center">
           <p className="text-[0.55rem] font-bold uppercase tracking-[0.25em] text-white/40">
             Faturamento
@@ -378,13 +415,12 @@ function PodiumCard({ item, position, height }: { item: RankingItem; position: 1
         </div>
       </div>
 
-      {/* Podium base */}
       <div className={`h-3 w-full rounded-b-xl ${cfg.bar}`} />
     </div>
   );
 }
 
-function ListRow({ item, position }: { item: RankingItem; position: number }) {
+function ListRow({ item, position }: { item: PublicRankingItem; position: number }) {
   const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0f172a&color=fff`;
   return (
     <div className="group flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-400/[0.03]">
