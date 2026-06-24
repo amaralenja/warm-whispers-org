@@ -470,8 +470,8 @@ function RankingTV() {
               <span className="ml-auto text-[0.52rem] tracking-[0.18em] text-neutral-600">destaques</span>
             </header>
             <div className="space-y-2">
-              <HallCard label="Lobo do X1" sub="Maior ticket médio" item={hallOfFame.lobo} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} />
-              <HallCard label="Rainha do X1" sub="Mais vendas no dia" item={hallOfFame.rainha} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} />
+              <HallCard label="Lobo do X1" item={hallData?.lobo ?? null} prox={hallData?.proxLobo ?? null} meta={hallData?.metaLobo ?? 18000} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} emptyHint="Em busca do Lobo" />
+              <HallCard label="Rainha do X1" item={hallData?.rainha ?? null} prox={hallData?.proxRainha ?? null} meta={hallData?.metaRainha ?? 20000} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} emptyHint="Em busca da Rainha" />
             </div>
           </section>
         </aside>
