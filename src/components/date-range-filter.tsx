@@ -16,13 +16,22 @@ function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function todayUTC() {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+/** Retorna a data "hoje" no fuso de São Paulo como Date UTC (00:00). */
+function todayBR() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = +parts.find((p) => p.type === "year")!.value;
+  const m = +parts.find((p) => p.type === "month")!.value;
+  const d = +parts.find((p) => p.type === "day")!.value;
+  return new Date(Date.UTC(y, m - 1, d));
 }
 
 export function computeRange(preset: RangePreset): DateRangeValue {
-  const today = todayUTC();
+  const today = todayBR();
   if (preset === "hoje") return { preset, from: iso(today), to: iso(today) };
   if (preset === "ontem") {
     const y = new Date(today); y.setUTCDate(y.getUTCDate() - 1);
