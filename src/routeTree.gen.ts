@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as AuthenticatedRankingTvRouteImport } from './routes/_authenticated/ranking-tv'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
@@ -35,6 +36,11 @@ const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRankingTvRoute = AuthenticatedRankingTvRouteImport.update({
+  id: '/ranking-tv',
+  path: '/ranking-tv',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedRankingRoute = AuthenticatedRankingRouteImport.update({
   id: '/ranking',
   path: '/ranking',
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/ranking': typeof AuthenticatedRankingRoute
+  '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRoutesByTo {
@@ -58,6 +65,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/ranking': typeof AuthenticatedRankingRoute
+  '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRoutesById {
@@ -67,13 +75,20 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
+  '/_authenticated/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/ranking' | '/relatorios'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/ranking'
+    | '/ranking-tv'
+    | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/ranking' | '/relatorios'
+  to: '/' | '/auth' | '/dashboard' | '/ranking' | '/ranking-tv' | '/relatorios'
   id:
     | '__root__'
     | '/'
@@ -81,6 +96,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard'
     | '/_authenticated/ranking'
+    | '/_authenticated/ranking-tv'
     | '/_authenticated/relatorios'
   fileRoutesById: FileRoutesById
 }
@@ -120,6 +136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ranking-tv': {
+      id: '/_authenticated/ranking-tv'
+      path: '/ranking-tv'
+      fullPath: '/ranking-tv'
+      preLoaderRoute: typeof AuthenticatedRankingTvRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ranking': {
       id: '/_authenticated/ranking'
       path: '/ranking'
@@ -140,12 +163,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
+  AuthenticatedRankingTvRoute: typeof AuthenticatedRankingTvRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
+  AuthenticatedRankingTvRoute: AuthenticatedRankingTvRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
 }
 
