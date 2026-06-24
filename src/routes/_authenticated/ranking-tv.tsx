@@ -79,6 +79,14 @@ function RankingTV() {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-10 pt-6">
         <div className="flex items-center gap-4">
+          <Link
+            to="/ranking"
+            className="group flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-black uppercase tracking-[0.25em] text-white/60 backdrop-blur-xl transition hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-400"
+            title="Voltar (Esc)"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            Sair
+          </Link>
           <div className="relative">
             <div className="absolute inset-0 animate-pulse rounded-full bg-emerald-400/30 blur-xl" />
             <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 backdrop-blur-xl">
