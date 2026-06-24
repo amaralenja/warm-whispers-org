@@ -120,13 +120,8 @@ function RootShell({ children }: { children?: ReactNode } = {}) {
 const fallbackQueryClient = new QueryClient();
 
 function RootComponent() {
-  let queryClient: QueryClient = fallbackQueryClient;
-  try {
-    const ctx = Route.useRouteContext();
-    if (ctx?.queryClient) queryClient = ctx.queryClient;
-  } catch {
-    // contexto ainda não pronto — usa fallback
-  }
+  const ctx = Route.useRouteContext();
+  const queryClient = ctx?.queryClient ?? fallbackQueryClient;
 
   return (
     <QueryClientProvider client={queryClient}>
