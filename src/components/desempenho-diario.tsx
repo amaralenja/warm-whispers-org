@@ -199,11 +199,10 @@ export function DesempenhoDiario({
               <path
                 d={linePath}
                 fill="none"
-                stroke="url(#dd-line)"
-                strokeWidth={2.5}
+                stroke="#10b981"
+                strokeWidth={1.75}
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                filter="url(#dd-glow)"
               />
 
               {/* pontos */}
