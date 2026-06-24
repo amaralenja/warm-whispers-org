@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { WorkspaceProvider } from "@/lib/workspace-context";
-import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
