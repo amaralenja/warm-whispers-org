@@ -224,6 +224,13 @@ function Dashboard() {
 
             {/* Participação por vendedor */}
             <ParticipacaoVendedores vendedores={data?.vendedores ?? []} loading={isLoading} />
+
+            {/* Vendas Reembolsadas */}
+            <ReembolsosList
+              reembolsos={data?.reembolsos ?? []}
+              totalValor={data?.totalValorReembolsado ?? 0}
+              loading={isLoading}
+            />
           </TabsContent>
         </Tabs>
       </div>
