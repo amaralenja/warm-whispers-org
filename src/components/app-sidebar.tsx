@@ -1,6 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, LogOut } from "lucide-react";
+import { LayoutDashboard, LineChart, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -20,6 +20,7 @@ import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Relatórios", url: "/relatorios", icon: LineChart },
 ];
 
 export function AppSidebar() {
