@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Crown, Flame, Trophy, Medal, Sparkles, Radio, TrendingUp } from "lucide-react";
+import { Crown, Flame, Trophy, Medal, Sparkles, Radio, TrendingUp, ArrowLeft } from "lucide-react";
 import { getRankingStats, type RankingItem } from "@/lib/ranking.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 
