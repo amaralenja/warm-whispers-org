@@ -102,7 +102,10 @@ function classifyOpByUtm(raw: unknown): string | null {
 export const getOperacoesStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: DateRange | undefined) => input ?? {})
-  .handler(async ({ context, data }): Promise<OperacoesPayload> => {
+  .handler(async (opts): Promise<OperacoesPayload> => {
+    const context = opts?.context;
+    const data = opts?.data ?? {};
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const { supabase } = context;
     const expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
@@ -214,8 +217,6 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return getRefundExpert(r) === expertFilter;
     });
 
-    const now = new Date();
-    const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
     const gastosMes = financeiroAll
       .filter((f: any) => {
         const tipo = String(f.tipo ?? "").toLowerCase();
