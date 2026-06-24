@@ -21,12 +21,8 @@ export const Route = createFileRoute("/_authenticated/meta-ads")({
 });
 
 const EVENTS = [
-  { name: "PageView", desc: "Visualização de página" },
-  { name: "ViewContent", desc: "Visualização de conteúdo" },
-  { name: "Lead", desc: "Lead capturado" },
-  { name: "InitiateCheckout", desc: "Início de checkout" },
-  { name: "Purchase", desc: "Compra realizada" },
-  { name: "CompleteRegistration", desc: "Cadastro completo" },
+  { name: "Purchase", desc: "Venda fechada (com valor R$)", needsValue: true },
+  { name: "ShowUp", desc: "Comparecimento na call", needsValue: false },
 ];
 
 function MetaAdsPage() {
