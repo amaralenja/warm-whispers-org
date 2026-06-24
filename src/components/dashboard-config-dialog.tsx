@@ -53,11 +53,13 @@ export function DashboardConfigDialog({ open, onOpenChange, experts, scoped, sco
   }
 
   function handleSave() {
+    const mergedShare = { ...config.sharePct };
     for (const e of list) {
       const desired = draft.sharePct[e.nome] ?? getShare(e.nome);
-      setShare(e.nome, desired);
+      mergedShare[e.nome] = Math.max(0, Math.min(100, Math.round(desired)));
     }
     update({
+      sharePct: mergedShare,
       includeHighTicket: draft.includeHighTicket,
       showFinanceiro: draft.showFinanceiro,
       showGastosCard: draft.showGastosCard,
