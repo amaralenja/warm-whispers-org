@@ -205,29 +205,18 @@ function RankingTV() {
       clearTimeout(t2);
     };
   }, [metaLogs]);
-  // === DERIVAÇÕES EXTRAS (Metas Coletivas / Hall of Fame / Balões) ===
-  const metasColetivas = useMemo(() => {
-    const map = new Map<string, { expert: string; faturamento: number; meta: number; vendas: number }>();
-    ranking.forEach((r) => {
-      const exp = (r.expert ?? "—").toUpperCase();
-      const cur = map.get(exp) ?? { expert: exp, faturamento: 0, meta: 0, vendas: 0 };
-      cur.faturamento += r.faturamento;
-      cur.meta += r.meta * 30; // meta diária * 30 = meta mensal estimada
-      cur.vendas += r.vendas;
-      map.set(exp, cur);
-    });
-    return Array.from(map.values())
-      .filter((m) => m.expert !== "—")
-      .sort((a, b) => b.faturamento - a.faturamento)
-      .map((m) => {
-        const pct = m.meta > 0 ? Math.min(100, (m.faturamento / m.meta) * 100) : 0;
-        // sistema de níveis: 25/50/75/100% = N1/N2/N3/N4
-        const nivel = pct >= 100 ? 4 : pct >= 75 ? 3 : pct >= 50 ? 2 : 1;
-        const proxLimite = nivel >= 4 ? m.meta : (nivel / 4) * m.meta;
-        const faltaProx = Math.max(0, proxLimite - m.faturamento);
-        return { ...m, pct, nivel, faltaProx };
-      });
-  }, [ranking]);
+  // === Metas Coletivas (POR OPERAÇÃO / EXPERT, no mês) — vem da RPC ===
+  const { data: coletivasData } = useQuery<ColetivaItem[]>({
+    queryKey: ["metas-coletivas-mes"],
+    queryFn: async () => {
+      const { data: r, error } = await supabase.rpc("get_metas_coletivas_mes");
+      if (error) throw error;
+      return (r ?? []) as unknown as ColetivaItem[];
+    },
+    refetchInterval: 30_000,
+  });
+  const metasColetivas = coletivasData ?? [];
+
 
   // Hall of Fame mensal vem de RPC dedicada (lobo = homem 18k+, rainha = mulher 20k+)
   const { data: hallData } = useQuery<HallOfFamePayload>({
