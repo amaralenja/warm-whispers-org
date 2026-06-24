@@ -79,9 +79,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const rawList = localStorage.getItem(LIST_KEY);
-      if (rawList) setCustom(JSON.parse(rawList));
+      if (rawList) {
+        const parsed = JSON.parse(rawList);
+        if (Array.isArray(parsed)) setCustom(parsed);
+      }
       const rawOver = localStorage.getItem(OVERRIDES_KEY);
-      if (rawOver) setOverrides(JSON.parse(rawOver));
+      if (rawOver) {
+        const parsed = JSON.parse(rawOver);
+        if (parsed && typeof parsed === "object") setOverrides(parsed);
+      }
       const saved = localStorage.getItem(ACTIVE_KEY);
       if (saved) setActiveId(saved);
     } catch {}
@@ -100,14 +106,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }
 
   const baseWithOverrides = BASE_WORKSPACES.map(applyOverride);
-  const customResolved: Workspace[] = custom.map((p) => ({
-    id: p.id,
-    nome: p.nome,
-    accentIndex: p.accentIndex,
-    accent: ACCENTS[p.accentIndex % ACCENTS.length],
-    photo: p.photo ?? null,
-    custom: true,
-  }));
+  const customResolved: Workspace[] = (custom ?? [])
+    .filter((p) => p && typeof p.id === "string" && typeof p.nome === "string")
+    .map((p) => {
+      const idx = typeof p.accentIndex === "number" && p.accentIndex >= 0 ? p.accentIndex : 0;
+      return {
+        id: p.id,
+        nome: p.nome,
+        accentIndex: idx,
+        accent: ACCENTS[idx % ACCENTS.length] ?? ACCENTS[0],
+        photo: p.photo ?? null,
+        custom: true,
+      };
+    });
   const workspaces = [...baseWithOverrides, ...customResolved];
   const workspace = workspaces.find((w) => w.id === activeId) ?? workspaces[0];
 

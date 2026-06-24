@@ -35,12 +35,15 @@ export function WorkspaceSwitcher() {
     setOpen(false);
   }
 
+  const hex = workspace?.accent?.hex ?? "#e94560";
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="group flex w-full items-center gap-3 rounded-lg border border-border bg-card/40 px-3 py-2 text-left transition-colors hover:bg-card"
+          style={{ ["--ws-accent" as any]: hex }}
+          className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-border bg-card/40 px-3 py-2 text-left transition-all hover:border-[color:var(--ws-accent)]/40 hover:bg-[color:var(--ws-accent)]/[0.06] hover:shadow-[inset_0_0_0_1px_var(--ws-accent)]/20"
         >
           <Avatar ws={workspace} size={36} />
           <div className="min-w-0 flex-1">
@@ -48,10 +51,10 @@ export function WorkspaceSwitcher() {
               Workspace
             </div>
             <div className="truncate text-sm font-medium text-foreground">
-              {workspace.nome}
+              {workspace?.nome}
             </div>
           </div>
-          <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronsUpDown className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-[color:var(--ws-accent)]" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-80 border-border bg-popover p-1">
@@ -63,11 +66,12 @@ export function WorkspaceSwitcher() {
 
         <div className="max-h-[60vh] overflow-y-auto">
           {workspaces.map((w) => {
-            const active = w.id === workspace.id;
+            const active = w.id === workspace?.id;
             const isEditing = editingId === w.id;
+            const wHex = w.accent?.hex ?? "#e94560";
             return (
-              <div key={w.id} className={`rounded-md ${active ? "bg-secondary/30" : ""}`}>
-                <div className="group/item flex items-center gap-2 px-1 transition-colors hover:bg-secondary/50 rounded-md">
+              <div key={w.id} style={{ ["--ws-accent" as any]: wHex }} className={`rounded-md ${active ? "bg-[color:var(--ws-accent)]/[0.08]" : ""}`}>
+                <div className="group/item flex items-center gap-2 px-1 transition-colors hover:bg-[color:var(--ws-accent)]/[0.07] rounded-md">
                   <button
                     type="button"
                     onClick={() => {
