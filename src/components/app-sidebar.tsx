@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import logoMultium from "@/assets/logo-multium.webp.asset.json";
+import logoMultium from "@/assets/logo-multium.webp";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 const items = [
