@@ -1,6 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, LineChart, LogOut } from "lucide-react";
+import { LayoutDashboard, LineChart, Trophy, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
