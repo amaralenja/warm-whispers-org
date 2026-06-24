@@ -93,6 +93,11 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
+      <div className="px-2 pb-2">
+        {!collapsed && <WorkspaceSwitcher />}
+      </div>
+
+
       <SidebarFooter className="border-t border-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
