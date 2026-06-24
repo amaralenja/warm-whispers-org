@@ -65,6 +65,18 @@ export function DateRangeFilter({
   onChange: (v: DateRangeValue) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<RDPRange | undefined>(() => ({
+    from: parseISO(value.from),
+    to: parseISO(value.to),
+  }));
+
+  // Sincroniza quando abre o popover ou quando value muda externamente
+  useEffect(() => {
+    if (open) {
+      setPending({ from: parseISO(value.from), to: parseISO(value.to) });
+    }
+  }, [open, value.from, value.to]);
+
 
   const subtitle = useMemo(() => {
     if (!value.from || !value.to) return "Selecione um período";
