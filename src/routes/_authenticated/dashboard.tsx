@@ -30,9 +30,11 @@ const EXPERT_ACCENT: Record<string, string> = {
 function Dashboard() {
   const { user } = useRouteContext({ from: "/_authenticated" });
   const { workspace } = useWorkspace();
+  const { config, getShare } = useDashboardConfig();
   const fetchOps = useServerFn(getOperacoesStats);
 
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
+  const [configOpen, setConfigOpen] = useState(false);
 
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
@@ -56,7 +58,13 @@ function Dashboard() {
     : visibleExperts.reduce((a, e) => a + e.reembolsos, 0);
   const tmGeral = totalVendas ? totalFat / totalVendas : 0;
   const gastosMes = data?.gastosMes ?? 0;
-  const saldoEstimado = totalFat - gastosMes;
+
+  // Nossa parte = soma do faturamento × % de cada expert visível
+  const nossaParte = visibleExperts.reduce(
+    (acc, e) => acc + e.faturamento * (getShare(e.nome) / 100),
+    0,
+  );
+  const saldoEstimado = nossaParte - gastosMes;
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
