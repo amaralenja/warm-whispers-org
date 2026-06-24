@@ -144,27 +144,15 @@ export function DesempenhoDiario({
             <svg
               viewBox={`0 0 ${W} ${H}`}
               className="h-64 w-full"
-              preserveAspectRatio="none"
+              preserveAspectRatio="xMidYMid meet"
               onMouseMove={handleMove}
               onMouseLeave={() => setHover(null)}
             >
               <defs>
                 <linearGradient id="dd-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.55" />
-                  <stop offset="60%" stopColor="#10b981" stopOpacity="0.12" />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.22" />
                   <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
                 </linearGradient>
-                <linearGradient id="dd-line" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#34d399" />
-                  <stop offset="100%" stopColor="#10b981" />
-                </linearGradient>
-                <filter id="dd-glow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
               </defs>
 
               {/* grade horizontal */}
