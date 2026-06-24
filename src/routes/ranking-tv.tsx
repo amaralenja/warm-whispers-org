@@ -728,20 +728,21 @@ function MetaLogRow({ log }: { log: MetaLog }) {
   );
 }
 
-type ColetivaItem = { expert: string; faturamento: number; meta: number; vendas: number; pct: number; nivel: number; faltaProx: number };
+type ColetivaItem = { expert: string; faturamento: number; meta: number; vendas: number; pct: number; nivel: number; diasRestantes: number; necessarioSemana: number; faltam: number };
 
 function ColetivaRow({ m }: { m: ColetivaItem }) {
-  const nivelColors = ["", "text-amber-400 border-amber-400/30", "text-emerald-400 border-emerald-400/30", "text-sky-400 border-sky-400/30", "text-violet-400 border-violet-400/30"];
+  const nivelColors = ["text-neutral-500 border-white/[.06]", "text-amber-400 border-amber-400/30", "text-emerald-400 border-emerald-400/30", "text-sky-400 border-sky-400/30", "text-violet-400 border-violet-400/30"];
+  const nomeUp = (m.expert || "").toUpperCase();
   return (
     <div className="rounded border border-white/[.04] bg-white/[.012] p-2.5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold text-neutral-200">{m.expert} MENSAL</p>
+          <p className="text-xs font-semibold text-neutral-200">{nomeUp} MENSAL</p>
           <p className="font-mono text-base font-light tabular-nums text-emerald-400">{BRL(m.faturamento)}</p>
         </div>
         <div className="text-right">
-          <span className={`inline-block rounded border px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider ${nivelColors[m.nivel]}`}>
-            Nível {m.nivel}
+          <span className={`inline-block rounded border px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider ${nivelColors[m.nivel] ?? nivelColors[0]}`}>
+            Nível {m.nivel} ({Math.round(m.meta / 1000)}K)
           </span>
           <p className="mt-1 font-mono text-[0.7rem] font-semibold text-amber-400">{m.pct.toFixed(0)}%</p>
         </div>
@@ -750,11 +751,12 @@ function ColetivaRow({ m }: { m: ColetivaItem }) {
         <div className="h-full bg-emerald-500" style={{ width: `${m.pct}%` }} />
       </div>
       <p className="mt-1 text-[0.55rem] tracking-wide text-neutral-500">
-        {m.faltaProx > 0 ? <>Necessário p/ Nível {m.nivel + 1}: <span className="font-semibold text-neutral-300">{BRL(m.faltaProx)}</span></> : "Nível máximo!"}
+        Necessário p/ Nível {m.nivel} da semana: <span className="font-semibold text-neutral-300">{BRL(m.necessarioSemana)}</span> <span className="text-neutral-600">/ Dias restantes: {m.diasRestantes}</span>
       </p>
     </div>
   );
 }
+
 
 function HallCard({ label, item, prox, meta, highlight, icon, emptyHint }: { label: string; item: HallEntry | null; prox: HallProx | null; meta: number; highlight: "amber" | "rose"; icon: React.ReactNode; emptyHint: string }) {
   const tone = highlight === "amber" ? "text-amber-400 border-amber-400/30 bg-amber-400/[.04]" : "text-rose-400 border-rose-400/30 bg-rose-400/[.04]";
