@@ -286,6 +286,53 @@ function RankingTV() {
         </div>
       )}
 
+      {/* Pops de venda em tempo real */}
+      {salePops.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-[205] overflow-hidden">
+          {salePops.map((p) => (
+            <div
+              key={p.id}
+              className="sale-pop absolute"
+              style={{ left: `${p.left}%`, top: 0, transform: "translateX(-50%)" }}
+            >
+              <div className="relative -translate-x-1/2 flex flex-col items-center">
+                {/* Anéis */}
+                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-emerald-400/70" />
+                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-emerald-400/40" style={{ animationDelay: "0.25s" }} />
+                {/* Moedas */}
+                {Array.from({ length: 8 }).map((_, i) => {
+                  const angle = (i / 8) * Math.PI * 2;
+                  const dist = 90;
+                  const cx = Math.cos(angle) * dist;
+                  const cy = Math.sin(angle) * dist - 20;
+                  return (
+                    <span
+                      key={i}
+                      className="sale-coin absolute top-10 h-3 w-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,.8)]"
+                      style={{ ["--cx" as string]: `${cx}px`, ["--cy" as string]: `${cy}px`, animationDelay: `${i * 0.04}s` } as React.CSSProperties}
+                    />
+                  );
+                })}
+                {/* Avatar */}
+                <div className="relative">
+                  <img
+                    src={p.avatar}
+                    alt={p.nome}
+                    className="relative h-20 w-20 rounded-full object-cover ring-4 ring-emerald-500 ring-offset-4 ring-offset-[#0a0a0c] shadow-[0_0_30px_rgba(16,185,129,.6)]"
+                  />
+                </div>
+                {/* Label */}
+                <div className="mt-3 rounded-md border border-emerald-500/40 bg-[#0d1411]/95 px-3 py-1.5 text-center shadow-[0_8px_30px_-8px_rgba(16,185,129,.5)] backdrop-blur-sm">
+                  <p className="text-[0.55rem] font-bold uppercase tracking-[0.28em] text-emerald-400">+ venda</p>
+                  <p className="font-mono text-base font-bold text-emerald-300">{BRL(p.ticket)}</p>
+                  <p className="mt-0.5 truncate text-[0.65rem] font-semibold text-neutral-200">{p.nome}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* HEADER sóbrio */}
       <header className={`relative z-10 flex h-[80px] items-center justify-between border-b border-white/[.04] px-10 ${pulseFlash ? "header-pulse" : ""}`}>
         <div className="flex items-center gap-4">
