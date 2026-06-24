@@ -67,6 +67,7 @@ function Financeiro() {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Lancamento | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [tab, setTab] = useState<"lancamentos" | "relatorios" | "dre">("lancamentos");
 
   const rowsMes = useMemo(() => all.filter((r) => yearMon(r.data_ref) === mes), [all, mes]);
 
