@@ -71,7 +71,7 @@ function Dashboard() {
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
       <div className="mx-auto max-w-7xl px-8 py-10">
         {/* Header */}
-        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
+        <div className="flex flex-wrap items-start justify-between gap-6 border-b border-border pb-6">
           <div>
             <p className={`text-[0.65rem] uppercase tracking-[0.28em] ${workspace.accent.text}`}>
               — {workspace.id === "all" ? "Visão geral" : `Squad · ${workspace.nome}`}
@@ -80,12 +80,12 @@ function Dashboard() {
               Boa, <em className="text-accent">{user?.email?.split("@")[0]}</em>.
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <DateRangeFilter value={range} onChange={setRange} />
             <button
               type="button"
               onClick={() => setConfigOpen(true)}
-              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary/50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/40 px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
               title={workspace.id === "all" ? "Configurar todas as operações" : `Configurar ${workspace.nome}`}
             >
               <Settings className="h-3.5 w-3.5" />
