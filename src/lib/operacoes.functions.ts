@@ -3,8 +3,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 function parseTicket(raw: unknown): number {
   if (raw == null) return 0;
-  const s = String(raw).replace(/[R$\s]/g, "").replace(/\./g, "").replace(",", ".");
-  const n = Number(s);
+  let s = String(raw).replace(/R\$\s?/g, "").replace(/\s/g, "").trim();
+  const hasDot = s.includes(".");
+  const hasComma = s.includes(",");
+  if (hasDot && hasComma) {
+    s = s.lastIndexOf(",") > s.lastIndexOf(".")
+      ? s.replace(/\./g, "").replace(",", ".")
+      : s.replace(/,/g, "");
+  } else if (hasComma) {
+    const after = s.split(",")[1] || "";
+    s = after.length <= 2 ? s.replace(",", ".") : s.replace(/,/g, "");
+  } else if (hasDot) {
+    const after = s.split(".").pop() || "";
+    if (after.length === 3) s = s.replace(/\./g, "");
+  }
+  const n = Number.parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -75,10 +88,24 @@ export type OperacoesPayload = {
 
 export type DateRange = { from?: string | null; to?: string | null; expert?: string | null };
 
+const CAIO_UTMS = ["GC", "BP"];
+const GUSTAVO_UTMS = ["LS", "LF"];
+
+function classifyOpByUtm(raw: unknown): string | null {
+  const utm = String(raw ?? "").trim().toUpperCase();
+  if (!utm) return null;
+  if (CAIO_UTMS.some((prefix) => utm.startsWith(prefix))) return "Caio";
+  if (GUSTAVO_UTMS.some((prefix) => utm.startsWith(prefix))) return "Gustavo";
+  return null;
+}
+
 export const getOperacoesStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: DateRange | undefined) => input ?? {})
-  .handler(async ({ context, data }): Promise<OperacoesPayload> => {
+  .handler(async (opts): Promise<OperacoesPayload> => {
+    const context = opts?.context;
+    const data = opts?.data ?? {};
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const { supabase } = context;
     const expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
@@ -104,10 +131,14 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       fetchAll<any>((from, to) =>
-        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto"').range(from, to),
+        supabase
+          .from("vendas")
+          .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento"')
+          .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+          .range(from, to),
       ),
       fetchAll<any>((from, to) =>
-        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto"').range(from, to),
+        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source').range(from, to),
       ),
       fetchAll<any>((from, to) =>
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
@@ -147,19 +178,10 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return true;
     };
 
-    // IDs de TODAS as vendas reembolsadas (independente do período do reembolso)
-    const reembolsadasIds = new Set<string>(
-      (reembolsosAll as any[])
-        .map((r) => String(r["ID da Venda"] ?? ""))
-        .filter(Boolean),
-    );
-    const isReembolsada = (v: any) =>
-      reembolsadasIds.has(String(v["ID de Referência"] ?? ""));
-
-    // Filtra vendas pelo período + remove reembolsadas + EXIGE produto mapeado (=dashboard antigo)
+    // Filtra vendas aprovadas pelo período + EXIGE produto mapeado (=dashboard antigo)
     // Atribui expert via produtos_map (sobrescreve nome_expert)
     const vendasPeriodo = vendasAll
-      .filter((v: any) => inRange(parseDataField(v.Data)) && !isReembolsada(v))
+      .filter((v: any) => inRange(parseDataField(v.Data)))
       .map((v: any) => {
         const mapped = lookupProduto(v);
         if (!mapped) return null;
@@ -181,16 +203,25 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       }
     }
 
+    const getRefundExpert = (r: any) =>
+      classifyOpByUtm(r.utm_source) ??
+      classifyOpByUtm(r["UTM Source"]) ??
+      classifyOpByUtm(r.UTM) ??
+      lookupProduto(r)?.expert ??
+      vendaToExpert.get(String(r["ID da Venda"] ?? "")) ??
+      null;
+
     const reembolsos = reembolsosAll.filter((r: any) => {
       if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
       if (!expertFilter) return true;
-      return vendaToExpert.get(String(r["ID da Venda"])) === expertFilter;
+      return getRefundExpert(r) === expertFilter;
     });
 
-    const now = new Date();
-    const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
     const gastosMes = financeiroAll
-      .filter((f: any) => (f.tipo === "saida" || f.tipo === "despesa") && String(f.data_ref ?? "").startsWith(ym))
+      .filter((f: any) => {
+        const tipo = String(f.tipo ?? "").toLowerCase();
+        return (tipo === "gasto" || tipo === "saida" || tipo === "despesa") && inRange(parseDataField(f.data_ref));
+      })
       .reduce((acc, f: any) => acc + Number(f.valor ?? 0), 0);
 
     const totalFaturamento = vendasScoped.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
@@ -202,13 +233,13 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       const vds = vendasPeriodo.filter((v: any) => v._expert === e.nome);
       const faturamento = vds.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
       const vendasCount = vds.length;
-      // Ticket Médio: só vendas "main" com ticket >= 97 (igual ao antigo)
-      const vdsTm = vds.filter((v: any) => v._tipo === "main" && parseTicket(v.Ticket) >= TICKET_MIN);
+      // Ticket Médio: só vendas com ticket >= 97 (igual ao antigo)
+      const vdsTm = vds.filter((v: any) => parseTicket(v.Ticket) >= TICKET_MIN);
       const fatTm = vdsTm.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
       const vendedoresCount = vendedoresRaw.filter((vd: any) => vd.expert === e.nome && vd.ativo).length;
       const reembolsosCount = reembolsosAll.filter((r: any) => {
         if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
-        return vendaToExpert.get(String(r["ID da Venda"])) === e.nome;
+        return getRefundExpert(r) === e.nome;
       }).length;
       const totalFatPeriodo = vendasPeriodo.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
       return {
@@ -289,8 +320,8 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     }
 
     const totalReembolsos = reembolsos.length;
-    // Ticket Médio Geral: aplica mesmo threshold de R$97 + apenas tipo "main"
-    const vendasTm = vendasScoped.filter((v: any) => v._tipo === "main" && parseTicket(v.Ticket) >= TICKET_MIN);
+    // Ticket Médio Geral: aplica mesmo threshold de R$97 do dashboard antigo
+    const vendasTm = vendasScoped.filter((v: any) => parseTicket(v.Ticket) >= TICKET_MIN);
     const fatTm = vendasTm.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
     const ticketMedioGeral = vendasTm.length ? fatTm / vendasTm.length : 0;
     const saldoEstimado = totalFaturamento - gastosMes;
@@ -302,7 +333,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       valor: parseTicket(r["Valor Base do Produto"]),
       dataVenda: asStrOrNull(r["Data da Venda"]),
       dataReembolso: asStrOrNull(r["Data do Reembolso"]),
-      expert: asStrOrNull(vendaToExpert.get(asStr(r["ID da Venda"]))),
+      expert: asStrOrNull(getRefundExpert(r)),
     })).sort((a, b) => (b.dataReembolso ?? "").localeCompare(a.dataReembolso ?? ""));
 
     const totalValorReembolsado = reembolsosList.reduce((a, r) => a + r.valor, 0);

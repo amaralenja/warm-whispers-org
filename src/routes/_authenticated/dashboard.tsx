@@ -34,7 +34,7 @@ function Dashboard() {
   const { config, getShare } = useDashboardConfig();
   const fetchOps = useServerFn(getOperacoesStats);
 
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("mes"));
   const [configOpen, setConfigOpen] = useState(false);
 
   const expertFilter = workspace.id === "all" ? null : workspace.id;
@@ -57,7 +57,7 @@ function Dashboard() {
   const totalReemb = workspace.id === "all"
     ? data?.totalReembolsos ?? 0
     : visibleExperts.reduce((a, e) => a + e.reembolsos, 0);
-  const tmGeral = totalVendas ? totalFat / totalVendas : 0;
+  const tmGeral = data?.ticketMedioGeral ?? 0;
   const gastosMes = data?.gastosMes ?? 0;
 
   // Nossa parte = soma do faturamento × % de cada expert visível

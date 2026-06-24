@@ -4,7 +4,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
-export type RangePreset = "hoje" | "ontem" | "7d" | "15d" | "30d" | "custom";
+export type RangePreset = "hoje" | "semana" | "mes" | "ano" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
@@ -33,15 +33,18 @@ function todayBR() {
 export function computeRange(preset: RangePreset): DateRangeValue {
   const today = todayBR();
   if (preset === "hoje") return { preset, from: iso(today), to: iso(today) };
-  if (preset === "ontem") {
-    const y = new Date(today); y.setUTCDate(y.getUTCDate() - 1);
-    return { preset, from: iso(y), to: iso(y) };
+  if (preset === "semana") {
+    const weekStart = new Date(today);
+    const day = weekStart.getUTCDay();
+    weekStart.setUTCDate(weekStart.getUTCDate() - day + (day === 0 ? -6 : 1));
+    return { preset, from: iso(weekStart), to: iso(today) };
   }
-  const daysMap: Record<string, number> = { "7d": 6, "15d": 14, "30d": 29 };
-  const back = daysMap[preset];
-  if (back != null) {
-    const from = new Date(today); from.setUTCDate(from.getUTCDate() - back);
-    return { preset, from: iso(from), to: iso(today) };
+  if (preset === "mes") {
+    const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    return { preset, from: iso(monthStart), to: iso(today) };
+  }
+  if (preset === "ano") {
+    return { preset, from: "2026-01-01", to: iso(today) };
   }
   // custom — caller fills from/to
   return { preset: "custom", from: iso(today), to: iso(today) };
@@ -49,10 +52,9 @@ export function computeRange(preset: RangePreset): DateRangeValue {
 
 const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "hoje", label: "Hoje" },
-  { id: "ontem", label: "Ontem" },
-  { id: "7d", label: "7 dias" },
-  { id: "15d", label: "15 dias" },
-  { id: "30d", label: "30 dias" },
+  { id: "semana", label: "Semana" },
+  { id: "mes", label: "Mês" },
+  { id: "ano", label: "2026" },
 ];
 
 function fmtBR(s: string) {
