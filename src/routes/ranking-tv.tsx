@@ -194,6 +194,63 @@ function RankingTV() {
       clearTimeout(t2);
     };
   }, [metaLogs]);
+  // === DERIVAÇÕES EXTRAS (Metas Coletivas / Hall of Fame / Balões) ===
+  const metasColetivas = useMemo(() => {
+    const map = new Map<string, { expert: string; faturamento: number; meta: number; vendas: number }>();
+    ranking.forEach((r) => {
+      const exp = (r.expert ?? "—").toUpperCase();
+      const cur = map.get(exp) ?? { expert: exp, faturamento: 0, meta: 0, vendas: 0 };
+      cur.faturamento += r.faturamento;
+      cur.meta += r.meta * 30; // meta diária * 30 = meta mensal estimada
+      cur.vendas += r.vendas;
+      map.set(exp, cur);
+    });
+    return Array.from(map.values())
+      .filter((m) => m.expert !== "—")
+      .sort((a, b) => b.faturamento - a.faturamento)
+      .map((m) => {
+        const pct = m.meta > 0 ? Math.min(100, (m.faturamento / m.meta) * 100) : 0;
+        // sistema de níveis: 25/50/75/100% = N1/N2/N3/N4
+        const nivel = pct >= 100 ? 4 : pct >= 75 ? 3 : pct >= 50 ? 2 : 1;
+        const proxLimite = nivel >= 4 ? m.meta : (nivel / 4) * m.meta;
+        const faltaProx = Math.max(0, proxLimite - m.faturamento);
+        return { ...m, pct, nivel, faltaProx };
+      });
+  }, [ranking]);
+
+  const hallOfFame = useMemo(() => {
+    const lobo = [...ranking].filter((r) => r.vendas > 0).sort((a, b) => b.ticketMedio - a.ticketMedio)[0];
+    const rainha = [...ranking].sort((a, b) => b.vendas - a.vendas)[0];
+    return { lobo, rainha };
+  }, [ranking]);
+
+  // Meta dos balões — 14 prêmios fixos; abrem na ordem das metas batidas
+  const baloes = useMemo<Array<{ premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" }>>(() => [
+    { premio: "NADA", sub: "Quase! Mas o foco continua!", tier: "nada" },
+    { premio: "NADA", sub: "Bateu na trave, guerreiro!", tier: "nada" },
+    { premio: "ESTOURE OUTRO BALÃO!", sub: "O universo te deu mais uma chance!", tier: "extra" },
+    { premio: "NADA", sub: "Fica triste não, amanhã tem mais!", tier: "nada" },
+    { premio: "NADA", sub: "Quase!", tier: "nada" },
+    { premio: "NADA", sub: "Vazio igual ao direct do concorrente kkk", tier: "nada" },
+    { premio: "PIX DE R$ 100,00 NA CONTA!", sub: "O prêmio de ouro!", tier: "ouro" },
+    { premio: "NADA", sub: "Segue o jogo, tubarão!", tier: "nada" },
+    { premio: "NADA", sub: "Não desiste!", tier: "nada" },
+    { premio: "NADA", sub: "O balão tava com preguiça hoje…", tier: "nada" },
+    { premio: "NADA", sub: "Passou perto!", tier: "nada" },
+    { premio: "VALE REDBULL OU BARRA DE CHOCOLATE", sub: "Pra dar aquele gás no fechamento!", tier: "vale" },
+    { premio: "NADA", sub: "O próximo vai ser o premiado!", tier: "nada" },
+    { premio: "PIX DE R$ 50,00 NA CONTA!", sub: "Bônus surpresa!", tier: "pix" },
+  ], []);
+  const baloesAbertos = Math.min(hitCount, baloes.length);
+  const totaisPremios = useMemo(() => {
+    const abertos = baloes.slice(0, baloesAbertos);
+    return {
+      pix: abertos.filter((b) => b.tier === "pix" || b.tier === "ouro").length,
+      premio: abertos.filter((b) => b.tier !== "nada" && b.tier !== "extra").length,
+      vale: abertos.filter((b) => b.tier === "vale").length,
+    };
+  }, [baloes, baloesAbertos]);
+
 
   // pulso suave no header quando entra venda nova
   const [pulseFlash, setPulseFlash] = useState(false);
