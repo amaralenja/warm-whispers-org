@@ -143,12 +143,19 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const isReembolsada = (v: any) =>
       reembolsadasIds.has(String(v["ID de Referência"] ?? ""));
 
-    // Filtra vendas pelo período + expert + remove reembolsadas
-    const vendasPeriodo = vendasAll.filter(
-      (v: any) => inRange(parseDataField(v.Data)) && !isReembolsada(v),
-    );
+    // Filtra vendas pelo período + remove reembolsadas + EXIGE produto mapeado (=dashboard antigo)
+    // Atribui expert via produtos_map (sobrescreve nome_expert)
+    const vendasPeriodo = vendasAll
+      .filter((v: any) => inRange(parseDataField(v.Data)) && !isReembolsada(v))
+      .map((v: any) => {
+        const mapped = lookupProduto(v);
+        if (!mapped) return null;
+        return { ...v, _expert: mapped.expert, _tipo: mapped.tipo };
+      })
+      .filter((v: any): v is any => v !== null);
+
     const vendasScoped = expertFilter
-      ? vendasPeriodo.filter((v: any) => v.nome_expert === expertFilter)
+      ? vendasPeriodo.filter((v: any) => v._expert === expertFilter)
       : vendasPeriodo;
 
     const vendaToExpert = new Map<string, string>();
