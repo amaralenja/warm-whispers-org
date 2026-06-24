@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -117,10 +117,11 @@ function RootShell({ children }: { children?: ReactNode } = {}) {
   );
 }
 
+const fallbackQueryClient = new QueryClient();
+
 function RootComponent() {
-  const routeContext = Route.useRouteContext();
-  const [fallbackQueryClient] = useState(() => new QueryClient());
-  const queryClient = routeContext?.queryClient ?? fallbackQueryClient;
+  const ctx = Route.useRouteContext();
+  const queryClient = ctx?.queryClient ?? fallbackQueryClient;
 
   return (
     <QueryClientProvider client={queryClient}>
