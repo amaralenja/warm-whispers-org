@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { X, Check } from "lucide-react";
 import { useDashboardConfig, type DashboardConfig } from "@/lib/dashboard-config";
 import { ACCENTS, BASE_WORKSPACES } from "@/lib/workspace-context";
@@ -69,7 +68,7 @@ export function DashboardConfigDialog({ open, onOpenChange, experts, scoped, sco
     onOpenChange(false);
   }
 
-  return createPortal(
+  return (
     <div className="fixed inset-0 z-[100] flex">
       {/* backdrop */}
       <div
@@ -191,8 +190,7 @@ export function DashboardConfigDialog({ open, onOpenChange, experts, scoped, sco
           </div>
         </footer>
       </aside>
-    </div>,
-    document.body,
+    </div>
   );
 }
 
