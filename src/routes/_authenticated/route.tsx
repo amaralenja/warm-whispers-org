@@ -21,19 +21,21 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   return (
     <WorkspaceProvider>
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-background">
-          <AppSidebar />
-          <div className="flex-1 flex flex-col min-w-0">
-            <header className="flex h-14 items-center gap-3 border-b border-border px-3 md:px-5">
-              <SidebarTrigger />
-            </header>
-            <div className="flex-1">
-              <Outlet />
+      <DashboardConfigProvider>
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full bg-background">
+            <AppSidebar />
+            <div className="flex-1 flex flex-col min-w-0">
+              <header className="flex h-14 items-center gap-3 border-b border-border px-3 md:px-5">
+                <SidebarTrigger />
+              </header>
+              <div className="flex-1">
+                <Outlet />
+              </div>
             </div>
           </div>
-        </div>
-      </SidebarProvider>
+        </SidebarProvider>
+      </DashboardConfigProvider>
     </WorkspaceProvider>
   );
 }
