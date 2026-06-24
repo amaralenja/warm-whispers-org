@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import logoMultium from "@/assets/logo-multium.webp.asset.json";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -37,8 +38,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarHeader className="border-b border-border px-4 py-5">
-        <div className="font-display text-xl tracking-tight">
-          {collapsed ? "M" : "MULTIUM"}
+        <div className="flex items-center justify-center">
+          <img
+            src={logoMultium.url}
+            alt="MULTIUM"
+            className={collapsed ? "h-8 w-8 object-contain" : "h-10 w-auto object-contain"}
+          />
         </div>
       </SidebarHeader>
 
