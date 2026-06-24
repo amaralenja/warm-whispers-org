@@ -33,7 +33,7 @@
   --color-success: var(--success);
 
   --font-display: "Instrument Serif", "Times New Roman", serif;
-  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 /* Premium dark — editorial, monocromático com acento âmbar quente */
