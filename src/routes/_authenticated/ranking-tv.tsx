@@ -36,7 +36,16 @@ function RankingTV() {
   const fetchStats = useServerFn(getRankingStats);
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
-  const [period, setPeriod] = useState<"hoje" | "mes">("mes");
+  const [period, setPeriod] = useState<"hoje" | "mes">("hoje");
+  const [metaHoje, setMetaHoje] = useState<number>(() => {
+    if (typeof window === "undefined") return 5000;
+    return Number(localStorage.getItem("rankingtv.meta.hoje")) || 5000;
+  });
+  const [metaMes, setMetaMes] = useState<number>(() => {
+    if (typeof window === "undefined") return 150000;
+    return Number(localStorage.getItem("rankingtv.meta.mes")) || 150000;
+  });
+  const [editMeta, setEditMeta] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   const navigate = useNavigate();
@@ -145,6 +154,76 @@ function RankingTV() {
         <StatPill label="Ticket Médio" value={BRL(data?.ticketMedioGeral ?? 0)} accent="amber" icon={<Sparkles className="h-4 w-4" />} />
         <StatPill label="Vendedores" value={String(data?.vendedoresAtivos ?? 0)} accent="violet" icon={<Crown className="h-4 w-4" />} />
       </div>
+
+      {/* Meta progress */}
+      <div className="relative z-10 mx-10 mt-4">
+        {(() => {
+          const meta = period === "hoje" ? metaHoje : metaMes;
+          const setMeta = period === "hoje" ? setMetaHoje : setMetaMes;
+          const storageKey = period === "hoje" ? "rankingtv.meta.hoje" : "rankingtv.meta.mes";
+          const fat = data?.totalFaturamento ?? 0;
+          const pct = meta > 0 ? Math.min(100, (fat / meta) * 100) : 0;
+          const falta = Math.max(0, meta - fat);
+          const batido = fat >= meta && meta > 0;
+          return (
+            <div className={`rounded-2xl border p-4 backdrop-blur-xl ${batido ? "border-emerald-400/40 bg-emerald-400/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Trophy className={`h-4 w-4 ${batido ? "text-emerald-400" : "text-white/40"}`} />
+                  <p className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-white/60">
+                    Meta {period === "hoje" ? "do dia" : "do mês"}
+                  </p>
+                  {batido && (
+                    <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[0.55rem] font-black uppercase tracking-widest text-emerald-300">
+                      Batida!
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-right">
+                  {editMeta ? (
+                    <input
+                      type="number"
+                      defaultValue={meta}
+                      autoFocus
+                      onBlur={(e) => {
+                        const v = Number(e.target.value) || 0;
+                        setMeta(v);
+                        localStorage.setItem(storageKey, String(v));
+                        setEditMeta(false);
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="w-32 rounded-lg border border-white/20 bg-black/40 px-2 py-1 text-right font-mono text-sm text-white"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditMeta(true)}
+                      className="font-mono text-sm font-black tabular-nums text-white/80 hover:text-emerald-300"
+                      title="Editar meta"
+                    >
+                      {BRL(fat)} <span className="text-white/30">/</span> {BRL(meta)}
+                    </button>
+                  )}
+                  <span className={`font-mono text-lg font-black tabular-nums ${batido ? "text-emerald-300" : "text-white"}`}>
+                    {pct.toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${batido ? "bg-gradient-to-r from-emerald-400 to-cyan-300 shadow-[0_0_20px_rgba(74,222,128,0.6)]" : "bg-gradient-to-r from-emerald-400 to-cyan-400"}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              {!batido && (
+                <p className="mt-2 text-[0.6rem] uppercase tracking-widest text-white/40">
+                  Faltam <span className="font-mono font-black text-white/70">{BRL(falta)}</span> para bater
+                </p>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
 
       {/* Podium + list */}
       <div className="relative z-10 grid flex-1 grid-cols-12 gap-6 px-10 pb-8 pt-6" style={{ height: "calc(100vh - 240px)" }}>
