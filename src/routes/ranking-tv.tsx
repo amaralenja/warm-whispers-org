@@ -53,6 +53,17 @@ type RankingTvPayload = {
   metaDia: number;
 };
 
+type HallEntry = { utm: string; nome: string; expert: string | null; fotoUrl: string | null; faturamento: number; vendas: number; meta: number };
+type HallProx = { nome: string; faturamento: number; meta: number };
+type HallOfFamePayload = {
+  lobo: HallEntry | null;
+  rainha: HallEntry | null;
+  metaLobo: number;
+  metaRainha: number;
+  proxLobo: HallProx | null;
+  proxRainha: HallProx | null;
+};
+
 function todayISO() {
   const d = new Date();
   const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -218,11 +229,17 @@ function RankingTV() {
       });
   }, [ranking]);
 
-  const hallOfFame = useMemo(() => {
-    const lobo = [...ranking].filter((r) => r.vendas > 0).sort((a, b) => b.ticketMedio - a.ticketMedio)[0];
-    const rainha = [...ranking].sort((a, b) => b.vendas - a.vendas)[0];
-    return { lobo, rainha };
-  }, [ranking]);
+  // Hall of Fame mensal vem de RPC dedicada (lobo = homem 18k+, rainha = mulher 20k+)
+  const { data: hallData } = useQuery<HallOfFamePayload>({
+    queryKey: ["hall-of-fame-mes"],
+    queryFn: async () => {
+      const { data: r, error } = await supabase.rpc("get_hall_of_fame_mes");
+      if (error) throw error;
+      return (r ?? {}) as unknown as HallOfFamePayload;
+    },
+    refetchInterval: 30_000,
+  });
+
 
   // Meta dos balões — 14 prêmios fixos; abrem na ordem das metas batidas
   const baloes = useMemo<Array<{ premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" }>>(() => [
@@ -453,8 +470,8 @@ function RankingTV() {
               <span className="ml-auto text-[0.52rem] tracking-[0.18em] text-neutral-600">destaques</span>
             </header>
             <div className="space-y-2">
-              <HallCard label="Lobo do X1" sub="Maior ticket médio" item={hallOfFame.lobo} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} />
-              <HallCard label="Rainha do X1" sub="Mais vendas no dia" item={hallOfFame.rainha} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} />
+              <HallCard label="Lobo do X1" item={hallData?.lobo ?? null} prox={hallData?.proxLobo ?? null} meta={hallData?.metaLobo ?? 18000} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} emptyHint="Em busca do Lobo" />
+              <HallCard label="Rainha do X1" item={hallData?.rainha ?? null} prox={hallData?.proxRainha ?? null} meta={hallData?.metaRainha ?? 20000} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} emptyHint="Em busca da Rainha" />
             </div>
           </section>
         </aside>
@@ -750,15 +767,32 @@ function ColetivaRow({ m }: { m: ColetivaItem }) {
   );
 }
 
-function HallCard({ label, sub, item, highlight, icon }: { label: string; sub: string; item: PublicRankingItem | undefined; highlight: "amber" | "rose"; icon: React.ReactNode }) {
+function HallCard({ label, item, prox, meta, highlight, icon, emptyHint }: { label: string; item: HallEntry | null; prox: HallProx | null; meta: number; highlight: "amber" | "rose"; icon: React.ReactNode; emptyHint: string }) {
   const tone = highlight === "amber" ? "text-amber-400 border-amber-400/30 bg-amber-400/[.04]" : "text-rose-400 border-rose-400/30 bg-rose-400/[.04]";
+  const conquistado = !!item;
+  const faltam = prox ? Math.max(0, prox.meta - prox.faturamento) : meta;
+  const pct = prox ? Math.min(100, (prox.faturamento / prox.meta) * 100) : 0;
   return (
-    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${tone}`}>
-      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${tone}`}>{icon}</div>
+    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${conquistado ? tone : "border-white/[.05] bg-white/[.015] text-neutral-500"}`}>
+      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${conquistado ? tone : "border-white/[.08] text-neutral-600"}`}>{icon}</div>
       <div className="min-w-0 flex-1">
         <p className="text-[0.58rem] font-bold uppercase tracking-[0.2em]">{label}</p>
-        <p className="truncate text-xs font-semibold text-neutral-100">{item?.nome ?? "—"}</p>
-        <p className="text-[0.55rem] uppercase tracking-wider text-neutral-500">{sub}</p>
+        {conquistado ? (
+          <>
+            <p className="truncate text-xs font-semibold text-neutral-100">{item!.nome}</p>
+            <p className="font-mono text-[0.6rem] tabular-nums text-neutral-400">{BRL(item!.faturamento)} <span className="text-neutral-600">· meta {BRL(meta)}</span></p>
+          </>
+        ) : (
+          <>
+            <p className="truncate text-[0.65rem] font-semibold text-neutral-400">{emptyHint} — meta {BRL(meta)}/mês</p>
+            <div className="mt-1 h-0.5 overflow-hidden rounded bg-white/[.05]">
+              <div className={`h-full ${highlight === "amber" ? "bg-amber-500/60" : "bg-rose-500/60"}`} style={{ width: `${pct}%` }} />
+            </div>
+            <p className="mt-0.5 font-mono text-[0.52rem] tabular-nums text-neutral-600">
+              {prox ? <>{prox.nome} · faltam {BRL(faltam)}</> : "Nenhum candidato no mês"}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
