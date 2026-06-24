@@ -134,26 +134,44 @@ function Dashboard() {
               />
             </section>
 
+            {/* Nossa Parte — sempre que houver % configurado */}
+            <section className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-5">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Nossa Parte</span>
+              </div>
+              <div className={`mt-2 text-4xl ${NUM} text-emerald-400`}>
+                {isLoading ? "—" : BRL(nossaParte)}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {visibleExperts.length === 0
+                  ? "Sem operações no período"
+                  : visibleExperts.map((e) => `${e.nome} ${getShare(e.nome)}%`).join(" · ")}
+              </p>
+            </section>
+
             {/* Desempenho diário */}
             <DesempenhoDiario serie={data?.serieDiaria ?? []} loading={isLoading} />
 
-            {/* Financeiro (só visão geral) */}
-            {workspace.id === "all" && (
+            {/* Financeiro (toggle pela config) */}
+            {config.showFinanceiro && workspace.id === "all" && (
               <section className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-3">
                 <MiniCard
                   icon={<Wallet className="h-4 w-4" />}
                   label="Saldo Estimado"
                   value={isLoading ? "—" : BRL(saldoEstimado)}
-                  hint="Faturamento − gastos do mês"
+                  hint="Nossa parte − gastos do mês"
                   accent={saldoEstimado >= 0 ? "text-emerald-400" : "text-rose-400"}
                 />
-                <MiniCard
-                  icon={<AlertTriangle className="h-4 w-4" />}
-                  label="Gastos do Mês"
-                  value={isLoading ? "—" : BRL(gastosMes)}
-                  hint="Financeiro · mês atual"
-                  accent="text-rose-400"
-                />
+                {config.showGastosCard && (
+                  <MiniCard
+                    icon={<AlertTriangle className="h-4 w-4" />}
+                    label="Gastos do Mês"
+                    value={isLoading ? "—" : BRL(gastosMes)}
+                    hint="Financeiro · mês atual"
+                    accent="text-rose-400"
+                  />
+                )}
                 <MiniCard
                   icon={<Coins className="h-4 w-4" />}
                   label="Reembolsos"
