@@ -289,13 +289,13 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const saldoEstimado = totalFaturamento - gastosMes;
 
     const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
-      idVenda: String(r["ID da Venda"] ?? ""),
-      produto: r["Produto"] ?? null,
-      cliente: r["Nome do Cliente"] ?? null,
+      idVenda: asStr(r["ID da Venda"]),
+      produto: asStrOrNull(r["Produto"]),
+      cliente: asStrOrNull(r["Nome do Cliente"]),
       valor: parseTicket(r["Valor Base do Produto"]),
-      dataVenda: r["Data da Venda"] ?? null,
-      dataReembolso: r["Data do Reembolso"] ?? null,
-      expert: vendaToExpert.get(String(r["ID da Venda"])) ?? null,
+      dataVenda: asStrOrNull(r["Data da Venda"]),
+      dataReembolso: asStrOrNull(r["Data do Reembolso"]),
+      expert: asStrOrNull(vendaToExpert.get(asStr(r["ID da Venda"]))),
     })).sort((a, b) => (b.dataReembolso ?? "").localeCompare(a.dataReembolso ?? ""));
 
     const totalValorReembolsado = reembolsosList.reduce((a, r) => a + r.valor, 0);
