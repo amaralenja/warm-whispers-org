@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Build target = Vercel. Saída em .vercel/output (Build Output API v3).
+  // Dentro do sandbox da Lovable o preset Cloudflare continua sendo forçado;
+  // o preset Vercel só vale fora do sandbox (CI da Vercel).
+  nitro: {
+    preset: "vercel",
+  },
 });
