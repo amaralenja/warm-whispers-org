@@ -850,6 +850,7 @@ export type Database = {
           created_at: string | null
           expert: string
           foto_url: string | null
+          genero: string | null
           id: number
           meta: number | null
           nome: string
@@ -860,6 +861,7 @@ export type Database = {
           created_at?: string | null
           expert: string
           foto_url?: string | null
+          genero?: string | null
           id?: never
           meta?: number | null
           nome: string
@@ -870,6 +872,7 @@ export type Database = {
           created_at?: string | null
           expert?: string
           foto_url?: string | null
+          genero?: string | null
           id?: never
           meta?: number | null
           nome?: string
@@ -914,6 +917,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_hall_of_fame_mes: { Args: never; Returns: Json }
       get_ranking_tv_stats: {
         Args: { _from?: string; _to?: string }
         Returns: Json
