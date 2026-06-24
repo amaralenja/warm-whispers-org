@@ -13,7 +13,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
-import { Route as AuthenticatedRankingTvRouteImport } from './routes/_authenticated/ranking-tv'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -36,11 +35,6 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRankingTvRoute = AuthenticatedRankingTvRouteImport.update({
-  id: '/ranking-tv',
-  path: '/ranking-tv',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRankingRoute = AuthenticatedRankingRouteImport.update({
@@ -71,7 +65,6 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/ranking': typeof AuthenticatedRankingRoute
-  '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRoutesByTo {
@@ -81,7 +74,6 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/ranking': typeof AuthenticatedRankingRoute
-  '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRoutesById {
@@ -93,7 +85,6 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
-  '/_authenticated/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
 }
 export interface FileRouteTypes {
@@ -105,7 +96,6 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/meta-ads'
     | '/ranking'
-    | '/ranking-tv'
     | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -115,7 +105,6 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/meta-ads'
     | '/ranking'
-    | '/ranking-tv'
     | '/relatorios'
   id:
     | '__root__'
@@ -126,7 +115,6 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/meta-ads'
     | '/_authenticated/ranking'
-    | '/_authenticated/ranking-tv'
     | '/_authenticated/relatorios'
   fileRoutesById: FileRoutesById
 }
@@ -166,13 +154,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/ranking-tv': {
-      id: '/_authenticated/ranking-tv'
-      path: '/ranking-tv'
-      fullPath: '/ranking-tv'
-      preLoaderRoute: typeof AuthenticatedRankingTvRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/ranking': {
       id: '/_authenticated/ranking'
       path: '/ranking'
@@ -209,7 +190,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
-  AuthenticatedRankingTvRoute: typeof AuthenticatedRankingTvRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
 }
 
@@ -218,7 +198,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
-  AuthenticatedRankingTvRoute: AuthenticatedRankingTvRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
 }
 
