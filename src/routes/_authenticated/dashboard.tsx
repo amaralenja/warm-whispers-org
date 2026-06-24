@@ -151,6 +151,37 @@ function Dashboard() {
               </p>
             </section>
 
+            {/* Cards por operação — só na visão geral (todas) */}
+            {workspace.id === "all" && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em]">Operações no período</h2>
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+                    {experts.length} {experts.length === 1 ? "operação" : "operações"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {isLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-40 animate-pulse rounded-2xl border border-border bg-card/40" />
+                    ))
+                  ) : (
+                    <>
+                      {experts.map((e) => (
+                        <OperacaoCard key={e.id} expert={e} share={getShare(e.nome)} />
+                      ))}
+                      <TotalOperacoesCard
+                        faturamento={totalFat}
+                        vendas={totalVendas}
+                        ticketMedio={tmGeral}
+                        reembolsos={totalReemb}
+                      />
+                    </>
+                  )}
+                </div>
+              </section>
+            )}
+
             {/* Desempenho diário */}
             <DesempenhoDiario serie={data?.serieDiaria ?? []} loading={isLoading} />
 
@@ -285,6 +316,58 @@ function ExpertRow({ expert }: { expert: ExpertStats }) {
         {expert.reembolsos}
       </div>
       <div className={`text-right text-base ${NUM} text-foreground`}>{BRL(expert.faturamento)}</div>
+    </div>
+  );
+}
+
+function OperacaoCard({ expert, share }: { expert: ExpertStats; share: number }) {
+  const dot = EXPERT_ACCENT[expert.nome] ?? "bg-accent";
+  const nossa = expert.faturamento * (share / 100);
+  return (
+    <div className="rounded-2xl border border-border bg-card/40 p-5 transition-colors hover:bg-card/60">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${dot}`} />
+          <span className="text-sm font-semibold">{expert.nome}</span>
+        </div>
+        <span className="text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">{share}%</span>
+      </div>
+      <div className={`mt-3 text-2xl ${NUM} text-emerald-400`}>{BRL(expert.faturamento)}</div>
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">Nossa parte: {BRL(nossa)}</div>
+      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3">
+        <Mini label="Vendas" value={String(expert.vendas)} />
+        <Mini label="TM" value={BRL(expert.ticketMedio)} accent="text-sky-400" />
+        <Mini label="Reemb" value={String(expert.reembolsos)} accent={expert.reembolsos > 0 ? "text-rose-400" : undefined} />
+      </div>
+    </div>
+  );
+}
+
+function TotalOperacoesCard({
+  faturamento, vendas, ticketMedio, reembolsos,
+}: { faturamento: number; vendas: number; ticketMedio: number; reembolsos: number }) {
+  return (
+    <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 to-transparent p-5">
+      <div className="flex items-center gap-2 text-emerald-400">
+        <TrendingUp className="h-4 w-4" />
+        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Total</span>
+      </div>
+      <div className={`mt-3 text-2xl ${NUM} text-emerald-400`}>{BRL(faturamento)}</div>
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">Somatório de todas as operações</div>
+      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-emerald-500/20 pt-3">
+        <Mini label="Vendas" value={String(vendas)} />
+        <Mini label="TM" value={BRL(ticketMedio)} accent="text-sky-400" />
+        <Mini label="Reemb" value={String(reembolsos)} accent={reembolsos > 0 ? "text-rose-400" : undefined} />
+      </div>
+    </div>
+  );
+}
+
+function Mini({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div>
+      <div className="text-[0.55rem] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+      <div className={`mt-1 text-sm ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
     </div>
   );
 }
