@@ -197,10 +197,14 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const totalVendas = vendasScoped.length;
 
     // Stats por expert (sempre considera todas as vendas do período, sem o filtro de expert)
+    const TICKET_MIN = 97; // mesmo threshold do dashboard antigo — exclui order bumps
     const expertStats: ExpertStats[] = experts.map((e: any) => {
       const vds = vendasPeriodo.filter((v: any) => v._expert === e.nome);
       const faturamento = vds.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
       const vendasCount = vds.length;
+      // Ticket Médio: só vendas "main" com ticket >= 97 (igual ao antigo)
+      const vdsTm = vds.filter((v: any) => v._tipo === "main" && parseTicket(v.Ticket) >= TICKET_MIN);
+      const fatTm = vdsTm.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
       const vendedoresCount = vendedoresRaw.filter((vd: any) => vd.expert === e.nome && vd.ativo).length;
       const reembolsosCount = reembolsosAll.filter((r: any) => {
         if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
@@ -215,7 +219,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         vendedoresCount,
         faturamento,
         vendas: vendasCount,
-        ticketMedio: vendasCount ? faturamento / vendasCount : 0,
+        ticketMedio: vdsTm.length ? fatTm / vdsTm.length : 0,
         reembolsos: reembolsosCount,
         pctTotal: totalFatPeriodo > 0 ? faturamento / totalFatPeriodo : 0,
       };
@@ -285,7 +289,10 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     }
 
     const totalReembolsos = reembolsos.length;
-    const ticketMedioGeral = totalVendas ? totalFaturamento / totalVendas : 0;
+    // Ticket Médio Geral: aplica mesmo threshold de R$97 + apenas tipo "main"
+    const vendasTm = vendasScoped.filter((v: any) => v._tipo === "main" && parseTicket(v.Ticket) >= TICKET_MIN);
+    const fatTm = vendasTm.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
+    const ticketMedioGeral = vendasTm.length ? fatTm / vendasTm.length : 0;
     const saldoEstimado = totalFaturamento - gastosMes;
 
     const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
