@@ -79,7 +79,18 @@ function Dashboard() {
               Boa, <em className="text-accent">{user?.email?.split("@")[0]}</em>.
             </h1>
           </div>
-          <DateRangeFilter value={range} onChange={setRange} />
+          <div className="flex items-center gap-2">
+            <DateRangeFilter value={range} onChange={setRange} />
+            <button
+              type="button"
+              onClick={() => setConfigOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary/50"
+              title={workspace.id === "all" ? "Configurar todas as operações" : `Configurar ${workspace.nome}`}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Configurar
+            </button>
+          </div>
         </div>
 
         <Tabs defaultValue="geral" className="mt-8">
