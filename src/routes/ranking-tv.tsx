@@ -218,11 +218,17 @@ function RankingTV() {
       });
   }, [ranking]);
 
-  const hallOfFame = useMemo(() => {
-    const lobo = [...ranking].filter((r) => r.vendas > 0).sort((a, b) => b.ticketMedio - a.ticketMedio)[0];
-    const rainha = [...ranking].sort((a, b) => b.vendas - a.vendas)[0];
-    return { lobo, rainha };
-  }, [ranking]);
+  // Hall of Fame mensal vem de RPC dedicada (lobo = homem 18k+, rainha = mulher 20k+)
+  const { data: hallData } = useQuery<HallOfFamePayload>({
+    queryKey: ["hall-of-fame-mes"],
+    queryFn: async () => {
+      const { data: r, error } = await supabase.rpc("get_hall_of_fame_mes");
+      if (error) throw error;
+      return (r ?? {}) as unknown as HallOfFamePayload;
+    },
+    refetchInterval: 30_000,
+  });
+
 
   // Meta dos balões — 14 prêmios fixos; abrem na ordem das metas batidas
   const baloes = useMemo<Array<{ premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" }>>(() => [
