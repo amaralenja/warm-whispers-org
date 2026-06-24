@@ -340,6 +340,10 @@ function Financeiro() {
             );
           })}
         </div>
+        </>)}
+
+        {tab === "relatorios" && <RelatoriosTab mes={mes} />}
+        {tab === "dre" && <DreTab mes={mes} />}
       </div>
 
       {modalOpen && (
