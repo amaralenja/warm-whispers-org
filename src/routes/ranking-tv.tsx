@@ -474,9 +474,9 @@ function RankingTV() {
             </header>
 
             <div className="flex flex-1 items-end justify-center gap-4 pb-1 pt-4">
-              {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[70%]" />}
-              {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[90%]" />}
-              {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[58%]" />}
+              {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[82%]" />}
+              {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[95%]" />}
+              {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[74%]" />}
               {top3.length === 0 && (
                 <div className="flex h-full w-full items-center justify-center text-neutral-600">
                   <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
