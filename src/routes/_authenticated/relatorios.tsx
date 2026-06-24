@@ -309,8 +309,8 @@ function KpiCard({
 }: {
   label: string;
   value: string;
-  sub: React.ReactNode;
-  icon?: React.ReactNode;
+  sub: ReactNode;
+  icon?: ReactNode;
   accent?: boolean;
 }) {
   return (
