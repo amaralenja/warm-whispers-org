@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
-export type RangePreset = "hoje" | "7d" | "30d" | "mes" | "tudo";
+export type RangePreset = "hoje" | "ontem" | "7d" | "15d" | "30d" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
@@ -12,31 +15,46 @@ function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-export function computeRange(preset: RangePreset): DateRangeValue {
+function todayUTC() {
   const now = new Date();
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  if (preset === "tudo") return { preset, from: null, to: null };
-  if (preset === "hoje") return { preset, from: iso(today), to: iso(today) };
-  if (preset === "7d") {
-    const from = new Date(today); from.setUTCDate(from.getUTCDate() - 6);
-    return { preset, from: iso(from), to: iso(today) };
-  }
-  if (preset === "30d") {
-    const from = new Date(today); from.setUTCDate(from.getUTCDate() - 29);
-    return { preset, from: iso(from), to: iso(today) };
-  }
-  // mes
-  const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-  return { preset, from: iso(from), to: iso(today) };
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-const PRESETS: { id: RangePreset; label: string }[] = [
+export function computeRange(preset: RangePreset): DateRangeValue {
+  const today = todayUTC();
+  if (preset === "hoje") return { preset, from: iso(today), to: iso(today) };
+  if (preset === "ontem") {
+    const y = new Date(today); y.setUTCDate(y.getUTCDate() - 1);
+    return { preset, from: iso(y), to: iso(y) };
+  }
+  const daysMap: Record<string, number> = { "7d": 6, "15d": 14, "30d": 29 };
+  const back = daysMap[preset];
+  if (back != null) {
+    const from = new Date(today); from.setUTCDate(from.getUTCDate() - back);
+    return { preset, from: iso(from), to: iso(today) };
+  }
+  // custom — caller fills from/to
+  return { preset: "custom", from: iso(today), to: iso(today) };
+}
+
+const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "hoje", label: "Hoje" },
+  { id: "ontem", label: "Ontem" },
   { id: "7d", label: "7 dias" },
+  { id: "15d", label: "15 dias" },
   { id: "30d", label: "30 dias" },
-  { id: "mes", label: "Mês" },
-  { id: "tudo", label: "Tudo" },
 ];
+
+function fmtBR(s: string) {
+  const [y, m, d] = s.split("-");
+  return `${d}/${m}/${y.slice(2)}`;
+}
+
+function parseISO(s: string | null): Date | undefined {
+  if (!s) return undefined;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
 
 export function DateRangeFilter({
   value,
@@ -45,14 +63,14 @@ export function DateRangeFilter({
   value: DateRangeValue;
   onChange: (v: DateRangeValue) => void;
 }) {
+  const [open, setOpen] = useState(false);
+
   const subtitle = useMemo(() => {
-    if (value.preset === "tudo" || !value.from || !value.to) return "Todo o período";
-    const fmt = (s: string) => {
-      const [y, m, d] = s.split("-");
-      return `${d}/${m}/${y.slice(2)}`;
-    };
-    return value.from === value.to ? fmt(value.from) : `${fmt(value.from)} → ${fmt(value.to)}`;
+    if (!value.from || !value.to) return "Selecione um período";
+    return value.from === value.to ? fmtBR(value.from) : `${fmtBR(value.from)} → ${fmtBR(value.to)}`;
   }, [value]);
+
+  const customActive = value.preset === "custom";
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -75,6 +93,39 @@ export function DateRangeFilter({
             </button>
           );
         })}
+
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={[
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors",
+                customActive
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+              ].join(" ")}
+            >
+              <CalendarIcon className="h-3.5 w-3.5" />
+              Personalizado
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-auto border-border bg-popover p-0">
+            <Calendar
+              mode="range"
+              numberOfMonths={2}
+              defaultMonth={parseISO(value.from)}
+              selected={{ from: parseISO(value.from), to: parseISO(value.to) }}
+              onSelect={(r) => {
+                if (!r?.from) return;
+                const from = iso(r.from);
+                const to = iso(r.to ?? r.from);
+                onChange({ preset: "custom", from, to });
+                if (r.to) setOpen(false);
+              }}
+              className="pointer-events-auto p-3"
+            />
+          </PopoverContent>
+        </Popover>
       </div>
       <div className="text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">
         {subtitle}
