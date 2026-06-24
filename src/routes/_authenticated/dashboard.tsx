@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDashboardStats } from "@/lib/dashboard.functions";
 import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 import { useWorkspace } from "@/lib/workspace-context";
+import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MULTIUM" }] }),
@@ -22,14 +24,16 @@ function Dashboard() {
   const fetchStats = useServerFn(getDashboardStats);
   const fetchOps = useServerFn(getOperacoesStats);
 
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
+
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: () => fetchStats(),
   });
 
   const { data: experts, isLoading: loadingExperts } = useQuery({
-    queryKey: ["operacoes-stats"],
-    queryFn: () => fetchOps(),
+    queryKey: ["operacoes-stats", range.from, range.to],
+    queryFn: () => fetchOps({ data: { from: range.from, to: range.to } }),
   });
 
   const visibleExperts =
@@ -40,7 +44,7 @@ function Dashboard() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background bg-grain">
       <div className="mx-auto max-w-7xl px-8 py-14">
-        <div className="flex items-end justify-between border-b border-border pb-10">
+        <div className="flex items-end justify-between gap-6 border-b border-border pb-10">
           <div>
             <p className={`text-xs uppercase tracking-[0.25em] ${workspace.accent.text}`}>
               — {workspace.id === "all" ? "Visão geral" : `Operação · ${workspace.nome}`}
@@ -56,10 +60,9 @@ function Dashboard() {
                 : `Você está visualizando o squad da ${workspace.nome}.`}
             </p>
           </div>
-          <div className={`hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground md:block ${NUM}`}>
-            {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
-          </div>
+          <DateRangeFilter value={range} onChange={setRange} />
         </div>
+
 
         {/* Operações — squads */}
         <section className="mt-14">
