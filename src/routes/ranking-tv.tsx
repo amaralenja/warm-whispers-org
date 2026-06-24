@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Award, Crown, Flame, Medal, Radio, Sparkles, Target, Trophy, Zap } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Award, Crown, Flame, Medal, Sparkles, Target, Trophy, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/ranking-tv")({
@@ -59,11 +59,22 @@ function todayISO() {
   return tz.toISOString().slice(0, 10);
 }
 
+type Celebration = {
+  id: number;
+  nome: string;
+  expert: string | null;
+  meta: number;
+  faturamento: number;
+};
+
 function RankingTV() {
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
-  const [balloons, setBalloons] = useState<{ id: number; left: number; color: string; delay: number }[]>([]);
-  const [hitFlash, setHitFlash] = useState(false);
-  const [celebrated, setCelebrated] = useState<string[]>([]);
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const [confetti, setConfetti] = useState<{ id: number; left: number; color: string; delay: number; size: number; kind: "balloon" | "confetti" }[]>([]);
+  const celebratedRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
+  const [pulse, setPulse] = useState(0); // flash pulse on new sale
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -75,8 +86,10 @@ function RankingTV() {
     return { from: to, to };
   }, []);
 
+  const queryKey = ["ranking-tv-public-rpc", range.from, range.to];
+
   const { data } = useQuery<RankingTvPayload>({
-    queryKey: ["ranking-tv-public-rpc", range.from, range.to],
+    queryKey,
     queryFn: async () => {
       const { data: rpcData, error } = await supabase.rpc("get_ranking_tv_stats", {
         _from: range.from,
@@ -85,176 +98,264 @@ function RankingTV() {
       if (error) throw error;
       return rpcData as unknown as RankingTvPayload;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
+
+  // Realtime: invalida a query quando entra venda nova
+  useEffect(() => {
+    const channel = supabase
+      .channel("ranking-tv-vendas")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "vendas" },
+        () => {
+          setPulse((p) => p + 1);
+          queryClient.invalidateQueries({ queryKey });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "vendas" },
+        () => {
+          queryClient.invalidateQueries({ queryKey });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ranking = data?.ranking ?? [];
   const top3 = ranking.slice(0, 3);
   const rest = ranking.slice(3, 15);
   const metaLogs = data?.metaLogs ?? [];
-  const hitKeys = useMemo(() => metaLogs.filter((l) => l.batida).map((l) => l.utm).sort(), [metaLogs]);
+  const hitCount = metaLogs.filter((l) => l.batida).length;
 
+  // Detecta novas metas batidas e celebra em FILA
   useEffect(() => {
-    const newHits = hitKeys.filter((utm) => !celebrated.includes(utm));
-    if (newHits.length === 0) return;
-    setCelebrated((prev) => Array.from(new Set([...prev, ...newHits])));
-    setHitFlash(true);
-    const colors = ["#fbbf24", "#34d399", "#60a5fa", "#f472b6", "#ffffff"];
-    const next = Array.from({ length: 32 }, (_, i) => ({
+    const hits = metaLogs.filter((l) => l.batida);
+    if (!initializedRef.current) {
+      // primeira carga: já registra todas como celebradas sem disparar animação
+      hits.forEach((h) => celebratedRef.current.add(h.utm));
+      initializedRef.current = true;
+      return;
+    }
+    const novos = hits.filter((h) => !celebratedRef.current.has(h.utm));
+    if (novos.length === 0) return;
+    novos.forEach((h) => celebratedRef.current.add(h.utm));
+    // dispara celebração do primeiro novo
+    setCelebration({
+      id: Date.now(),
+      nome: novos[0].nome,
+      expert: novos[0].expert,
+      meta: novos[0].meta,
+      faturamento: novos[0].faturamento,
+    });
+    const colors = ["#d4a017", "#10b981", "#3b82f6", "#e11d48", "#f5f5f5"];
+    const items = Array.from({ length: 60 }, (_, i) => ({
       id: Date.now() + i,
       left: Math.random() * 100,
       color: colors[i % colors.length],
-      delay: Math.random() * 2,
+      delay: Math.random() * 1.5,
+      size: 0.7 + Math.random() * 0.8,
+      kind: (i % 3 === 0 ? "balloon" : "confetti") as "balloon" | "confetti",
     }));
-    setBalloons(next);
-    const t1 = setTimeout(() => setHitFlash(false), 1800);
-    const t2 = setTimeout(() => setBalloons([]), 9000);
+    setConfetti(items);
+    const t1 = setTimeout(() => setCelebration(null), 6000);
+    const t2 = setTimeout(() => setConfetti([]), 10000);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [celebrated, hitKeys]);
+  }, [metaLogs]);
+
+  // pulso suave no header quando entra venda nova
+  const [pulseFlash, setPulseFlash] = useState(false);
+  useEffect(() => {
+    if (pulse === 0) return;
+    setPulseFlash(true);
+    const t = setTimeout(() => setPulseFlash(false), 900);
+    return () => clearTimeout(t);
+  }, [pulse]);
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#070710] text-white">
+    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#0a0a0c] text-neutral-100">
       <style>{`
-        @keyframes float-up { 0% { transform: translateY(110vh) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-20vh) rotate(15deg); opacity: 0; } }
-        @keyframes flash-bg { 0%, 100% { background-color: rgba(52,211,153,0); } 50% { background-color: rgba(52,211,153,0.18); } }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        @keyframes pulse-glow { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
-        .balloon { animation: float-up 7s ease-in forwards; }
-        .flash-overlay { animation: flash-bg 1.6s ease-out; }
-        .grid-bg { background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 56px 56px; }
-        .shimmer-text { background: linear-gradient(90deg, #fbbf24 0%, #fde68a 50%, #fbbf24 100%); background-size: 200% 100%; animation: shimmer 4s linear infinite; -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .glow-gold { box-shadow: 0 0 60px rgba(251,191,36,.35), inset 0 0 30px rgba(251,191,36,.08); }
-        .glow-silver { box-shadow: 0 0 40px rgba(203,213,225,.18), inset 0 0 20px rgba(203,213,225,.05); }
-        .glow-bronze { box-shadow: 0 0 40px rgba(251,146,60,.22), inset 0 0 20px rgba(251,146,60,.06); }
+        @keyframes balloon-rise { 0% { transform: translate3d(0,110vh,0) rotate(-4deg); opacity:0; } 8% { opacity:1; } 92% { opacity:1; } 100% { transform: translate3d(0,-25vh,0) rotate(8deg); opacity:0; } }
+        @keyframes confetti-fall { 0% { transform: translate3d(0,-15vh,0) rotate(0deg); opacity:0; } 10% { opacity:1; } 90% { opacity:1; } 100% { transform: translate3d(0,110vh,0) rotate(720deg); opacity:0; } }
+        @keyframes celebration-pop { 0% { transform: scale(.85) translateY(20px); opacity:0; } 15% { transform: scale(1.04) translateY(0); opacity:1; } 85% { transform: scale(1) translateY(0); opacity:1; } 100% { transform: scale(.95) translateY(-10px); opacity:0; } }
+        @keyframes pulse-dot { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:.4; transform:scale(.85);} }
+        @keyframes border-pulse { 0%,100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);} 50% { box-shadow: inset 0 0 0 1px rgba(16,185,129,.35);} }
+        .balloon-rise { animation: balloon-rise 7s cubic-bezier(.4,.0,.6,1) forwards; }
+        .confetti-fall { animation: confetti-fall 5s cubic-bezier(.55,.15,.45,.85) forwards; }
+        .live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+        .header-pulse { animation: border-pulse 900ms ease-out; }
+        .corp-grid { background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); background-size: 72px 72px; }
+        .celebrate-card { animation: celebration-pop 6s ease forwards; }
       `}</style>
 
-      {/* ambient layers */}
+      {/* Background sóbrio */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="grid-bg absolute inset-0" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(251,191,36,.12),transparent_45%),radial-gradient(circle_at_80%_100%,rgba(167,139,250,.10),transparent_45%)]" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent" />
+        <div className="corp-grid absolute inset-0" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,.025),transparent_60%)]" />
       </div>
 
-      {balloons.length > 0 && (
+      {/* Confete + balões */}
+      {confetti.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-[200] overflow-hidden">
-          {balloons.map((b) => (
-            <div key={b.id} className="balloon absolute" style={{ left: `${b.left}%`, animationDelay: `${b.delay}s`, bottom: 0 }}>
-              <svg width="48" height="64" viewBox="0 0 48 64">
-                <ellipse cx="24" cy="22" rx="20" ry="24" fill={b.color} opacity="0.95" />
-                <ellipse cx="18" cy="14" rx="6" ry="4" fill="white" opacity="0.4" />
-                <path d="M24 46 L22 50 L26 50 Z" fill={b.color} />
-                <path d="M24 50 Q22 56 24 64" stroke="white" strokeOpacity="0.5" strokeWidth="1" fill="none" />
-              </svg>
-            </div>
-          ))}
+          {confetti.map((c) =>
+            c.kind === "balloon" ? (
+              <div
+                key={c.id}
+                className="balloon-rise absolute"
+                style={{ left: `${c.left}%`, animationDelay: `${c.delay}s`, bottom: 0, transform: `scale(${c.size})` }}
+              >
+                <svg width="44" height="58" viewBox="0 0 48 64">
+                  <ellipse cx="24" cy="22" rx="18" ry="22" fill={c.color} opacity="0.9" />
+                  <ellipse cx="18" cy="14" rx="5" ry="3" fill="white" opacity="0.3" />
+                  <path d="M24 44 L22 48 L26 48 Z" fill={c.color} opacity="0.85" />
+                  <path d="M24 48 Q22 56 24 64" stroke="white" strokeOpacity="0.35" strokeWidth="0.8" fill="none" />
+                </svg>
+              </div>
+            ) : (
+              <div
+                key={c.id}
+                className="confetti-fall absolute"
+                style={{
+                  left: `${c.left}%`,
+                  top: 0,
+                  animationDelay: `${c.delay}s`,
+                  width: `${10 * c.size}px`,
+                  height: `${14 * c.size}px`,
+                  backgroundColor: c.color,
+                  opacity: 0.9,
+                }}
+              />
+            )
+          )}
         </div>
       )}
 
-      {hitFlash && <div className="flash-overlay pointer-events-none absolute inset-0 z-[150]" />}
+      {/* Card de celebração */}
+      {celebration && (
+        <div className="pointer-events-none absolute left-1/2 top-[18%] z-[210] -translate-x-1/2">
+          <div className="celebrate-card rounded-xl border border-emerald-500/40 bg-[#0d1411]/95 px-8 py-5 text-center shadow-[0_20px_60px_-20px_rgba(16,185,129,.5)] backdrop-blur-md">
+            <div className="flex items-center justify-center gap-2 text-[0.6rem] font-bold uppercase tracking-[0.32em] text-emerald-400">
+              <Award className="h-3 w-3" /> meta batida
+            </div>
+            <p className="mt-2 text-3xl font-bold text-white">{celebration.nome}</p>
+            {celebration.expert && (
+              <p className="text-[0.65rem] uppercase tracking-[0.24em] text-neutral-400">{celebration.expert}</p>
+            )}
+            <p className="mt-2 font-mono text-xl font-bold text-emerald-400">
+              {BRL(celebration.faturamento)} <span className="text-neutral-500">/ {BRL(celebration.meta)}</span>
+            </p>
+          </div>
+        </div>
+      )}
 
-      {/* HEADER */}
-      <header className="relative z-10 flex h-[88px] items-center justify-between px-10">
+      {/* HEADER sóbrio */}
+      <header className={`relative z-10 flex h-[80px] items-center justify-between border-b border-white/[.04] px-10 ${pulseFlash ? "header-pulse" : ""}`}>
         <div className="flex items-center gap-4">
-          <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_30px_rgba(251,191,36,.4)]">
-            <Trophy className="h-6 w-6 text-black" fill="currentColor" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-amber-500/90">
+            <Trophy className="h-5 w-5 text-neutral-900" fill="currentColor" />
           </div>
           <div>
-            <div className="flex items-center gap-2 text-[0.65rem] font-bold uppercase tracking-[0.32em] text-emerald-400">
-              <Radio className="h-3 w-3 animate-pulse" />
-              <span style={{ animation: "pulse-glow 2s ease-in-out infinite" }}>ao vivo</span>
-              <span className="text-white/30">·</span>
-              <span className="text-white/50">TV aberta</span>
+            <div className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.34em] text-neutral-400">
+              <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              ao vivo
+              <span className="text-neutral-700">·</span>
+              <span>TV aberta</span>
             </div>
-            <h1 className="mt-0.5 text-3xl font-black uppercase leading-none tracking-tight">
-              Ranking <span className="shimmer-text">Multium</span>
+            <h1 className="mt-1 text-2xl font-bold uppercase leading-none tracking-[0.04em] text-neutral-100">
+              Ranking <span className="text-amber-500">Multium</span>
             </h1>
           </div>
         </div>
 
         <div className="text-right">
-          <p className="font-mono text-4xl font-black leading-none tabular-nums tracking-tight">
+          <p className="font-mono text-3xl font-light leading-none tabular-nums text-neutral-100">
             {now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
           </p>
-          <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.3em] text-white/40">
+          <p className="mt-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.32em] text-neutral-500">
             {now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
           </p>
         </div>
       </header>
 
-      {/* STAT STRIP */}
-      <div className="relative z-10 grid grid-cols-3 gap-4 px-10 pb-4">
-        <StatCard label="Faturamento hoje" value={BRL(data?.totalFaturamento ?? 0)} tone="emerald" icon={<Zap className="h-4 w-4" />} />
-        <StatCard label="Vendas aprovadas" value={String(data?.totalVendas ?? 0)} tone="amber" icon={<Flame className="h-4 w-4" />} />
-        <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="violet" icon={<Sparkles className="h-4 w-4" />} />
+      {/* STATS sóbrios */}
+      <div className="relative z-10 grid grid-cols-3 gap-4 border-b border-white/[.04] px-10 py-5">
+        <StatCard label="Faturamento hoje" value={BRL(data?.totalFaturamento ?? 0)} tone="emerald" icon={<Zap className="h-3.5 w-3.5" />} />
+        <StatCard label="Vendas aprovadas" value={String(data?.totalVendas ?? 0)} tone="amber" icon={<Flame className="h-3.5 w-3.5" />} />
+        <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="neutral" icon={<Sparkles className="h-3.5 w-3.5" />} />
       </div>
 
       {/* MAIN GRID */}
-      <main className="relative z-10 grid h-[calc(100vh-88px-76px)] grid-cols-12 gap-5 px-10 pb-6">
+      <main className="relative z-10 grid h-[calc(100vh-80px-92px)] grid-cols-12 gap-4 px-10 py-5">
         {/* PODIUM */}
-        <section className="col-span-8 flex min-h-0 flex-col rounded-2xl border border-white/[.06] bg-white/[.02] p-6 backdrop-blur-sm">
+        <section className="col-span-8 flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-6">
           <header className="mb-2 flex items-center justify-between">
             <div>
-              <h2 className="text-[0.62rem] font-bold uppercase tracking-[0.3em] text-amber-400/80">O pódio</h2>
-              <p className="mt-1 text-2xl font-black">Top performers de hoje</p>
+              <h2 className="text-[0.58rem] font-semibold uppercase tracking-[0.34em] text-neutral-500">o pódio</h2>
+              <p className="mt-1.5 text-xl font-semibold text-neutral-100">Top performers de hoje</p>
             </div>
-            <div className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[0.62rem] font-bold uppercase tracking-[0.2em] text-amber-300">
+            <div className="rounded border border-white/[.06] bg-white/[.02] px-3 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.24em] text-neutral-400">
               {data?.vendedoresAtivos ?? 0} vendedores
             </div>
           </header>
 
-          <div className="flex flex-1 items-end justify-center gap-6 pb-4 pt-8">
-            {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[68%]" />}
-            {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[88%]" />}
-            {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[56%]" />}
+          <div className="flex flex-1 items-end justify-center gap-5 pb-2 pt-6">
+            {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[70%]" />}
+            {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[90%]" />}
+            {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[58%]" />}
             {top3.length === 0 && (
-              <div className="flex h-full w-full items-center justify-center text-white/30">
+              <div className="flex h-full w-full items-center justify-center text-neutral-600">
                 <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
               </div>
             )}
           </div>
         </section>
 
-        {/* RIGHT COLUMN */}
-        <aside className="col-span-4 grid min-h-0 grid-rows-2 gap-5">
-          {/* Top 4-15 */}
-          <section className="flex min-h-0 flex-col rounded-2xl border border-white/[.06] bg-white/[.02] p-5 backdrop-blur-sm">
-            <header className="mb-3 flex items-center justify-between border-b border-white/5 pb-3">
-              <h2 className="flex items-center gap-2 text-[0.65rem] font-bold uppercase tracking-[0.24em] text-white/60">
-                <Trophy className="h-3.5 w-3.5 text-amber-400" /> Próximos no pódio
+        {/* RIGHT */}
+        <aside className="col-span-4 grid min-h-0 grid-rows-2 gap-4">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
+            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
+              <h2 className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-400">
+                <Trophy className="h-3 w-3 text-amber-500" /> Próximos no pódio
               </h2>
-              <span className="font-mono text-[0.65rem] font-black text-amber-400">#4 — #{Math.min(15, 3 + rest.length)}</span>
+              <span className="font-mono text-[0.6rem] font-semibold text-neutral-500">
+                #4 — #{Math.min(15, 3 + rest.length)}
+              </span>
             </header>
             <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
               {rest.map((v, i) => (
                 <ListRow key={v.utm} item={v} position={i + 4} />
               ))}
               {rest.length === 0 && (
-                <div className="flex h-full items-center justify-center text-white/25">
+                <div className="flex h-full items-center justify-center text-neutral-700">
                   <p className="text-[0.7rem] uppercase tracking-widest">Sem mais vendedores</p>
                 </div>
               )}
             </div>
           </section>
 
-          {/* Metas individuais */}
-          <section className="flex min-h-0 flex-col rounded-2xl border border-white/[.06] bg-white/[.02] p-5 backdrop-blur-sm">
-            <header className="mb-3 flex items-center justify-between border-b border-white/5 pb-3">
-              <h2 className="flex items-center gap-2 text-[0.65rem] font-bold uppercase tracking-[0.24em] text-white/60">
-                <Target className="h-3.5 w-3.5 text-emerald-400" /> Metas individuais
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
+            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
+              <h2 className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-400">
+                <Target className="h-3 w-3 text-emerald-500" /> Metas individuais
               </h2>
-              <span className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 font-mono text-[0.62rem] font-black text-emerald-400">
-                {hitKeys.length} batidas
+              <span className="rounded border border-emerald-500/20 bg-emerald-500/[.06] px-2 py-0.5 font-mono text-[0.58rem] font-semibold text-emerald-400">
+                {hitCount} batidas
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
               {metaLogs.map((log) => (
                 <MetaLogRow key={log.utm} log={log} />
               ))}
               {metaLogs.length === 0 && (
-                <div className="flex h-full items-center justify-center text-center text-[0.7rem] uppercase tracking-[0.2em] text-white/25">
+                <div className="flex h-full items-center justify-center text-center text-[0.7rem] uppercase tracking-[0.2em] text-neutral-700">
                   Nenhuma meta registrada
                 </div>
               )}
@@ -266,20 +367,19 @@ function RankingTV() {
   );
 }
 
-function StatCard({ label, value, tone, icon }: { label: string; value: string; tone: "emerald" | "amber" | "violet"; icon: React.ReactNode }) {
-  const tones = {
-    emerald: { ring: "from-emerald-400/40 to-transparent", text: "text-emerald-400", glow: "shadow-[0_0_30px_rgba(52,211,153,.15)]" },
-    amber: { ring: "from-amber-400/40 to-transparent", text: "text-amber-400", glow: "shadow-[0_0_30px_rgba(251,191,36,.15)]" },
-    violet: { ring: "from-violet-400/40 to-transparent", text: "text-violet-400", glow: "shadow-[0_0_30px_rgba(167,139,250,.15)]" },
+function StatCard({ label, value, tone, icon }: { label: string; value: string; tone: "emerald" | "amber" | "neutral"; icon: React.ReactNode }) {
+  const colors = {
+    emerald: "text-emerald-400",
+    amber: "text-amber-400",
+    neutral: "text-neutral-200",
   }[tone];
   return (
-    <div className={`group relative overflow-hidden rounded-2xl border border-white/[.06] bg-gradient-to-br from-white/[.04] to-white/[.01] p-5 ${tones.glow}`}>
-      <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-radial ${tones.ring} opacity-30`} />
-      <div className="relative flex items-center justify-between">
-        <p className="text-[0.62rem] font-bold uppercase tracking-[0.24em] text-white/50">{label}</p>
-        <span className={`flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 ${tones.text}`}>{icon}</span>
+    <div className="rounded-lg border border-white/[.05] bg-white/[.015] px-5 py-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[0.58rem] font-semibold uppercase tracking-[0.28em] text-neutral-500">{label}</p>
+        <span className={`flex h-6 w-6 items-center justify-center rounded border border-white/[.06] ${colors}`}>{icon}</span>
       </div>
-      <p className={`relative mt-3 font-mono text-4xl font-black tabular-nums ${tones.text}`}>{value}</p>
+      <p className={`mt-2 font-mono text-3xl font-light tabular-nums ${colors}`}>{value}</p>
     </div>
   );
 }
@@ -287,123 +387,110 @@ function StatCard({ label, value, tone, icon }: { label: string; value: string; 
 function PodiumCard({ item, position, height }: { item: PublicRankingItem; position: 1 | 2 | 3; height: string }) {
   const cfg = {
     1: {
-      glow: "glow-gold",
-      ring: "ring-amber-400",
-      bar: "bg-gradient-to-t from-amber-600 via-amber-400 to-yellow-300",
-      icon: <Crown className="h-7 w-7 text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,.8)]" fill="currentColor" />,
+      ring: "ring-amber-500/80",
+      bar: "bg-amber-500",
+      icon: <Crown className="h-5 w-5 text-amber-400" fill="currentColor" />,
       label: "CAMPEÃO",
-      labelColor: "text-amber-300",
-      valueColor: "text-amber-300",
-      badge: "bg-gradient-to-br from-amber-400 to-amber-600 text-black",
+      labelColor: "text-amber-400",
+      valueColor: "text-amber-400",
+      badge: "bg-amber-500 text-neutral-900",
     },
     2: {
-      glow: "glow-silver",
-      ring: "ring-slate-300",
-      bar: "bg-gradient-to-t from-slate-600 via-slate-400 to-slate-200",
-      icon: <Trophy className="h-5 w-5 text-slate-200" />,
+      ring: "ring-neutral-400/60",
+      bar: "bg-neutral-400",
+      icon: <Trophy className="h-4 w-4 text-neutral-300" />,
       label: "VICE",
-      labelColor: "text-slate-300",
-      valueColor: "text-slate-100",
-      badge: "bg-gradient-to-br from-slate-300 to-slate-500 text-black",
+      labelColor: "text-neutral-300",
+      valueColor: "text-neutral-100",
+      badge: "bg-neutral-300 text-neutral-900",
     },
     3: {
-      glow: "glow-bronze",
-      ring: "ring-orange-400",
-      bar: "bg-gradient-to-t from-orange-700 via-orange-500 to-orange-300",
-      icon: <Medal className="h-5 w-5 text-orange-400" />,
+      ring: "ring-orange-600/70",
+      bar: "bg-orange-600",
+      icon: <Medal className="h-4 w-4 text-orange-400" />,
       label: "TERCEIRO",
-      labelColor: "text-orange-300",
-      valueColor: "text-orange-200",
-      badge: "bg-gradient-to-br from-orange-400 to-orange-600 text-black",
+      labelColor: "text-orange-400",
+      valueColor: "text-orange-300",
+      badge: "bg-orange-600 text-neutral-50",
     },
   }[position];
 
-  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0a0a14&color=ffffff&size=256&bold=true`;
+  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0a0a0c&color=e5e5e5&size=256&bold=true`;
   const isFirst = position === 1;
 
   return (
     <div className={`relative flex w-full max-w-[260px] flex-col items-center ${height}`}>
-      {/* Card */}
-      <div className={`relative flex flex-1 w-full flex-col items-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.06] to-white/[.01] px-5 pb-5 pt-10 backdrop-blur-xl ${cfg.glow}`}>
-        {/* Position badge */}
-        <div className={`absolute -top-5 left-1/2 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full font-mono text-base font-black shadow-lg ${cfg.badge}`}>
+      <div className="relative flex w-full flex-1 flex-col items-center gap-3 rounded-lg border border-white/[.06] bg-white/[.02] px-5 pb-5 pt-9">
+        <div className={`absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full font-mono text-sm font-bold ${cfg.badge}`}>
           {position}
         </div>
 
-        {/* Crown for #1 */}
         {isFirst && (
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 animate-bounce">
-            {cfg.icon}
-          </div>
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2">{cfg.icon}</div>
         )}
 
-        {/* Avatar */}
         <div className={`relative ${isFirst ? "h-28 w-28" : "h-20 w-20"}`}>
-          <div className={`absolute inset-0 rounded-full ${isFirst ? "bg-amber-400/30" : "bg-white/10"} blur-2xl`} />
           <img
             src={avatar}
             alt={item.nome}
-            className={`relative h-full w-full rounded-full object-cover ring-4 ${cfg.ring} ring-offset-4 ring-offset-[#0a0a14]`}
+            className={`relative h-full w-full rounded-full object-cover ring-2 ${cfg.ring} ring-offset-4 ring-offset-[#0a0a0c]`}
           />
           {!isFirst && (
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2">{cfg.icon}</div>
+            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2">{cfg.icon}</div>
           )}
         </div>
 
-        {/* Name */}
         <div className="text-center">
-          <p className={`text-[0.55rem] font-black uppercase tracking-[0.3em] ${cfg.labelColor}`}>{cfg.label}</p>
-          <h3 className={`mt-1 truncate font-black leading-tight ${isFirst ? "text-2xl" : "text-lg"}`}>{item.nome}</h3>
+          <p className={`text-[0.55rem] font-semibold uppercase tracking-[0.3em] ${cfg.labelColor}`}>{cfg.label}</p>
+          <h3 className={`mt-1 truncate font-semibold leading-tight text-neutral-100 ${isFirst ? "text-xl" : "text-base"}`}>{item.nome}</h3>
           {item.expert && (
-            <p className="mt-0.5 text-[0.6rem] uppercase tracking-[0.2em] text-white/40">{item.expert}</p>
+            <p className="mt-0.5 text-[0.58rem] uppercase tracking-[0.2em] text-neutral-500">{item.expert}</p>
           )}
         </div>
 
-        {/* Stats */}
         <div className="mt-auto w-full space-y-2">
           <div className="text-center">
-            <p className={`font-mono font-black tabular-nums ${isFirst ? "text-3xl" : "text-xl"} ${cfg.valueColor}`}>
+            <p className={`font-mono font-light tabular-nums ${isFirst ? "text-3xl" : "text-xl"} ${cfg.valueColor}`}>
               {BRL(item.faturamento)}
             </p>
-            <p className="mt-0.5 text-[0.6rem] font-bold uppercase tracking-[0.18em] text-white/40">
+            <p className="mt-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               {item.vendas} venda{item.vendas !== 1 ? "s" : ""} · TM {BRL(item.ticketMedio)}
             </p>
           </div>
           {item.meta > 0 && (
             <div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-1 overflow-hidden rounded-full bg-white/[.06]">
                 <div
-                  className={item.metaBatida ? "h-full bg-emerald-400" : "h-full bg-amber-400"}
+                  className={item.metaBatida ? "h-full bg-emerald-500" : "h-full bg-amber-500"}
                   style={{ width: `${item.metaPct}%` }}
                 />
               </div>
-              <p className="mt-1 text-center text-[0.58rem] font-bold uppercase tracking-wider text-white/40">
-                {item.metaBatida ? "✨ Meta batida" : `${item.metaPct.toFixed(0)}% da meta`}
+              <p className={`mt-1 text-center text-[0.56rem] font-semibold uppercase tracking-wider ${item.metaBatida ? "text-emerald-400" : "text-neutral-500"}`}>
+                {item.metaBatida ? "✓ meta batida" : `${item.metaPct.toFixed(0)}% da meta`}
               </p>
             </div>
           )}
         </div>
       </div>
-      {/* Podium base */}
-      <div className={`h-2 w-full rounded-b-md ${cfg.bar}`} />
+      <div className={`h-1 w-full rounded-b ${cfg.bar}`} />
     </div>
   );
 }
 
 function ListRow({ item, position }: { item: PublicRankingItem; position: number }) {
-  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0a0a14&color=ffffff&bold=true`;
+  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0a0a0c&color=e5e5e5&bold=true`;
   return (
-    <div className="grid grid-cols-[24px_32px_1fr_auto] items-center gap-2.5 rounded-lg border border-white/[.04] bg-white/[.02] px-2 py-1.5 transition-colors hover:bg-white/[.05]">
-      <span className="font-mono text-xs font-black text-white/40">{position}</span>
-      <img src={avatar} alt={item.nome} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10" />
+    <div className="grid grid-cols-[22px_30px_1fr_auto] items-center gap-2.5 rounded border border-white/[.03] bg-white/[.012] px-2 py-1.5">
+      <span className="font-mono text-[0.65rem] font-semibold text-neutral-500">{position}</span>
+      <img src={avatar} alt={item.nome} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/[.08]" />
       <div className="min-w-0">
-        <p className="truncate text-xs font-bold">{item.nome}</p>
-        <div className="flex items-center gap-1.5 text-[0.55rem] text-white/40">
+        <p className="truncate text-xs font-semibold text-neutral-200">{item.nome}</p>
+        <div className="flex items-center gap-1.5 text-[0.55rem] text-neutral-500">
           {item.expert && <span className="uppercase tracking-wider">{item.expert}</span>}
           <span>· {item.vendas}v</span>
         </div>
       </div>
-      <p className="font-mono text-xs font-black tabular-nums text-amber-400">{BRL(item.faturamento)}</p>
+      <p className="font-mono text-xs font-semibold tabular-nums text-amber-400">{BRL(item.faturamento)}</p>
     </div>
   );
 }
@@ -411,40 +498,28 @@ function ListRow({ item, position }: { item: PublicRankingItem; position: number
 function MetaLogRow({ log }: { log: MetaLog }) {
   const pct = log.meta > 0 ? Math.min(100, (log.faturamento / log.meta) * 100) : 0;
   return (
-    <div
-      className={`rounded-lg border px-3 py-2 ${
-        log.batida
-          ? "border-emerald-400/30 bg-emerald-400/[.06]"
-          : "border-white/[.05] bg-white/[.02]"
-      }`}
-    >
+    <div className={`rounded border px-2.5 py-1.5 ${log.batida ? "border-emerald-500/20 bg-emerald-500/[.04]" : "border-white/[.04] bg-white/[.012]"}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-bold">{log.nome}</p>
-          <p className="text-[0.55rem] uppercase tracking-wider text-white/40">
+          <p className="truncate text-xs font-semibold text-neutral-200">{log.nome}</p>
+          <p className="text-[0.55rem] uppercase tracking-wider text-neutral-500">
             {log.expert ?? log.utm} · {log.vendas}v
           </p>
         </div>
-        <div
-          className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.58rem] font-black uppercase tracking-wider ${
-            log.batida
-              ? "bg-emerald-400/15 text-emerald-300"
-              : "bg-amber-400/10 text-amber-300"
-          }`}
-        >
-          {log.batida ? <Award className="h-3 w-3" /> : <Target className="h-3 w-3" />}
+        <div className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[0.56rem] font-semibold uppercase tracking-wider ${log.batida ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-white/[.06] bg-white/[.02] text-neutral-400"}`}>
+          {log.batida ? <Award className="h-2.5 w-2.5" /> : <Target className="h-2.5 w-2.5" />}
           {log.batida ? "batida" : `${pct.toFixed(0)}%`}
         </div>
       </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[.06]">
+      <div className="mt-1.5 h-0.5 overflow-hidden rounded-full bg-white/[.05]">
         <div
-          className={log.batida ? "h-full bg-gradient-to-r from-emerald-500 to-emerald-300" : "h-full bg-gradient-to-r from-amber-500 to-amber-300"}
+          className={log.batida ? "h-full bg-emerald-500" : "h-full bg-amber-500"}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="mt-1 flex items-center justify-between font-mono text-[0.6rem] font-bold tabular-nums text-white/50">
-        <span>{BRL(log.faturamento)}</span>
-        <span className="text-white/30">/ {BRL(log.meta)}</span>
+      <div className="mt-1 flex items-center justify-between font-mono text-[0.58rem] font-semibold tabular-nums text-neutral-500">
+        <span className={log.batida ? "text-emerald-400" : "text-neutral-300"}>{BRL(log.faturamento)}</span>
+        <span className="text-neutral-600">/ {BRL(log.meta)}</span>
       </div>
     </div>
   );
