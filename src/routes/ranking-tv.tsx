@@ -767,15 +767,32 @@ function ColetivaRow({ m }: { m: ColetivaItem }) {
   );
 }
 
-function HallCard({ label, sub, item, highlight, icon }: { label: string; sub: string; item: PublicRankingItem | undefined; highlight: "amber" | "rose"; icon: React.ReactNode }) {
+function HallCard({ label, item, prox, meta, highlight, icon, emptyHint }: { label: string; item: HallEntry | null; prox: HallProx | null; meta: number; highlight: "amber" | "rose"; icon: React.ReactNode; emptyHint: string }) {
   const tone = highlight === "amber" ? "text-amber-400 border-amber-400/30 bg-amber-400/[.04]" : "text-rose-400 border-rose-400/30 bg-rose-400/[.04]";
+  const conquistado = !!item;
+  const faltam = prox ? Math.max(0, prox.meta - prox.faturamento) : meta;
+  const pct = prox ? Math.min(100, (prox.faturamento / prox.meta) * 100) : 0;
   return (
-    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${tone}`}>
-      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${tone}`}>{icon}</div>
+    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${conquistado ? tone : "border-white/[.05] bg-white/[.015] text-neutral-500"}`}>
+      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${conquistado ? tone : "border-white/[.08] text-neutral-600"}`}>{icon}</div>
       <div className="min-w-0 flex-1">
         <p className="text-[0.58rem] font-bold uppercase tracking-[0.2em]">{label}</p>
-        <p className="truncate text-xs font-semibold text-neutral-100">{item?.nome ?? "—"}</p>
-        <p className="text-[0.55rem] uppercase tracking-wider text-neutral-500">{sub}</p>
+        {conquistado ? (
+          <>
+            <p className="truncate text-xs font-semibold text-neutral-100">{item!.nome}</p>
+            <p className="font-mono text-[0.6rem] tabular-nums text-neutral-400">{BRL(item!.faturamento)} <span className="text-neutral-600">· meta {BRL(meta)}</span></p>
+          </>
+        ) : (
+          <>
+            <p className="truncate text-[0.65rem] font-semibold text-neutral-400">{emptyHint} — meta {BRL(meta)}/mês</p>
+            <div className="mt-1 h-0.5 overflow-hidden rounded bg-white/[.05]">
+              <div className={`h-full ${highlight === "amber" ? "bg-amber-500/60" : "bg-rose-500/60"}`} style={{ width: `${pct}%` }} />
+            </div>
+            <p className="mt-0.5 font-mono text-[0.52rem] tabular-nums text-neutral-600">
+              {prox ? <>{prox.nome} · faltam {BRL(faltam)}</> : "Nenhum candidato no mês"}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
