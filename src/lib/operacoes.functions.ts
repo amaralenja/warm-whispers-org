@@ -158,10 +158,13 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       ? vendasPeriodo.filter((v: any) => v._expert === expertFilter)
       : vendasPeriodo;
 
+    // Map ID da venda -> expert: usa produtos_map (consistente com vendas filtradas)
     const vendaToExpert = new Map<string, string>();
     for (const v of vendasAll as any[]) {
-      if (v["ID de Referência"] && v.nome_expert) {
-        vendaToExpert.set(String(v["ID de Referência"]), v.nome_expert);
+      const mapped = lookupProduto(v);
+      const expertName = mapped?.expert ?? v.nome_expert;
+      if (v["ID de Referência"] && expertName) {
+        vendaToExpert.set(String(v["ID de Referência"]), expertName);
       }
     }
 
