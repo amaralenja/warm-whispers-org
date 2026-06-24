@@ -151,6 +151,37 @@ function Dashboard() {
               </p>
             </section>
 
+            {/* Cards por operação — só na visão geral (todas) */}
+            {workspace.id === "all" && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em]">Operações no período</h2>
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+                    {experts.length} {experts.length === 1 ? "operação" : "operações"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {isLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-40 animate-pulse rounded-2xl border border-border bg-card/40" />
+                    ))
+                  ) : (
+                    <>
+                      {experts.map((e) => (
+                        <OperacaoCard key={e.id} expert={e} share={getShare(e.nome)} />
+                      ))}
+                      <TotalOperacoesCard
+                        faturamento={totalFat}
+                        vendas={totalVendas}
+                        ticketMedio={tmGeral}
+                        reembolsos={totalReemb}
+                      />
+                    </>
+                  )}
+                </div>
+              </section>
+            )}
+
             {/* Desempenho diário */}
             <DesempenhoDiario serie={data?.serieDiaria ?? []} loading={isLoading} />
 
