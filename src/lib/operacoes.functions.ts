@@ -114,13 +114,26 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       ),
     ]);
 
+    // Coerce defensivo: alguns campos podem vir como objeto/jsonb vazio do Postgres
+    const asStr = (x: unknown): string => {
+      if (x == null) return "";
+      if (typeof x === "string") return x;
+      if (typeof x === "number" || typeof x === "boolean") return String(x);
+      return ""; // objetos/arrays viram string vazia
+    };
+    const asStrOrNull = (x: unknown): string | null => {
+      const s = asStr(x);
+      return s ? s : null;
+    };
+
     // Mapa produto -> { expert, tipo } — vendas com produto NÃO mapeado são descartadas (igual ao dashboard antigo)
     const produtoMap = new Map<string, { expert: string; tipo: string }>();
     for (const p of (produtosMapRes.data ?? []) as any[]) {
-      const key = String(p.nome_produto ?? "").trim().toLowerCase();
-      if (key) produtoMap.set(key, { expert: p.nome_expert, tipo: String(p.tipo_produto ?? "main").toLowerCase() });
+      const key = asStr(p.nome_produto).trim().toLowerCase();
+      const expertName = asStr(p.nome_expert).trim();
+      if (key && expertName) produtoMap.set(key, { expert: expertName, tipo: asStr(p.tipo_produto || "main").toLowerCase() });
     }
-    const lookupProduto = (v: any) => produtoMap.get(String(v.Produto ?? "").trim().toLowerCase()) ?? null;
+    const lookupProduto = (v: any) => produtoMap.get(asStr(v.Produto).trim().toLowerCase()) ?? null;
 
 
     const experts = expertsRes.data ?? [];
