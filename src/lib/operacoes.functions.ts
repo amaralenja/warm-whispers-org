@@ -20,7 +20,7 @@ function parseDataField(raw: unknown): number | null {
     if (match) { d = +match[1]; m = +match[2]; y = +match[3]; }
     else return null;
   }
-  const t = Date.UTC(y, m - 1, d));
+  const t = Date.UTC(y, m - 1, d);
   return Number.isFinite(t) ? t : null;
 }
 
