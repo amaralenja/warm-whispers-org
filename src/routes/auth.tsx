@@ -56,7 +56,7 @@ function AuthPage() {
            style={{ background: "radial-gradient(closest-side, var(--accent), transparent)" }} />
 
       <header className="relative z-10 flex items-center justify-between px-8 py-7">
-        <img src={logoMultium.url} alt="MULTIUM" className="h-10 w-auto object-contain" />
+        <img src={logoMultium} alt="MULTIUM" className="h-10 w-auto object-contain" />
         <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
           {mode === "signin" ? "Acesso" : "Cadastro"}
         </div>
