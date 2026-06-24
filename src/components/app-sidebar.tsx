@@ -1,6 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, LineChart, Trophy, Tv, Wallet, LogOut } from "lucide-react";
+import { LayoutDashboard, LineChart, Trophy, Tv, Wallet, Activity, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -24,6 +24,7 @@ const items = [
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
+  { title: "Meta Ads", url: "/meta-ads", icon: Activity },
 ];
 
 export function AppSidebar() {
