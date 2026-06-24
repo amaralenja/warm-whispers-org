@@ -289,7 +289,10 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     }
 
     const totalReembolsos = reembolsos.length;
-    const ticketMedioGeral = totalVendas ? totalFaturamento / totalVendas : 0;
+    // Ticket Médio Geral: aplica mesmo threshold de R$97 + apenas tipo "main"
+    const vendasTm = vendasScoped.filter((v: any) => v._tipo === "main" && parseTicket(v.Ticket) >= TICKET_MIN);
+    const fatTm = vendasTm.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
+    const ticketMedioGeral = vendasTm.length ? fatTm / vendasTm.length : 0;
     const saldoEstimado = totalFaturamento - gastosMes;
 
     const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
