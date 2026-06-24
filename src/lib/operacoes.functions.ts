@@ -99,11 +99,12 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    const [expertsRes, vendedoresRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
+      supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       fetchAll<any>((from, to) =>
-        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM"').range(from, to),
+        supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
         supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto"').range(from, to),
@@ -112,6 +113,15 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
       ),
     ]);
+
+    // Mapa produto -> { expert, tipo } — vendas com produto NÃO mapeado são descartadas (igual ao dashboard antigo)
+    const produtoMap = new Map<string, { expert: string; tipo: string }>();
+    for (const p of (produtosMapRes.data ?? []) as any[]) {
+      const key = String(p.nome_produto ?? "").trim().toLowerCase();
+      if (key) produtoMap.set(key, { expert: p.nome_expert, tipo: String(p.tipo_produto ?? "main").toLowerCase() });
+    }
+    const lookupProduto = (v: any) => produtoMap.get(String(v.Produto ?? "").trim().toLowerCase()) ?? null;
+
 
     const experts = expertsRes.data ?? [];
     const vendedoresRaw = vendedoresRes.data ?? [];
@@ -133,18 +143,28 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const isReembolsada = (v: any) =>
       reembolsadasIds.has(String(v["ID de Referência"] ?? ""));
 
-    // Filtra vendas pelo período + expert + remove reembolsadas
-    const vendasPeriodo = vendasAll.filter(
-      (v: any) => inRange(parseDataField(v.Data)) && !isReembolsada(v),
-    );
+    // Filtra vendas pelo período + remove reembolsadas + EXIGE produto mapeado (=dashboard antigo)
+    // Atribui expert via produtos_map (sobrescreve nome_expert)
+    const vendasPeriodo = vendasAll
+      .filter((v: any) => inRange(parseDataField(v.Data)) && !isReembolsada(v))
+      .map((v: any) => {
+        const mapped = lookupProduto(v);
+        if (!mapped) return null;
+        return { ...v, _expert: mapped.expert, _tipo: mapped.tipo };
+      })
+      .filter((v: any): v is any => v !== null);
+
     const vendasScoped = expertFilter
-      ? vendasPeriodo.filter((v: any) => v.nome_expert === expertFilter)
+      ? vendasPeriodo.filter((v: any) => v._expert === expertFilter)
       : vendasPeriodo;
 
+    // Map ID da venda -> expert: usa produtos_map (consistente com vendas filtradas)
     const vendaToExpert = new Map<string, string>();
     for (const v of vendasAll as any[]) {
-      if (v["ID de Referência"] && v.nome_expert) {
-        vendaToExpert.set(String(v["ID de Referência"]), v.nome_expert);
+      const mapped = lookupProduto(v);
+      const expertName = mapped?.expert ?? v.nome_expert;
+      if (v["ID de Referência"] && expertName) {
+        vendaToExpert.set(String(v["ID de Referência"]), expertName);
       }
     }
 
@@ -165,7 +185,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
 
     // Stats por expert (sempre considera todas as vendas do período, sem o filtro de expert)
     const expertStats: ExpertStats[] = experts.map((e: any) => {
-      const vds = vendasPeriodo.filter((v: any) => v.nome_expert === e.nome);
+      const vds = vendasPeriodo.filter((v: any) => v._expert === e.nome);
       const faturamento = vds.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
       const vendasCount = vds.length;
       const vendedoresCount = vendedoresRaw.filter((vd: any) => vd.expert === e.nome && vd.ativo).length;
