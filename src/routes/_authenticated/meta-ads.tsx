@@ -42,7 +42,7 @@ function MetaAdsPage() {
   const [showToken, setShowToken] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState("Purchase");
   const [eventValue, setEventValue] = useState("");
-  const [eventCurrency, setEventCurrency] = useState("BRL");
+  const needsValue = EVENTS.find((e) => e.name === selectedEvent)?.needsValue ?? false;
 
   useEffect(() => {
     if (cfg) {
@@ -84,12 +84,16 @@ function MetaAdsPage() {
   }
 
   function handleSend() {
+    if (needsValue && (!eventValue || Number(eventValue) <= 0)) {
+      return toast.error("Informe o valor da venda em R$");
+    }
     sendMut.mutate({
       eventName: selectedEvent,
-      value: eventValue ? Number(eventValue) : undefined,
-      currency: eventCurrency,
+      value: needsValue ? Number(eventValue) : undefined,
+      currency: needsValue ? "BRL" : undefined,
       eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
     });
+    if (needsValue) setEventValue("");
   }
 
   return (
@@ -192,18 +196,18 @@ function MetaAdsPage() {
             <Send className="h-5 w-5 text-accent" />
             <h2 className="text-lg font-semibold">Disparar evento</h2>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="md:col-span-3">
+          <div className="space-y-4">
+            <div>
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Evento
               </label>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {EVENTS.map((ev) => (
                   <button
                     key={ev.name}
                     onClick={() => setSelectedEvent(ev.name)}
                     className={[
-                      "rounded-lg border px-3 py-2.5 text-left text-sm transition",
+                      "rounded-lg border px-4 py-3 text-left text-sm transition",
                       selectedEvent === ev.name
                         ? "border-accent bg-accent/10 text-accent"
                         : "border-border bg-background hover:border-accent/50",
@@ -215,39 +219,42 @@ function MetaAdsPage() {
                 ))}
               </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Valor (opcional)
-              </label>
-              <input
-                type="number"
-                value={eventValue}
-                onChange={(e) => setEventValue(e.target.value)}
-                placeholder="0.00"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Moeda
-              </label>
-              <input
-                type="text"
-                value={eventCurrency}
-                onChange={(e) => setEventCurrency(e.target.value.toUpperCase())}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleSend}
-                disabled={sendMut.isPending || !cfg?.hasToken}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
-              >
-                {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Enviar evento
-              </button>
-            </div>
+
+            {needsValue && (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Valor da venda (R$)
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={eventValue}
+                    onChange={(e) => setEventValue(e.target.value)}
+                    placeholder="0,00"
+                    autoFocus
+                    className="w-full rounded-lg border border-border bg-background py-2.5 pl-10 pr-3 text-base font-semibold outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Vai pro Meta como Purchase + value em BRL — bom pra otimizar campanhas por ROAS.
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={handleSend}
+              disabled={sendMut.isPending || !cfg?.hasToken}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+            >
+              {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Disparar {selectedEvent}
+              {needsValue && eventValue ? ` • R$ ${eventValue}` : ""}
+            </button>
           </div>
           {!cfg?.hasToken && (
             <p className="mt-3 text-xs text-muted-foreground">
