@@ -31,9 +31,11 @@ function Dashboard() {
 
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
 
+  const expertFilter = workspace.id === "all" ? null : workspace.id;
+
   const { data, isLoading } = useQuery({
-    queryKey: ["operacoes-stats", range.from, range.to],
-    queryFn: () => fetchOps({ data: { from: range.from, to: range.to } }),
+    queryKey: ["operacoes-stats", range.from, range.to, expertFilter],
+    queryFn: () => fetchOps({ data: { from: range.from, to: range.to, expert: expertFilter } }),
   });
 
   const experts = data?.experts ?? [];
