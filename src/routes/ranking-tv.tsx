@@ -105,16 +105,35 @@ function RankingTV() {
     refetchInterval: 15_000,
   });
 
-  // Realtime: invalida a query quando entra venda nova
+  // Realtime: invalida a query quando entra venda nova + dispara pop
   useEffect(() => {
     const channel = supabase
       .channel("ranking-tv-vendas")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "vendas" },
-        () => {
+        (payload) => {
           setPulse((p) => p + 1);
           queryClient.invalidateQueries({ queryKey });
+          const row = (payload.new ?? {}) as Record<string, unknown>;
+          const evento = String(row.Evento ?? "");
+          if (!/aprov|purchase_approved/i.test(evento)) return;
+          const utm = String(row.UTM ?? "").trim().toUpperCase();
+          const ticketRaw = String(row.Ticket ?? "0").replace(/[^0-9,.-]/g, "").replace(",", ".");
+          const ticket = parseFloat(ticketRaw) || 0;
+          const seller = rankingRef.current.find((r) => r.utm?.toUpperCase() === utm);
+          const nome = seller?.nome ?? "Nova venda";
+          const expert = seller?.expert ?? null;
+          const avatar = seller?.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=0a0a0c&color=e5e5e5&size=200&bold=true`;
+          const pop: SalePop = {
+            id: Date.now() + Math.random(),
+            nome, expert, avatar, ticket,
+            left: 20 + Math.random() * 60,
+          };
+          setSalePops((prev) => [...prev, pop]);
+          setTimeout(() => {
+            setSalePops((prev) => prev.filter((p) => p.id !== pop.id));
+          }, 5200);
         }
       )
       .on(
@@ -132,6 +151,7 @@ function RankingTV() {
   }, []);
 
   const ranking = data?.ranking ?? [];
+  useEffect(() => { rankingRef.current = ranking; }, [ranking]);
   const top3 = ranking.slice(0, 3);
   const rest = ranking.slice(3, 15);
   const metaLogs = data?.metaLogs ?? [];
