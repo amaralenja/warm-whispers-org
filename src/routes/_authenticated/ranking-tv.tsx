@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Crown, Flame, Trophy, Medal, Sparkles, Radio, TrendingUp } from "lucide-react";
+import { Crown, Flame, Trophy, Medal, Sparkles, Radio, TrendingUp, ArrowLeft } from "lucide-react";
 import { getRankingStats, type RankingItem } from "@/lib/ranking.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 
@@ -39,10 +39,18 @@ function RankingTV() {
   const [period, setPeriod] = useState<"hoje" | "mes">("mes");
   const [now, setNow] = useState(() => new Date());
 
+  const navigate = useNavigate();
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") navigate({ to: "/ranking" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navigate]);
 
   const range = useMemo(() => {
     const to = todayISO();
@@ -79,6 +87,14 @@ function RankingTV() {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-10 pt-6">
         <div className="flex items-center gap-4">
+          <Link
+            to="/ranking"
+            className="group flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-black uppercase tracking-[0.25em] text-white/60 backdrop-blur-xl transition hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-400"
+            title="Voltar (Esc)"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            Sair
+          </Link>
           <div className="relative">
             <div className="absolute inset-0 animate-pulse rounded-full bg-emerald-400/30 blur-xl" />
             <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 backdrop-blur-xl">
