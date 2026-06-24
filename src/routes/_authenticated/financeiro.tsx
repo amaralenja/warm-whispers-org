@@ -4,11 +4,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Wallet, TrendingUp, TrendingDown, Plus, Pencil, Trash2, Search,
-  Filter, Calendar, Repeat, AlertCircle, CheckCircle2, Clock,
+  Filter, Repeat, AlertCircle, CheckCircle2, Clock,
+  BarChart3, Gem, ClipboardList, Percent,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listLancamentos, upsertLancamento, deleteLancamento, type Lancamento,
+  getFinanceiroRelatorio, getDRE,
 } from "@/lib/financeiro.functions";
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
