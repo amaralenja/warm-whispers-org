@@ -105,20 +105,40 @@ const listLogsSchema = z.object({
   limit: z.number().int().min(1).max(50).optional(),
 });
 
+// Meta Advanced Matching specs: https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/customer-information-parameters
 function normalizeEmail(value?: string): string | null {
-  const normalized = value?.trim().toLowerCase();
-  return normalized || null;
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  // Basic RFC-ish check; Meta rejects malformed emails
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+  return normalized;
 }
 
 function normalizePhone(value?: string): string | null {
-  const digits = value?.replace(/\D/g, "") ?? "";
+  if (!value) return null;
+  // E.164 sem o "+" (só dígitos), com country code. Default BR = 55.
+  let digits = value.replace(/\D/g, "");
   if (!digits) return null;
-  if (digits.startsWith("55")) return digits;
-  return digits.length >= 10 && digits.length <= 11 ? `55${digits}` : digits;
+  // Remove zeros à esquerda (ex: 011 99999...)
+  digits = digits.replace(/^0+/, "");
+  // Se já vier com 55 + 10/11 dígitos, mantém
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return digits;
+  // Número BR local (10 = fixo DDD+8, 11 = celular DDD+9)
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  // Outros países: assume que já veio com country code
+  if (digits.length >= 8 && digits.length <= 15) return digits;
+  return null;
 }
 
 function normalizeName(value?: string): string | null {
-  const normalized = value?.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (!value) return null;
+  // Meta: lowercase, sem acentos, sem pontuação, sem espaços
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // tira acentos
+    .replace(/[^a-z]/g, ""); // só letras a-z
   return normalized || null;
 }
 
