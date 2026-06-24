@@ -106,7 +106,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         supabase.from("vendas").select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
-        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso"').range(from, to),
+        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto"').range(from, to),
       ),
       fetchAll<any>((from, to) =>
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
