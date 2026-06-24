@@ -426,14 +426,15 @@ function RankingTV() {
       </header>
 
       {/* STATS sóbrios */}
-      <div className="relative z-10 grid grid-cols-3 gap-4 border-b border-white/[.04] px-10 py-5">
+      <div className="relative z-10 grid shrink-0 grid-cols-3 gap-3 border-b border-white/[.04] px-8 py-2.5">
         <StatCard label="Faturamento hoje" value={BRL(data?.totalFaturamento ?? 0)} tone="emerald" icon={<Zap className="h-3.5 w-3.5" />} />
         <StatCard label="Vendas aprovadas" value={String(data?.totalVendas ?? 0)} tone="amber" icon={<Flame className="h-3.5 w-3.5" />} />
         <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="neutral" icon={<Sparkles className="h-3.5 w-3.5" />} />
       </div>
 
       {/* MAIN GRID — 12 colunas */}
-      <main className="relative z-10 grid h-[calc(100vh-80px-92px-32px)] grid-cols-12 gap-3 px-6 py-4">
+      <main className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-hidden px-5 py-3">
+
         {/* COL ESQUERDA — Metas Coletivas + Hall of Fame */}
         <aside className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
           <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
