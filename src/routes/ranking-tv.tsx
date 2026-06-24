@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, Crown, Flame, Medal, Sparkles, Target, Trophy, Zap } from "lucide-react";
+import { Award, Crown, Flame, Gift, MapPin, Medal, Sparkles, Target, Trophy, Users, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/ranking-tv")({
@@ -194,6 +194,63 @@ function RankingTV() {
       clearTimeout(t2);
     };
   }, [metaLogs]);
+  // === DERIVAÇÕES EXTRAS (Metas Coletivas / Hall of Fame / Balões) ===
+  const metasColetivas = useMemo(() => {
+    const map = new Map<string, { expert: string; faturamento: number; meta: number; vendas: number }>();
+    ranking.forEach((r) => {
+      const exp = (r.expert ?? "—").toUpperCase();
+      const cur = map.get(exp) ?? { expert: exp, faturamento: 0, meta: 0, vendas: 0 };
+      cur.faturamento += r.faturamento;
+      cur.meta += r.meta * 30; // meta diária * 30 = meta mensal estimada
+      cur.vendas += r.vendas;
+      map.set(exp, cur);
+    });
+    return Array.from(map.values())
+      .filter((m) => m.expert !== "—")
+      .sort((a, b) => b.faturamento - a.faturamento)
+      .map((m) => {
+        const pct = m.meta > 0 ? Math.min(100, (m.faturamento / m.meta) * 100) : 0;
+        // sistema de níveis: 25/50/75/100% = N1/N2/N3/N4
+        const nivel = pct >= 100 ? 4 : pct >= 75 ? 3 : pct >= 50 ? 2 : 1;
+        const proxLimite = nivel >= 4 ? m.meta : (nivel / 4) * m.meta;
+        const faltaProx = Math.max(0, proxLimite - m.faturamento);
+        return { ...m, pct, nivel, faltaProx };
+      });
+  }, [ranking]);
+
+  const hallOfFame = useMemo(() => {
+    const lobo = [...ranking].filter((r) => r.vendas > 0).sort((a, b) => b.ticketMedio - a.ticketMedio)[0];
+    const rainha = [...ranking].sort((a, b) => b.vendas - a.vendas)[0];
+    return { lobo, rainha };
+  }, [ranking]);
+
+  // Meta dos balões — 14 prêmios fixos; abrem na ordem das metas batidas
+  const baloes = useMemo<Array<{ premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" }>>(() => [
+    { premio: "NADA", sub: "Quase! Mas o foco continua!", tier: "nada" },
+    { premio: "NADA", sub: "Bateu na trave, guerreiro!", tier: "nada" },
+    { premio: "ESTOURE OUTRO BALÃO!", sub: "O universo te deu mais uma chance!", tier: "extra" },
+    { premio: "NADA", sub: "Fica triste não, amanhã tem mais!", tier: "nada" },
+    { premio: "NADA", sub: "Quase!", tier: "nada" },
+    { premio: "NADA", sub: "Vazio igual ao direct do concorrente kkk", tier: "nada" },
+    { premio: "PIX DE R$ 100,00 NA CONTA!", sub: "O prêmio de ouro!", tier: "ouro" },
+    { premio: "NADA", sub: "Segue o jogo, tubarão!", tier: "nada" },
+    { premio: "NADA", sub: "Não desiste!", tier: "nada" },
+    { premio: "NADA", sub: "O balão tava com preguiça hoje…", tier: "nada" },
+    { premio: "NADA", sub: "Passou perto!", tier: "nada" },
+    { premio: "VALE REDBULL OU BARRA DE CHOCOLATE", sub: "Pra dar aquele gás no fechamento!", tier: "vale" },
+    { premio: "NADA", sub: "O próximo vai ser o premiado!", tier: "nada" },
+    { premio: "PIX DE R$ 50,00 NA CONTA!", sub: "Bônus surpresa!", tier: "pix" },
+  ], []);
+  const baloesAbertos = Math.min(hitCount, baloes.length);
+  const totaisPremios = useMemo(() => {
+    const abertos = baloes.slice(0, baloesAbertos);
+    return {
+      pix: abertos.filter((b) => b.tier === "pix" || b.tier === "ouro").length,
+      premio: abertos.filter((b) => b.tier !== "nada" && b.tier !== "extra").length,
+      vale: abertos.filter((b) => b.tier === "vale").length,
+    };
+  }, [baloes, baloesAbertos]);
+
 
   // pulso suave no header quando entra venda nova
   const [pulseFlash, setPulseFlash] = useState(false);
@@ -369,44 +426,98 @@ function RankingTV() {
         <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="neutral" icon={<Sparkles className="h-3.5 w-3.5" />} />
       </div>
 
-      {/* MAIN GRID */}
-      <main className="relative z-10 grid h-[calc(100vh-80px-92px)] grid-cols-12 gap-4 px-10 py-5">
-        {/* PODIUM */}
-        <section className="col-span-8 flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-6">
-          <header className="mb-2 flex items-center justify-between">
-            <div>
-              <h2 className="text-[0.58rem] font-semibold uppercase tracking-[0.34em] text-neutral-500">o pódio</h2>
-              <p className="mt-1.5 text-xl font-semibold text-neutral-100">Top performers de hoje</p>
+      {/* MAIN GRID — 12 colunas */}
+      <main className="relative z-10 grid h-[calc(100vh-80px-92px-32px)] grid-cols-12 gap-3 px-6 py-4">
+        {/* COL ESQUERDA — Metas Coletivas + Hall of Fame */}
+        <aside className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
+                <Target className="h-3 w-3 text-emerald-500" /> Metas coletivas
+              </h2>
+              <span className="text-[0.55rem] uppercase tracking-[0.2em] text-neutral-600">mês atual</span>
+            </header>
+            <div className="min-h-0 flex-1 space-y-2 overflow-hidden">
+              {metasColetivas.slice(0, 4).map((m) => (
+                <ColetivaRow key={m.expert} m={m} />
+              ))}
+              {metasColetivas.length === 0 && (
+                <p className="py-6 text-center text-[0.65rem] uppercase tracking-widest text-neutral-700">Sem dados</p>
+              )}
             </div>
-            <div className="rounded border border-white/[.06] bg-white/[.02] px-3 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.24em] text-neutral-400">
-              {data?.vendedoresAtivos ?? 0} vendedores
-            </div>
-          </header>
+          </section>
 
-          <div className="flex flex-1 items-end justify-center gap-5 pb-2 pt-6">
-            {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[70%]" />}
-            {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[90%]" />}
-            {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[58%]" />}
-            {top3.length === 0 && (
-              <div className="flex h-full w-full items-center justify-center text-neutral-600">
-                <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
+          <section className="flex flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-2 flex items-center gap-2 border-b border-white/[.04] pb-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
+              <Trophy className="h-3 w-3 text-amber-500" /> Hall of fame
+              <span className="ml-auto text-[0.52rem] tracking-[0.18em] text-neutral-600">destaques</span>
+            </header>
+            <div className="space-y-2">
+              <HallCard label="Lobo do X1" sub="Maior ticket médio" item={hallOfFame.lobo} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} />
+              <HallCard label="Rainha do X1" sub="Mais vendas no dia" item={hallOfFame.rainha} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} />
+            </div>
+          </section>
+        </aside>
+
+        {/* COL CENTRO — Pódio + Meta dos Balões */}
+        <section className="col-span-6 grid min-h-0 grid-rows-[1fr_auto] gap-3">
+          <div className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
+            <header className="mb-1 flex items-center justify-between">
+              <div>
+                <h2 className="text-[0.56rem] font-semibold uppercase tracking-[0.32em] text-neutral-500">o pódio</h2>
+                <p className="mt-1 text-lg font-semibold text-neutral-100">Top performers de hoje</p>
               </div>
-            )}
+              <div className="rounded border border-white/[.06] bg-white/[.02] px-3 py-1 text-[0.56rem] font-semibold uppercase tracking-[0.22em] text-neutral-400">
+                <Users className="mr-1 inline h-3 w-3" />
+                {data?.vendedoresAtivos ?? 0} vendedores
+              </div>
+            </header>
+
+            <div className="flex flex-1 items-end justify-center gap-4 pb-1 pt-4">
+              {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[70%]" />}
+              {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[90%]" />}
+              {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[58%]" />}
+              {top3.length === 0 && (
+                <div className="flex h-full w-full items-center justify-center text-neutral-600">
+                  <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Meta dos Balões */}
+          <div className="rounded-lg border border-white/[.04] bg-white/[.012] p-3">
+            <header className="mb-2 flex items-center justify-between px-1">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
+                <MapPin className="h-3 w-3 text-rose-400" /> Meta dos balões
+                <span className="text-[0.5rem] tracking-[0.16em] text-neutral-600">PREMIAÇÃO DA CAMPANHA</span>
+              </h2>
+              <div className="flex items-center gap-2 text-[0.55rem] font-mono">
+                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-400">{totaisPremios.premio}× prêmio</span>
+                <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-400">{totaisPremios.pix}× pix</span>
+                <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-semibold text-rose-400">{totaisPremios.vale}× vale</span>
+              </div>
+            </header>
+            <div className="grid grid-cols-7 gap-1.5">
+              {baloes.map((b, i) => (
+                <BalaoSlot key={i} index={i + 1} balao={b} aberto={i < baloesAbertos} />
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* RIGHT */}
-        <aside className="col-span-4 grid min-h-0 grid-rows-2 gap-4">
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
-            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
-              <h2 className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-400">
+        {/* COL DIREITA — Próximos + Metas Individuais */}
+        <aside className="col-span-3 grid min-h-0 grid-rows-2 gap-3">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-2 flex items-center justify-between border-b border-white/[.04] pb-2">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
                 <Trophy className="h-3 w-3 text-amber-500" /> Próximos no pódio
               </h2>
-              <span className="font-mono text-[0.6rem] font-semibold text-neutral-500">
+              <span className="font-mono text-[0.56rem] font-semibold text-neutral-500">
                 #4 — #{Math.min(15, 3 + rest.length)}
               </span>
             </header>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
               {rest.map((v, i) => (
                 <ListRow key={v.utm} item={v} position={i + 4} />
               ))}
@@ -418,12 +529,12 @@ function RankingTV() {
             </div>
           </section>
 
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
-            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
-              <h2 className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-400">
+          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
+            <header className="mb-2 flex items-center justify-between border-b border-white/[.04] pb-2">
+              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
                 <Target className="h-3 w-3 text-emerald-500" /> Metas individuais
               </h2>
-              <span className="rounded border border-emerald-500/20 bg-emerald-500/[.06] px-2 py-0.5 font-mono text-[0.58rem] font-semibold text-emerald-400">
+              <span className="rounded border border-emerald-500/20 bg-emerald-500/[.06] px-2 py-0.5 font-mono text-[0.55rem] font-semibold text-emerald-400">
                 {hitCount} batidas
               </span>
             </header>
@@ -440,6 +551,15 @@ function RankingTV() {
           </section>
         </aside>
       </main>
+
+      {/* FOOTER */}
+      <footer className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-10 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
+        <span>MULTIUM OS V2.0 · RANKING ENGINE</span>
+        <span className="flex items-center gap-2">
+          <span className="live-dot inline-block h-1 w-1 rounded-full bg-emerald-500" />
+          Sincronizado · pulse {pulse}
+        </span>
+      </footer>
     </div>
   );
 }
@@ -601,3 +721,74 @@ function MetaLogRow({ log }: { log: MetaLog }) {
     </div>
   );
 }
+
+type ColetivaItem = { expert: string; faturamento: number; meta: number; vendas: number; pct: number; nivel: number; faltaProx: number };
+
+function ColetivaRow({ m }: { m: ColetivaItem }) {
+  const nivelColors = ["", "text-amber-400 border-amber-400/30", "text-emerald-400 border-emerald-400/30", "text-sky-400 border-sky-400/30", "text-violet-400 border-violet-400/30"];
+  return (
+    <div className="rounded border border-white/[.04] bg-white/[.012] p-2.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-neutral-200">{m.expert} MENSAL</p>
+          <p className="font-mono text-base font-light tabular-nums text-emerald-400">{BRL(m.faturamento)}</p>
+        </div>
+        <div className="text-right">
+          <span className={`inline-block rounded border px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider ${nivelColors[m.nivel]}`}>
+            Nível {m.nivel}
+          </span>
+          <p className="mt-1 font-mono text-[0.7rem] font-semibold text-amber-400">{m.pct.toFixed(0)}%</p>
+        </div>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[.06]">
+        <div className="h-full bg-emerald-500" style={{ width: `${m.pct}%` }} />
+      </div>
+      <p className="mt-1 text-[0.55rem] tracking-wide text-neutral-500">
+        {m.faltaProx > 0 ? <>Necessário p/ Nível {m.nivel + 1}: <span className="font-semibold text-neutral-300">{BRL(m.faltaProx)}</span></> : "Nível máximo!"}
+      </p>
+    </div>
+  );
+}
+
+function HallCard({ label, sub, item, highlight, icon }: { label: string; sub: string; item: PublicRankingItem | undefined; highlight: "amber" | "rose"; icon: React.ReactNode }) {
+  const tone = highlight === "amber" ? "text-amber-400 border-amber-400/30 bg-amber-400/[.04]" : "text-rose-400 border-rose-400/30 bg-rose-400/[.04]";
+  return (
+    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${tone}`}>
+      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${tone}`}>{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.58rem] font-bold uppercase tracking-[0.2em]">{label}</p>
+        <p className="truncate text-xs font-semibold text-neutral-100">{item?.nome ?? "—"}</p>
+        <p className="text-[0.55rem] uppercase tracking-wider text-neutral-500">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+type Balao = { premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" };
+
+function BalaoSlot({ index, balao, aberto }: { index: number; balao: Balao; aberto: boolean }) {
+  if (!aberto) {
+    return (
+      <div className="flex h-14 flex-col items-center justify-center rounded border border-white/[.05] bg-white/[.015] text-center">
+        <span className="font-mono text-[0.55rem] font-semibold text-neutral-600">{index}</span>
+        <Gift className="h-3.5 w-3.5 text-neutral-700" />
+      </div>
+    );
+  }
+  const tones: Record<Balao["tier"], string> = {
+    nada: "border-white/[.06] bg-white/[.02] text-neutral-500",
+    pix: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+    ouro: "border-amber-500/50 bg-amber-500/15 text-amber-300",
+    vale: "border-rose-500/40 bg-rose-500/10 text-rose-300",
+    extra: "border-sky-500/40 bg-sky-500/10 text-sky-300",
+  };
+  return (
+    <div className={`group relative flex h-14 flex-col items-center justify-center rounded border px-1 text-center ${tones[balao.tier]}`} title={`${balao.premio} — ${balao.sub}`}>
+      <span className="absolute left-1 top-0.5 font-mono text-[0.5rem] font-bold opacity-60">{index}</span>
+      <p className="line-clamp-2 text-[0.5rem] font-bold uppercase leading-tight tracking-tight">
+        {balao.tier === "nada" ? "✕ nada" : balao.premio}
+      </p>
+    </div>
+  );
+}
+
