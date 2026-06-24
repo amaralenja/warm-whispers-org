@@ -190,8 +190,7 @@ export function DashboardConfigDialog({ open, onOpenChange, experts, scoped, sco
           </div>
         </footer>
       </aside>
-    </div>,
-    document.body,
+    </div>
   );
 }
 
