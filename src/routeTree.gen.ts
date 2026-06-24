@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingTvRouteImport } from './routes/_authenticated/ranking-tv'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
+import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
 const AuthRoute = AuthRouteImport.update({
@@ -46,6 +47,11 @@ const AuthenticatedRankingRoute = AuthenticatedRankingRouteImport.update({
   path: '/ranking',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -56,6 +62,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/ranking-tv': typeof AuthenticatedRankingTvRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -84,17 +93,26 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/financeiro'
     | '/ranking'
     | '/ranking-tv'
     | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/ranking' | '/ranking-tv' | '/relatorios'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/financeiro'
+    | '/ranking'
+    | '/ranking-tv'
+    | '/relatorios'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/dashboard'
+    | '/_authenticated/financeiro'
     | '/_authenticated/ranking'
     | '/_authenticated/ranking-tv'
     | '/_authenticated/relatorios'
@@ -150,6 +168,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRankingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/financeiro': {
+      id: '/_authenticated/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AuthenticatedFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -162,6 +187,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRankingTvRoute: typeof AuthenticatedRankingTvRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
@@ -169,6 +195,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRankingTvRoute: AuthenticatedRankingTvRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
