@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, Crown, Flame, Medal, Sparkles, Target, Trophy, Zap } from "lucide-react";
+import { Award, Crown, Flame, Gift, MapPin, Medal, Sparkles, Target, Trophy, Users, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/ranking-tv")({
