@@ -273,7 +273,7 @@ export function DesempenhoDiario({
             {/* Tooltip HTML — segue o ponto */}
             {hoverPoint && (
               <div
-                className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-emerald-500/40 bg-popover/95 px-3 py-2 text-xs shadow-xl shadow-emerald-500/10 backdrop-blur"
+                className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-lg"
                 style={{
                   left: `${(hoverPoint.x / W) * 100}%`,
                   top: `${((hoverPoint.y / H) * 100) * 0.88}%`,
