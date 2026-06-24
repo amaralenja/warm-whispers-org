@@ -2,9 +2,11 @@ import { useState } from "react";
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Coins, ArrowUpRight, Users } from "lucide-react";
+import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Coins, ArrowUpRight, Users, Settings, Sparkles } from "lucide-react";
 import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 import { useWorkspace } from "@/lib/workspace-context";
+import { useDashboardConfig } from "@/lib/dashboard-config";
+import { DashboardConfigDialog } from "@/components/dashboard-config-dialog";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 import { ParticipacaoVendedores } from "@/components/participacao-vendedores";
 import { DesempenhoDiario } from "@/components/desempenho-diario";
@@ -28,9 +30,11 @@ const EXPERT_ACCENT: Record<string, string> = {
 function Dashboard() {
   const { user } = useRouteContext({ from: "/_authenticated" });
   const { workspace } = useWorkspace();
+  const { config, getShare } = useDashboardConfig();
   const fetchOps = useServerFn(getOperacoesStats);
 
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("30d"));
+  const [configOpen, setConfigOpen] = useState(false);
 
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
@@ -54,7 +58,13 @@ function Dashboard() {
     : visibleExperts.reduce((a, e) => a + e.reembolsos, 0);
   const tmGeral = totalVendas ? totalFat / totalVendas : 0;
   const gastosMes = data?.gastosMes ?? 0;
-  const saldoEstimado = totalFat - gastosMes;
+
+  // Nossa parte = soma do faturamento × % de cada expert visível
+  const nossaParte = visibleExperts.reduce(
+    (acc, e) => acc + e.faturamento * (getShare(e.nome) / 100),
+    0,
+  );
+  const saldoEstimado = nossaParte - gastosMes;
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
@@ -69,7 +79,18 @@ function Dashboard() {
               Boa, <em className="text-accent">{user?.email?.split("@")[0]}</em>.
             </h1>
           </div>
-          <DateRangeFilter value={range} onChange={setRange} />
+          <div className="flex items-center gap-2">
+            <DateRangeFilter value={range} onChange={setRange} />
+            <button
+              type="button"
+              onClick={() => setConfigOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary/50"
+              title={workspace.id === "all" ? "Configurar todas as operações" : `Configurar ${workspace.nome}`}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Configurar
+            </button>
+          </div>
         </div>
 
         <Tabs defaultValue="geral" className="mt-8">
@@ -113,26 +134,44 @@ function Dashboard() {
               />
             </section>
 
+            {/* Nossa Parte — sempre que houver % configurado */}
+            <section className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-5">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Nossa Parte</span>
+              </div>
+              <div className={`mt-2 text-4xl ${NUM} text-emerald-400`}>
+                {isLoading ? "—" : BRL(nossaParte)}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {visibleExperts.length === 0
+                  ? "Sem operações no período"
+                  : visibleExperts.map((e) => `${e.nome} ${getShare(e.nome)}%`).join(" · ")}
+              </p>
+            </section>
+
             {/* Desempenho diário */}
             <DesempenhoDiario serie={data?.serieDiaria ?? []} loading={isLoading} />
 
-            {/* Financeiro (só visão geral) */}
-            {workspace.id === "all" && (
+            {/* Financeiro (toggle pela config) */}
+            {config.showFinanceiro && workspace.id === "all" && (
               <section className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-3">
                 <MiniCard
                   icon={<Wallet className="h-4 w-4" />}
                   label="Saldo Estimado"
                   value={isLoading ? "—" : BRL(saldoEstimado)}
-                  hint="Faturamento − gastos do mês"
+                  hint="Nossa parte − gastos do mês"
                   accent={saldoEstimado >= 0 ? "text-emerald-400" : "text-rose-400"}
                 />
-                <MiniCard
-                  icon={<AlertTriangle className="h-4 w-4" />}
-                  label="Gastos do Mês"
-                  value={isLoading ? "—" : BRL(gastosMes)}
-                  hint="Financeiro · mês atual"
-                  accent="text-rose-400"
-                />
+                {config.showGastosCard && (
+                  <MiniCard
+                    icon={<AlertTriangle className="h-4 w-4" />}
+                    label="Gastos do Mês"
+                    value={isLoading ? "—" : BRL(gastosMes)}
+                    hint="Financeiro · mês atual"
+                    accent="text-rose-400"
+                  />
+                )}
                 <MiniCard
                   icon={<Coins className="h-4 w-4" />}
                   label="Reembolsos"
@@ -187,6 +226,14 @@ function Dashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <DashboardConfigDialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        experts={experts.map((e) => ({ id: e.id, nome: e.nome }))}
+        scoped={workspace.id !== "all"}
+        scopedName={workspace.id !== "all" ? workspace.nome : undefined}
+      />
     </main>
   );
 }
