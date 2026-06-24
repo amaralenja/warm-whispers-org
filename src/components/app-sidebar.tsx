@@ -23,6 +23,7 @@ const items = [
   { title: "Relatórios", url: "/relatorios", icon: LineChart },
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
+  { title: "Financeiro", url: "/financeiro", icon: Wallet },
 ];
 
 export function AppSidebar() {
