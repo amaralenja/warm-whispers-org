@@ -34,7 +34,7 @@ function Dashboard() {
   const { config, getShare } = useDashboardConfig();
   const fetchOps = useServerFn(getOperacoesStats);
 
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("mes"));
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("ano"));
   const [configOpen, setConfigOpen] = useState(false);
 
   const expertFilter = workspace.id === "all" ? null : workspace.id;
