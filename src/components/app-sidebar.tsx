@@ -22,6 +22,7 @@ const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Relatórios", url: "/relatorios", icon: LineChart },
   { title: "Ranking", url: "/ranking", icon: Trophy },
+  { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
 ];
 
 export function AppSidebar() {
