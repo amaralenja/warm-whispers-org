@@ -279,7 +279,7 @@ export const sendMetaEvent = createServerFn({ method: "POST" })
           event_name: data.eventName,
           event_time: Math.floor(Date.now() / 1000),
           event_id: eventId,
-          action_source: "system_generated",
+          action_source: "phone_call",
           ...(data.eventSourceUrl ? { event_source_url: data.eventSourceUrl } : {}),
           user_data: userData,
           custom_data:
