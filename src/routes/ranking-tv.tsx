@@ -268,7 +268,7 @@ function RankingTV() {
   }, [pulse]);
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#0a0a0c] text-neutral-100">
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#0a0a0c] text-neutral-100">
       <style>{`
         @keyframes balloon-rise { 0% { transform: translate3d(0,110vh,0) rotate(-4deg); opacity:0; } 8% { opacity:1; } 92% { opacity:1; } 100% { transform: translate3d(0,-25vh,0) rotate(8deg); opacity:0; } }
         @keyframes confetti-fall { 0% { transform: translate3d(0,-15vh,0) rotate(0deg); opacity:0; } 10% { opacity:1; } 90% { opacity:1; } 100% { transform: translate3d(0,110vh,0) rotate(720deg); opacity:0; } }
