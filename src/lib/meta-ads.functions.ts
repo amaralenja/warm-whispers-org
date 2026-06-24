@@ -266,6 +266,8 @@ export const sendMetaEvent = createServerFn({ method: "POST" })
         currency: "BRL",
         email_hash: emailHash,
         phone_hash: phoneHash,
+        first_name_hash: firstNameHash,
+        last_name_hash: lastNameHash,
         external_id_hash: externalIdHash,
         client_ip_hash: clientIpHash,
         user_agent: userAgent,
