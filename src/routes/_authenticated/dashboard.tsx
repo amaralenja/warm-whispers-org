@@ -135,6 +135,13 @@ function Dashboard() {
           )}
         </section>
 
+        {/* Participação por vendedor + Desempenho diário */}
+        <section className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <ParticipacaoVendedores vendedores={data?.vendedores ?? []} loading={isLoading} />
+          <DesempenhoDiario serie={data?.serieDiaria ?? []} loading={isLoading} />
+        </section>
+
+
         {/* Rodapé — Financeiro */}
         {workspace.id === "all" && (
           <section className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-3">
