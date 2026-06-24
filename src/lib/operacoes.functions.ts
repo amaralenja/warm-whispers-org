@@ -114,13 +114,26 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       ),
     ]);
 
+    // Coerce defensivo: alguns campos podem vir como objeto/jsonb vazio do Postgres
+    const asStr = (x: unknown): string => {
+      if (x == null) return "";
+      if (typeof x === "string") return x;
+      if (typeof x === "number" || typeof x === "boolean") return String(x);
+      return ""; // objetos/arrays viram string vazia
+    };
+    const asStrOrNull = (x: unknown): string | null => {
+      const s = asStr(x);
+      return s ? s : null;
+    };
+
     // Mapa produto -> { expert, tipo } — vendas com produto NÃO mapeado são descartadas (igual ao dashboard antigo)
     const produtoMap = new Map<string, { expert: string; tipo: string }>();
     for (const p of (produtosMapRes.data ?? []) as any[]) {
-      const key = String(p.nome_produto ?? "").trim().toLowerCase();
-      if (key) produtoMap.set(key, { expert: p.nome_expert, tipo: String(p.tipo_produto ?? "main").toLowerCase() });
+      const key = asStr(p.nome_produto).trim().toLowerCase();
+      const expertName = asStr(p.nome_expert).trim();
+      if (key && expertName) produtoMap.set(key, { expert: expertName, tipo: asStr(p.tipo_produto || "main").toLowerCase() });
     }
-    const lookupProduto = (v: any) => produtoMap.get(String(v.Produto ?? "").trim().toLowerCase()) ?? null;
+    const lookupProduto = (v: any) => produtoMap.get(asStr(v.Produto).trim().toLowerCase()) ?? null;
 
 
     const experts = expertsRes.data ?? [];
@@ -276,13 +289,13 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const saldoEstimado = totalFaturamento - gastosMes;
 
     const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
-      idVenda: String(r["ID da Venda"] ?? ""),
-      produto: r["Produto"] ?? null,
-      cliente: r["Nome do Cliente"] ?? null,
+      idVenda: asStr(r["ID da Venda"]),
+      produto: asStrOrNull(r["Produto"]),
+      cliente: asStrOrNull(r["Nome do Cliente"]),
       valor: parseTicket(r["Valor Base do Produto"]),
-      dataVenda: r["Data da Venda"] ?? null,
-      dataReembolso: r["Data do Reembolso"] ?? null,
-      expert: vendaToExpert.get(String(r["ID da Venda"])) ?? null,
+      dataVenda: asStrOrNull(r["Data da Venda"]),
+      dataReembolso: asStrOrNull(r["Data do Reembolso"]),
+      expert: asStrOrNull(vendaToExpert.get(asStr(r["ID da Venda"]))),
     })).sort((a, b) => (b.dataReembolso ?? "").localeCompare(a.dataReembolso ?? ""));
 
     const totalValorReembolsado = reembolsosList.reduce((a, r) => a + r.valor, 0);
