@@ -49,16 +49,28 @@ export type VendedorStat = {
 
 export type SerieDiaria = { data: string; total: number; vendas: number };
 
+export type ReembolsoItem = {
+  idVenda: string;
+  produto: string | null;
+  cliente: string | null;
+  valor: number;
+  dataVenda: string | null;
+  dataReembolso: string | null;
+  expert: string | null;
+};
+
 export type OperacoesPayload = {
   experts: ExpertStats[];
   totalFaturamento: number;
   totalVendas: number;
   totalReembolsos: number;
+  totalValorReembolsado: number;
   ticketMedioGeral: number;
   gastosMes: number;
   saldoEstimado: number;
   vendedores: VendedorStat[];
   serieDiaria: SerieDiaria[];
+  reembolsos: ReembolsoItem[];
 };
 
 export type DateRange = { from?: string | null; to?: string | null; expert?: string | null };
