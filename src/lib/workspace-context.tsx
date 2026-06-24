@@ -79,9 +79,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const rawList = localStorage.getItem(LIST_KEY);
-      if (rawList) setCustom(JSON.parse(rawList));
+      if (rawList) {
+        const parsed = JSON.parse(rawList);
+        if (Array.isArray(parsed)) setCustom(parsed);
+      }
       const rawOver = localStorage.getItem(OVERRIDES_KEY);
-      if (rawOver) setOverrides(JSON.parse(rawOver));
+      if (rawOver) {
+        const parsed = JSON.parse(rawOver);
+        if (parsed && typeof parsed === "object") setOverrides(parsed);
+      }
       const saved = localStorage.getItem(ACTIVE_KEY);
       if (saved) setActiveId(saved);
     } catch {}
