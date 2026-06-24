@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import logoMultium from "@/assets/logo-multium.webp.asset.json";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
