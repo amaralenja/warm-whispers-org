@@ -397,7 +397,7 @@ function RankingTV() {
       )}
 
       {/* HEADER sóbrio */}
-      <header className={`relative z-10 flex h-[80px] items-center justify-between border-b border-white/[.04] px-10 ${pulseFlash ? "header-pulse" : ""}`}>
+      <header className={`relative z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-white/[.04] px-8 ${pulseFlash ? "header-pulse" : ""}`}>
         <div className="flex items-center gap-4">
           <div className="flex h-11 w-11 items-center justify-center rounded-md bg-amber-500/90">
             <Trophy className="h-5 w-5 text-neutral-900" fill="currentColor" />
