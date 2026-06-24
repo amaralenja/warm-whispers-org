@@ -6,6 +6,8 @@ import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Coins, ArrowUp
 import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
+import { ParticipacaoVendedores } from "@/components/participacao-vendedores";
+import { DesempenhoDiario } from "@/components/desempenho-diario";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MULTIUM" }] }),
