@@ -66,11 +66,12 @@ export function WorkspaceSwitcher() {
 
         <div className="max-h-[60vh] overflow-y-auto">
           {workspaces.map((w) => {
-            const active = w.id === workspace.id;
+            const active = w.id === workspace?.id;
             const isEditing = editingId === w.id;
+            const wHex = w.accent?.hex ?? "#e94560";
             return (
-              <div key={w.id} className={`rounded-md ${active ? "bg-secondary/30" : ""}`}>
-                <div className="group/item flex items-center gap-2 px-1 transition-colors hover:bg-secondary/50 rounded-md">
+              <div key={w.id} style={{ ["--ws-accent" as any]: wHex }} className={`rounded-md ${active ? "bg-[color:var(--ws-accent)]/[0.08]" : ""}`}>
+                <div className="group/item flex items-center gap-2 px-1 transition-colors hover:bg-[color:var(--ws-accent)]/[0.07] rounded-md">
                   <button
                     type="button"
                     onClick={() => {
