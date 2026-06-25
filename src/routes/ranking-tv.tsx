@@ -409,12 +409,12 @@ function RankingTV() {
           </header>
 
           {/* Podium Area */}
-          <main className="no-scrollbar relative flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto pb-10 pt-6">
+          <main className="no-scrollbar relative flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-10 pt-20">
             <div className="absolute top-[20%] -z-10 flex items-center justify-center opacity-15">
               <div className="h-[500px] w-[500px] animate-glow rounded-full bg-green-400 blur-[180px]" />
             </div>
 
-            <div className="mt-2 flex w-full shrink-0 items-end justify-center gap-10">
+            <div className="mt-2 flex w-full shrink-0 items-end justify-center gap-10 overflow-visible">
               {top3[1] ? <PodiumPlace item={top3[1]} place={2} /> : <PodiumPlaceholder place={2} />}
               {top3[0] ? <PodiumPlace item={top3[0]} place={1} /> : <PodiumPlaceholder place={1} />}
               {top3[2] ? <PodiumPlace item={top3[2]} place={3} /> : <PodiumPlaceholder place={3} />}
