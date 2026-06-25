@@ -1,15 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, Save, Send, KeyRound, Eye, EyeOff, CheckCircle2, Loader2, Clock3, ShieldCheck, AlertCircle } from "lucide-react";
+import { Activity, Save, Send, KeyRound, Eye, EyeOff, CheckCircle2, Loader2, Clock3, ShieldCheck, AlertCircle, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@supabase/supabase-js";
 import {
   getMetaAdsConfig,
   listMetaEventLogs,
   saveMetaAdsConfig,
   sendMetaEvent,
 } from "@/lib/meta-ads.functions";
+
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizClient = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+});
+
+type QuizLead = {
+  id: string;
+  nome: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  faturamento: string | null;
+  caixa_letra: string | null;
+  lead_score: number | null;
+  fbp: string | null;
+  fbc: string | null;
+};
 
 export const Route = createFileRoute("/_authenticated/meta-ads")({
   head: () => ({
