@@ -479,75 +479,75 @@ function RankingTV() {
 
 function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
   const palettes = [
-    { border: "border-l-green-400", grad: "linear-gradient(90deg, #4ade80, #22d3ee)", txt: "text-green-400", chip: "bg-green-400/15 text-green-300" },
-    { border: "border-l-cyan-400",  grad: "linear-gradient(90deg, #22d3ee, #3b82f6)", txt: "text-cyan-400",  chip: "bg-cyan-400/15 text-cyan-300" },
-    { border: "border-l-amber-400", grad: "linear-gradient(90deg, #fbbf24, #f97316)", txt: "text-amber-400", chip: "bg-amber-400/15 text-amber-300" },
-    { border: "border-l-fuchsia-400", grad: "linear-gradient(90deg, #e879f9, #a855f7)", txt: "text-fuchsia-400", chip: "bg-fuchsia-400/15 text-fuchsia-300" },
+    { border: "border-l-green-400", grad: "linear-gradient(90deg, #4ade80, #22d3ee)", txt: "text-green-400", bg: "bg-green-400", ring: "ring-green-400/40" },
+    { border: "border-l-cyan-400", grad: "linear-gradient(90deg, #22d3ee, #3b82f6)", txt: "text-cyan-400", bg: "bg-cyan-400", ring: "ring-cyan-400/40" },
+    { border: "border-l-amber-400", grad: "linear-gradient(90deg, #fbbf24, #f97316)", txt: "text-amber-400", bg: "bg-amber-400", ring: "ring-amber-400/40" },
+    { border: "border-l-fuchsia-400", grad: "linear-gradient(90deg, #e879f9, #a855f7)", txt: "text-fuchsia-400", bg: "bg-fuchsia-400", ring: "ring-fuchsia-400/40" },
   ];
   const p = palettes[idx % palettes.length];
 
+  const niveis = m.niveis ?? [];
+  const metaMax = niveis[niveis.length - 1]?.meta ?? 0;
+  const pctTotal = metaMax > 0 ? Math.min(100, (m.faturamento / metaMax) * 100) : 0;
+  const nivelAtual = m.nivelAtual ?? 0;
+  const proxNivel = niveis.find((n) => !n.batida);
+  const bateu = nivelAtual >= 3;
+
   return (
-    <div className={`glass relative overflow-hidden rounded-xl border-l-2 p-3 ${p.border}`}>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="truncate text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          {m.expert} <span className="text-gray-600">· Mensal</span>
-        </p>
-        <span className={`shrink-0 rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${p.chip}`}>
-          Nível {m.nivelAtual}/3
-        </span>
+    <div className={`glass relative overflow-hidden rounded-xl border-l-2 p-4 ${p.border}`}>
+      {/* Header */}
+      <div className="mb-2 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-widest text-gray-500">{m.expert} · Mensal</p>
+          <h3 className="mt-1 text-lg font-black leading-none text-white">
+            {BRL(m.faturamento)} <span className="text-[10px] font-bold text-gray-500">/ {BRL(metaMax)}</span>
+          </h3>
+        </div>
+        <p className={`shrink-0 text-xl font-black tracking-tighter ${p.txt}`}>{pctTotal.toFixed(0)}%</p>
       </div>
 
-      <div className="space-y-2">
-        {m.niveis.map((n) => {
-          const atingido = n.batida;
-          const atual = !atingido && m.nivelAtual + 1 === n.nivel;
+      {/* Barra com marcadores em N1 e N2 (proporcional aos valores absolutos) */}
+      <div className="relative mb-2 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctTotal}%`, background: p.grad }} />
+        {niveis.slice(0, 2).map((n) => (
+          <span key={n.nivel} className="absolute top-0 h-full w-px bg-black/40" style={{ left: `${metaMax > 0 ? (n.meta / metaMax) * 100 : 0}%` }} />
+        ))}
+      </div>
+
+      {/* Pills de nível (3 níveis absolutos) */}
+      <div className="mb-2 grid grid-cols-3 gap-1">
+        {niveis.map((n) => {
+          const ativo = n.batida;
+          const atual = !bateu && proxNivel?.nivel === n.nivel;
           return (
             <div
               key={n.nivel}
-              className={`rounded-lg border bg-black/30 p-2.5 transition ${
-                atingido ? "border-green-400/40" : atual ? "border-white/20" : "border-white/5 opacity-60"
-              }`}
+              className={`flex flex-col items-center justify-center rounded-md px-1 py-1 text-[9px] font-black uppercase tracking-wider transition ${
+                ativo ? `${p.bg} text-black` : "bg-white/5 text-white/40"
+              } ${atual ? `ring-2 ${p.ring}` : ""}`}
             >
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${atingido ? "text-green-400" : p.txt}`}>
-                    Nível {n.nivel}
-                  </span>
-                  <span className="text-xs font-black text-white">{BRL(n.meta)}</span>
-                </div>
-                <span className={`text-[10px] font-black ${atingido ? "text-green-400" : "text-gray-400"}`}>
-                  {atingido ? "✓ Batida" : `${n.pct.toFixed(0)}%`}
-                </span>
-              </div>
-
-              <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, n.pct)}%`, background: atingido ? "linear-gradient(90deg,#4ade80,#22c55e)" : p.grad }}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-1 text-center">
-                <div>
-                  <p className="text-[8px] font-bold uppercase tracking-wider text-gray-500">No mês</p>
-                  <p className="text-[10px] font-black text-white">{BRL(m.faturamento)}</p>
-                </div>
-                <div>
-                  <p className="text-[8px] font-bold uppercase tracking-wider text-gray-500">Na semana</p>
-                  <p className="text-[10px] font-black text-white">{atingido ? "—" : BRL(n.porSemana)}</p>
-                </div>
-                <div>
-                  <p className="text-[8px] font-bold uppercase tracking-wider text-gray-500">Por vend.</p>
-                  <p className="text-[10px] font-black text-white">{n.porVendedor > 0 ? BRL(n.porVendedor) : "—"}</p>
-                </div>
-              </div>
+              <span>N{n.nivel}</span>
+              <span className="text-[8px] font-bold opacity-80">{BRL(n.meta)}</span>
             </div>
           );
         })}
       </div>
+
+      {/* Status */}
+      <div className="flex items-center justify-between gap-2 text-[10px]">
+        <span className={`font-black uppercase ${p.txt}`}>
+          {bateu ? "✓ Meta batida (N3)" : `Nível atual: ${nivelAtual}`}
+        </span>
+        {!bateu && proxNivel && (
+          <span className="text-right text-gray-400">
+            Faltam <span className="font-black text-white">{BRL(proxNivel.faltam)}</span> p/ N{proxNivel.nivel}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
+
 
 
 
