@@ -202,6 +202,7 @@ function MetaAdsPage() {
     setLeadPhone("");
     setLeadFirstName("");
     setLeadLastName("");
+    clearSelectedLead();
   }
 
   function handleSend() {
@@ -220,8 +221,8 @@ function MetaAdsPage() {
       phone: leadPhone.trim() || undefined,
       firstName: leadFirstName.trim() || undefined,
       lastName: leadLastName.trim() || undefined,
-      fbp: getCookieValue("_fbp"),
-      fbc: getCookieValue("_fbc"),
+      fbp: selectedLead?.fbp || getCookieValue("_fbp"),
+      fbc: selectedLead?.fbc || getCookieValue("_fbc"),
     }, {
       onSuccess: () => {
         if (needsValue) setEventValue("");
