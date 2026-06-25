@@ -306,6 +306,9 @@ export type Database = {
           foto_url: string | null
           id: number
           meta_mensal: number
+          meta_nivel1: number
+          meta_nivel2: number
+          meta_nivel3: number
           nome: string
         }
         Insert: {
@@ -315,6 +318,9 @@ export type Database = {
           foto_url?: string | null
           id?: never
           meta_mensal?: number
+          meta_nivel1?: number
+          meta_nivel2?: number
+          meta_nivel3?: number
           nome: string
         }
         Update: {
@@ -324,6 +330,9 @@ export type Database = {
           foto_url?: string | null
           id?: never
           meta_mensal?: number
+          meta_nivel1?: number
+          meta_nivel2?: number
+          meta_nivel3?: number
           nome?: string
         }
         Relationships: []
