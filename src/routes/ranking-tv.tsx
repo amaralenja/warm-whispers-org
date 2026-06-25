@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, Crown, Flame, Gift, MapPin, Medal, Sparkles, Target, Trophy, Users, Zap } from "lucide-react";
+import { Award } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/ranking-tv")({
@@ -10,6 +10,11 @@ export const Route = createFileRoute("/ranking-tv")({
     meta: [
       { title: "Ranking TV — MULTIUM" },
       { name: "description", content: "Ranking de vendas ao vivo em modo TV." },
+    ],
+    links: [
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" },
     ],
   }),
   component: RankingTV,
@@ -64,21 +69,37 @@ type HallOfFamePayload = {
   proxRainha: HallProx | null;
 };
 
+type ColetivaItem = { expert: string; faturamento: number; meta: number; vendas: number; pct: number; nivel: number; diasRestantes: number; necessarioSemana: number; faltam: number };
+
+type Balao = { num: number; icon: string; label: string; desc: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" };
+
 function todayISO() {
   const d = new Date();
   const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return tz.toISOString().slice(0, 10);
 }
 
-type Celebration = {
-  id: number;
-  nome: string;
-  expert: string | null;
-  meta: number;
-  faturamento: number;
-};
-
+type Celebration = { id: number; nome: string; expert: string | null; meta: number; faturamento: number };
 type SalePop = { id: number; nome: string; expert: string | null; avatar: string; ticket: number; left: number };
+
+const BALOES: Balao[] = [
+  { num: 1, icon: "❌", label: "NADA", desc: "Quase! Mas o foco continua!", tier: "nada" },
+  { num: 2, icon: "❌", label: "NADA", desc: "Bateu na trave, guerreiro!", tier: "nada" },
+  { num: 3, icon: "🎈", label: "ESTOURE OUTRO BALÃO!", desc: "O universo te deu mais uma chance!", tier: "extra" },
+  { num: 4, icon: "❌", label: "NADA", desc: "Fica triste não, amanhã tem mais!", tier: "nada" },
+  { num: 5, icon: "❌", label: "NADA", desc: "Quase!", tier: "nada" },
+  { num: 6, icon: "❌", label: "NADA", desc: "Vazio igual ao direct do concorrente kkk", tier: "nada" },
+  { num: 7, icon: "💸", label: "PIX DE R$ 100,00 NA CONTA!", desc: "O prêmio de ouro!", tier: "ouro" },
+  { num: 8, icon: "❌", label: "NADA", desc: "Segue o jogo, tubarão!", tier: "nada" },
+  { num: 9, icon: "❌", label: "NADA", desc: "Não desiste!", tier: "nada" },
+  { num: 10, icon: "❌", label: "NADA", desc: "O balão tava com preguiça hoje…", tier: "nada" },
+  { num: 11, icon: "❌", label: "NADA", desc: "Passou perto!", tier: "nada" },
+  { num: 12, icon: "⚡", label: "VALE REDBULL OU BARRA DE CHOCOLATE", desc: "Pra dar aquele gás no fechamento!", tier: "vale" },
+  { num: 13, icon: "❌", label: "NADA", desc: "O próximo vai ser o premiado!", tier: "nada" },
+  { num: 14, icon: "❌", label: "NADA", desc: "Bora que o faturamento cura tudo!", tier: "nada" },
+  { num: 15, icon: "💸", label: "PIX DE R$ 50,00!", desc: "Bônus surpresa!", tier: "pix" },
+  { num: 16, icon: "❌", label: "NADA", desc: "Tente amanhã com mais sangue no olho!", tier: "nada" },
+];
 
 function RankingTV() {
   const queryClient = useQueryClient();
@@ -89,7 +110,7 @@ function RankingTV() {
   const celebratedRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
   const rankingRef = useRef<PublicRankingItem[]>([]);
-  const [pulse, setPulse] = useState(0); // flash pulse on new sale
+  const [pulse, setPulse] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -106,73 +127,51 @@ function RankingTV() {
   const { data } = useQuery<RankingTvPayload>({
     queryKey,
     queryFn: async () => {
-      const { data: rpcData, error } = await supabase.rpc("get_ranking_tv_stats", {
-        _from: range.from,
-        _to: range.to,
-      });
+      const { data: rpcData, error } = await supabase.rpc("get_ranking_tv_stats", { _from: range.from, _to: range.to });
       if (error) throw error;
       return rpcData as unknown as RankingTvPayload;
     },
     refetchInterval: 15_000,
   });
 
-  // Realtime: invalida a query quando entra venda nova + dispara pop
   useEffect(() => {
     const channel = supabase
       .channel("ranking-tv-vendas")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "vendas" },
-        (payload) => {
-          setPulse((p) => p + 1);
-          queryClient.invalidateQueries({ queryKey });
-          const row = (payload.new ?? {}) as Record<string, unknown>;
-          const evento = String(row.Evento ?? "");
-          if (!/aprov|purchase_approved/i.test(evento)) return;
-          const utm = String(row.UTM ?? "").trim().toUpperCase();
-          const ticketRaw = String(row.Ticket ?? "0").replace(/[^0-9,.-]/g, "").replace(",", ".");
-          const ticket = parseFloat(ticketRaw) || 0;
-          const seller = rankingRef.current.find((r) => r.utm?.toUpperCase() === utm);
-          const nome = seller?.nome ?? "Nova venda";
-          const expert = seller?.expert ?? null;
-          const avatar = seller?.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=0a0a0c&color=e5e5e5&size=200&bold=true`;
-          const pop: SalePop = {
-            id: Date.now() + Math.random(),
-            nome, expert, avatar, ticket,
-            left: 20 + Math.random() * 60,
-          };
-          setSalePops((prev) => [...prev, pop]);
-          setTimeout(() => {
-            setSalePops((prev) => prev.filter((p) => p.id !== pop.id));
-          }, 5200);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "vendas" },
-        () => {
-          queryClient.invalidateQueries({ queryKey });
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "vendas" }, (payload) => {
+        setPulse((p) => p + 1);
+        queryClient.invalidateQueries({ queryKey });
+        const row = (payload.new ?? {}) as Record<string, unknown>;
+        const evento = String(row.Evento ?? "");
+        if (!/aprov|purchase_approved/i.test(evento)) return;
+        const utm = String(row.UTM ?? "").trim().toUpperCase();
+        const ticketRaw = String(row.Ticket ?? "0").replace(/[^0-9,.-]/g, "").replace(",", ".");
+        const ticket = parseFloat(ticketRaw) || 0;
+        const seller = rankingRef.current.find((r) => r.utm?.toUpperCase() === utm);
+        const nome = seller?.nome ?? "Nova venda";
+        const expert = seller?.expert ?? null;
+        const avatar = seller?.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=4ade80&color=000&size=200&bold=true`;
+        const pop: SalePop = { id: Date.now() + Math.random(), nome, expert, avatar, ticket, left: 20 + Math.random() * 60 };
+        setSalePops((prev) => [...prev, pop]);
+        setTimeout(() => setSalePops((prev) => prev.filter((p) => p.id !== pop.id)), 5200);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vendas" }, () => {
+        queryClient.invalidateQueries({ queryKey });
+      })
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const ranking = data?.ranking ?? [];
   useEffect(() => { rankingRef.current = ranking; }, [ranking]);
   const top3 = ranking.slice(0, 3);
-  const rest = ranking.slice(3, 15);
+  const rest = ranking.slice(3, 10);
   const metaLogs = data?.metaLogs ?? [];
   const hitCount = metaLogs.filter((l) => l.batida).length;
 
-  // Detecta novas metas batidas e celebra em FILA
   useEffect(() => {
     const hits = metaLogs.filter((l) => l.batida);
     if (!initializedRef.current) {
-      // primeira carga: já registra todas como celebradas sem disparar animação
       hits.forEach((h) => celebratedRef.current.add(h.utm));
       initializedRef.current = true;
       return;
@@ -180,15 +179,8 @@ function RankingTV() {
     const novos = hits.filter((h) => !celebratedRef.current.has(h.utm));
     if (novos.length === 0) return;
     novos.forEach((h) => celebratedRef.current.add(h.utm));
-    // dispara celebração do primeiro novo
-    setCelebration({
-      id: Date.now(),
-      nome: novos[0].nome,
-      expert: novos[0].expert,
-      meta: novos[0].meta,
-      faturamento: novos[0].faturamento,
-    });
-    const colors = ["#d4a017", "#10b981", "#3b82f6", "#e11d48", "#f5f5f5"];
+    setCelebration({ id: Date.now(), nome: novos[0].nome, expert: novos[0].expert, meta: novos[0].meta, faturamento: novos[0].faturamento });
+    const colors = ["#fbbf24", "#4ade80", "#22d3ee", "#e11d48", "#f5f5f5"];
     const items = Array.from({ length: 60 }, (_, i) => ({
       id: Date.now() + i,
       left: Math.random() * 100,
@@ -200,12 +192,9 @@ function RankingTV() {
     setConfetti(items);
     const t1 = setTimeout(() => setCelebration(null), 6000);
     const t2 = setTimeout(() => setConfetti([]), 10000);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [metaLogs]);
-  // === Metas Coletivas (POR OPERAÇÃO / EXPERT, no mês) — vem da RPC ===
+
   const { data: coletivasData } = useQuery<ColetivaItem[]>({
     queryKey: ["metas-coletivas-mes"],
     queryFn: async () => {
@@ -217,8 +206,6 @@ function RankingTV() {
   });
   const metasColetivas = coletivasData ?? [];
 
-
-  // Hall of Fame mensal vem de RPC dedicada (lobo = homem 18k+, rainha = mulher 20k+)
   const { data: hallData } = useQuery<HallOfFamePayload>({
     queryKey: ["hall-of-fame-mes"],
     queryFn: async () => {
@@ -229,108 +216,72 @@ function RankingTV() {
     refetchInterval: 30_000,
   });
 
-
-  // Meta dos balões — 14 prêmios fixos; abrem na ordem das metas batidas
-  const baloes = useMemo<Array<{ premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" }>>(() => [
-    { premio: "NADA", sub: "Quase! Mas o foco continua!", tier: "nada" },
-    { premio: "NADA", sub: "Bateu na trave, guerreiro!", tier: "nada" },
-    { premio: "ESTOURE OUTRO BALÃO!", sub: "O universo te deu mais uma chance!", tier: "extra" },
-    { premio: "NADA", sub: "Fica triste não, amanhã tem mais!", tier: "nada" },
-    { premio: "NADA", sub: "Quase!", tier: "nada" },
-    { premio: "NADA", sub: "Vazio igual ao direct do concorrente kkk", tier: "nada" },
-    { premio: "PIX DE R$ 100,00 NA CONTA!", sub: "O prêmio de ouro!", tier: "ouro" },
-    { premio: "NADA", sub: "Segue o jogo, tubarão!", tier: "nada" },
-    { premio: "NADA", sub: "Não desiste!", tier: "nada" },
-    { premio: "NADA", sub: "O balão tava com preguiça hoje…", tier: "nada" },
-    { premio: "NADA", sub: "Passou perto!", tier: "nada" },
-    { premio: "VALE REDBULL OU BARRA DE CHOCOLATE", sub: "Pra dar aquele gás no fechamento!", tier: "vale" },
-    { premio: "NADA", sub: "O próximo vai ser o premiado!", tier: "nada" },
-    { premio: "PIX DE R$ 50,00 NA CONTA!", sub: "Bônus surpresa!", tier: "pix" },
-  ], []);
-  const baloesAbertos = Math.min(hitCount, baloes.length);
+  const baloesAbertos = Math.min(hitCount, BALOES.length);
   const totaisPremios = useMemo(() => {
-    const abertos = baloes.slice(0, baloesAbertos);
+    const abertos = BALOES.slice(0, baloesAbertos);
     return {
       pix: abertos.filter((b) => b.tier === "pix" || b.tier === "ouro").length,
-      premio: abertos.filter((b) => b.tier !== "nada" && b.tier !== "extra").length,
+      premio: abertos.filter((b) => b.tier !== "nada").length,
       vale: abertos.filter((b) => b.tier === "vale").length,
     };
-  }, [baloes, baloesAbertos]);
-
-
-  // pulso suave no header quando entra venda nova
-  const [pulseFlash, setPulseFlash] = useState(false);
-  useEffect(() => {
-    if (pulse === 0) return;
-    setPulseFlash(true);
-    const t = setTimeout(() => setPulseFlash(false), 900);
-    return () => clearTimeout(t);
-  }, [pulse]);
+  }, [baloesAbertos]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#0a0a0c] text-neutral-100">
+    <div className="fixed inset-0 z-[100] flex h-screen flex-col overflow-hidden bg-[#020206] text-white" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <style>{`
-        @keyframes balloon-rise { 0% { transform: translate3d(0,110vh,0) rotate(-4deg); opacity:0; } 8% { opacity:1; } 92% { opacity:1; } 100% { transform: translate3d(0,-25vh,0) rotate(8deg); opacity:0; } }
-        @keyframes confetti-fall { 0% { transform: translate3d(0,-15vh,0) rotate(0deg); opacity:0; } 10% { opacity:1; } 90% { opacity:1; } 100% { transform: translate3d(0,110vh,0) rotate(720deg); opacity:0; } }
-        @keyframes celebration-pop { 0% { transform: scale(.85) translateY(20px); opacity:0; } 15% { transform: scale(1.04) translateY(0); opacity:1; } 85% { transform: scale(1) translateY(0); opacity:1; } 100% { transform: scale(.95) translateY(-10px); opacity:0; } }
-        @keyframes pulse-dot { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:.4; transform:scale(.85);} }
-        @keyframes border-pulse { 0%,100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);} 50% { box-shadow: inset 0 0 0 1px rgba(16,185,129,.35);} }
-        .balloon-rise { animation: balloon-rise 7s cubic-bezier(.4,.0,.6,1) forwards; }
+        @keyframes ambientShift { 0% { transform: translate(0,0) rotate(0deg);} 100% { transform: translate(-2%,2%) rotate(3deg);} }
+        @keyframes pulse-glow { 0%,100% { transform: scale(1); opacity:.6;} 50% { transform: scale(1.08); opacity:1;} }
+        @keyframes float-y { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-8px);} }
+        @keyframes crown-bounce { 0%,100% { transform: translateX(-50%) rotate(-5deg) scale(1);} 50% { transform: translateX(-50%) rotate(5deg) scale(1.1);} }
+        @keyframes ring-rotate { from { transform: rotate(0);} to { transform: rotate(360deg);} }
+        @keyframes shimmer { 0% { background-position: -200% 0;} 100% { background-position: 200% 0;} }
+        @keyframes balloon-rise { 0% { transform: translate3d(0,110vh,0) rotate(-4deg); opacity:0;} 8% { opacity:1;} 92% { opacity:1;} 100% { transform: translate3d(0,-25vh,0) rotate(8deg); opacity:0;} }
+        @keyframes confetti-fall { 0% { transform: translate3d(0,-15vh,0) rotate(0); opacity:0;} 10% { opacity:1;} 90% { opacity:1;} 100% { transform: translate3d(0,110vh,0) rotate(720deg); opacity:0;} }
+        @keyframes celebration-pop { 0% { transform: scale(.85) translateY(20px); opacity:0;} 15% { transform: scale(1.04) translateY(0); opacity:1;} 85% { transform: scale(1) translateY(0); opacity:1;} 100% { transform: scale(.95) translateY(-10px); opacity:0;} }
+        @keyframes sale-pop-rise { 0% { transform: translateY(60vh) scale(.4); opacity:0;} 12% { opacity:1; transform: translateY(40vh) scale(1.08);} 22% { transform: translateY(38vh) scale(1);} 78% { transform: translateY(38vh) scale(1); opacity:1;} 100% { transform: translateY(-30vh) scale(.85); opacity:0;} }
+        @keyframes sale-ring { 0% { transform: scale(.6); opacity:.9;} 100% { transform: scale(2.4); opacity:0;} }
+        .ambient::before { content:''; position:fixed; top:-50%; left:-50%; width:200%; height:200%; background: radial-gradient(ellipse at 20% 50%, rgba(74,222,128,.04) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(34,211,238,.03) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(251,191,36,.02) 0%, transparent 50%); animation: ambientShift 20s ease-in-out infinite alternate; pointer-events:none; z-index:0; }
+        .glass { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); backdrop-filter: blur(20px); }
+        .glass-strong { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(30px); }
+        .glow-gold { filter: drop-shadow(0 0 40px rgba(251,191,36,.35)); }
+        .glow-silver { filter: drop-shadow(0 0 25px rgba(148,163,184,.25)); }
+        .glow-bronze { filter: drop-shadow(0 0 25px rgba(217,119,6,.25)); }
+        .animate-glow { animation: pulse-glow 4s ease-in-out infinite; }
+        .float-animation { animation: float-y 6s ease-in-out infinite; }
+        .crown-animation { animation: crown-bounce 3s ease-in-out infinite; }
+        .ring-spin { animation: ring-rotate 12s linear infinite; }
+        .progress-bar { height:6px; background: rgba(255,255,255,.05); border-radius:10px; overflow:hidden; }
+        .progress-fill { height:100%; border-radius:10px; transition: width 1s ease; }
+        .no-scrollbar::-webkit-scrollbar { display:none; }
+        .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+        .balloon-scroll::-webkit-scrollbar { width:3px; }
+        .balloon-scroll::-webkit-scrollbar-track { background: transparent; }
+        .balloon-scroll::-webkit-scrollbar-thumb { background: rgba(74,222,128,.2); border-radius:10px; }
+        .balloon-rise { animation: balloon-rise 7s cubic-bezier(.4,0,.6,1) forwards; }
         .confetti-fall { animation: confetti-fall 5s cubic-bezier(.55,.15,.45,.85) forwards; }
-        .live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
-        .header-pulse { animation: border-pulse 900ms ease-out; }
-        .corp-grid { background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); background-size: 72px 72px; }
         .celebrate-card { animation: celebration-pop 6s ease forwards; }
-        @keyframes sale-pop-rise { 0% { transform: translateY(60vh) scale(.4); opacity: 0; } 12% { opacity: 1; transform: translateY(40vh) scale(1.08); } 22% { transform: translateY(38vh) scale(1); } 78% { transform: translateY(38vh) scale(1); opacity: 1; } 100% { transform: translateY(-30vh) scale(.85); opacity: 0; } }
-        @keyframes sale-ring { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.4); opacity: 0; } }
-        @keyframes sale-coin { 0% { transform: translate(0,0) scale(.3); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--cx), var(--cy)) scale(1) rotate(540deg); opacity: 0; } }
         .sale-pop { animation: sale-pop-rise 5s cubic-bezier(.22,.61,.36,1) forwards; }
         .sale-ring { animation: sale-ring 1.4s ease-out forwards; }
-        .sale-coin { animation: sale-coin 1.6s ease-out forwards; }
-        .tv-scroll { scrollbar-width: thin; scrollbar-color: rgba(245,158,11,.35) transparent; }
-        .tv-scroll::-webkit-scrollbar { width: 6px; }
-        .tv-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,.02); border-radius: 8px; }
-        .tv-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(245,158,11,.55), rgba(245,158,11,.25)); border-radius: 8px; }
-        .tv-scroll::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,.7); }
+        .stat-card { position: relative; overflow: hidden; }
+        .stat-card::after { content:''; position:absolute; inset:0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.03) 50%, transparent 100%); background-size:200% 100%; animation: shimmer 8s ease-in-out infinite; pointer-events:none; }
       `}</style>
 
-      {/* Background sóbrio */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="corp-grid absolute inset-0" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,.025),transparent_60%)]" />
-      </div>
+      <div className="ambient" />
 
-      {/* Confete + balões */}
+      {/* Confete + balões celebração */}
       {confetti.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-[200] overflow-hidden">
           {confetti.map((c) =>
             c.kind === "balloon" ? (
-              <div
-                key={c.id}
-                className="balloon-rise absolute"
-                style={{ left: `${c.left}%`, animationDelay: `${c.delay}s`, bottom: 0, transform: `scale(${c.size})` }}
-              >
+              <div key={c.id} className="balloon-rise absolute" style={{ left: `${c.left}%`, animationDelay: `${c.delay}s`, bottom: 0, transform: `scale(${c.size})` }}>
                 <svg width="44" height="58" viewBox="0 0 48 64">
                   <ellipse cx="24" cy="22" rx="18" ry="22" fill={c.color} opacity="0.9" />
                   <ellipse cx="18" cy="14" rx="5" ry="3" fill="white" opacity="0.3" />
                   <path d="M24 44 L22 48 L26 48 Z" fill={c.color} opacity="0.85" />
-                  <path d="M24 48 Q22 56 24 64" stroke="white" strokeOpacity="0.35" strokeWidth="0.8" fill="none" />
                 </svg>
               </div>
             ) : (
-              <div
-                key={c.id}
-                className="confetti-fall absolute"
-                style={{
-                  left: `${c.left}%`,
-                  top: 0,
-                  animationDelay: `${c.delay}s`,
-                  width: `${10 * c.size}px`,
-                  height: `${14 * c.size}px`,
-                  backgroundColor: c.color,
-                  opacity: 0.9,
-                }}
-              />
+              <div key={c.id} className="confetti-fall absolute" style={{ left: `${c.left}%`, top: 0, animationDelay: `${c.delay}s`, width: `${10 * c.size}px`, height: `${14 * c.size}px`, backgroundColor: c.color, opacity: .9 }} />
             )
           )}
         </div>
@@ -338,62 +289,35 @@ function RankingTV() {
 
       {/* Card de celebração */}
       {celebration && (
-        <div className="pointer-events-none absolute left-1/2 top-[18%] z-[210] -translate-x-1/2">
-          <div className="celebrate-card rounded-xl border border-emerald-500/40 bg-[#0d1411]/95 px-8 py-5 text-center shadow-[0_20px_60px_-20px_rgba(16,185,129,.5)] backdrop-blur-md">
-            <div className="flex items-center justify-center gap-2 text-[0.6rem] font-bold uppercase tracking-[0.32em] text-emerald-400">
+        <div className="pointer-events-none absolute left-1/2 top-[15%] z-[210] -translate-x-1/2">
+          <div className="celebrate-card rounded-2xl border border-green-400/40 bg-black/80 px-10 py-6 text-center shadow-[0_20px_60px_-20px_rgba(74,222,128,.5)] backdrop-blur-md">
+            <div className="flex items-center justify-center gap-2 text-[0.6rem] font-black uppercase tracking-[0.32em] text-green-400">
               <Award className="h-3 w-3" /> meta batida
             </div>
-            <p className="mt-2 text-3xl font-bold text-white">{celebration.nome}</p>
-            {celebration.expert && (
-              <p className="text-[0.65rem] uppercase tracking-[0.24em] text-neutral-400">{celebration.expert}</p>
-            )}
-            <p className="mt-2 font-mono text-xl font-bold text-emerald-400">
-              {BRL(celebration.faturamento)} <span className="text-neutral-500">/ {BRL(celebration.meta)}</span>
+            <p className="mt-2 text-4xl font-black text-white">{celebration.nome}</p>
+            {celebration.expert && <p className="text-[0.65rem] uppercase tracking-[0.24em] text-gray-400">{celebration.expert}</p>}
+            <p className="mt-2 text-2xl font-black text-green-400">
+              {BRL(celebration.faturamento)} <span className="text-gray-500">/ {BRL(celebration.meta)}</span>
             </p>
           </div>
         </div>
       )}
 
-      {/* Pops de venda em tempo real */}
+      {/* Pops de venda */}
       {salePops.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-[205] overflow-hidden">
           {salePops.map((p) => (
-            <div
-              key={p.id}
-              className="sale-pop absolute"
-              style={{ left: `${p.left}%`, top: 0, transform: "translateX(-50%)" }}
-            >
+            <div key={p.id} className="sale-pop absolute" style={{ left: `${p.left}%`, top: 0, transform: "translateX(-50%)" }}>
               <div className="relative -translate-x-1/2 flex flex-col items-center">
-                {/* Anéis */}
-                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-emerald-400/70" />
-                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-emerald-400/40" style={{ animationDelay: "0.25s" }} />
-                {/* Moedas */}
-                {Array.from({ length: 8 }).map((_, i) => {
-                  const angle = (i / 8) * Math.PI * 2;
-                  const dist = 90;
-                  const cx = Math.cos(angle) * dist;
-                  const cy = Math.sin(angle) * dist - 20;
-                  return (
-                    <span
-                      key={i}
-                      className="sale-coin absolute top-10 h-3 w-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,.8)]"
-                      style={{ ["--cx" as string]: `${cx}px`, ["--cy" as string]: `${cy}px`, animationDelay: `${i * 0.04}s` } as React.CSSProperties}
-                    />
-                  );
-                })}
-                {/* Avatar */}
+                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-green-400/70" />
+                <span className="sale-ring absolute top-8 h-24 w-24 rounded-full border-2 border-green-400/40" style={{ animationDelay: "0.25s" }} />
                 <div className="relative">
-                  <img
-                    src={p.avatar}
-                    alt={p.nome}
-                    className="relative h-20 w-20 rounded-full object-cover ring-4 ring-emerald-500 ring-offset-4 ring-offset-[#0a0a0c] shadow-[0_0_30px_rgba(16,185,129,.6)]"
-                  />
+                  <img src={p.avatar} alt={p.nome} className="relative h-20 w-20 rounded-full object-cover ring-4 ring-green-400 ring-offset-4 ring-offset-[#020206] shadow-[0_0_30px_rgba(74,222,128,.6)]" />
                 </div>
-                {/* Label */}
-                <div className="mt-3 rounded-md border border-emerald-500/40 bg-[#0d1411]/95 px-3 py-1.5 text-center shadow-[0_8px_30px_-8px_rgba(16,185,129,.5)] backdrop-blur-sm">
-                  <p className="text-[0.55rem] font-bold uppercase tracking-[0.28em] text-emerald-400">+ venda</p>
-                  <p className="font-mono text-base font-bold text-emerald-300">{BRL(p.ticket)}</p>
-                  <p className="mt-0.5 truncate text-[0.65rem] font-semibold text-neutral-200">{p.nome}</p>
+                <div className="mt-3 rounded-md border border-green-400/40 bg-black/90 px-3 py-1.5 text-center backdrop-blur-sm">
+                  <p className="text-[0.55rem] font-black uppercase tracking-[0.28em] text-green-400">+ venda</p>
+                  <p className="text-base font-black text-green-300">{BRL(p.ticket)}</p>
+                  <p className="mt-0.5 truncate text-[0.65rem] font-bold text-gray-200">{p.nome}</p>
                 </div>
               </div>
             </div>
@@ -401,425 +325,320 @@ function RankingTV() {
         </div>
       )}
 
-      {/* HEADER sóbrio */}
-      <header className={`relative z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-white/[.04] px-8 ${pulseFlash ? "header-pulse" : ""}`}>
-        <div className="flex items-center gap-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-amber-500/90">
-            <Trophy className="h-5 w-5 text-neutral-900" fill="currentColor" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.34em] text-neutral-400">
-              <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              ao vivo
-              <span className="text-neutral-700">·</span>
-              <span>TV aberta</span>
-            </div>
-            <h1 className="mt-1 text-2xl font-bold uppercase leading-none tracking-[0.04em] text-neutral-100">
-              Ranking <span className="text-amber-500">Multium</span>
-            </h1>
-          </div>
-        </div>
+      {/* Container principal */}
+      <div className="relative z-10 flex h-screen min-h-0 flex-1">
 
-        <div className="text-right">
-          <p className="font-mono text-3xl font-light leading-none tabular-nums text-neutral-100">
-            {now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-          </p>
-          <p className="mt-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.32em] text-neutral-500">
-            {now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
-          </p>
-        </div>
-      </header>
+        {/* LEFT — Metas + Hall of Fame */}
+        <aside className="no-scrollbar flex w-[340px] flex-shrink-0 flex-col overflow-y-auto border-r border-white/[.06] bg-black/40" style={{ backdropFilter: "blur(30px)" }}>
+          <div className="flex flex-col gap-6 p-5">
 
-      {/* STATS sóbrios */}
-      <div className="relative z-10 grid shrink-0 grid-cols-3 gap-3 border-b border-white/[.04] px-8 py-2.5">
-        <StatCard label="Faturamento hoje" value={BRL(data?.totalFaturamento ?? 0)} tone="emerald" icon={<Zap className="h-3.5 w-3.5" />} />
-        <StatCard label="Vendas aprovadas" value={String(data?.totalVendas ?? 0)} tone="amber" icon={<Flame className="h-3.5 w-3.5" />} />
-        <StatCard label="Ticket médio" value={BRL(data?.ticketMedioGeral ?? 0)} tone="neutral" icon={<Sparkles className="h-3.5 w-3.5" />} />
-      </div>
-
-      {/* MAIN GRID — 12 colunas */}
-      <main className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-hidden px-5 py-3">
-
-        {/* COL ESQUERDA — Metas Coletivas + Hall of Fame */}
-        <aside className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
-            <header className="mb-3 flex items-center justify-between border-b border-white/[.04] pb-3">
-              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
-                <Target className="h-3 w-3 text-emerald-500" /> Metas coletivas
-              </h2>
-              <span className="text-[0.55rem] uppercase tracking-[0.2em] text-neutral-600">mês atual</span>
-            </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 tv-scroll">
-              {metasColetivas.slice(0, 4).map((m) => (
-                <ColetivaRow key={m.expert} m={m} />
-              ))}
-              {metasColetivas.length === 0 && (
-                <p className="py-6 text-center text-[0.65rem] uppercase tracking-widest text-neutral-700">Sem dados</p>
-              )}
-            </div>
-          </section>
-
-          <section className="flex flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
-            <header className="mb-2 flex items-center gap-2 border-b border-white/[.04] pb-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
-              <Trophy className="h-3 w-3 text-amber-500" /> Hall of fame
-              <span className="ml-auto text-[0.52rem] tracking-[0.18em] text-neutral-600">destaques</span>
-            </header>
-            <div className="space-y-2">
-              <HallCard label="Lobo do X1" item={hallData?.lobo ?? null} prox={hallData?.proxLobo ?? null} meta={hallData?.metaLobo ?? 18000} highlight="amber" icon={<Crown className="h-3.5 w-3.5" />} emptyHint="Em busca do Lobo" />
-              <HallCard label="Rainha do X1" item={hallData?.rainha ?? null} prox={hallData?.proxRainha ?? null} meta={hallData?.metaRainha ?? 20000} highlight="rose" icon={<Sparkles className="h-3.5 w-3.5" />} emptyHint="Em busca da Rainha" />
-            </div>
-          </section>
-        </aside>
-
-        {/* COL CENTRO — Pódio + Meta dos Balões */}
-        <section className="col-span-6 grid min-h-0 grid-rows-[1fr_auto] gap-3">
-          <div className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-5">
-            <header className="mb-1 flex items-center justify-between">
-              <div>
-                <h2 className="text-[0.56rem] font-semibold uppercase tracking-[0.32em] text-neutral-500">o pódio</h2>
-                <p className="mt-1 text-lg font-semibold text-neutral-100">Top performers de hoje</p>
-              </div>
-              <div className="rounded border border-white/[.06] bg-white/[.02] px-3 py-1 text-[0.56rem] font-semibold uppercase tracking-[0.22em] text-neutral-400">
-                <Users className="mr-1 inline h-3 w-3" />
-                {data?.vendedoresAtivos ?? 0} vendedores
-              </div>
-            </header>
-
-            <div className="flex flex-1 items-end justify-center gap-4 pb-1 pt-4">
-              {top3[1] && <PodiumCard item={top3[1]} position={2} height="h-[82%]" />}
-              {top3[0] && <PodiumCard item={top3[0]} position={1} height="h-[95%]" />}
-              {top3[2] && <PodiumCard item={top3[2]} position={3} height="h-[74%]" />}
-              {top3.length === 0 && (
-                <div className="flex h-full w-full items-center justify-center text-neutral-600">
-                  <p className="text-sm uppercase tracking-[0.3em]">Aguardando vendas…</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Meta dos Balões */}
-          <div className="rounded-lg border border-white/[.04] bg-white/[.012] p-3">
-            <header className="mb-2 flex items-center justify-between px-1">
-              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
-                <MapPin className="h-3 w-3 text-rose-400" /> Meta dos balões
-                <span className="text-[0.5rem] tracking-[0.16em] text-neutral-600">PREMIAÇÃO DA CAMPANHA</span>
-              </h2>
-              <div className="flex items-center gap-2 text-[0.55rem] font-mono">
-                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-400">{totaisPremios.premio}× prêmio</span>
-                <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-400">{totaisPremios.pix}× pix</span>
-                <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-semibold text-rose-400">{totaisPremios.vale}× vale</span>
-              </div>
-            </header>
-            <div className="grid grid-cols-7 gap-1.5">
-              {baloes.map((b, i) => (
-                <BalaoSlot key={i} index={i + 1} balao={b} aberto={i < baloesAbertos} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* COL DIREITA — Próximos + Metas Individuais */}
-        <aside className="col-span-3 grid min-h-0 grid-rows-2 gap-3">
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
-            <header className="mb-2 flex items-center justify-between border-b border-white/[.04] pb-2">
-              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
-                <Trophy className="h-3 w-3 text-amber-500" /> Próximos no pódio
-              </h2>
-              <span className="font-mono text-[0.56rem] font-semibold text-neutral-500">
-                #4 — #{Math.min(15, 3 + rest.length)}
-              </span>
-            </header>
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 tv-scroll">
-              {rest.map((v, i) => (
-                <ListRow key={v.utm} item={v} position={i + 4} />
-              ))}
-              {rest.length === 0 && (
-                <div className="flex h-full items-center justify-center text-neutral-700">
-                  <p className="text-[0.7rem] uppercase tracking-widest">Sem mais vendedores</p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="flex min-h-0 flex-col rounded-lg border border-white/[.04] bg-white/[.012] p-4">
-            <header className="mb-2 flex items-center justify-between border-b border-white/[.04] pb-2">
-              <h2 className="flex items-center gap-2 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-neutral-400">
-                <Target className="h-3 w-3 text-emerald-500" /> Metas individuais
-              </h2>
-              <span className="rounded border border-emerald-500/20 bg-emerald-500/[.06] px-2 py-0.5 font-mono text-[0.55rem] font-semibold text-emerald-400">
-                {hitCount} batidas
-              </span>
-            </header>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 tv-scroll">
-              {metaLogs.map((log) => (
-                <MetaLogRow key={log.utm} log={log} />
-              ))}
-              {metaLogs.length === 0 && (
-                <div className="flex h-full items-center justify-center text-center text-[0.7rem] uppercase tracking-[0.2em] text-neutral-700">
-                  Nenhuma meta registrada
-                </div>
-              )}
-            </div>
-          </section>
-        </aside>
-      </main>
-
-      {/* FOOTER */}
-      <footer className="relative z-10 flex h-7 shrink-0 items-center justify-between border-t border-white/[.04] bg-[#08080a] px-8 text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-neutral-600">
-        <span>MULTIUM OS V2.0 · RANKING ENGINE</span>
-        <span className="flex items-center gap-2">
-          <span className="live-dot inline-block h-1 w-1 rounded-full bg-emerald-500" />
-          Sincronizado · pulse {pulse}
-        </span>
-      </footer>
-    </div>
-  );
-}
-
-function StatCard({ label, value, tone, icon }: { label: string; value: string; tone: "emerald" | "amber" | "neutral"; icon: React.ReactNode }) {
-  const colors = {
-    emerald: "text-emerald-400",
-    amber: "text-amber-400",
-    neutral: "text-neutral-200",
-  }[tone];
-  return (
-    <div className="rounded-lg border border-white/[.05] bg-white/[.015] px-5 py-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[0.58rem] font-semibold uppercase tracking-[0.28em] text-neutral-500">{label}</p>
-        <span className={`flex h-6 w-6 items-center justify-center rounded border border-white/[.06] ${colors}`}>{icon}</span>
-      </div>
-      <p className={`mt-2 font-mono text-3xl font-light tabular-nums ${colors}`}>{value}</p>
-    </div>
-  );
-}
-
-function PodiumCard({ item, position, height }: { item: PublicRankingItem; position: 1 | 2 | 3; height: string }) {
-  const cfg = {
-    1: {
-      ring: "ring-amber-500/80",
-      bar: "bg-amber-500",
-      icon: <Crown className="h-5 w-5 text-amber-400" fill="currentColor" />,
-      label: "CAMPEÃO",
-      labelColor: "text-amber-400",
-      valueColor: "text-amber-400",
-      badge: "bg-amber-500 text-neutral-900",
-    },
-    2: {
-      ring: "ring-neutral-400/60",
-      bar: "bg-neutral-400",
-      icon: <Trophy className="h-4 w-4 text-neutral-300" />,
-      label: "VICE",
-      labelColor: "text-neutral-300",
-      valueColor: "text-neutral-100",
-      badge: "bg-neutral-300 text-neutral-900",
-    },
-    3: {
-      ring: "ring-orange-600/70",
-      bar: "bg-orange-600",
-      icon: <Medal className="h-4 w-4 text-orange-400" />,
-      label: "TERCEIRO",
-      labelColor: "text-orange-400",
-      valueColor: "text-orange-300",
-      badge: "bg-orange-600 text-neutral-50",
-    },
-  }[position];
-
-  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0a0a0c&color=e5e5e5&size=256&bold=true`;
-  const isFirst = position === 1;
-
-  return (
-    <div className={`relative flex w-full max-w-[260px] flex-col items-center ${height}`}>
-      <div className="relative flex w-full flex-1 flex-col items-center gap-3 rounded-lg border border-white/[.06] bg-white/[.02] px-5 pb-5 pt-9">
-        <div className={`absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full font-mono text-sm font-bold ${cfg.badge}`}>
-          {position}
-        </div>
-
-        {isFirst && (
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2">{cfg.icon}</div>
-        )}
-
-        <div className={`relative ${isFirst ? "h-28 w-28" : "h-20 w-20"}`}>
-          <img
-            src={avatar}
-            alt={item.nome}
-            className={`relative h-full w-full rounded-full object-cover ring-2 ${cfg.ring} ring-offset-4 ring-offset-[#0a0a0c]`}
-          />
-          {!isFirst && (
-            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2">{cfg.icon}</div>
-          )}
-        </div>
-
-        <div className="text-center">
-          <p className={`text-[0.55rem] font-semibold uppercase tracking-[0.3em] ${cfg.labelColor}`}>{cfg.label}</p>
-          <h3 className={`mt-1 truncate font-semibold leading-tight text-neutral-100 ${isFirst ? "text-xl" : "text-base"}`}>{item.nome}</h3>
-          {item.expert && (
-            <p className="mt-0.5 text-[0.58rem] uppercase tracking-[0.2em] text-neutral-500">{item.expert}</p>
-          )}
-        </div>
-
-        <div className="mt-auto w-full space-y-2">
-          <div className="text-center">
-            <p className={`font-mono font-light tabular-nums ${isFirst ? "text-3xl" : "text-xl"} ${cfg.valueColor}`}>
-              {BRL(item.faturamento)}
-            </p>
-            <p className="mt-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-neutral-500">
-              {item.vendas} venda{item.vendas !== 1 ? "s" : ""} · TM {BRL(item.ticketMedio)}
-            </p>
-          </div>
-          {item.meta > 0 && (
+            {/* Metas Coletivas */}
             <div>
-              <div className="h-1 overflow-hidden rounded-full bg-white/[.06]">
-                <div
-                  className={item.metaBatida ? "h-full bg-emerald-500" : "h-full bg-amber-500"}
-                  style={{ width: `${item.metaPct}%` }}
-                />
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-400/20 to-cyan-500/20 text-xl">🎯</div>
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-wider text-white">Metas Coletivas</h2>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Mês Atual</p>
+                </div>
               </div>
-              <p className={`mt-1 text-center text-[0.56rem] font-semibold uppercase tracking-wider ${item.metaBatida ? "text-emerald-400" : "text-neutral-500"}`}>
-                {item.metaBatida ? "✓ meta batida" : `${item.metaPct.toFixed(0)}% da meta`}
+              <div className="space-y-3">
+                {metasColetivas.map((m, i) => <ColetivaCard key={m.expert} m={m} idx={i} />)}
+                {metasColetivas.length === 0 && (
+                  <p className="py-4 text-center text-[10px] uppercase tracking-widest text-gray-700">Sem dados</p>
+                )}
+              </div>
+            </div>
+
+            <div className="my-2 h-px w-full bg-white/10" />
+
+            {/* Hall of Fame */}
+            <div>
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/20 to-amber-500/20 text-xl">🏆</div>
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-wider text-white">Hall of Fame</h2>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Destaques Individuais</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <HallCard kind="lobo" item={hallData?.lobo ?? null} meta={hallData?.metaLobo ?? 18000} />
+                <HallCard kind="rainha" item={hallData?.rainha ?? null} meta={hallData?.metaRainha ?? 20000} />
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* CENTER */}
+        <div className="flex min-w-0 flex-1 flex-col p-6">
+
+          {/* Header */}
+          <header className="mb-4 flex flex-shrink-0 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-2xl shadow-[0_0_30px_rgba(251,191,36,.3)]">🏆</div>
+              <div>
+                <h1 className="text-2xl font-black uppercase italic leading-none tracking-tighter text-white">RANKING DE OPERAÇÃO</h1>
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-500">MULTIUM MONITORING SYSTEM</p>
+              </div>
+            </div>
+            <div className="z-20 flex flex-col items-end gap-2">
+              <div className="text-right">
+                <p className="font-mono text-2xl font-light leading-none tabular-nums text-white">
+                  {now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.3em] text-gray-500">
+                  {now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+                </p>
+              </div>
+              <div className="glass stat-card flex items-center gap-6 rounded-2xl px-5 py-2 shadow-xl">
+                <div className="text-center">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Faturamento</p>
+                  <p className="text-lg font-black tracking-tighter text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,.3)]">{BRL(data?.totalFaturamento ?? 0)}</p>
+                </div>
+                <div className="h-5 w-px bg-white/10" />
+                <div className="text-center">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Vendas</p>
+                  <p className="text-lg font-black tracking-tighter text-white">{data?.totalVendas ?? 0}</p>
+                </div>
+                <div className="h-5 w-px bg-white/10" />
+                <div className="text-center">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Ticket</p>
+                  <p className="text-lg font-black tracking-tighter text-amber-400">{BRL(data?.ticketMedioGeral ?? 0)}</p>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Podium Area */}
+          <main className="no-scrollbar relative flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto pb-10 pt-6">
+            <div className="absolute top-[20%] -z-10 flex items-center justify-center opacity-15">
+              <div className="h-[500px] w-[500px] animate-glow rounded-full bg-green-400 blur-[180px]" />
+            </div>
+
+            <div className="mt-2 flex w-full shrink-0 items-end justify-center gap-10">
+              {top3[1] ? <PodiumPlace item={top3[1]} place={2} /> : <PodiumPlaceholder place={2} />}
+              {top3[0] ? <PodiumPlace item={top3[0]} place={1} /> : <PodiumPlaceholder place={1} />}
+              {top3[2] ? <PodiumPlace item={top3[2]} place={3} /> : <PodiumPlaceholder place={3} />}
+            </div>
+
+            {/* Ranking 4+ */}
+            <div className="z-10 mt-12 flex w-full max-w-4xl shrink-0 flex-col gap-2 px-4">
+              {rest.map((v, i) => <RankRow key={v.utm} item={v} pos={i + 4} />)}
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="flex flex-shrink-0 items-center justify-between pt-2 text-[9px] font-bold uppercase tracking-widest text-gray-600">
+            <div>MULTIUM OS v2.0 — RANKING ENGINE</div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-1 w-1 animate-pulse rounded-full bg-green-400" />
+              Sincronizado · pulse {pulse}
+            </div>
+          </footer>
+        </div>
+
+        {/* RIGHT — Balões */}
+        <aside className="flex w-[380px] flex-shrink-0 flex-col border-l border-white/[.06] bg-black/40" style={{ backdropFilter: "blur(30px)" }}>
+          <div className="flex items-center justify-between border-b border-white/[.06] p-5">
+            <div>
+              <div className="mb-2 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-400/20 to-cyan-500/20 text-xl">🎈</div>
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-wider text-white">Meta dos Balões</h2>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Premiação da Campanha</p>
+                </div>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+                Bateu a meta? <span className="font-bold text-green-400">Estoure um balão</span> e descubra seu prêmio! 🎉
               </p>
             </div>
-          )}
-        </div>
-      </div>
-      <div className={`h-1 w-full rounded-b ${cfg.bar}`} />
-    </div>
-  );
-}
+          </div>
 
-function ListRow({ item, position }: { item: PublicRankingItem; position: number }) {
-  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=0a0a0c&color=e5e5e5&bold=true`;
-  return (
-    <div className="grid grid-cols-[22px_30px_1fr_auto] items-center gap-2.5 rounded border border-white/[.03] bg-white/[.012] px-2 py-1.5">
-      <span className="font-mono text-[0.65rem] font-semibold text-neutral-500">{position}</span>
-      <img src={avatar} alt={item.nome} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/[.08]" />
-      <div className="min-w-0">
-        <p className="truncate text-xs font-semibold text-neutral-200">{item.nome}</p>
-        <div className="flex items-center gap-1.5 text-[0.55rem] text-neutral-500">
-          {item.expert && <span className="uppercase tracking-wider">{item.expert}</span>}
-          <span>· {item.vendas}v</span>
-        </div>
-      </div>
-      <p className="font-mono text-xs font-semibold tabular-nums text-amber-400">{BRL(item.faturamento)}</p>
-    </div>
-  );
-}
+          <div className="balloon-scroll flex-1 overflow-y-auto p-3">
+            <div className="flex flex-col gap-1.5">
+              {BALOES.map((b, i) => <BalloonItem key={b.num} b={b} aberto={i < baloesAbertos} />)}
+            </div>
+          </div>
 
-function MetaLogRow({ log }: { log: MetaLog }) {
-  const pct = log.meta > 0 ? Math.min(100, (log.faturamento / log.meta) * 100) : 0;
-  return (
-    <div className={`rounded border px-2.5 py-1.5 ${log.batida ? "border-emerald-500/20 bg-emerald-500/[.04]" : "border-white/[.04] bg-white/[.012]"}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-neutral-200">{log.nome}</p>
-          <p className="text-[0.55rem] uppercase tracking-wider text-neutral-500">
-            {log.expert ?? log.utm} · {log.vendas}v
-          </p>
-        </div>
-        <div className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[0.56rem] font-semibold uppercase tracking-wider ${log.batida ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-white/[.06] bg-white/[.02] text-neutral-400"}`}>
-          {log.batida ? <Award className="h-2.5 w-2.5" /> : <Target className="h-2.5 w-2.5" />}
-          {log.batida ? "batida" : `${pct.toFixed(0)}%`}
-        </div>
-      </div>
-      <div className="mt-1.5 h-0.5 overflow-hidden rounded-full bg-white/[.05]">
-        <div
-          className={log.batida ? "h-full bg-emerald-500" : "h-full bg-amber-500"}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="mt-1 flex items-center justify-between font-mono text-[0.58rem] font-semibold tabular-nums text-neutral-500">
-        <span className={log.batida ? "text-emerald-400" : "text-neutral-300"}>{BRL(log.faturamento)}</span>
-        <span className="text-neutral-600">/ {BRL(log.meta)}</span>
+          <div className="border-t border-white/[.06] p-4">
+            <div className="glass rounded-xl p-3 text-center">
+              <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-gray-500">Total de Prêmios</p>
+              <div className="flex justify-center gap-4 text-[10px]">
+                <span className="font-black text-amber-400">{totaisPremios.premio}× prêmio</span>
+                <span className="font-black text-green-400">{totaisPremios.pix}× pix</span>
+                <span className="font-black text-cyan-400">{totaisPremios.vale}× vale</span>
+                <span className="font-black text-gray-500">{hitCount} metas</span>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
 
-type ColetivaItem = { expert: string; faturamento: number; meta: number; vendas: number; pct: number; nivel: number; diasRestantes: number; necessarioSemana: number; faltam: number };
-
-function ColetivaRow({ m }: { m: ColetivaItem }) {
-  const nivelColors = ["text-neutral-500 border-white/[.06]", "text-amber-400 border-amber-400/30", "text-emerald-400 border-emerald-400/30", "text-sky-400 border-sky-400/30", "text-violet-400 border-violet-400/30"];
-  const nomeUp = (m.expert || "").toUpperCase();
+function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
+  const palettes = [
+    { border: "border-l-green-400", grad: "linear-gradient(90deg, #4ade80, #22d3ee)", txt: "text-green-400" },
+    { border: "border-l-cyan-400", grad: "linear-gradient(90deg, #22d3ee, #3b82f6)", txt: "text-cyan-400" },
+    { border: "border-l-amber-400", grad: "linear-gradient(90deg, #fbbf24, #f97316)", txt: "text-amber-400" },
+    { border: "border-l-fuchsia-400", grad: "linear-gradient(90deg, #e879f9, #a855f7)", txt: "text-fuchsia-400" },
+  ];
+  const p = palettes[idx % palettes.length];
   return (
-    <div className="rounded border border-white/[.04] bg-white/[.012] p-2.5">
-      <div className="flex items-center justify-between">
+    <div className={`glass relative overflow-hidden rounded-xl border-l-2 p-4 ${p.border}`}>
+      <div className="mb-2 flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold text-neutral-200">{nomeUp} MENSAL</p>
-          <p className="font-mono text-base font-light tabular-nums text-emerald-400">{BRL(m.faturamento)}</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{m.expert} Mensal</p>
+          <h3 className="mt-1 text-lg font-black leading-none text-white">{BRL(m.faturamento)}</h3>
         </div>
         <div className="text-right">
-          <span className={`inline-block rounded border px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider ${nivelColors[m.nivel] ?? nivelColors[0]}`}>
-            Nível {m.nivel} ({Math.round(m.meta / 1000)}K)
-          </span>
-          <p className="mt-1 font-mono text-[0.7rem] font-semibold text-amber-400">{m.pct.toFixed(0)}%</p>
+          <p className="text-[9px] font-bold uppercase text-white/50">Nível {m.nivel} ({Math.round(m.meta / 1000)}k)</p>
+          <p className={`text-xs font-black ${p.txt}`}>{m.pct.toFixed(0)}%</p>
         </div>
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[.06]">
-        <div className="h-full bg-emerald-500" style={{ width: `${m.pct}%` }} />
+      <div className="progress-bar mb-1">
+        <div className="progress-fill" style={{ width: `${Math.min(100, m.pct)}%`, background: p.grad }} />
       </div>
-      <p className="mt-1 text-[0.55rem] tracking-wide text-neutral-500">
-        Necessário p/ Nível {m.nivel} da semana: <span className="font-semibold text-neutral-300">{BRL(m.necessarioSemana)}</span> <span className="text-neutral-600">/ Dias restantes: {m.diasRestantes}</span>
+      <p className="mt-2 text-[9px] font-medium italic text-gray-400">
+        Necessário p/ Nível {m.nivel} da semana: {BRL(m.necessarioSemana)} / Dias restantes: {m.diasRestantes}
       </p>
     </div>
   );
 }
 
+function HallCard({ kind, item, meta }: { kind: "lobo" | "rainha"; item: HallEntry | null; meta: number }) {
+  const cfg = kind === "lobo"
+    ? { emoji: "🐺", title: "Lobo do X1", emptyText: "Em busca do Lobo...", gradBg: "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(0,0,0,0.4))", border: "rgba(251,191,36,0.5)", shadow: "0 0 20px rgba(251,191,36,0.2)", ringClass: "border-amber-400", titleClass: "text-amber-400" }
+    : { emoji: "👑", title: "Rainha do X1", emptyText: "Em busca da Rainha...", gradBg: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(236,72,153,0.1))", border: "rgba(168,85,247,0.5)", shadow: "0 0 20px rgba(168,85,247,0.2)", ringClass: "border-fuchsia-500", titleClass: "bg-gradient-to-r from-purple-400 to-fuchsia-500 bg-clip-text text-transparent" };
 
-function HallCard({ label, item, prox, meta, highlight, icon, emptyHint }: { label: string; item: HallEntry | null; prox: HallProx | null; meta: number; highlight: "amber" | "rose"; icon: React.ReactNode; emptyHint: string }) {
-  const tone = highlight === "amber" ? "text-amber-400 border-amber-400/30 bg-amber-400/[.04]" : "text-rose-400 border-rose-400/30 bg-rose-400/[.04]";
-  const conquistado = !!item;
-  const faltam = prox ? Math.max(0, prox.meta - prox.faturamento) : meta;
-  const pct = prox ? Math.min(100, (prox.faturamento / prox.meta) * 100) : 0;
-  return (
-    <div className={`flex items-center gap-3 rounded border px-3 py-2 ${conquistado ? tone : "border-white/[.05] bg-white/[.015] text-neutral-500"}`}>
-      <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${conquistado ? tone : "border-white/[.08] text-neutral-600"}`}>{icon}</div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[0.58rem] font-bold uppercase tracking-[0.2em]">{label}</p>
-        {conquistado ? (
-          <>
-            <p className="truncate text-xs font-semibold text-neutral-100">{item!.nome}</p>
-            <p className="font-mono text-[0.6rem] tabular-nums text-neutral-400">{BRL(item!.faturamento)} <span className="text-neutral-600">· meta {BRL(meta)}</span></p>
-          </>
-        ) : (
-          <>
-            <p className="truncate text-[0.65rem] font-semibold text-neutral-400">{emptyHint} — meta {BRL(meta)}/mês</p>
-            <div className="mt-1 h-0.5 overflow-hidden rounded bg-white/[.05]">
-              <div className={`h-full ${highlight === "amber" ? "bg-amber-500/60" : "bg-rose-500/60"}`} style={{ width: `${pct}%` }} />
-            </div>
-            <p className="mt-0.5 font-mono text-[0.52rem] tabular-nums text-neutral-600">
-              {prox ? <>{prox.nome} · faltam {BRL(faltam)}</> : "Nenhum candidato no mês"}
-            </p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-type Balao = { premio: string; sub: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" };
-
-function BalaoSlot({ index, balao, aberto }: { index: number; balao: Balao; aberto: boolean }) {
-  if (!aberto) {
+  if (!item) {
     return (
-      <div className="flex h-14 flex-col items-center justify-center rounded border border-white/[.05] bg-white/[.015] text-center">
-        <span className="font-mono text-[0.55rem] font-semibold text-neutral-600">{index}</span>
-        <Gift className="h-3.5 w-3.5 text-neutral-700" />
+      <div className="glass flex items-center gap-4 rounded-xl p-4 opacity-50 grayscale transition-all">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-white/5 text-2xl">{cfg.emoji}</div>
+        <div>
+          <h4 className="text-xs font-black uppercase tracking-wider text-white">{cfg.title}</h4>
+          <p className="text-[10px] italic text-gray-400">{cfg.emptyText}</p>
+          <p className="mt-0.5 text-[8px] uppercase text-white/30">Meta: {BRL(meta)} / Mês</p>
+        </div>
       </div>
     );
   }
-  const tones: Record<Balao["tier"], string> = {
-    nada: "border-white/[.06] bg-white/[.02] text-neutral-500",
-    pix: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-    ouro: "border-amber-500/50 bg-amber-500/15 text-amber-300",
-    vale: "border-rose-500/40 bg-rose-500/10 text-rose-300",
-    extra: "border-sky-500/40 bg-sky-500/10 text-sky-300",
-  };
+  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=fbbf24&color=000&size=200&bold=true`;
   return (
-    <div className={`group relative flex h-14 flex-col items-center justify-center rounded border px-1 text-center ${tones[balao.tier]}`} title={`${balao.premio} — ${balao.sub}`}>
-      <span className="absolute left-1 top-0.5 font-mono text-[0.5rem] font-bold opacity-60">{index}</span>
-      <p className="line-clamp-2 text-[0.5rem] font-bold uppercase leading-tight tracking-tight">
-        {balao.tier === "nada" ? "✕ nada" : balao.premio}
-      </p>
+    <div className="relative flex flex-col items-center overflow-hidden rounded-xl p-4 text-center" style={{ background: cfg.gradBg, border: `1px solid ${cfg.border}`, boxShadow: cfg.shadow }}>
+      <div className="relative z-10 mb-2 h-16 w-16">
+        <div className={`h-full w-full rounded-full border-[3px] p-0.5 ${cfg.ringClass}`} style={{ filter: kind === "lobo" ? "drop-shadow(0 0 15px rgba(251,191,36,0.5))" : "drop-shadow(0 0 15px rgba(236,72,153,0.3))" }}>
+          <img src={avatar} alt={item.nome} className="h-full w-full rounded-full object-cover" />
+        </div>
+        <div className="absolute -bottom-2 -right-2 rounded-full bg-black text-lg shadow-xl">{cfg.emoji}</div>
+      </div>
+      <h4 className={`relative z-10 mb-1 text-xs font-black uppercase tracking-widest ${cfg.titleClass}`}>{cfg.title}</h4>
+      <p className="relative z-10 text-sm font-bold text-white">{BRL(item.faturamento)}</p>
+      <p className="relative z-10 mt-1 text-[10px] uppercase tracking-widest text-gray-300">{item.nome}</p>
     </div>
   );
 }
 
+function PodiumPlace({ item, place }: { item: PublicRankingItem; place: 1 | 2 | 3 }) {
+  const cfg = {
+    1: { ring: "border-amber-400", glow: "glow-gold", badge: "from-amber-400 to-amber-600", size: "w-56 h-56 md:w-64 md:h-64", num: "w-16 h-16 text-2xl", nameSize: "text-4xl md:text-5xl", valSize: "text-2xl md:text-3xl", marginB: "mb-14", delay: "0s" },
+    2: { ring: "border-slate-400", glow: "glow-silver", badge: "from-slate-400 to-gray-500", size: "w-40 h-40 md:w-44 md:h-44", num: "w-12 h-12 text-lg", nameSize: "text-xl md:text-2xl", valSize: "text-lg", marginB: "mb-0", delay: "1s" },
+    3: { ring: "border-amber-700", glow: "glow-bronze", badge: "from-amber-700 to-amber-900", size: "w-40 h-40 md:w-44 md:h-44", num: "w-12 h-12 text-lg", nameSize: "text-xl md:text-2xl", valSize: "text-lg", marginB: "mb-0", delay: "2s" },
+  }[place];
+  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=${place === 1 ? "fbbf24&color=000" : place === 2 ? "94a3b8&color=fff" : "d97706&color=fff"}&size=256&bold=true`;
+
+  return (
+    <div className={`float-animation flex flex-col items-center gap-3 ${cfg.marginB}`} style={{ animationDelay: cfg.delay }}>
+      <div className="relative">
+        {place === 1 && (
+          <>
+            <div className="crown-animation absolute -top-12 left-1/2 z-10 text-5xl" style={{ filter: "drop-shadow(0 0 10px rgba(251,191,36,0.5))" }}>👑</div>
+            <div className="ring-spin absolute -inset-4 rounded-full" style={{ border: "2px dashed rgba(251,191,36,0.18)" }} />
+          </>
+        )}
+        <div className={`${cfg.size} overflow-hidden rounded-full border-[4px] p-1 ${cfg.ring} ${cfg.glow}`}>
+          <img src={avatar} alt={item.nome} className="h-full w-full rounded-full object-cover" />
+        </div>
+        <div className={`absolute -bottom-2 -right-2 ${cfg.num} flex items-center justify-center rounded-full bg-gradient-to-br ${cfg.badge} border-4 border-[#020206] font-black text-black shadow-xl`}>
+          {place}
+        </div>
+      </div>
+      <div className="max-w-[280px] text-center">
+        <p className={`truncate font-black leading-tight text-white drop-shadow-lg ${cfg.nameSize}`}>{item.nome}</p>
+        {item.expert && <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{item.expert}</p>}
+        <p className={`mt-1 font-black italic tracking-tighter text-green-400 ${cfg.valSize}`}>{BRL(item.faturamento)}</p>
+        <p className="mt-0.5 text-[11px] font-bold text-gray-500">{item.vendas} venda{item.vendas !== 1 ? "s" : ""} · TM {BRL(item.ticketMedio)}</p>
+        {item.meta > 0 && (
+          <div className="mx-auto mt-2 w-44">
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${Math.min(100, item.metaPct)}%`, background: item.metaBatida ? "#4ade80" : "linear-gradient(90deg,#fbbf24,#f59e0b)" }} />
+            </div>
+            <p className={`mt-1 text-[9px] font-black uppercase tracking-wider ${item.metaBatida ? "text-green-400" : "text-gray-500"}`}>
+              {item.metaBatida ? "✓ meta batida" : `${item.metaPct.toFixed(0)}% da meta`}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PodiumPlaceholder({ place }: { place: 1 | 2 | 3 }) {
+  const sz = place === 1 ? "w-56 h-56 md:w-64 md:h-64" : "w-40 h-40 md:w-44 md:h-44";
+  return (
+    <div className={`flex flex-col items-center gap-3 opacity-40 ${place === 1 ? "mb-14" : ""}`}>
+      <div className={`${sz} rounded-full border-[3px] border-dashed border-white/15 bg-white/[.02]`} />
+      <p className="text-[10px] uppercase tracking-widest text-gray-700">aguardando #{place}</p>
+    </div>
+  );
+}
+
+function RankRow({ item, pos }: { item: PublicRankingItem; pos: number }) {
+  const avatar = item.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome)}&background=1a1a1a&color=fff&bold=true`;
+  return (
+    <div className="glass flex items-center gap-4 rounded-xl px-4 py-2.5">
+      <span className="w-6 text-center font-mono text-sm font-black text-gray-500">{pos}</span>
+      <img src={avatar} alt={item.nome} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-white">{item.nome}</p>
+        <p className="text-[10px] uppercase tracking-wider text-gray-500">{item.expert ?? "—"} · {item.vendas}v</p>
+      </div>
+      <p className="font-mono text-base font-black tabular-nums text-green-400">{BRL(item.faturamento)}</p>
+    </div>
+  );
+}
+
+function BalloonItem({ b, aberto }: { b: Balao; aberto: boolean }) {
+  const tones: Record<Balao["tier"], { border: string; bg: string; text: string }> = {
+    nada: { border: "border-l-white/10", bg: "bg-white/[.02]", text: "text-gray-500" },
+    pix: { border: "border-l-amber-400", bg: "bg-amber-500/[.04]", text: "text-amber-300" },
+    ouro: { border: "border-l-amber-400", bg: "bg-amber-500/[.06]", text: "text-amber-300" },
+    vale: { border: "border-l-cyan-400", bg: "bg-cyan-500/[.04]", text: "text-cyan-300" },
+    extra: { border: "border-l-green-400", bg: "bg-green-500/[.04]", text: "text-green-300" },
+  };
+  const tone = tones[b.tier];
+
+  if (!aberto) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-white/[.04] border-l-2 border-l-white/10 bg-white/[.02] px-3 py-2.5 opacity-60">
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-black/40 font-mono text-[10px] font-black text-gray-500">{b.num}</span>
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base grayscale">🎈</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-bold uppercase tracking-wider text-gray-600">Bloqueado</p>
+          <p className="truncate text-[9px] text-gray-700">Bata mais metas para abrir</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-3 rounded-lg border border-white/[.04] border-l-2 px-3 py-2.5 transition ${tone.border} ${tone.bg}`}>
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-black/40 font-mono text-[10px] font-black text-white">{b.num}</span>
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-base">{b.icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className={`truncate text-[11px] font-black uppercase tracking-wider ${tone.text}`}>{b.label}</p>
+        {b.desc && <p className="truncate text-[9px] italic text-gray-400">{b.desc}</p>}
+      </div>
+    </div>
+  );
+}
