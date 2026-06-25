@@ -1,15 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, Save, Send, KeyRound, Eye, EyeOff, CheckCircle2, Loader2, Clock3, ShieldCheck, AlertCircle } from "lucide-react";
+import { Activity, Save, Send, KeyRound, Eye, EyeOff, CheckCircle2, Loader2, Clock3, ShieldCheck, AlertCircle, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@supabase/supabase-js";
 import {
   getMetaAdsConfig,
   listMetaEventLogs,
   saveMetaAdsConfig,
   sendMetaEvent,
 } from "@/lib/meta-ads.functions";
+
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizClient = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+});
+
+type QuizLead = {
+  id: string;
+  nome: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  faturamento: string | null;
+  caixa_letra: string | null;
+  lead_score: number | null;
+  fbp: string | null;
+  fbc: string | null;
+};
 
 export const Route = createFileRoute("/_authenticated/meta-ads")({
   head: () => ({
@@ -78,6 +99,44 @@ function MetaAdsPage() {
   const [leadPhone, setLeadPhone] = useState("");
   const [leadFirstName, setLeadFirstName] = useState("");
   const [leadLastName, setLeadLastName] = useState("");
+  const [leadSearch, setLeadSearch] = useState("");
+  const [selectedLead, setSelectedLead] = useState<QuizLead | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const { data: leadResults = [], isFetching: searching } = useQuery<QuizLead[]>({
+    queryKey: ["quiz-lead-search", leadSearch],
+    queryFn: async () => {
+      const q = leadSearch.trim();
+      if (q.length < 2) return [];
+      const { data, error } = await quizClient
+        .from("leads")
+        .select("id,nome,email,whatsapp,instagram,faturamento,caixa_letra,lead_score,fbp,fbc")
+        .or(`nome.ilike.*${q}*,email.ilike.*${q}*,whatsapp.ilike.*${q}*,instagram.ilike.*${q}*`)
+        .order("data_criacao", { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      return (data ?? []) as QuizLead[];
+    },
+    enabled: leadSearch.trim().length >= 2,
+  });
+
+  function selectLead(l: QuizLead) {
+    setSelectedLead(l);
+    setLeadEmail(l.email ?? "");
+    setLeadPhone(l.whatsapp ?? "");
+    const partes = (l.nome ?? "").trim().split(/\s+/);
+    setLeadFirstName(partes[0] ?? "");
+    setLeadLastName(partes.slice(1).join(" "));
+    setSearchOpen(false);
+    setLeadSearch(l.nome ?? l.email ?? "");
+    toast.success("Lead carregado", { description: l.nome ?? l.email ?? "" });
+  }
+
+  function clearSelectedLead() {
+    setSelectedLead(null);
+    setLeadSearch("");
+  }
+
   const needsValue = EVENTS.find((e) => e.name === selectedEvent)?.needsValue ?? false;
 
   useEffect(() => {
@@ -143,6 +202,7 @@ function MetaAdsPage() {
     setLeadPhone("");
     setLeadFirstName("");
     setLeadLastName("");
+    clearSelectedLead();
   }
 
   function handleSend() {
@@ -161,8 +221,8 @@ function MetaAdsPage() {
       phone: leadPhone.trim() || undefined,
       firstName: leadFirstName.trim() || undefined,
       lastName: leadLastName.trim() || undefined,
-      fbp: getCookieValue("_fbp"),
-      fbc: getCookieValue("_fbc"),
+      fbp: selectedLead?.fbp || getCookieValue("_fbp"),
+      fbc: selectedLead?.fbc || getCookieValue("_fbc"),
     }, {
       onSuccess: () => {
         if (needsValue) setEventValue("");
@@ -332,6 +392,74 @@ function MetaAdsPage() {
                   </div>
                 </div>
               )}
+
+              <div className="relative">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Buscar lead do Quiz
+                </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={leadSearch}
+                    onChange={(e) => { setLeadSearch(e.target.value); setSearchOpen(true); setSelectedLead(null); }}
+                    onFocus={() => setSearchOpen(true)}
+                    placeholder="Nome, email, whatsapp ou @instagram..."
+                    className="w-full rounded-lg border border-border bg-background pl-10 pr-10 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                  {(leadSearch || selectedLead) && (
+                    <button
+                      type="button"
+                      onClick={clearLeadFields}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {searchOpen && leadSearch.trim().length >= 2 && (
+                  <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-popover shadow-xl">
+                    {searching && (
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Buscando...
+                      </div>
+                    )}
+                    {!searching && leadResults.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum lead encontrado.</div>
+                    )}
+                    {leadResults.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => selectLead(l)}
+                        className="flex w-full items-start justify-between gap-3 border-b border-border/50 px-3 py-2 text-left hover:bg-accent/10"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold">{l.nome ?? "(sem nome)"}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {l.email ?? ""}{l.email && l.whatsapp ? " • " : ""}{l.whatsapp ?? ""}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
+                          {l.caixa_letra && (
+                            <span className="rounded bg-accent/20 px-1.5 py-0.5 font-bold text-accent">{l.caixa_letra}</span>
+                          )}
+                          {l.lead_score != null && (
+                            <span className="text-muted-foreground">{l.lead_score}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedLead && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-accent/10 px-2 py-1.5 text-[11px] text-accent">
+                    <CheckCircle2 className="h-3 w-3" /> Lead carregado: <strong>{selectedLead.nome ?? selectedLead.email}</strong>
+                    {selectedLead.fbp && <span className="text-accent/70">• fbp ✓</span>}
+                    {selectedLead.fbc && <span className="text-accent/70">• fbc ✓</span>}
+                  </div>
+                )}
+              </div>
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
