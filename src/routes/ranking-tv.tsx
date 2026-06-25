@@ -478,33 +478,73 @@ function RankingTV() {
 
 function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
   const palettes = [
-    { border: "border-l-green-400", grad: "linear-gradient(90deg, #4ade80, #22d3ee)", txt: "text-green-400" },
-    { border: "border-l-cyan-400", grad: "linear-gradient(90deg, #22d3ee, #3b82f6)", txt: "text-cyan-400" },
-    { border: "border-l-amber-400", grad: "linear-gradient(90deg, #fbbf24, #f97316)", txt: "text-amber-400" },
-    { border: "border-l-fuchsia-400", grad: "linear-gradient(90deg, #e879f9, #a855f7)", txt: "text-fuchsia-400" },
+    { border: "border-l-green-400", grad: "linear-gradient(90deg, #4ade80, #22d3ee)", txt: "text-green-400", bg: "bg-green-400", ring: "ring-green-400/40" },
+    { border: "border-l-cyan-400", grad: "linear-gradient(90deg, #22d3ee, #3b82f6)", txt: "text-cyan-400", bg: "bg-cyan-400", ring: "ring-cyan-400/40" },
+    { border: "border-l-amber-400", grad: "linear-gradient(90deg, #fbbf24, #f97316)", txt: "text-amber-400", bg: "bg-amber-400", ring: "ring-amber-400/40" },
+    { border: "border-l-fuchsia-400", grad: "linear-gradient(90deg, #e879f9, #a855f7)", txt: "text-fuchsia-400", bg: "bg-fuchsia-400", ring: "ring-fuchsia-400/40" },
   ];
   const p = palettes[idx % palettes.length];
+  // Tiers fixos: N1=25%, N2=50%, N3=75%, N4=100% da meta
+  const tiers = [0.25, 0.5, 0.75, 1];
+  const nivelAtual = Math.max(0, Math.min(4, m.nivel));
+  const proxTierIdx = nivelAtual >= 4 ? 3 : nivelAtual; // próximo limiar a alcançar
+  const proxMetaValor = m.meta * tiers[proxTierIdx];
+  const faltaProxNivel = Math.max(0, proxMetaValor - m.faturamento);
+  const bateu = nivelAtual >= 4;
+
   return (
     <div className={`glass relative overflow-hidden rounded-xl border-l-2 p-4 ${p.border}`}>
-      <div className="mb-2 flex items-end justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{m.expert} Mensal</p>
-          <h3 className="mt-1 text-lg font-black leading-none text-white">{BRL(m.faturamento)}</h3>
+      {/* Header: operação + faturamento atual + % */}
+      <div className="mb-2 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-widest text-gray-500">{m.expert} · Mensal</p>
+          <h3 className="mt-1 text-lg font-black leading-none text-white">{BRL(m.faturamento)} <span className="text-[10px] font-bold text-gray-500">/ {BRL(m.meta)}</span></h3>
         </div>
-        <div className="text-right">
-          <p className="text-[9px] font-bold uppercase text-white/50">Nível {m.nivel} ({Math.round(m.meta / 1000)}k)</p>
-          <p className={`text-xs font-black ${p.txt}`}>{m.pct.toFixed(0)}%</p>
-        </div>
+        <p className={`shrink-0 text-xl font-black tracking-tighter ${p.txt}`}>{m.pct.toFixed(0)}%</p>
       </div>
-      <div className="progress-bar mb-1">
-        <div className="progress-fill" style={{ width: `${Math.min(100, m.pct)}%`, background: p.grad }} />
+
+      {/* Barra com marcadores dos níveis */}
+      <div className="relative mb-2 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, m.pct)}%`, background: p.grad }} />
+        {tiers.slice(0, 3).map((t, i) => (
+          <span key={i} className="absolute top-0 h-full w-px bg-black/40" style={{ left: `${t * 100}%` }} />
+        ))}
       </div>
-      <p className="mt-2 text-[9px] font-medium italic text-gray-400">
-        Necessário p/ Nível {m.nivel} da semana: {BRL(m.necessarioSemana)} / Dias restantes: {m.diasRestantes}
-      </p>
+
+      {/* Pills de nível: destaca o atual */}
+      <div className="mb-2 grid grid-cols-4 gap-1">
+        {[1, 2, 3, 4].map((n) => {
+          const ativo = n <= nivelAtual;
+          const atual = n === nivelAtual || (nivelAtual === 0 && n === 1);
+          return (
+            <div
+              key={n}
+              className={`flex flex-col items-center justify-center rounded-md px-1 py-1 text-[9px] font-black uppercase tracking-wider transition ${
+                ativo ? `${p.bg} text-black` : "bg-white/5 text-white/40"
+              } ${atual && nivelAtual > 0 ? `ring-2 ${p.ring}` : ""}`}
+            >
+              <span>N{n}</span>
+              <span className="text-[8px] font-bold opacity-80">{BRL(m.meta * tiers[n - 1])}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Status: nível atual + próxima meta */}
+      <div className="flex items-center justify-between gap-2 text-[10px]">
+        <span className={`font-black uppercase ${p.txt}`}>
+          {bateu ? "✓ Meta batida (N4)" : `Nível atual: ${nivelAtual || 1}`}
+        </span>
+        {!bateu && (
+          <span className="text-right text-gray-400">
+            Faltam <span className="font-black text-white">{BRL(faltaProxNivel)}</span> p/ N{proxTierIdx + 1}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
+
 
 function HallCard({ kind, item, meta }: { kind: "lobo" | "rainha"; item: HallEntry | null; meta: number }) {
   const cfg = kind === "lobo"
