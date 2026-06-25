@@ -25,6 +25,7 @@ const items = [
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
   { title: "Meta Ads", url: "/meta-ads", icon: Activity },
+  { title: "Quiz", url: "/quiz", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
