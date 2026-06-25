@@ -393,6 +393,74 @@ function MetaAdsPage() {
                 </div>
               )}
 
+              <div className="relative">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Buscar lead do Quiz
+                </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={leadSearch}
+                    onChange={(e) => { setLeadSearch(e.target.value); setSearchOpen(true); setSelectedLead(null); }}
+                    onFocus={() => setSearchOpen(true)}
+                    placeholder="Nome, email, whatsapp ou @instagram..."
+                    className="w-full rounded-lg border border-border bg-background pl-10 pr-10 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                  {(leadSearch || selectedLead) && (
+                    <button
+                      type="button"
+                      onClick={clearLeadFields}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {searchOpen && leadSearch.trim().length >= 2 && (
+                  <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-popover shadow-xl">
+                    {searching && (
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Buscando...
+                      </div>
+                    )}
+                    {!searching && leadResults.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum lead encontrado.</div>
+                    )}
+                    {leadResults.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => selectLead(l)}
+                        className="flex w-full items-start justify-between gap-3 border-b border-border/50 px-3 py-2 text-left hover:bg-accent/10"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold">{l.nome ?? "(sem nome)"}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {l.email ?? ""}{l.email && l.whatsapp ? " • " : ""}{l.whatsapp ?? ""}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
+                          {l.caixa_letra && (
+                            <span className="rounded bg-accent/20 px-1.5 py-0.5 font-bold text-accent">{l.caixa_letra}</span>
+                          )}
+                          {l.lead_score != null && (
+                            <span className="text-muted-foreground">{l.lead_score}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedLead && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-accent/10 px-2 py-1.5 text-[11px] text-accent">
+                    <CheckCircle2 className="h-3 w-3" /> Lead carregado: <strong>{selectedLead.nome ?? selectedLead.email}</strong>
+                    {selectedLead.fbp && <span className="text-accent/70">• fbp ✓</span>}
+                    {selectedLead.fbc && <span className="text-accent/70">• fbc ✓</span>}
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
