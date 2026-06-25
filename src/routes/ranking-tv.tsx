@@ -552,7 +552,7 @@ function PodiumPlace({ item, place }: { item: PublicRankingItem; place: 1 | 2 | 
       <div className="relative">
         {place === 1 && (
           <>
-            <div className="crown-animation absolute -top-12 left-1/2 z-10 text-5xl" style={{ filter: "drop-shadow(0 0 10px rgba(251,191,36,0.5))" }}>👑</div>
+            <div className="crown-animation absolute -top-16 left-1/2 z-10 text-6xl" style={{ filter: "drop-shadow(0 0 10px rgba(251,191,36,0.5))", transform: "translateX(-50%)" }}>👑</div>
             <div className="ring-spin absolute -inset-4 rounded-full" style={{ border: "2px dashed rgba(251,191,36,0.18)" }} />
           </>
         )}
