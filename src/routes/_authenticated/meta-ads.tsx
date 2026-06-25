@@ -99,6 +99,44 @@ function MetaAdsPage() {
   const [leadPhone, setLeadPhone] = useState("");
   const [leadFirstName, setLeadFirstName] = useState("");
   const [leadLastName, setLeadLastName] = useState("");
+  const [leadSearch, setLeadSearch] = useState("");
+  const [selectedLead, setSelectedLead] = useState<QuizLead | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const { data: leadResults = [], isFetching: searching } = useQuery<QuizLead[]>({
+    queryKey: ["quiz-lead-search", leadSearch],
+    queryFn: async () => {
+      const q = leadSearch.trim();
+      if (q.length < 2) return [];
+      const { data, error } = await quizClient
+        .from("leads")
+        .select("id,nome,email,whatsapp,instagram,faturamento,caixa_letra,lead_score,fbp,fbc")
+        .or(`nome.ilike.*${q}*,email.ilike.*${q}*,whatsapp.ilike.*${q}*,instagram.ilike.*${q}*`)
+        .order("data_criacao", { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      return (data ?? []) as QuizLead[];
+    },
+    enabled: leadSearch.trim().length >= 2,
+  });
+
+  function selectLead(l: QuizLead) {
+    setSelectedLead(l);
+    setLeadEmail(l.email ?? "");
+    setLeadPhone(l.whatsapp ?? "");
+    const partes = (l.nome ?? "").trim().split(/\s+/);
+    setLeadFirstName(partes[0] ?? "");
+    setLeadLastName(partes.slice(1).join(" "));
+    setSearchOpen(false);
+    setLeadSearch(l.nome ?? l.email ?? "");
+    toast.success("Lead carregado", { description: l.nome ?? l.email ?? "" });
+  }
+
+  function clearSelectedLead() {
+    setSelectedLead(null);
+    setLeadSearch("");
+  }
+
   const needsValue = EVENTS.find((e) => e.name === selectedEvent)?.needsValue ?? false;
 
   useEffect(() => {
