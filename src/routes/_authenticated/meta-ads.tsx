@@ -226,15 +226,27 @@ function MetaAdsManagerPage() {
     }
   }
 
-  function selectCampaign(id: string) {
-    setCampaignId(id);
-    setAdsetId(null);
-    setTab("adsets");
+  function toggleCampaign(id: string) {
+    setSelectedCampaigns((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    setSelectedAdsets(new Set());
   }
 
-  function selectAdset(id: string) {
-    setAdsetId(id);
-    setTab("ads");
+  function toggleAdset(id: string) {
+    setSelectedAdsets((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function clearAll() {
+    setSelectedCampaigns(new Set());
+    setSelectedAdsets(new Set());
+    setTab("campaigns");
   }
 
   return (
