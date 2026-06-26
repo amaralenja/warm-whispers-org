@@ -35,7 +35,6 @@ import {
   CheckCircle2,
   XCircle,
   CalendarClock,
-  Plus,
   X,
 } from "lucide-react";
 
