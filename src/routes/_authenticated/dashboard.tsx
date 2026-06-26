@@ -332,8 +332,17 @@ function OperacaoCard({ expert, share }: { expert: ExpertStats; share: number })
         </div>
         <span className="text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">{share}%</span>
       </div>
-      <div className={`mt-3 text-2xl ${NUM} text-emerald-400`}>{BRL(expert.faturamento)}</div>
-      <div className="mt-1 text-[0.7rem] text-muted-foreground">Nossa parte: {BRL(nossa)}</div>
+      <div className="mt-3 text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">Faturamento</div>
+      <div className={`text-lg ${NUM} text-foreground/80`}>{BRL(expert.faturamento)}</div>
+
+      <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
+        <div className="flex items-center gap-1.5 text-emerald-400">
+          <Sparkles className="h-3 w-3" />
+          <span className="text-[0.55rem] font-semibold uppercase tracking-[0.22em]">Nossa Parte</span>
+        </div>
+        <div className={`mt-1 text-3xl ${NUM} text-emerald-400`}>{BRL(nossa)}</div>
+      </div>
+
       <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3">
         <Mini label="Vendas" value={String(expert.vendas)} />
         <Mini label="TM" value={BRL(expert.ticketMedio)} accent="text-sky-400" />
