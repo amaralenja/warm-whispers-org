@@ -851,12 +851,14 @@ function EventRow({
   onDelete: () => void;
 }) {
   const [showUpOpen, setShowUpOpen] = useState(false);
+  const [, force] = useState(0);
   const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
   const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
   const guest = guestOf(ev);
   const attendeeEmail = guest?.email;
   const attendeeName = guest?.displayName;
   const link = getEventLink(ev.id);
+  const noShow = getNoShow(ev.id);
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:border-accent/40">
@@ -884,6 +886,9 @@ function EventRow({
             ✓ Vinculado: {link.nome || link.email}
           </p>
         )}
+        {noShow && (
+          <p className="mt-0.5 text-xs text-rose-400">✗ Marcado como NoShow</p>
+        )}
       </div>
       <div className="flex items-center gap-1">
         <Button
@@ -894,6 +899,20 @@ function EventRow({
         >
           <Zap className="h-3.5 w-3.5" />
           <span className="text-xs font-semibold">{link ? "Re-disparar" : "ShowUp"}</span>
+        </Button>
+        <Button
+          size="sm"
+          variant={noShow ? "destructive" : "outline"}
+          onClick={() => {
+            if (noShow) { unmarkNoShow(ev.id); toast.success("NoShow removido"); }
+            else { markNoShow(ev.id); toast.success("Marcado como NoShow"); }
+            force((n) => n + 1);
+          }}
+          className="h-8 gap-1.5 px-2.5"
+          title={noShow ? "Desmarcar NoShow" : "Marcar como NoShow"}
+        >
+          <UserX className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold">{noShow ? "NoShow ✓" : "NoShow"}</span>
         </Button>
         {ev.htmlLink && (
           <a href={ev.htmlLink} target="_blank" rel="noreferrer" className="rounded p-2 hover:bg-muted">
