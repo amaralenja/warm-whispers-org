@@ -4,7 +4,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
-export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "custom";
+export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "7d" | "30d" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
@@ -44,6 +44,16 @@ export function computeRange(preset: RangePreset): DateRangeValue {
     weekStart.setUTCDate(weekStart.getUTCDate() - day + (day === 0 ? -6 : 1));
     return { preset, from: iso(weekStart), to: iso(today) };
   }
+  if (preset === "7d") {
+    const s = new Date(today);
+    s.setUTCDate(s.getUTCDate() - 6);
+    return { preset, from: iso(s), to: iso(today) };
+  }
+  if (preset === "30d") {
+    const s = new Date(today);
+    s.setUTCDate(s.getUTCDate() - 29);
+    return { preset, from: iso(s), to: iso(today) };
+  }
   if (preset === "mes") {
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
     return { preset, from: iso(monthStart), to: iso(today) };
@@ -59,7 +69,9 @@ const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "hoje", label: "Hoje" },
   { id: "ontem", label: "Ontem" },
   { id: "semana", label: "Semana" },
+  { id: "7d", label: "7 dias" },
   { id: "mes", label: "Mês" },
+  { id: "30d", label: "30 dias" },
   { id: "ano", label: "2026" },
 ];
 
@@ -77,9 +89,11 @@ function parseISO(s: string | null): Date | undefined {
 export function DateRangeFilter({
   value,
   onChange,
+  presets,
 }: {
   value: DateRangeValue;
   onChange: (v: DateRangeValue) => void;
+  presets?: Exclude<RangePreset, "custom">[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<RDPRange | undefined>(() => ({
@@ -101,11 +115,12 @@ export function DateRangeFilter({
   }, [value]);
 
   const customActive = value.preset === "custom";
+  const visiblePresets = presets ? PRESETS.filter((p) => presets.includes(p.id)) : PRESETS;
 
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card/40 p-1">
-        {PRESETS.map((p) => {
+        {visiblePresets.map((p) => {
           const active = p.id === value.preset;
           return (
             <button
