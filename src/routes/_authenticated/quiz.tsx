@@ -73,39 +73,43 @@ type Lead = {
   origem: string | null;
 };
 
-type Period = "today" | "yesterday" | "7d" | "30d" | "90d" | "all";
+type Period = "today" | "yesterday" | "7d" | "15d" | "30d" | "custom" | "all";
 type ViewMode = "kanban" | "list";
 type RealityFilter = "all" | "real" | "fake";
 
-function periodToFrom(p: Period): string | null {
+function periodToRange(
+  p: Period,
+  customFrom?: string,
+  customTo?: string,
+): { from: string | null; to: string | null } {
   const now = new Date();
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const startTomorrow = new Date(startToday);
+  startTomorrow.setDate(startTomorrow.getDate() + 1);
   switch (p) {
     case "today":
-      return d.toISOString();
+      return { from: startToday.toISOString(), to: startTomorrow.toISOString() };
     case "yesterday": {
-      const y = new Date(d);
+      const y = new Date(startToday);
       y.setDate(y.getDate() - 1);
-      return y.toISOString();
+      return { from: y.toISOString(), to: startToday.toISOString() };
     }
-    case "7d": {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 7);
-      return x.toISOString();
-    }
+    case "7d":
+    case "15d":
     case "30d": {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 30);
-      return x.toISOString();
+      const days = p === "7d" ? 7 : p === "15d" ? 15 : 30;
+      const x = new Date(startToday);
+      x.setDate(x.getDate() - days);
+      return { from: x.toISOString(), to: startTomorrow.toISOString() };
     }
-    case "90d": {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 90);
-      return x.toISOString();
+    case "custom": {
+      const f = customFrom ? new Date(customFrom + "T00:00:00").toISOString() : null;
+      const t = customTo ? new Date(customTo + "T23:59:59").toISOString() : null;
+      return { from: f, to: t };
     }
     case "all":
-      return null;
+      return { from: null, to: null };
   }
 }
 
@@ -212,7 +216,9 @@ function QuizPage() {
   const { workspace } = useWorkspace();
   const isGeral = workspace?.id === "all";
 
-  const [period, setPeriod] = useState<Period>("7d");
+  const [period, setPeriod] = useState<Period>("today");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState<OriginKey | "all">("all");
   const [liveCount, setLiveCount] = useState(0);
@@ -237,10 +243,10 @@ function QuizPage() {
     return isRealHeuristic(l);
   }
 
-  const fromIso = periodToFrom(period);
+  const { from: fromIso, to: toIso } = periodToRange(period, customFrom, customTo);
 
   const { data: leads = [], isLoading, error } = useQuery({
-    queryKey: ["quiz-leads", period],
+    queryKey: ["quiz-leads", period, fromIso, toIso],
     queryFn: async () => {
       let q = quizSb
         .from("leads")
@@ -248,6 +254,7 @@ function QuizPage() {
         .order("data_criacao", { ascending: false })
         .limit(1000);
       if (fromIso) q = q.gte("data_criacao", fromIso);
+      if (toIso) q = q.lt("data_criacao", toIso);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Lead[];
@@ -358,19 +365,44 @@ function QuizPage() {
                 className="h-9 w-[260px] pl-8"
               />
             </div>
-            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Hoje</SelectItem>
-                <SelectItem value="yesterday">Ontem</SelectItem>
-                <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                <SelectItem value="all">Tudo</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex rounded-md border border-border overflow-hidden">
+              {([
+                ["today", "Hoje"],
+                ["yesterday", "Ontem"],
+                ["7d", "7d"],
+                ["15d", "15d"],
+                ["30d", "30d"],
+                ["custom", "Personalizado"],
+              ] as [Period, string][]).map(([key, label], i) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPeriod(key)}
+                  className={`px-3 h-9 text-xs transition ${i > 0 ? "border-l border-border" : ""} ${
+                    period === key ? "bg-accent/20 text-accent font-semibold" : "hover:bg-accent/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {period === "custom" && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-9 w-[140px]"
+                />
+                <span className="text-muted-foreground text-xs">até</span>
+                <Input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-9 w-[140px]"
+                />
+              </div>
+            )}
             <Select value={reality} onValueChange={(v) => setReality(v as RealityFilter)}>
               <SelectTrigger className="h-9 w-[140px]">
                 <SelectValue />
