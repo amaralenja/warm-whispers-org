@@ -148,6 +148,7 @@ function CalendarPage() {
   const [view, setView] = useState<"month" | "list">("month");
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
 
@@ -246,9 +247,38 @@ function CalendarPage() {
   }
 
   const weekdayLabels = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  const selectedDayEvents = selectedDay
-    ? eventsByDay.get(format(selectedDay, "yyyy-MM-dd")) || []
-    : [];
+
+  // Panel events: if user clicked a day → that day only; otherwise filtered by global range
+  const panelEvents = useMemo(() => {
+    if (selectedDay) {
+      return eventsByDay.get(format(selectedDay, "yyyy-MM-dd")) || [];
+    }
+    const from = range.from ? new Date(range.from + "T00:00:00") : null;
+    const to = range.to ? new Date(range.to + "T23:59:59") : null;
+    return events
+      .filter((ev) => {
+        const d = evDate(ev);
+        if (isNaN(d.getTime())) return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      })
+      .sort((a, b) => evDate(a).getTime() - evDate(b).getTime());
+  }, [selectedDay, eventsByDay, events, range]);
+
+  const PRESET_LABELS: Record<string, string> = {
+    hoje: "Hoje",
+    ontem: "Ontem",
+    semana: "Esta semana",
+    "7d": "Últimos 7 dias",
+    "15d": "Últimos 15 dias",
+    "30d": "Últimos 30 dias",
+    mes: "Este mês",
+    personalizado: "Período personalizado",
+  };
+  const panelTitle = selectedDay
+    ? format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })
+    : PRESET_LABELS[range.preset] || "Período selecionado";
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -434,36 +464,43 @@ function CalendarPage() {
         </Card>
       ) : null}
 
-      <StatsCards events={events} />
+      <StatsCards events={events} range={range} setRange={setRange} />
 
-
-
-      {view === "month" && selectedDay && (
+      {view === "month" && (
         <Card className="bg-card/60">
           <div className="p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold capitalize">
-                📅 {format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                {selectedDayEvents.length > 0 && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    ({selectedDayEvents.length} {selectedDayEvents.length === 1 ? "evento" : "eventos"})
+                📅 {panelTitle}
+                {panelEvents.length > 0 && (
+                  <span className="ml-2 text-xs text-muted-foreground normal-case">
+                    ({panelEvents.length} {panelEvents.length === 1 ? "evento" : "eventos"})
+                  </span>
+                )}
+                {!selectedDay && (
+                  <span className="ml-2 text-[10px] uppercase tracking-wider text-accent">
+                    · filtro do período
                   </span>
                 )}
               </h3>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay)}>
+                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay ?? new Date())}>
                   <Plus className="mr-1 h-3 w-3" /> Adicionar
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedDay(null)}>
-                  <X className="h-3 w-3" />
-                </Button>
+                {selectedDay && (
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedDay(null)} title="Voltar ao filtro do período">
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </div>
-            {selectedDayEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
+            {panelEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {selectedDay ? "Nenhum evento neste dia." : "Nenhum evento no período selecionado."}
+              </p>
             ) : (
               <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {selectedDayEvents.map((ev) => (
+                {panelEvents.map((ev) => (
                   <EventRow
                     key={ev.id}
                     ev={ev}
@@ -602,8 +639,7 @@ function CalendarPage() {
   );
 }
 
-function StatsCards({ events }: { events: CalendarEvent[] }) {
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("mes"));
+function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; range: DateRangeValue; setRange: (v: DateRangeValue) => void }) {
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -640,7 +676,7 @@ function StatsCards({ events }: { events: CalendarEvent[] }) {
     <div className="space-y-2">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          📊 Filtro afeta <strong>apenas os cards de métricas</strong> abaixo — o calendário sempre mostra o mês inteiro.
+          📊 Filtro afeta as <strong>métricas</strong> e a <strong>lista de eventos</strong> abaixo do calendário. Clique num dia pra ver só ele.
         </p>
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
