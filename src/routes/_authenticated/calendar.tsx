@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
+import { LeadSearchPicker } from "@/components/lead-search-picker";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 
 import { Button } from "@/components/ui/button";
