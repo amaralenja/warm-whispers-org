@@ -213,6 +213,22 @@ function CalendarPage() {
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [events]);
 
+  // Conflict detection: any event overlapping the chosen [start, end), excluding the one being edited.
+  const conflicts = useMemo(() => {
+    if (!form.start || !form.end) return [] as CalendarEvent[];
+    const s = new Date(form.start).getTime();
+    const e = new Date(form.end).getTime();
+    if (!isFinite(s) || !isFinite(e) || e <= s) return [];
+    return events.filter((ev) => {
+      if (form.id && ev.id === form.id) return false;
+      const es = new Date(ev.start.dateTime || ev.start.date || "").getTime();
+      const ee = new Date(ev.end?.dateTime || ev.end?.date || ev.start.dateTime || ev.start.date || "").getTime();
+      if (!isFinite(es) || !isFinite(ee)) return false;
+      return es < e && ee > s;
+    });
+  }, [events, form.start, form.end, form.id]);
+  const hasConflict = conflicts.length > 0;
+
   const saveMutation = useMutation({
     mutationFn: async (f: FormState) => {
       const payload = {
@@ -467,15 +483,31 @@ function CalendarPage() {
                   />
                 </div>
               </div>
+              {hasConflict && (
+                <div className="mt-3 rounded-md border border-rose-500/40 bg-rose-500/10 p-3 text-sm">
+                  <p className="font-semibold text-rose-300">⚠ Este horário já está ocupado</p>
+                  <ul className="mt-1 space-y-0.5 text-xs text-rose-200/90">
+                    {conflicts.slice(0, 4).map((c) => (
+                      <li key={c.id}>
+                        • {c.summary || "(sem título)"} —{" "}
+                        {format(new Date(c.start.dateTime || c.start.date || ""), "HH:mm")}–
+                        {format(new Date(c.end.dateTime || c.end.date || ""), "HH:mm")}
+                      </li>
+                    ))}
+                    {conflicts.length > 4 && <li>• +{conflicts.length - 4} outros</li>}
+                  </ul>
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
                 <Button
                   onClick={() => saveMutation.mutate(form)}
-                  disabled={!form.summary || !form.start || !form.end || saveMutation.isPending}
+                  disabled={!form.summary || !form.start || !form.end || hasConflict || saveMutation.isPending}
+                  title={hasConflict ? "Horário ocupado — escolha outro" : undefined}
                 >
-                  {saveMutation.isPending ? "Salvando..." : "Salvar"}
+                  {saveMutation.isPending ? "Salvando..." : hasConflict ? "Horário ocupado" : "Salvar"}
                 </Button>
               </DialogFooter>
             </DialogContent>
