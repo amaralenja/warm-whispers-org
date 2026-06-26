@@ -231,8 +231,13 @@ function CRMPage() {
         if (fallback !== "|") existingKeys.add(fallback);
       }
 
+      const seenThisSync = new Set<string>();
       const toInsert = fetched
-        .filter((lead) => !existingKeys.has(lead._syncKey))
+        .filter((lead) => {
+          if (existingKeys.has(lead._syncKey) || seenThisSync.has(lead._syncKey)) return false;
+          seenThisSync.add(lead._syncKey);
+          return true;
+        })
         .map(({ _syncKey, ...lead }) => lead)
         .filter((lead) => lead.nome?.trim());
 
