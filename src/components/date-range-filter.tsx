@@ -4,7 +4,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
-export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "custom";
+export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "7d" | "30d" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
