@@ -213,6 +213,22 @@ function CalendarPage() {
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [events]);
 
+  // Conflict detection: any event overlapping the chosen [start, end), excluding the one being edited.
+  const conflicts = useMemo(() => {
+    if (!form.start || !form.end) return [] as CalendarEvent[];
+    const s = new Date(form.start).getTime();
+    const e = new Date(form.end).getTime();
+    if (!isFinite(s) || !isFinite(e) || e <= s) return [];
+    return events.filter((ev) => {
+      if (form.id && ev.id === form.id) return false;
+      const es = new Date(ev.start.dateTime || ev.start.date || "").getTime();
+      const ee = new Date(ev.end?.dateTime || ev.end?.date || ev.start.dateTime || ev.start.date || "").getTime();
+      if (!isFinite(es) || !isFinite(ee)) return false;
+      return es < e && ee > s;
+    });
+  }, [events, form.start, form.end, form.id]);
+  const hasConflict = conflicts.length > 0;
+
   const saveMutation = useMutation({
     mutationFn: async (f: FormState) => {
       const payload = {
