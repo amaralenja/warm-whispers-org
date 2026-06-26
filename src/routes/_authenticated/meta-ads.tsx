@@ -78,14 +78,14 @@ function MetaToggle({
 function MetricCells({ i }: { i: AdInsights }) {
   return (
     <>
-      <td className="px-3 py-3 text-right font-mono text-sm">{brl(i.spend)}</td>
-      <td className="px-3 py-3 text-right text-sm">{num(i.results)}</td>
-      <td className="px-3 py-3 text-right text-sm">{i.results ? brl(i.costPerResult) : "—"}</td>
-      <td className="px-3 py-3 text-right text-sm">{num(i.impressions)}</td>
-      <td className="px-3 py-3 text-right text-sm">{num(i.clicks)}</td>
-      <td className="px-3 py-3 text-right text-sm">{pct(i.ctr)}</td>
-      <td className="px-3 py-3 text-right text-sm">{brl(i.cpc)}</td>
-      <td className="px-3 py-3 text-right text-sm">{brl(i.cpm)}</td>
+      <td className="px-4 py-4 text-right font-mono text-sm font-semibold">{brl(i.spend)}</td>
+      <td className="px-4 py-4 text-right text-sm">{num(i.results)}</td>
+      <td className="px-4 py-4 text-right text-sm">{i.results ? brl(i.costPerResult) : "—"}</td>
+      <td className="px-4 py-4 text-right text-sm">{num(i.impressions)}</td>
+      <td className="px-4 py-4 text-right text-sm">{num(i.clicks)}</td>
+      <td className="px-4 py-4 text-right text-sm">{pct(i.ctr)}</td>
+      <td className="px-4 py-4 text-right text-sm">{brl(i.cpc)}</td>
+      <td className="px-4 py-4 text-right text-sm">{brl(i.cpm)}</td>
     </>
   );
 }
