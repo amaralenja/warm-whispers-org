@@ -446,7 +446,7 @@ function QuizPage() {
                   </div>
                   <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
                   {items.map((l) => (
                     <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} compact />
                   ))}
