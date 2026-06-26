@@ -32,7 +32,7 @@ type QuizLead = {
   fbc: string | null;
 };
 
-export const Route = createFileRoute("/_authenticated/meta-ads")({
+export const Route = createFileRoute("/_authenticated/meta-ads/conversoes")({
   head: () => ({
     meta: [
       { title: "Meta Ads — MULTIUM" },
