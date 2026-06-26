@@ -246,7 +246,9 @@ function RankingTV() {
     },
     refetchInterval: 30_000,
   });
-  const metasColetivas = coletivasData ?? [];
+  const metasColetivas = (coletivasData ?? []).filter(
+    (m) => !m.semMeta && !/gustavo/i.test(m.expert),
+  );
 
   const { data: hallData } = useQuery<HallOfFamePayload>({
     queryKey: ["hall-of-fame-mes"],
