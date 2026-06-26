@@ -50,6 +50,7 @@ const highTicketItems: Item[] = [
   { title: "Calendário Calls", url: "/calendar", icon: Calendar },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Meta Ads", url: "/meta-ads", icon: Activity },
+  { title: "Conversões API", url: "/meta-ads/conversoes", icon: Activity },
 ];
 
 export function AppSidebar() {
