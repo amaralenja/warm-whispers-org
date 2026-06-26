@@ -447,35 +447,32 @@ function MetaAdsManagerPage() {
                 ))}
 
               {tab === "adsets" &&
-                (adsetsQ.isLoading ? (
+                (adsetsLoading ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
-                ) : adsetsQ.error ? (
-                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsetsQ.error as any)?.message ?? "Erro ao carregar conjuntos"}</td></tr>
+                ) : adsetsError ? (
+                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsetsError as any)?.message ?? "Erro ao carregar conjuntos"}</td></tr>
                 ) : !adsets.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum conjunto</td></tr>
                 ) : (
                   adsets.map((a: AdSet) => (
-                    <tr key={a.id} className={`group transition hover:bg-muted/30 ${adsetId === a.id ? "bg-accent/5" : ""}`}>
+                    <tr key={a.id} className={`group transition hover:bg-muted/30 ${selectedAdsets.has(a.id) ? "bg-accent/5" : ""}`}>
                       <td className="px-3 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedAdsets.has(a.id)}
+                            onCheckedChange={() => toggleAdset(a.id)}
+                            aria-label="Selecionar conjunto"
+                          />
                           <MetaToggle
                             active={a.status === "ACTIVE"}
                             disabled={toggleStatus.isPending}
                             onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
                           />
-                          <button
-                            type="button"
-                            onClick={() => selectAdset(a.id)}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                          >
-                            <MousePointerClick className="h-3.5 w-3.5" />
-                            Selecionar
-                          </button>
                         </div>
                       </td>
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => selectAdset(a.id)}
+                          onClick={() => toggleAdset(a.id)}
                           className="flex items-center gap-2 text-left font-medium hover:text-accent"
                         >
                           <StatusDot effective={a.effectiveStatus} />
