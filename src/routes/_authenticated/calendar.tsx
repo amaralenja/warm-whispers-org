@@ -123,8 +123,18 @@ const EVENT_PALETTE = [
   { bg: "bg-fuchsia-500/25", border: "border-fuchsia-400", text: "text-fuchsia-100", dot: "bg-fuchsia-400" },
 ];
 
+function isGuest(a: NonNullable<CalendarEvent["attendees"]>[number]): boolean {
+  if (!a.email) return false;
+  if (a.organizer || a.self || a.resource) return false;
+  if (a.email.includes("calendar.google")) return false;
+  if (a.email.endsWith(".iam.gserviceaccount.com")) return false;
+  return true;
+}
+function guestOf(ev: CalendarEvent) {
+  return ev.attendees?.find(isGuest);
+}
 function colorKeyFor(ev: CalendarEvent): string {
-  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  const att = guestOf(ev);
   return (att?.displayName || att?.email || ev.summary || ev.id || "x").toLowerCase().trim();
 }
 function colorFor(ev: CalendarEvent) {
@@ -134,7 +144,7 @@ function colorFor(ev: CalendarEvent) {
   return EVENT_PALETTE[h % EVENT_PALETTE.length];
 }
 function personLabel(ev: CalendarEvent): string {
-  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  const att = guestOf(ev);
   return att?.displayName || att?.email?.split("@")[0] || "";
 }
 
