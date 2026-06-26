@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
-  User, DollarSign, Tag as TagIcon, MoreVertical,
+  User, DollarSign, Tag as TagIcon, MoreVertical, KeyRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
