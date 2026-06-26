@@ -169,6 +169,24 @@ function CRMPage() {
     [workspaces],
   );
 
+  const { data: expertsWithKeys = [], isLoading: loadingApiKeys } = useQuery({
+    queryKey: ["experts-crm-keys"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("experts")
+        .select("id, nome, ativo, crm_api_key")
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as ExpertApiKey[];
+    },
+  });
+
+  const targetApiExperts = useMemo(() => {
+    const active = expertsWithKeys.filter((e) => e.ativo && e.crm_api_key);
+    if (isGeral) return active;
+    return active.filter((e) => e.nome === workspace?.nome);
+  }, [expertsWithKeys, isGeral, workspace?.nome]);
+
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["crm-leads"],
     queryFn: async () => {
@@ -181,6 +199,68 @@ function CRMPage() {
       return (data ?? []) as Lead[];
     },
   });
+
+  const syncLeads = useMutation({
+    mutationFn: async () => {
+      if (targetApiExperts.length === 0) {
+        return { fetched: 0, inserted: 0, skipped: 0 };
+      }
+
+      const batches = await Promise.all(targetApiExperts.map(fetchCrmApiLeads));
+      const fetched = batches.flat();
+      if (fetched.length === 0) {
+        return { fetched: 0, inserted: 0, skipped: 0 };
+      }
+
+      const { data: existingRows, error: existingError } = await supabase
+        .from("crm_leads")
+        .select("id,nome,telefone,email,expert,dados");
+      if (existingError) throw existingError;
+
+      const existingKeys = new Set<string>();
+      for (const row of (existingRows ?? []) as any[]) {
+        const dados = row.dados && typeof row.dados === "object" ? row.dados : {};
+        if (dados.sync_key) existingKeys.add(String(dados.sync_key).toLowerCase());
+        const fallback = `${row.expert ?? ""}|${row.email || row.telefone || row.nome || ""}`.toLowerCase();
+        if (fallback !== "|") existingKeys.add(fallback);
+      }
+
+      const toInsert = fetched
+        .filter((lead) => !existingKeys.has(lead._syncKey))
+        .map(({ _syncKey, ...lead }) => lead)
+        .filter((lead) => lead.nome?.trim());
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("crm_leads").insert(toInsert as any[]);
+        if (error) throw error;
+      }
+
+      return {
+        fetched: fetched.length,
+        inserted: toInsert.length,
+        skipped: fetched.length - toInsert.length,
+      };
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["crm-leads"] });
+      if (result.inserted > 0) {
+        toast.success(`${result.inserted} lead${result.inserted === 1 ? "" : "s"} importado${result.inserted === 1 ? "" : "s"}`);
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao puxar leads da API"),
+  });
+
+  const lastAutoSyncKey = useRef("");
+  const autoSyncKey = useMemo(
+    () => targetApiExperts.map((e) => `${e.id}:${e.crm_api_key}`).join("|"),
+    [targetApiExperts],
+  );
+
+  useEffect(() => {
+    if (loadingApiKeys || !autoSyncKey || lastAutoSyncKey.current === autoSyncKey) return;
+    lastAutoSyncKey.current = autoSyncKey;
+    syncLeads.mutate();
+  }, [autoSyncKey, loadingApiKeys]);
 
   // Apply filters
   const filtered = useMemo(() => {
