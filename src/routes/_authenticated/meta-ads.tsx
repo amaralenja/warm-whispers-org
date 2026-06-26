@@ -377,6 +377,8 @@ function MetaAdsManagerPage() {
               {tab === "adsets" &&
                 (adsetsQ.isLoading ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
+                ) : adsetsQ.error ? (
+                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsetsQ.error as any)?.message ?? "Erro ao carregar conjuntos"}</td></tr>
                 ) : !adsetsQ.data?.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum conjunto</td></tr>
                 ) : (
