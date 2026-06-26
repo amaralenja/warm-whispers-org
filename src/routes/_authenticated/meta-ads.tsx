@@ -4,13 +4,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Activity, ChevronRight, Megaphone, Layers, ImageIcon,
-  RefreshCw, Pencil, Loader2, Settings2,
+  RefreshCw, Pencil, Loader2, Settings2, MousePointerClick,
+  Eye, PlayCircle, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   listCampaigns, listAdSets, listAds,
-  updateEntityStatus, updateAdSetBudget, updateCampaignBudget,
-  type Campaign, type AdSet, type Ad, type AdInsights,
+  updateEntityStatus, updateAdSetBudget, updateCampaignBudget, getAdPreview,
+  type Campaign, type AdSet, type Ad, type AdInsights, type AdPreview,
 } from "@/lib/meta-ads-manager.functions";
 
 export const Route = createFileRoute("/_authenticated/meta-ads")({
@@ -109,6 +113,7 @@ function MetaAdsManagerPage() {
   const [preset, setPreset] = useState<Preset>("last_7d");
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [adsetId, setAdsetId] = useState<string | null>(null);
+  const [previewAd, setPreviewAd] = useState<Ad | null>(null);
   const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
 
   const qc = useQueryClient();
@@ -118,6 +123,7 @@ function MetaAdsManagerPage() {
   const updateStatusFn = useServerFn(updateEntityStatus);
   const updateAdSetBudgetFn = useServerFn(updateAdSetBudget);
   const updateCampaignBudgetFn = useServerFn(updateCampaignBudget);
+  const getAdPreviewFn = useServerFn(getAdPreview);
 
   const campaignsQ = useQuery({
     queryKey: ["meta-ads", "campaigns", preset],
@@ -139,6 +145,26 @@ function MetaAdsManagerPage() {
     staleTime: 30_000,
   });
 
+  const previewQ = useQuery({
+    queryKey: ["meta-ads", "ad-preview", previewAd?.id],
+    queryFn: () => getAdPreviewFn({ data: { adId: previewAd!.id } }),
+    enabled: !!previewAd,
+    staleTime: 5 * 60_000,
+  });
+
+  const campaigns = useMemo(
+    () => (Array.isArray(campaignsQ.data) ? campaignsQ.data : []),
+    [campaignsQ.data],
+  );
+  const adsets = useMemo(
+    () => (Array.isArray(adsetsQ.data) ? adsetsQ.data : []),
+    [adsetsQ.data],
+  );
+  const ads = useMemo(
+    () => (Array.isArray(adsQ.data) ? adsQ.data : []),
+    [adsQ.data],
+  );
+
   const toggleStatus = useMutation({
     mutationFn: (v: { id: string; status: "ACTIVE" | "PAUSED" }) =>
       updateStatusFn({ data: v }),
@@ -150,8 +176,7 @@ function MetaAdsManagerPage() {
   });
 
   const totals = useMemo(() => {
-    const list = campaignsQ.data ?? [];
-    return list.reduce(
+    return campaigns.reduce(
       (acc, c) => {
         acc.spend += c.insights.spend;
         acc.results += c.insights.results;
@@ -161,7 +186,7 @@ function MetaAdsManagerPage() {
       },
       { spend: 0, results: 0, clicks: 0, impressions: 0 },
     );
-  }, [campaignsQ.data]);
+  }, [campaigns]);
 
   const [budgetEdit, setBudgetEdit] = useState<{
     kind: "campaign" | "adset"; id: string; value: string;
@@ -186,6 +211,17 @@ function MetaAdsManagerPage() {
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao salvar orçamento");
     }
+  }
+
+  function selectCampaign(id: string) {
+    setCampaignId(id);
+    setAdsetId(null);
+    setTab("adsets");
+  }
+
+  function selectAdset(id: string) {
+    setAdsetId(id);
+    setTab("ads");
   }
 
   return (
@@ -286,7 +322,7 @@ function MetaAdsManagerPage() {
             <>
               <ChevronRight className="h-3 w-3" />
               <span className="text-foreground">
-                {campaignsQ.data?.find((c) => c.id === campaignId)?.name ?? "Campanha"}
+                {campaigns.find((c) => c.id === campaignId)?.name ?? "Campanha"}
               </span>
             </>
           )}
@@ -294,7 +330,7 @@ function MetaAdsManagerPage() {
             <>
               <ChevronRight className="h-3 w-3" />
               <span className="text-foreground">
-                {adsetsQ.data?.find((a) => a.id === adsetId)?.name ?? "Conjunto"}
+                {adsets.find((a) => a.id === adsetId)?.name ?? "Conjunto"}
               </span>
             </>
           )}
@@ -307,7 +343,7 @@ function MetaAdsManagerPage() {
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b border-border bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="w-10 px-3 py-2"></th>
+                <th className="w-36 px-3 py-2 text-left">Ações</th>
                 <th className="px-3 py-2 text-left">Nome</th>
                 <th className="px-3 py-2 text-right">Orçamento</th>
                 <MetricHeaders />
@@ -320,21 +356,31 @@ function MetaAdsManagerPage() {
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
                 ) : campaignsQ.error ? (
                   <tr><td colSpan={12} className="py-10 text-center text-destructive">{(campaignsQ.error as any)?.message}</td></tr>
-                ) : !campaignsQ.data?.length ? (
+                ) : !campaigns.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhuma campanha encontrada</td></tr>
                 ) : (
-                  campaignsQ.data.map((c: Campaign) => (
+                  campaigns.map((c: Campaign) => (
                     <tr key={c.id} className={`group transition hover:bg-muted/30 ${campaignId === c.id ? "bg-accent/5" : ""}`}>
                       <td className="px-3 py-4">
-                        <MetaToggle
-                          active={c.status === "ACTIVE"}
-                          disabled={toggleStatus.isPending}
-                          onToggle={() => toggleStatus.mutate({ id: c.id, status: c.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                        />
+                        <div className="flex items-center gap-2">
+                          <MetaToggle
+                            active={c.status === "ACTIVE"}
+                            disabled={toggleStatus.isPending}
+                            onToggle={() => toggleStatus.mutate({ id: c.id, status: c.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => selectCampaign(c.id)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <MousePointerClick className="h-3.5 w-3.5" />
+                            Selecionar
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => { setCampaignId(c.id); setAdsetId(null); setTab("adsets"); }}
+                          onClick={() => selectCampaign(c.id)}
                           className="flex items-center gap-2 text-left font-medium hover:text-accent"
                         >
                           <StatusDot effective={c.effectiveStatus} />
@@ -379,21 +425,31 @@ function MetaAdsManagerPage() {
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
                 ) : adsetsQ.error ? (
                   <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsetsQ.error as any)?.message ?? "Erro ao carregar conjuntos"}</td></tr>
-                ) : !adsetsQ.data?.length ? (
+                ) : !adsets.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum conjunto</td></tr>
                 ) : (
-                  adsetsQ.data.map((a: AdSet) => (
+                  adsets.map((a: AdSet) => (
                     <tr key={a.id} className={`group transition hover:bg-muted/30 ${adsetId === a.id ? "bg-accent/5" : ""}`}>
                       <td className="px-3 py-4">
-                        <MetaToggle
-                          active={a.status === "ACTIVE"}
-                          disabled={toggleStatus.isPending}
-                          onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                        />
+                        <div className="flex items-center gap-2">
+                          <MetaToggle
+                            active={a.status === "ACTIVE"}
+                            disabled={toggleStatus.isPending}
+                            onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => selectAdset(a.id)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <MousePointerClick className="h-3.5 w-3.5" />
+                            Selecionar
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => { setAdsetId(a.id); setTab("ads"); }}
+                          onClick={() => selectAdset(a.id)}
                           className="flex items-center gap-2 text-left font-medium hover:text-accent"
                         >
                           <StatusDot effective={a.effectiveStatus} />
@@ -431,20 +487,30 @@ function MetaAdsManagerPage() {
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
                 ) : adsQ.error ? (
                   <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsQ.error as any)?.message ?? "Erro ao carregar anúncios"}</td></tr>
-                ) : !adsQ.data?.length ? (
+                ) : !ads.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum anúncio</td></tr>
                 ) : (
-                  adsQ.data.map((a: Ad) => (
+                  ads.map((a: Ad) => (
                     <tr key={a.id} className="group transition hover:bg-muted/30">
                       <td className="px-3 py-4">
-                        <MetaToggle
-                          active={a.status === "ACTIVE"}
-                          disabled={toggleStatus.isPending}
-                          onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                        />
+                        <div className="flex items-center gap-2">
+                          <MetaToggle
+                            active={a.status === "ACTIVE"}
+                            disabled={toggleStatus.isPending}
+                            onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPreviewAd(a)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setPreviewAd(a)} className="flex items-center gap-3 text-left hover:text-accent">
                           {a.thumbnail ? (
                             <img src={a.thumbnail} alt="" className="h-10 w-10 rounded object-cover" />
                           ) : (
@@ -456,7 +522,7 @@ function MetaAdsManagerPage() {
                             <StatusDot effective={a.effectiveStatus} />
                             <span className="line-clamp-1 font-medium">{a.name}</span>
                           </div>
-                        </div>
+                        </button>
                       </td>
                       <td className="px-3 py-3 text-right text-xs text-muted-foreground">—</td>
                       <MetricCells i={a.insights} />
@@ -468,6 +534,116 @@ function MetaAdsManagerPage() {
           </table>
         </div>
       </div>
+      <AdPreviewDialog
+        ad={previewAd}
+        preview={previewQ.data}
+        isLoading={previewQ.isLoading || previewQ.isFetching}
+        error={previewQ.error as Error | null}
+        onOpenChange={(open) => !open && setPreviewAd(null)}
+      />
     </div>
+  );
+}
+
+function AdPreviewDialog({
+  ad,
+  preview,
+  isLoading,
+  error,
+  onOpenChange,
+}: {
+  ad: Ad | null;
+  preview: AdPreview | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={!!ad} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88vh] max-w-5xl overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-4">
+          <DialogTitle className="flex items-center gap-2">
+            <PlayCircle className="h-5 w-5 text-accent" />
+            {ad?.name ?? "Preview do anúncio"}
+          </DialogTitle>
+          <DialogDescription>
+            Abra o criativo do anúncio para conferir imagem, vídeo ou o preview oficial da Meta.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid min-h-[520px] gap-0 md:grid-cols-[1fr_300px]">
+          <div className="flex items-center justify-center bg-muted/30 p-4">
+            {isLoading ? (
+              <div className="text-center text-muted-foreground">
+                <Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin" />
+                Carregando criativo...
+              </div>
+            ) : error ? (
+              <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                {error.message}
+              </div>
+            ) : preview?.videoUrl ? (
+              <video
+                controls
+                playsInline
+                poster={preview.thumbnailUrl ?? preview.imageUrl ?? undefined}
+                className="max-h-[68vh] w-full rounded-lg bg-background object-contain shadow"
+                src={preview.videoUrl}
+              />
+            ) : preview?.imageUrl ? (
+              <img
+                src={preview.imageUrl}
+                alt={preview.name}
+                className="max-h-[68vh] w-full rounded-lg object-contain shadow"
+              />
+            ) : preview?.previewHtml ? (
+              <iframe
+                title="Preview oficial da Meta"
+                srcDoc={preview.previewHtml}
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                className="h-[68vh] w-full rounded-lg border border-border bg-background"
+              />
+            ) : (
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="mx-auto mb-3 h-10 w-10" />
+                Não foi possível carregar a mídia desse anúncio.
+              </div>
+            )}
+          </div>
+
+          <aside className="space-y-4 border-l border-border bg-card p-5">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Anúncio</div>
+              <div className="mt-1 font-semibold leading-snug">{preview?.name ?? ad?.name ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Criativo</div>
+              <div className="mt-1 text-sm text-muted-foreground">{preview?.creativeName ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Tipo exibido</div>
+              <div className="mt-1 text-sm font-medium">
+                {preview?.mediaType === "video" ? "Vídeo" : preview?.mediaType === "image" ? "Imagem" : preview?.mediaType === "preview" ? "Preview Meta" : "Indisponível"}
+              </div>
+            </div>
+            {preview?.previewError && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+                {preview.previewError}
+              </div>
+            )}
+            {preview?.permalinkUrl && (
+              <a
+                href={preview.permalinkUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border bg-background text-sm hover:bg-muted"
+              >
+                <ExternalLink className="h-4 w-4" /> Abrir na Meta
+              </a>
+            )}
+          </aside>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
