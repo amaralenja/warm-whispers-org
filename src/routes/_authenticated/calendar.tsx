@@ -778,8 +778,9 @@ function EventRow({
   const [showUpOpen, setShowUpOpen] = useState(false);
   const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
   const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
-  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
-  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+  const guest = guestOf(ev);
+  const attendeeEmail = guest?.email;
+  const attendeeName = guest?.displayName;
   const link = getEventLink(ev.id);
 
   return (
