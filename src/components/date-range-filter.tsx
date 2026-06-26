@@ -89,9 +89,11 @@ function parseISO(s: string | null): Date | undefined {
 export function DateRangeFilter({
   value,
   onChange,
+  presets,
 }: {
   value: DateRangeValue;
   onChange: (v: DateRangeValue) => void;
+  presets?: Exclude<RangePreset, "custom">[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<RDPRange | undefined>(() => ({
@@ -113,11 +115,12 @@ export function DateRangeFilter({
   }, [value]);
 
   const customActive = value.preset === "custom";
+  const visiblePresets = presets ? PRESETS.filter((p) => presets.includes(p.id)) : PRESETS;
 
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card/40 p-1">
-        {PRESETS.map((p) => {
+        {visiblePresets.map((p) => {
           const active = p.id === value.preset;
           return (
             <button
