@@ -2,7 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
+import {
+  format,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
+  isToday,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon,
@@ -14,10 +27,13 @@ import {
   MapPin,
   Users,
   ExternalLink,
-  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,11 +51,8 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
-  listCalendars,
   type CalendarEvent,
-  type CalendarListResult,
 } from "@/lib/google-calendar.functions";
-
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -53,7 +66,6 @@ function toLocalInput(iso?: string) {
 }
 
 function fromLocalInput(local: string) {
-  // treat as local time, convert to ISO
   return new Date(local).toISOString();
 }
 
@@ -67,10 +79,10 @@ type FormState = {
   attendees: string;
 };
 
-const emptyForm = (): FormState => {
-  const now = new Date();
-  const start = new Date(now.getTime() + 60 * 60 * 1000);
-  start.setMinutes(0, 0, 0);
+const emptyForm = (base?: Date): FormState => {
+  const now = base ?? new Date();
+  const start = new Date(now);
+  start.setHours(now.getHours() + 1, 0, 0, 0);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
   return {
     summary: "",
@@ -82,18 +94,22 @@ const emptyForm = (): FormState => {
   };
 };
 
+function evDate(ev: CalendarEvent) {
+  return new Date(ev.start.dateTime || ev.start.date || "");
+}
+
 function CalendarPage() {
   const qc = useQueryClient();
   const list = useServerFn(listEvents);
   const create = useServerFn(createEvent);
   const update = useServerFn(updateEvent);
   const del = useServerFn(deleteEvent);
-  const listCals = useServerFn(listCalendars);
 
-
+  const [view, setView] = useState<"month" | "list">("month");
+  const [cursor, setCursor] = useState<Date>(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
-  const [calendarDebug, setCalendarDebug] = useState<CalendarListResult | null>(null);
 
   const { data, isLoading, refetch, isFetching, error } = useQuery({
     queryKey: ["gcal-events"],
@@ -103,12 +119,35 @@ function CalendarPage() {
 
   const events = data?.items || [];
 
+  const monthDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 });
+    const days: Date[] = [];
+    let d = start;
+    while (d <= end) {
+      days.push(d);
+      d = addDays(d, 1);
+    }
+    return days;
+  }, [cursor]);
+
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const ev of events) {
+      const key = format(evDate(ev), "yyyy-MM-dd");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(ev);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => evDate(a).getTime() - evDate(b).getTime());
+    }
+    return map;
+  }, [events]);
+
   const grouped = useMemo(() => {
     const byDay = new Map<string, CalendarEvent[]>();
     for (const ev of events) {
-      const dt = ev.start.dateTime || ev.start.date;
-      if (!dt) continue;
-      const key = format(new Date(dt), "yyyy-MM-dd");
+      const key = format(evDate(ev), "yyyy-MM-dd");
       if (!byDay.has(key)) byDay.set(key, []);
       byDay.get(key)!.push(ev);
     }
@@ -149,8 +188,8 @@ function CalendarPage() {
     onError: (e: any) => toast.error(e?.message || "Erro ao remover"),
   });
 
-  function openCreate() {
-    setForm(emptyForm());
+  function openCreate(base?: Date) {
+    setForm(emptyForm(base));
     setDialogOpen(true);
   }
 
@@ -167,8 +206,14 @@ function CalendarPage() {
     setDialogOpen(true);
   }
 
+  const weekdayLabels = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  const selectedDayEvents = selectedDay
+    ? eventsByDay.get(format(selectedDay, "yyyy-MM-dd")) || []
+    : [];
+
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
@@ -177,29 +222,35 @@ function CalendarPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
             <p className="text-sm text-muted-foreground">
-              Google Agenda — eventos sincronizados em tempo real
+              Google Agenda — sincronizado em tempo real
             </p>
           </div>
         </div>
+
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                const r = await listCals();
-                setCalendarDebug(r);
-                console.log("[GCAL] calendarios visíveis:", r);
-                toast.success(
-                  `${r.items?.length ?? 0} calendário(s) visível(is). Resultado apareceu na tela.`,
-                  { duration: 8000 },
-                );
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-            }}
-          >
-            Listar calendários
-          </Button>
+          <div className="flex items-center rounded-md border border-border bg-card p-0.5">
+            <button
+              onClick={() => setView("month")}
+              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition ${
+                view === "month"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" /> Mês
+            </button>
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition ${
+                view === "list"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <List className="h-4 w-4" /> Lista
+            </button>
+          </div>
+
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Atualizar
@@ -207,7 +258,7 @@ function CalendarPage() {
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openCreate}>
+              <Button onClick={() => openCreate()}>
                 <Plus className="h-4 w-4 mr-2" />
                 Novo evento
               </Button>
@@ -284,212 +335,230 @@ function CalendarPage() {
         </div>
       </div>
 
-      {calendarDebug ? (
-        <Card className="border-border bg-card/80">
-          <CardContent className="space-y-4 p-4 text-sm">
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="font-semibold">Diagnóstico Google Calendar</p>
-                <p className="mt-1 text-muted-foreground">
-                  Service account: <code>{calendarDebug.serviceAccountEmail || "não detectada"}</code>
-                </p>
-                <p className="text-muted-foreground">
-                  GOOGLE_CALENDAR_ID: <code>{calendarDebug.configuredId || "não configurado"}</code>
-                </p>
-              </div>
-              <div
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
-                  calendarDebug.configuredCalendar.ok
-                    ? "bg-emerald-500/10 text-emerald-600"
-                    : "bg-destructive/10 text-destructive"
-                }`}
-              >
-                {calendarDebug.configuredCalendar.ok ? "Acesso OK" : "Sem acesso ao ID"}
-              </div>
-            </div>
-
-            {calendarDebug.configuredCalendar.ok ? (
-              <div className="rounded-lg border border-border bg-background/60 p-3">
-                <p className="font-medium">{calendarDebug.configuredCalendar.summary}</p>
-                <p className="text-xs text-muted-foreground">
-                  Timezone: {calendarDebug.configuredCalendar.timeZone || "não informado"}
-                </p>
-              </div>
-            ) : (
-              <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <p className="font-medium">
-                    Esse calendário ainda não está visível para a service account.
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground break-all">
-                    Status {calendarDebug.configuredCalendar.status || "—"}: {calendarDebug.configuredCalendar.message || "sem detalhes"}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Calendários visíveis ({calendarDebug.items?.length ?? 0})
-              </p>
-              {calendarDebug.items?.length ? (
-                <div className="space-y-2">
-                  {calendarDebug.items.map((cal) => (
-                    <div key={cal.id} className="rounded-lg border border-border bg-background/60 p-3">
-                      <p className="font-medium">{cal.summary || "Sem nome"}</p>
-                      <p className="text-xs text-muted-foreground break-all">{cal.id}</p>
-                      <p className="text-xs text-muted-foreground">Permissão: {cal.accessRole || "—"}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-lg border border-border bg-background/60 p-3 text-muted-foreground">
-                  Nenhum calendário apareceu na lista dessa service account.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
       {error ? (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="p-4 text-sm">
             <p className="font-semibold text-destructive mb-1">Erro ao carregar eventos</p>
             <p className="text-muted-foreground break-all">{(error as Error).message}</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Confere se o calendário foi compartilhado com{" "}
-              <code>multiumboard@n8n-calendar.iam.gserviceaccount.com</code> com permissão "fazer
-              alterações nos eventos", e se o GOOGLE_CALENDAR_ID está correto.
-            </p>
           </CardContent>
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total</p>
-            <p className="text-2xl font-bold">{events.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Próximos 7 dias</p>
-            <p className="text-2xl font-bold">
-              {
-                events.filter((e) => {
-                  const dt = new Date(e.start.dateTime || e.start.date || "");
-                  const now = Date.now();
-                  return dt.getTime() >= now && dt.getTime() <= now + 7 * 86400_000;
-                }).length
-              }
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Hoje</p>
-            <p className="text-2xl font-bold">
-              {
-                events.filter((e) => {
-                  const dt = new Date(e.start.dateTime || e.start.date || "");
-                  const t = new Date();
-                  return (
-                    dt.getDate() === t.getDate() &&
-                    dt.getMonth() === t.getMonth() &&
-                    dt.getFullYear() === t.getFullYear()
-                  );
-                }).length
-              }
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {view === "month" ? (
+        <Card className="overflow-hidden">
+          {/* Month navigator */}
+          <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>
+                Hoje
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setCursor(subMonths(cursor, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setCursor(addMonths(cursor, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <h2 className="text-lg font-semibold capitalize">
+              {format(cursor, "MMMM 'de' yyyy", { locale: ptBR })}
+            </h2>
+            <div className="w-[150px]" />
+          </div>
 
-      {isLoading ? (
-        <p className="text-muted-foreground text-sm">Carregando eventos...</p>
-      ) : grouped.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Nenhum evento encontrado.
-          </CardContent>
+          {/* Weekday header */}
+          <div className="grid grid-cols-7 border-b border-border bg-muted/30">
+            {weekdayLabels.map((w) => (
+              <div
+                key={w}
+                className="py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {w}
+              </div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div className="grid grid-cols-7 grid-rows-6">
+            {monthDays.map((day) => {
+              const key = format(day, "yyyy-MM-dd");
+              const dayEvents = eventsByDay.get(key) || [];
+              const inMonth = isSameMonth(day, cursor);
+              const today = isToday(day);
+              const selected = selectedDay && isSameDay(day, selectedDay);
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelectedDay(day)}
+                  onDoubleClick={() => openCreate(day)}
+                  className={`group relative min-h-[110px] border-b border-r border-border p-1.5 text-left transition hover:bg-muted/40 ${
+                    inMonth ? "bg-background" : "bg-muted/20"
+                  } ${selected ? "ring-2 ring-accent ring-inset" : ""}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                        today
+                          ? "bg-accent text-accent-foreground"
+                          : inMonth
+                            ? "text-foreground"
+                            : "text-muted-foreground/60"
+                      }`}
+                    >
+                      {format(day, "d")}
+                    </span>
+                    {dayEvents.length > 3 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        +{dayEvents.length - 3}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 space-y-0.5">
+                    {dayEvents.slice(0, 3).map((ev) => (
+                      <div
+                        key={ev.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(ev);
+                        }}
+                        className="truncate rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground hover:bg-accent/30"
+                        title={ev.summary}
+                      >
+                        {ev.start.dateTime
+                          ? format(new Date(ev.start.dateTime), "HH:mm") + " "
+                          : ""}
+                        {ev.summary || "(sem título)"}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected day panel */}
+          {selectedDay && (
+            <div className="border-t border-border bg-card/60 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold capitalize">
+                  {format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                </h3>
+                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay)}>
+                  <Plus className="mr-1 h-3 w-3" /> Adicionar
+                </Button>
+              </div>
+              {selectedDayEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedDayEvents.map((ev) => (
+                    <EventRow
+                      key={ev.id}
+                      ev={ev}
+                      onEdit={() => openEdit(ev)}
+                      onDelete={() => {
+                        if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       ) : (
         <div className="space-y-4">
-          {grouped.map(([day, evs]) => (
-            <Card key={day}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {format(parseISO(day), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {evs.map((ev) => {
-                  const start = ev.start.dateTime
-                    ? format(new Date(ev.start.dateTime), "HH:mm")
-                    : "dia todo";
-                  const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
-                  return (
-                    <div
-                      key={ev.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-accent/40 transition-colors"
-                    >
-                      <div className="text-xs text-muted-foreground w-20 shrink-0 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {start}
-                        {end ? `–${end}` : ""}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{ev.summary || "(sem título)"}</p>
-                        {ev.location && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <MapPin className="h-3 w-3" />
-                            {ev.location}
-                          </p>
-                        )}
-                        {ev.attendees && ev.attendees.length > 0 && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Users className="h-3 w-3" />
-                            {ev.attendees.length} convidado(s)
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {ev.htmlLink && (
-                          <a
-                            href={ev.htmlLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 rounded hover:bg-muted"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
-                        <button
-                          className="p-2 rounded hover:bg-muted"
-                          onClick={() => openEdit(ev)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="p-2 rounded hover:bg-destructive/10 text-destructive"
-                          onClick={() => {
-                            if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+          {isLoading ? (
+            <p className="text-muted-foreground text-sm">Carregando eventos...</p>
+          ) : grouped.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhum evento encontrado.
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            grouped.map(([day, evs]) => (
+              <Card key={day}>
+                <div className="border-b border-border px-4 py-2">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {format(parseISO(day), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                  </p>
+                </div>
+                <div className="space-y-2 p-3">
+                  {evs.map((ev) => (
+                    <EventRow
+                      key={ev.id}
+                      ev={ev}
+                      onEdit={() => openEdit(ev)}
+                      onDelete={() => {
+                        if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              </Card>
+            ))
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function EventRow({
+  ev,
+  onEdit,
+  onDelete,
+}: {
+  ev: CalendarEvent;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
+  const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:border-accent/40">
+      <div className="flex w-20 shrink-0 items-center gap-1 text-xs text-muted-foreground">
+        <Clock className="h-3 w-3" />
+        {start}
+        {end ? `–${end}` : ""}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{ev.summary || "(sem título)"}</p>
+        {ev.location && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3 w-3" />
+            {ev.location}
+          </p>
+        )}
+        {ev.attendees && ev.attendees.length > 0 && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+            <Users className="h-3 w-3" />
+            {ev.attendees.length} convidado(s)
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        {ev.htmlLink && (
+          <a
+            href={ev.htmlLink}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded p-2 hover:bg-muted"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )}
+        <button className="rounded p-2 hover:bg-muted" onClick={onEdit}>
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          className="rounded p-2 text-destructive hover:bg-destructive/10"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
