@@ -244,9 +244,9 @@ function MetaAdsManagerPage() {
           { label: "Cliques", value: num(totals.clicks) },
           { label: "Impressões", value: num(totals.impressions) },
         ].map((k) => (
-          <div key={k.label} className="rounded-xl border border-border bg-card p-4">
-            <div className="text-xs text-muted-foreground">{k.label}</div>
-            <div className="mt-1 text-xl font-bold">{k.value}</div>
+          <div key={k.label} className="rounded-2xl border border-border bg-gradient-to-br from-card to-card/60 p-5 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{k.label}</div>
+            <div className="mt-2 text-2xl font-bold tracking-tight">{k.value}</div>
           </div>
         ))}
       </div>
