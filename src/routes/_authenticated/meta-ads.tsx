@@ -119,6 +119,8 @@ function MetaAdsManagerPage() {
   const [adsetId, setAdsetId] = useState<string | null>(null);
   const [previewAd, setPreviewAd] = useState<Ad | null>(null);
   const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
+  const [pixelOpen, setPixelOpen] = useState(false);
+
 
   const qc = useQueryClient();
   const listCampaignsFn = useServerFn(listCampaigns);
