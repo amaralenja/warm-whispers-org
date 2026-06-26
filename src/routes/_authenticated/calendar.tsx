@@ -587,6 +587,60 @@ function StatsCards({ events }: { events: CalendarEvent[] }) {
 }
 
 
+function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void }) {
+  const [showUpOpen, setShowUpOpen] = useState(false);
+  const c = colorFor(ev);
+  const time = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "";
+  const person = personLabel(ev);
+  const title = ev.summary || "(sem título)";
+  const link = getEventLink(ev.id);
+  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
+  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit();
+      }}
+      className={`group/chip relative rounded-md border-l-4 ${c.border} ${c.bg} px-2 py-1.5 cursor-pointer hover:brightness-125 transition`}
+      title={`${time} ${title}${person ? " — " + person : ""}`}
+    >
+      <div className="flex items-center gap-1.5 min-w-0">
+        {time && (
+          <span className={`text-[10px] font-bold tabular-nums ${c.text} shrink-0`}>{time}</span>
+        )}
+        <span className={`truncate text-[11px] font-semibold ${c.text} flex-1`}>
+          {person || title}
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowUpOpen(true);
+          }}
+          className={`opacity-0 group-hover/chip:opacity-100 transition shrink-0 rounded p-0.5 hover:bg-black/30 ${link ? "text-emerald-300" : "text-amber-300"}`}
+          title={link ? "Re-disparar ShowUp" : "Disparar ShowUp"}
+        >
+          <Zap className="h-3 w-3" />
+        </button>
+      </div>
+      {person && time && (
+        <p className={`truncate text-[10px] opacity-80 ${c.text}`}>{title}</p>
+      )}
+      {link && (
+        <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-background" />
+      )}
+      <ShowUpDialog
+        open={showUpOpen}
+        onOpenChange={setShowUpOpen}
+        eventId={ev.id}
+        defaultEmail={attendeeEmail}
+        defaultName={attendeeName}
+      />
+    </div>
+  );
+}
+
 function EventRow({
   ev,
   onEdit,
