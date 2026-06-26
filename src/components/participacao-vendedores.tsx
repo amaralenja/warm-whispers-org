@@ -116,7 +116,7 @@ export function ParticipacaoVendedores({
                 </span>
                 {hover != null && vendedores[hover] && (
                   <span className="mt-1 text-[0.65rem] tabular-nums text-emerald-400">
-                    {vendedores[hover].utm} · {(vendedores[hover].pctTotal * 100).toFixed(1)}%
+                    {asStr(vendedores[hover].utm)} · {(vendedores[hover].pctTotal * 100).toFixed(1)}%
                   </span>
                 )}
               </div>
@@ -131,7 +131,7 @@ export function ParticipacaoVendedores({
                 const isTop = i === 0;
                 return (
                   <div
-                    key={v.utm}
+                    key={asStr(v.utm)}
                     onMouseEnter={() => setHover(i)}
                     onMouseLeave={() => setHover(null)}
                     className={`group relative grid grid-cols-[1.5rem_2rem_1fr_auto_auto] items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-all ${
@@ -158,7 +158,7 @@ export function ParticipacaoVendedores({
                     {/* nome + barra */}
                     <div className="min-w-0">
                       <div className="truncate text-xs font-semibold text-foreground">
-                        {v.utm}
+                        {asStr(v.utm)}
                       </div>
                       <div className="mt-1 h-1 overflow-hidden rounded-full bg-secondary/40">
                         <div
