@@ -109,7 +109,7 @@ export type CalendarEvent = {
   location?: string;
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
-  attendees?: { email: string; displayName?: string; responseStatus?: string }[];
+  attendees?: { email: string; displayName?: string; responseStatus?: string; organizer?: boolean; self?: boolean; resource?: boolean }[];
   htmlLink?: string;
   status?: string;
 };

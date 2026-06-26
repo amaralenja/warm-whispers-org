@@ -123,8 +123,18 @@ const EVENT_PALETTE = [
   { bg: "bg-fuchsia-500/25", border: "border-fuchsia-400", text: "text-fuchsia-100", dot: "bg-fuchsia-400" },
 ];
 
+function isGuest(a: NonNullable<CalendarEvent["attendees"]>[number]): boolean {
+  if (!a.email) return false;
+  if (a.organizer || a.self || a.resource) return false;
+  if (a.email.includes("calendar.google")) return false;
+  if (a.email.endsWith(".iam.gserviceaccount.com")) return false;
+  return true;
+}
+function guestOf(ev: CalendarEvent) {
+  return ev.attendees?.find(isGuest);
+}
 function colorKeyFor(ev: CalendarEvent): string {
-  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  const att = guestOf(ev);
   return (att?.displayName || att?.email || ev.summary || ev.id || "x").toLowerCase().trim();
 }
 function colorFor(ev: CalendarEvent) {
@@ -134,7 +144,7 @@ function colorFor(ev: CalendarEvent) {
   return EVENT_PALETTE[h % EVENT_PALETTE.length];
 }
 function personLabel(ev: CalendarEvent): string {
-  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  const att = guestOf(ev);
   return att?.displayName || att?.email?.split("@")[0] || "";
 }
 
@@ -708,8 +718,9 @@ function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void 
   const person = personLabel(ev);
   const title = ev.summary || "(sem título)";
   const link = getEventLink(ev.id);
-  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
-  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+  const guest = guestOf(ev);
+  const attendeeEmail = guest?.email;
+  const attendeeName = guest?.displayName;
 
   return (
     <div
@@ -767,8 +778,9 @@ function EventRow({
   const [showUpOpen, setShowUpOpen] = useState(false);
   const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
   const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
-  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
-  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+  const guest = guestOf(ev);
+  const attendeeEmail = guest?.email;
+  const attendeeName = guest?.displayName;
   const link = getEventLink(ev.id);
 
   return (
