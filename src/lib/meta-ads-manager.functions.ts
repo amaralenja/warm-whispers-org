@@ -189,6 +189,41 @@ export type Ad = {
   insights: AdInsights;
 };
 
+export type AdPreview = {
+  id: string;
+  name: string;
+  creativeName: string | null;
+  previewHtml: string | null;
+  previewError: string | null;
+  mediaType: "video" | "image" | "preview" | "empty";
+  imageUrl: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  permalinkUrl: string | null;
+};
+
+function findStringByKey(value: unknown, keys: string[]): string | null {
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findStringByKey(item, keys);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const obj = value as Record<string, unknown>;
+  for (const key of keys) {
+    const candidate = obj[key];
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  for (const candidate of Object.values(obj)) {
+    const found = findStringByKey(candidate, keys);
+    if (found) return found;
+  }
+  return null;
+}
+
 export const listAds = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -209,6 +244,63 @@ export const listAds = createServerFn({ method: "POST" })
       thumbnail: a.creative?.thumbnail_url ?? null,
       insights: parseInsights(a.insights),
     }));
+  });
+
+export const getAdPreview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ adId: z.string() }).parse(d))
+  .handler(async ({ data }): Promise<AdPreview> => {
+    const ad = await graphGet(data.adId, {
+      fields: "id,name,creative{id,name,thumbnail_url,image_url,video_id,effective_object_story_id,object_story_spec,asset_feed_spec}",
+    });
+
+    const creative = ad.creative ?? {};
+    const videoId =
+      creative.video_id ??
+      findStringByKey(creative.object_story_spec, ["video_id"]) ??
+      findStringByKey(creative.asset_feed_spec, ["video_id"]);
+    const imageUrl =
+      creative.image_url ??
+      findStringByKey(creative.object_story_spec, ["image_url", "picture"]) ??
+      findStringByKey(creative.asset_feed_spec, ["image_url", "picture"]) ??
+      creative.thumbnail_url ??
+      null;
+
+    let videoUrl: string | null = null;
+    let thumbnailUrl: string | null = creative.thumbnail_url ?? imageUrl ?? null;
+    let permalinkUrl: string | null = null;
+    if (videoId) {
+      try {
+        const video = await graphGet(videoId, { fields: "source,picture,permalink_url" });
+        videoUrl = video.source ?? null;
+        thumbnailUrl = video.picture ?? thumbnailUrl;
+        permalinkUrl = video.permalink_url ?? null;
+      } catch {
+        // Some video sources are not exposed to the token; the Meta preview iframe still works as fallback.
+      }
+    }
+
+    let previewHtml: string | null = null;
+    let previewError: string | null = null;
+    try {
+      const preview = await graphGet(`${data.adId}/previews`, { ad_format: "DESKTOP_FEED_STANDARD" });
+      previewHtml = preview.data?.[0]?.body ?? null;
+    } catch (error: any) {
+      previewError = error?.message ?? "Não foi possível carregar o preview da Meta";
+    }
+
+    return {
+      id: ad.id,
+      name: ad.name,
+      creativeName: creative.name ?? null,
+      previewHtml,
+      previewError,
+      mediaType: videoUrl ? "video" : imageUrl ? "image" : previewHtml ? "preview" : "empty",
+      imageUrl,
+      videoUrl,
+      thumbnailUrl,
+      permalinkUrl,
+    };
   });
 
 export const updateEntityStatus = createServerFn({ method: "POST" })
