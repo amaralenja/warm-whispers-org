@@ -464,36 +464,43 @@ function CalendarPage() {
         </Card>
       ) : null}
 
-      <StatsCards events={events} />
+      <StatsCards events={events} range={range} setRange={setRange} />
 
-
-
-      {view === "month" && selectedDay && (
+      {view === "month" && (
         <Card className="bg-card/60">
           <div className="p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold capitalize">
-                📅 {format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                {selectedDayEvents.length > 0 && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    ({selectedDayEvents.length} {selectedDayEvents.length === 1 ? "evento" : "eventos"})
+                📅 {panelTitle}
+                {panelEvents.length > 0 && (
+                  <span className="ml-2 text-xs text-muted-foreground normal-case">
+                    ({panelEvents.length} {panelEvents.length === 1 ? "evento" : "eventos"})
+                  </span>
+                )}
+                {!selectedDay && (
+                  <span className="ml-2 text-[10px] uppercase tracking-wider text-accent">
+                    · filtro do período
                   </span>
                 )}
               </h3>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay)}>
+                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay ?? new Date())}>
                   <Plus className="mr-1 h-3 w-3" /> Adicionar
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedDay(null)}>
-                  <X className="h-3 w-3" />
-                </Button>
+                {selectedDay && (
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedDay(null)} title="Voltar ao filtro do período">
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </div>
-            {selectedDayEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
+            {panelEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {selectedDay ? "Nenhum evento neste dia." : "Nenhum evento no período selecionado."}
+              </p>
             ) : (
               <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {selectedDayEvents.map((ev) => (
+                {panelEvents.map((ev) => (
                   <EventRow
                     key={ev.id}
                     ev={ev}
