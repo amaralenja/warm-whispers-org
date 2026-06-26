@@ -363,7 +363,6 @@ function MetaAdsManagerPage() {
               </span>
             </>
           )}
-          )}
         </div>
       )}
 
