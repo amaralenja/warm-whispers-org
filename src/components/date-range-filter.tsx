@@ -44,6 +44,16 @@ export function computeRange(preset: RangePreset): DateRangeValue {
     weekStart.setUTCDate(weekStart.getUTCDate() - day + (day === 0 ? -6 : 1));
     return { preset, from: iso(weekStart), to: iso(today) };
   }
+  if (preset === "7d") {
+    const s = new Date(today);
+    s.setUTCDate(s.getUTCDate() - 6);
+    return { preset, from: iso(s), to: iso(today) };
+  }
+  if (preset === "30d") {
+    const s = new Date(today);
+    s.setUTCDate(s.getUTCDate() - 29);
+    return { preset, from: iso(s), to: iso(today) };
+  }
   if (preset === "mes") {
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
     return { preset, from: iso(monthStart), to: iso(today) };
