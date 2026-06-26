@@ -421,6 +421,47 @@ function CalendarPage() {
 
 
 
+      {view === "month" && selectedDay && (
+        <Card className="bg-card/60">
+          <div className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold capitalize">
+                📅 {format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                {selectedDayEvents.length > 0 && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    ({selectedDayEvents.length} {selectedDayEvents.length === 1 ? "evento" : "eventos"})
+                  </span>
+                )}
+              </h3>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay)}>
+                  <Plus className="mr-1 h-3 w-3" /> Adicionar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedDay(null)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            {selectedDayEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                {selectedDayEvents.map((ev) => (
+                  <EventRow
+                    key={ev.id}
+                    ev={ev}
+                    onEdit={() => openEdit(ev)}
+                    onDelete={() => {
+                      if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       {view === "month" ? (
         <Card className="overflow-hidden">
           {/* Month navigator */}
