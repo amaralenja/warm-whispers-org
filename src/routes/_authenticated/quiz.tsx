@@ -73,39 +73,43 @@ type Lead = {
   origem: string | null;
 };
 
-type Period = "today" | "yesterday" | "7d" | "30d" | "90d" | "all";
+type Period = "today" | "yesterday" | "7d" | "15d" | "30d" | "custom" | "all";
 type ViewMode = "kanban" | "list";
 type RealityFilter = "all" | "real" | "fake";
 
-function periodToFrom(p: Period): string | null {
+function periodToRange(
+  p: Period,
+  customFrom?: string,
+  customTo?: string,
+): { from: string | null; to: string | null } {
   const now = new Date();
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const startTomorrow = new Date(startToday);
+  startTomorrow.setDate(startTomorrow.getDate() + 1);
   switch (p) {
     case "today":
-      return d.toISOString();
+      return { from: startToday.toISOString(), to: startTomorrow.toISOString() };
     case "yesterday": {
-      const y = new Date(d);
+      const y = new Date(startToday);
       y.setDate(y.getDate() - 1);
-      return y.toISOString();
+      return { from: y.toISOString(), to: startToday.toISOString() };
     }
-    case "7d": {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 7);
-      return x.toISOString();
-    }
+    case "7d":
+    case "15d":
     case "30d": {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 30);
-      return x.toISOString();
+      const days = p === "7d" ? 7 : p === "15d" ? 15 : 30;
+      const x = new Date(startToday);
+      x.setDate(x.getDate() - days);
+      return { from: x.toISOString(), to: startTomorrow.toISOString() };
     }
-    case "90d": {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 90);
-      return x.toISOString();
+    case "custom": {
+      const f = customFrom ? new Date(customFrom + "T00:00:00").toISOString() : null;
+      const t = customTo ? new Date(customTo + "T23:59:59").toISOString() : null;
+      return { from: f, to: t };
     }
     case "all":
-      return null;
+      return { from: null, to: null };
   }
 }
 
