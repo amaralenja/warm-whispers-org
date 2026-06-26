@@ -130,28 +130,34 @@ const ORIGIN_ORDER: OriginKey[] = ["facebook", "instagram", "google", "tiktok", 
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
-  const medium = "";
   const isInstagram = src.includes("ig") || src.includes("instagram");
+  const isFacebook = src.includes("fb") || src.includes("facebook");
   const hasFbTracking = !!(l.fbc && l.fbp);
 
-  // Instagram tem prioridade quando source explicita IG
-  if (isInstagram) {
-    return {
-      key: "instagram", label: "Instagram", icon: Instagram,
-      ring: "ring-pink-500/40", bg: "bg-gradient-to-br from-pink-500/10 to-purple-500/10",
-      text: "text-pink-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
-    };
-  }
-  // Facebook Ads SOMENTE com FBC + FBP (regra nova)
-  if (hasFbTracking || src.includes("fb") || src.includes("facebook")) {
-    if (hasFbTracking) {
+  // Anúncio Meta: SOMENTE com fbc + fbp.
+  // Se a source for IG => Instagram Ads; caso contrário => Facebook Ads.
+  if (hasFbTracking) {
+    if (isInstagram) {
       return {
-        key: "facebook", label: "Facebook Ads", icon: Facebook,
-        ring: "ring-blue-500/40", bg: "bg-blue-500/10", text: "text-blue-300",
-        glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
+        key: "instagram", label: "Instagram Ads", icon: Instagram,
+        ring: "ring-pink-500/40", bg: "bg-gradient-to-br from-pink-500/10 to-purple-500/10",
+        text: "text-pink-300",
+        glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
       };
     }
+    return {
+      key: "facebook", label: "Facebook Ads", icon: Facebook,
+      ring: "ring-blue-500/40", bg: "bg-blue-500/10", text: "text-blue-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
+    };
+  }
+  // Sem fbc/fbp: IG/FB caem como orgânico, mesmo com utm_source preenchida
+  if (isInstagram || isFacebook) {
+    return {
+      key: "organic", label: "Orgânico", icon: Sparkles,
+      ring: "ring-emerald-500/40", bg: "bg-emerald-500/10", text: "text-emerald-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(16,185,129,0.5)]", border: "border-emerald-500/40",
+    };
   }
   if (l.gclid || src.includes("google") || src.includes("gad")) {
     return {
