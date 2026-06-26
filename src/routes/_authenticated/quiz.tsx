@@ -323,7 +323,7 @@ function QuizPage() {
 
   const stats = useMemo(() => {
     const total = filteredLeads.length;
-    const byOrigin: Record<OriginKey, number> = { facebook: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
+    const byOrigin: Record<OriginKey, number> = { facebook: 0, instagram: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
     let high = 0;
     let real = 0;
     let fake = 0;
