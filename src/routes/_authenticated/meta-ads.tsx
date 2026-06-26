@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Activity, Play, Pause, ChevronRight, Megaphone, Layers, ImageIcon,
+  Activity, ChevronRight, Megaphone, Layers, ImageIcon,
   RefreshCw, Pencil, Loader2, Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
