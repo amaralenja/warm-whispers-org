@@ -639,8 +639,7 @@ function CalendarPage() {
   );
 }
 
-function StatsCards({ events }: { events: CalendarEvent[] }) {
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("mes"));
+function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; range: DateRangeValue; setRange: (v: DateRangeValue) => void }) {
 
   const stats = useMemo(() => {
     const now = new Date();
