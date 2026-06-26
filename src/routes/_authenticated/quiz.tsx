@@ -561,9 +561,11 @@ function QuizPage() {
                   <th className="text-left px-3 py-2">Lead</th>
                   <th className="text-left px-3 py-2">Origem</th>
                   <th className="text-left px-3 py-2">Contato</th>
+                  <th className="text-left px-3 py-2">Ticket</th>
                   <th className="text-left px-3 py-2">Score</th>
                   <th className="text-left px-3 py-2">Quando</th>
                   <th className="text-left px-3 py-2">Status</th>
+                  <th className="text-left px-3 py-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -572,8 +574,9 @@ function QuizPage() {
                   const Icon = o.icon;
                   const real = leadIsReal(l);
                   const letter = (l.caixa_letra ?? "").toUpperCase();
+                  const tier = TICKET_TIERS[letter];
                   return (
-                    <tr key={l.id} className="border-t border-border hover:bg-accent/5">
+                    <tr key={l.id} className="border-t border-border hover:bg-accent/5 cursor-pointer" onClick={() => setSelectedLead(l)}>
                       <td className="px-3 py-2 font-medium">{l.nome || <span className="italic text-muted-foreground">sem nome</span>}</td>
                       <td className="px-3 py-2">
                         <Badge variant="outline" className={`gap-1 ${o.text} ${o.bg}`}>
@@ -585,6 +588,11 @@ function QuizPage() {
                         <div>{l.whatsapp || ""}</div>
                       </td>
                       <td className="px-3 py-2">
+                        <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${tier?.cls ?? "bg-muted text-muted-foreground border-border"}`}>
+                          <DollarSign className="h-3 w-3" /> {ticketLabel(l)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
                         {letter ? (
                           <Badge className={HIGH_SCORE.has(letter) ? "bg-yellow-500/20 text-yellow-300" : "bg-muted text-muted-foreground"}>
                             {letter}
@@ -592,8 +600,13 @@ function QuizPage() {
                         ) : "—"}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{timeAgo(l.data_criacao)}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                         <RealityToggle real={real} onChange={(r) => setLeadReality(l.id, r)} />
+                      </td>
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setSelectedLead(l)}>
+                          <Eye className="h-3 w-3" /> Ver
+                        </Button>
                       </td>
                     </tr>
                   );
