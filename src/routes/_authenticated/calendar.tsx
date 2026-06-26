@@ -351,6 +351,10 @@ function CalendarPage() {
         </Card>
       ) : null}
 
+      <StatsCards events={events} />
+
+
+
       {view === "month" ? (
         <Card className="overflow-hidden">
           {/* Month navigator */}
