@@ -60,6 +60,11 @@ export function getEventLink(eventId: string): LinkRecord | undefined {
   return loadLinks()[eventId];
 }
 
+export function getAllEventLinks(): Record<string, LinkRecord> {
+  return loadLinks();
+}
+
+
 export function ShowUpDialog({
   open,
   onOpenChange,
