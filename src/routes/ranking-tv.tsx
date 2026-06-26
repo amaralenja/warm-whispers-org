@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Award } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import cashSoundAsset from "@/assets/cash-register.mp3.asset.json";
+import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 
 export const Route = createFileRoute("/ranking-tv")({
   ssr: false,
