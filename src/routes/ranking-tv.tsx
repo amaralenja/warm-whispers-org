@@ -440,6 +440,11 @@ function RankingTV() {
                   {now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
                 </p>
               </div>
+              <DateRangeFilter
+                value={dateRange}
+                onChange={setDateRange}
+                presets={["hoje", "ontem", "7d", "30d"]}
+              />
               <div className="glass stat-card flex items-center gap-6 rounded-2xl px-5 py-2 shadow-xl">
                 <div className="text-center">
                   <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Faturamento</p>
