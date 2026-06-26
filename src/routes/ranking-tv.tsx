@@ -160,10 +160,8 @@ function RankingTV() {
     return () => clearInterval(t);
   }, []);
 
-  const range = useMemo(() => {
-    const to = todayISO();
-    return { from: to, to };
-  }, []);
+  const [dateRange, setDateRange] = useState<DateRangeValue>(() => computeRange("hoje"));
+  const range = { from: dateRange.from ?? todayISO(), to: dateRange.to ?? todayISO() };
 
   const queryKey = ["ranking-tv-public-rpc", range.from, range.to];
 
