@@ -323,7 +323,18 @@ function RankingTV() {
 
       <div className="ambient" />
 
+      {/* Botão Simular Venda (canto inferior direito) */}
+      <button
+        type="button"
+        onClick={simulateSale}
+        className="fixed bottom-5 right-5 z-[300] rounded-full border border-emerald-400/40 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-300 backdrop-blur-md transition hover:bg-emerald-400/20 hover:text-emerald-200"
+        style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}
+      >
+        🧪 Simular Venda
+      </button>
+
       {/* Confete + balões celebração */}
+
       {confetti.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-[200] overflow-hidden">
           {confetti.map((c) =>
