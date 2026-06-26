@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
+import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
