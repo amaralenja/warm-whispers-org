@@ -28,6 +28,10 @@ import {
   Leaf,
   Megaphone,
   Crown,
+  LayoutGrid,
+  List as ListIcon,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
 
@@ -70,6 +74,8 @@ type Lead = {
 };
 
 type Period = "today" | "yesterday" | "7d" | "30d" | "90d" | "all";
+type ViewMode = "kanban" | "list";
+type RealityFilter = "all" | "real" | "fake";
 
 function periodToFrom(p: Period): string | null {
   const now = new Date();
@@ -104,71 +110,54 @@ function periodToFrom(p: Period): string | null {
 }
 
 // ---------- Lead Classification ----------
+type OriginKey = "facebook" | "google" | "organic" | "tiktok" | "unknown";
 type LeadOrigin = {
-  key: "facebook" | "google" | "organic" | "tiktok" | "unknown";
+  key: OriginKey;
   label: string;
   icon: typeof Facebook;
-  // Tailwind classes
   ring: string;
   bg: string;
   text: string;
   glow: string;
+  border: string;
 };
+
+const ORIGIN_ORDER: OriginKey[] = ["facebook", "google", "tiktok", "organic", "unknown"];
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
   if (l.fbc || l.fbp || l.fbclid || src.includes("fb") || src.includes("facebook") || src.includes("ig") || src.includes("instagram")) {
     return {
-      key: "facebook",
-      label: "Facebook Ads",
-      icon: Facebook,
-      ring: "ring-blue-500/40",
-      bg: "bg-blue-500/10",
-      text: "text-blue-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]",
+      key: "facebook", label: "Facebook Ads", icon: Facebook,
+      ring: "ring-blue-500/40", bg: "bg-blue-500/10", text: "text-blue-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
     };
   }
   if (l.gclid || src.includes("google") || src.includes("gad")) {
     return {
-      key: "google",
-      label: "Google Ads",
-      icon: Megaphone,
-      ring: "ring-amber-500/40",
-      bg: "bg-amber-500/10",
-      text: "text-amber-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(245,158,11,0.5)]",
+      key: "google", label: "Google Ads", icon: Megaphone,
+      ring: "ring-amber-500/40", bg: "bg-amber-500/10", text: "text-amber-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(245,158,11,0.5)]", border: "border-amber-500/40",
     };
   }
   if (src.includes("tiktok") || src.includes("tt")) {
     return {
-      key: "tiktok",
-      label: "TikTok",
-      icon: Flame,
-      ring: "ring-pink-500/40",
-      bg: "bg-pink-500/10",
-      text: "text-pink-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]",
+      key: "tiktok", label: "TikTok", icon: Flame,
+      ring: "ring-pink-500/40", bg: "bg-pink-500/10", text: "text-pink-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
     };
   }
   if (src && src !== "(direct)" && src !== "direct") {
     return {
-      key: "unknown",
-      label: src,
-      icon: Megaphone,
-      ring: "ring-violet-500/40",
-      bg: "bg-violet-500/10",
-      text: "text-violet-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(139,92,246,0.4)]",
+      key: "unknown", label: src || "Outros", icon: Megaphone,
+      ring: "ring-violet-500/40", bg: "bg-violet-500/10", text: "text-violet-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(139,92,246,0.4)]", border: "border-violet-500/40",
     };
   }
   return {
-    key: "organic",
-    label: "Orgânico",
-    icon: Leaf,
-    ring: "ring-emerald-500/30",
-    bg: "bg-emerald-500/5",
-    text: "text-emerald-300",
-    glow: "shadow-[0_0_24px_-10px_rgba(16,185,129,0.4)]",
+    key: "organic", label: "Orgânico", icon: Leaf,
+    ring: "ring-emerald-500/30", bg: "bg-emerald-500/5", text: "text-emerald-300",
+    glow: "shadow-[0_0_24px_-10px_rgba(16,185,129,0.4)]", border: "border-emerald-500/30",
   };
 }
 
@@ -176,8 +165,35 @@ const HIGH_SCORE = new Set(["E", "F", "G"]);
 const MID_SCORE = new Set(["C", "D"]);
 
 function hasUseful(l: Lead): boolean {
-  // Mostra só quem preencheu pelo menos um campo de contato real
   return !!(l.nome || l.email || l.whatsapp || l.instagram);
+}
+
+// "real" detection — heuristic. Manual overrides via localStorage.
+function isRealHeuristic(l: Lead): boolean {
+  const st = `${l.status ?? ""} ${l.crm_status ?? ""}`.toLowerCase();
+  if (st.includes("fake") || st.includes("falso") || st.includes("invalid") || st.includes("spam")) return false;
+  if (st.includes("real") || st.includes("valid") || st.includes("qualifi")) return true;
+  // default: precisa de e-mail OU whatsapp pra contar como "real"
+  return !!(l.email || l.whatsapp);
+}
+
+// ---- Manual real/fake overrides (localStorage) ----
+const REALITY_KEY = "quiz-reality-overrides-v1";
+type Reality = "real" | "fake";
+function loadOverrides(): Record<string, Reality> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(REALITY_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveOverrides(o: Record<string, Reality>) {
+  try {
+    localStorage.setItem(REALITY_KEY, JSON.stringify(o));
+  } catch {
+    /* noop */
+  }
 }
 
 function timeAgo(iso: string): string {
@@ -198,8 +214,28 @@ function QuizPage() {
 
   const [period, setPeriod] = useState<Period>("7d");
   const [search, setSearch] = useState("");
-  const [originFilter, setOriginFilter] = useState<LeadOrigin["key"] | "all">("all");
+  const [originFilter, setOriginFilter] = useState<OriginKey | "all">("all");
   const [liveCount, setLiveCount] = useState(0);
+  const [view, setView] = useState<ViewMode>("kanban");
+  const [reality, setReality] = useState<RealityFilter>("all");
+  const [overrides, setOverrides] = useState<Record<string, Reality>>(() => loadOverrides());
+
+  function setLeadReality(id: string, r: Reality | null) {
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (r === null) delete next[id];
+      else next[id] = r;
+      saveOverrides(next);
+      return next;
+    });
+  }
+
+  function leadIsReal(l: Lead): boolean {
+    const o = overrides[l.id];
+    if (o === "real") return true;
+    if (o === "fake") return false;
+    return isRealHeuristic(l);
+  }
 
   const fromIso = periodToFrom(period);
 
@@ -219,7 +255,6 @@ function QuizPage() {
     refetchInterval: 30000,
   });
 
-  // Realtime
   useEffect(() => {
     const ch = quizSb
       .channel("quiz-leads-stream")
@@ -237,7 +272,6 @@ function QuizPage() {
     };
   }, [qc]);
 
-  // Hide empty leads + workspace scope + search + origin filter
   const filteredLeads = useMemo(() => {
     let rows = leads.filter(hasUseful);
     if (!isGeral && workspace?.nome) {
@@ -249,9 +283,8 @@ function QuizPage() {
           (l.utm_content ?? "").toLowerCase().includes(w),
       );
     }
-    if (originFilter !== "all") {
-      rows = rows.filter((l) => classifyLead(l).key === originFilter);
-    }
+    if (originFilter !== "all") rows = rows.filter((l) => classifyLead(l).key === originFilter);
+    if (reality !== "all") rows = rows.filter((l) => (reality === "real" ? leadIsReal(l) : !leadIsReal(l)));
     if (search.trim()) {
       const s = search.toLowerCase();
       rows = rows.filter(
@@ -263,17 +296,26 @@ function QuizPage() {
       );
     }
     return rows;
-  }, [leads, isGeral, workspace, search, originFilter]);
+  }, [leads, isGeral, workspace, search, originFilter, reality, overrides]);
 
   const stats = useMemo(() => {
     const total = filteredLeads.length;
-    const byOrigin = { facebook: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
+    const byOrigin: Record<OriginKey, number> = { facebook: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
     let high = 0;
+    let real = 0;
+    let fake = 0;
     for (const l of filteredLeads) {
       byOrigin[classifyLead(l).key]++;
       if (HIGH_SCORE.has((l.caixa_letra ?? "").toUpperCase())) high++;
+      if (leadIsReal(l)) real++; else fake++;
     }
-    return { total, byOrigin, high };
+    return { total, byOrigin, high, real, fake };
+  }, [filteredLeads, overrides]);
+
+  const grouped = useMemo(() => {
+    const g: Record<OriginKey, Lead[]> = { facebook: [], google: [], tiktok: [], organic: [], unknown: [] };
+    for (const l of filteredLeads) g[classifyLead(l).key].push(l);
+    return g;
   }, [filteredLeads]);
 
   function refresh() {
@@ -329,6 +371,32 @@ function QuizPage() {
                 <SelectItem value="all">Tudo</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={reality} onValueChange={(v) => setReality(v as RealityFilter)}>
+              <SelectTrigger className="h-9 w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="real">Só reais</SelectItem>
+                <SelectItem value="fake">Só fakes</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex rounded-md border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setView("kanban")}
+                className={`px-3 h-9 text-xs flex items-center gap-1 transition ${view === "kanban" ? "bg-accent/20 text-accent" : "hover:bg-accent/10"}`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Kanban
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("list")}
+                className={`px-3 h-9 text-xs flex items-center gap-1 transition border-l border-border ${view === "list" ? "bg-accent/20 text-accent" : "hover:bg-accent/10"}`}
+              >
+                <ListIcon className="h-3.5 w-3.5" /> Lista
+              </button>
+            </div>
             <Button variant="outline" size="sm" onClick={refresh}>
               <RefreshCw className="mr-1.5 h-4 w-4" /> Atualizar
             </Button>
@@ -344,85 +412,111 @@ function QuizPage() {
         </Card>
       )}
 
-      {/* STATS — clickable filters */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatPill
-          active={originFilter === "all"}
-          onClick={() => setOriginFilter("all")}
-          icon={<Users className="h-4 w-4" />}
-          label="Total"
-          value={stats.total}
-          accent="text-foreground"
-          loading={isLoading}
-        />
-        <StatPill
-          active={originFilter === "facebook"}
-          onClick={() => setOriginFilter(originFilter === "facebook" ? "all" : "facebook")}
-          icon={<Facebook className="h-4 w-4" />}
-          label="Facebook"
-          value={stats.byOrigin.facebook}
-          accent="text-blue-300"
-          loading={isLoading}
-        />
-        <StatPill
-          active={originFilter === "google"}
-          onClick={() => setOriginFilter(originFilter === "google" ? "all" : "google")}
-          icon={<Megaphone className="h-4 w-4" />}
-          label="Google"
-          value={stats.byOrigin.google}
-          accent="text-amber-300"
-          loading={isLoading}
-        />
-        <StatPill
-          active={originFilter === "organic"}
-          onClick={() => setOriginFilter(originFilter === "organic" ? "all" : "organic")}
-          icon={<Leaf className="h-4 w-4" />}
-          label="Orgânico"
-          value={stats.byOrigin.organic}
-          accent="text-emerald-300"
-          loading={isLoading}
-        />
-        <StatPill
-          icon={<Crown className="h-4 w-4" />}
-          label="Score alto (E/F/G)"
-          value={stats.high}
-          accent="text-yellow-300"
-          loading={isLoading}
-        />
+      {/* STATS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+        <StatPill active={originFilter === "all"} onClick={() => setOriginFilter("all")} icon={<Users className="h-4 w-4" />} label="Total" value={stats.total} accent="text-foreground" loading={isLoading} />
+        <StatPill active={originFilter === "facebook"} onClick={() => setOriginFilter(originFilter === "facebook" ? "all" : "facebook")} icon={<Facebook className="h-4 w-4" />} label="Facebook" value={stats.byOrigin.facebook} accent="text-blue-300" loading={isLoading} />
+        <StatPill active={originFilter === "google"} onClick={() => setOriginFilter(originFilter === "google" ? "all" : "google")} icon={<Megaphone className="h-4 w-4" />} label="Google" value={stats.byOrigin.google} accent="text-amber-300" loading={isLoading} />
+        <StatPill active={originFilter === "tiktok"} onClick={() => setOriginFilter(originFilter === "tiktok" ? "all" : "tiktok")} icon={<Flame className="h-4 w-4" />} label="TikTok" value={stats.byOrigin.tiktok} accent="text-pink-300" loading={isLoading} />
+        <StatPill active={originFilter === "organic"} onClick={() => setOriginFilter(originFilter === "organic" ? "all" : "organic")} icon={<Leaf className="h-4 w-4" />} label="Orgânico" value={stats.byOrigin.organic} accent="text-emerald-300" loading={isLoading} />
+        <StatPill icon={<CheckCircle2 className="h-4 w-4" />} label="Reais" value={stats.real} accent="text-emerald-300" loading={isLoading} active={reality === "real"} onClick={() => setReality(reality === "real" ? "all" : "real")} />
+        <StatPill icon={<XCircle className="h-4 w-4" />} label="Fakes" value={stats.fake} accent="text-rose-300" loading={isLoading} active={reality === "fake"} onClick={() => setReality(reality === "fake" ? "all" : "fake")} />
       </div>
 
-      {/* LEAD GRID */}
+      {/* CONTENT */}
       {filteredLeads.length === 0 && !isLoading ? (
         <Card>
           <CardContent className="p-10 text-center text-sm text-muted-foreground">
-            Nenhum lead com dados de contato no período selecionado.
+            Nenhum lead encontrado com esses filtros.
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filteredLeads.slice(0, 120).map((l) => (
-            <LeadCard key={l.id} lead={l} />
-          ))}
+      ) : view === "kanban" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          {ORIGIN_ORDER.map((key) => {
+            const items = grouped[key];
+            if (items.length === 0) return null;
+            const sample = items[0];
+            const origin = classifyLead(sample);
+            const Icon = origin.icon;
+            return (
+              <div key={key} className={`flex flex-col rounded-xl border ${origin.border} ${origin.bg} max-h-[78vh]`}>
+                <div className={`flex items-center justify-between px-3 py-2 border-b ${origin.border}`}>
+                  <div className={`flex items-center gap-2 text-sm font-semibold ${origin.text}`}>
+                    <Icon className="h-4 w-4" /> {origin.label}
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {items.map((l) => (
+                    <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} compact />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
-
-      {filteredLeads.length > 120 && (
-        <p className="text-center text-xs text-muted-foreground">
-          Mostrando 120 de {filteredLeads.length} · refine o filtro pra ver mais.
-        </p>
+      ) : (
+        <Card>
+          <CardContent className="p-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left px-3 py-2">Lead</th>
+                  <th className="text-left px-3 py-2">Origem</th>
+                  <th className="text-left px-3 py-2">Contato</th>
+                  <th className="text-left px-3 py-2">Score</th>
+                  <th className="text-left px-3 py-2">Quando</th>
+                  <th className="text-left px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLeads.slice(0, 300).map((l) => {
+                  const o = classifyLead(l);
+                  const Icon = o.icon;
+                  const real = leadIsReal(l);
+                  const letter = (l.caixa_letra ?? "").toUpperCase();
+                  return (
+                    <tr key={l.id} className="border-t border-border hover:bg-accent/5">
+                      <td className="px-3 py-2 font-medium">{l.nome || <span className="italic text-muted-foreground">sem nome</span>}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant="outline" className={`gap-1 ${o.text} ${o.bg}`}>
+                          <Icon className="h-3 w-3" /> {o.label}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        <div>{l.email || "—"}</div>
+                        <div>{l.whatsapp || ""}</div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {letter ? (
+                          <Badge className={HIGH_SCORE.has(letter) ? "bg-yellow-500/20 text-yellow-300" : "bg-muted text-muted-foreground"}>
+                            {letter}
+                          </Badge>
+                        ) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{timeAgo(l.data_criacao)}</td>
+                      <td className="px-3 py-2">
+                        <RealityToggle real={real} onChange={(r) => setLeadReality(l.id, r)} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {filteredLeads.length > 300 && (
+              <p className="p-3 text-center text-xs text-muted-foreground">
+                Mostrando 300 de {filteredLeads.length} · refine o filtro pra ver mais.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
 function StatPill({
-  icon,
-  label,
-  value,
-  accent,
-  loading,
-  active,
-  onClick,
+  icon, label, value, accent, loading, active, onClick,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -440,9 +534,7 @@ function StatPill({
       disabled={!clickable}
       className={[
         "group relative overflow-hidden rounded-xl border p-4 text-left transition-all",
-        active
-          ? "border-accent/60 bg-accent/10 shadow-[0_0_30px_-10px_hsl(var(--accent))]"
-          : "border-border bg-card hover:border-accent/30",
+        active ? "border-accent/60 bg-accent/10 shadow-[0_0_30px_-10px_hsl(var(--accent))]" : "border-border bg-card hover:border-accent/30",
         clickable ? "cursor-pointer" : "cursor-default",
       ].join(" ")}
     >
@@ -456,9 +548,36 @@ function StatPill({
   );
 }
 
-function LeadCard({ lead }: { lead: Lead }) {
+function RealityToggle({ real, onChange }: { real: boolean; onChange: (r: Reality | null) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border overflow-hidden text-[11px]">
+      <button
+        type="button"
+        onClick={() => onChange(real ? null : "real")}
+        className={`px-2 py-1 flex items-center gap-1 transition ${real ? "bg-emerald-500/20 text-emerald-300" : "text-muted-foreground hover:bg-accent/10"}`}
+      >
+        <CheckCircle2 className="h-3 w-3" /> Real
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(!real ? null : "fake")}
+        className={`px-2 py-1 flex items-center gap-1 border-l border-border transition ${!real ? "bg-rose-500/20 text-rose-300" : "text-muted-foreground hover:bg-accent/10"}`}
+      >
+        <XCircle className="h-3 w-3" /> Fake
+      </button>
+    </div>
+  );
+}
+
+function LeadCard({
+  lead, real, onToggle, compact,
+}: {
+  lead: Lead;
+  real: boolean;
+  onToggle: (r: Reality | null) => void;
+  compact?: boolean;
+}) {
   const origin = classifyLead(lead);
-  const Icon = origin.icon;
   const letter = (lead.caixa_letra ?? "").toUpperCase();
   const isHigh = HIGH_SCORE.has(letter);
   const isMid = MID_SCORE.has(letter);
@@ -467,92 +586,67 @@ function LeadCard({ lead }: { lead: Lead }) {
   return (
     <div
       className={[
-        "relative overflow-hidden rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5",
-        "ring-1",
-        origin.ring,
-        origin.glow,
+        "relative overflow-hidden rounded-lg border bg-card p-3 transition-all",
+        real ? "" : "opacity-70",
         isHigh ? "border-yellow-500/40" : "border-border",
+        compact ? "" : "hover:-translate-y-0.5",
       ].join(" ")}
     >
-      {/* origin stripe */}
       <div className={`absolute left-0 top-0 h-full w-1 ${origin.bg}`} />
 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {lead.nome ? (
-              <h3 className="truncate text-base font-semibold">{lead.nome}</h3>
+              <h3 className="truncate text-sm font-semibold">{lead.nome}</h3>
             ) : (
-              <h3 className="truncate text-sm italic text-muted-foreground">sem nome</h3>
+              <h3 className="truncate text-xs italic text-muted-foreground">sem nome</h3>
             )}
             {isHigh && (
-              <Badge className="gap-1 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20">
+              <Badge className="gap-1 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20 text-[10px]">
                 <Crown className="h-3 w-3" /> {letter}
               </Badge>
             )}
             {isMid && (
-              <Badge variant="outline" className="font-mono text-muted-foreground">
-                {letter}
-              </Badge>
+              <Badge variant="outline" className="font-mono text-muted-foreground text-[10px]">{letter}</Badge>
             )}
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>{timeAgo(lead.data_criacao)}</span>
-            <span>·</span>
-            <span>{new Date(lead.data_criacao).toLocaleDateString("pt-BR")}</span>
-          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">{timeAgo(lead.data_criacao)}</div>
         </div>
-
-        <Badge
-          variant="outline"
-          className={`gap-1 border-current/30 ${origin.text} ${origin.bg}`}
-        >
-          <Icon className="h-3 w-3" /> {origin.label}
-        </Badge>
       </div>
 
-      {/* contact */}
-      <div className="mt-3 space-y-1 text-sm">
+      <div className="mt-2 space-y-0.5 text-xs">
         {lead.email && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Mail className="h-3.5 w-3.5 shrink-0" />
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Mail className="h-3 w-3 shrink-0" />
             <span className="truncate">{lead.email}</span>
           </div>
         )}
         {lead.whatsapp && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <MessageCircle className="h-3 w-3 shrink-0 text-emerald-400" />
             <span className="truncate">{lead.whatsapp}</span>
           </div>
         )}
         {cleanIg && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Instagram className="h-3.5 w-3.5 shrink-0 text-pink-400" />
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Instagram className="h-3 w-3 shrink-0 text-pink-400" />
             <span className="truncate">@{cleanIg}</span>
           </div>
         )}
       </div>
 
-      {/* utm + tracking */}
-      {(lead.utm_campaign || lead.utm_content || lead.fbc || lead.fbp || lead.gclid) && (
-        <div className="mt-3 flex flex-wrap gap-1 border-t border-border/50 pt-3">
-          {lead.utm_campaign && (
-            <Badge variant="outline" className="max-w-[200px] truncate text-[10px]">
-              <TrendingUp className="mr-1 h-2.5 w-2.5" /> {lead.utm_campaign}
-            </Badge>
-          )}
-          {(lead.fbc || lead.fbp) && (
-            <Badge variant="outline" className="text-[10px] text-blue-300">
-              FB tracking ✓
-            </Badge>
-          )}
-          {lead.gclid && (
-            <Badge variant="outline" className="text-[10px] text-amber-300">
-              gclid ✓
-            </Badge>
-          )}
+      {lead.utm_campaign && (
+        <div className="mt-2 pt-2 border-t border-border/50">
+          <Badge variant="outline" className="max-w-full truncate text-[9px]">
+            <TrendingUp className="mr-1 h-2.5 w-2.5" /> {lead.utm_campaign}
+          </Badge>
         </div>
       )}
+
+      <div className="mt-2 flex justify-end">
+        <RealityToggle real={real} onChange={onToggle} />
+      </div>
     </div>
   );
 }
