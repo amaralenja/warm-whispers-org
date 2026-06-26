@@ -382,13 +382,12 @@ function MetaAdsManagerPage() {
                 ) : (
                   adsetsQ.data.map((a: AdSet) => (
                     <tr key={a.id} className={`group transition hover:bg-muted/30 ${adsetId === a.id ? "bg-accent/5" : ""}`}>
-                      <td className="px-3 py-3">
-                        <button
-                          onClick={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
-                        >
-                          {a.status === "ACTIVE" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </button>
+                      <td className="px-3 py-4">
+                        <MetaToggle
+                          active={a.status === "ACTIVE"}
+                          disabled={toggleStatus.isPending}
+                          onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         <button
