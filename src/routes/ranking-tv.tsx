@@ -544,11 +544,12 @@ function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
   const p = palettes[idx % palettes.length];
 
   const niveis = m.niveis ?? [];
+  const semMeta = m.semMeta || niveis.every((n) => !n.meta || n.meta <= 0);
   const metaMax = niveis[niveis.length - 1]?.meta ?? 0;
   const pctTotal = metaMax > 0 ? Math.min(100, (m.faturamento / metaMax) * 100) : 0;
   const nivelAtual = m.nivelAtual ?? 0;
-  const proxNivel = niveis.find((n) => !n.batida);
-  const bateu = nivelAtual >= 3;
+  const proxNivel = niveis.find((n) => n.meta > 0 && !n.batida);
+  const bateu = !semMeta && nivelAtual >= 3;
 
   return (
     <div className={`glass relative overflow-hidden rounded-xl border-l-2 p-4 ${p.border}`}>
@@ -557,50 +558,65 @@ function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
         <div className="min-w-0">
           <p className="truncate text-[10px] font-bold uppercase tracking-widest text-gray-500">{m.expert} · Mensal</p>
           <h3 className="mt-1 text-lg font-black leading-none text-white">
-            {BRL(m.faturamento)} <span className="text-[10px] font-bold text-gray-500">/ {BRL(metaMax)}</span>
+            {BRL(m.faturamento)}{" "}
+            <span className="text-[10px] font-bold text-gray-500">
+              / {semMeta ? "sem meta" : BRL(metaMax)}
+            </span>
           </h3>
         </div>
-        <p className={`shrink-0 text-xl font-black tracking-tighter ${p.txt}`}>{pctTotal.toFixed(0)}%</p>
-      </div>
-
-      {/* Barra com marcadores em N1 e N2 (proporcional aos valores absolutos) */}
-      <div className="relative mb-2 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
-        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctTotal}%`, background: p.grad }} />
-        {niveis.slice(0, 2).map((n) => (
-          <span key={n.nivel} className="absolute top-0 h-full w-px bg-black/40" style={{ left: `${metaMax > 0 ? (n.meta / metaMax) * 100 : 0}%` }} />
-        ))}
-      </div>
-
-      {/* Pills de nível (3 níveis absolutos) */}
-      <div className="mb-2 grid grid-cols-3 gap-1">
-        {niveis.map((n) => {
-          const ativo = n.batida;
-          const atual = !bateu && proxNivel?.nivel === n.nivel;
-          return (
-            <div
-              key={n.nivel}
-              className={`flex flex-col items-center justify-center rounded-md px-1 py-1 text-[9px] font-black uppercase tracking-wider transition ${
-                ativo ? `${p.bg} text-black` : "bg-white/5 text-white/40"
-              } ${atual ? `ring-2 ${p.ring}` : ""}`}
-            >
-              <span>N{n.nivel}</span>
-              <span className="text-[8px] font-bold opacity-80">{BRL(n.meta)}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Status */}
-      <div className="flex items-center justify-between gap-2 text-[10px]">
-        <span className={`font-black uppercase ${p.txt}`}>
-          {bateu ? "✓ Meta batida (N3)" : `Nível atual: ${nivelAtual}`}
-        </span>
-        {!bateu && proxNivel && (
-          <span className="text-right text-gray-400">
-            Faltam <span className="font-black text-white">{BRL(proxNivel.faltam)}</span> p/ N{proxNivel.nivel}
-          </span>
+        {!semMeta && (
+          <p className={`shrink-0 text-xl font-black tracking-tighter ${p.txt}`}>{pctTotal.toFixed(0)}%</p>
         )}
       </div>
+
+      {semMeta ? (
+        <div className="rounded-md border border-white/10 bg-white/5 px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          Metas não configuradas
+        </div>
+      ) : (
+        <>
+          {/* Barra com marcadores em N1 e N2 (proporcional aos valores absolutos) */}
+          <div className="relative mb-2 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctTotal}%`, background: p.grad }} />
+            {niveis.slice(0, 2).map((n) => (
+              n.meta > 0 ? (
+                <span key={n.nivel} className="absolute top-0 h-full w-px bg-black/40" style={{ left: `${metaMax > 0 ? (n.meta / metaMax) * 100 : 0}%` }} />
+              ) : null
+            ))}
+          </div>
+
+          {/* Pills de nível (3 níveis absolutos) */}
+          <div className="mb-2 grid grid-cols-3 gap-1">
+            {niveis.map((n) => {
+              const ativo = n.batida;
+              const atual = !bateu && proxNivel?.nivel === n.nivel;
+              return (
+                <div
+                  key={n.nivel}
+                  className={`flex flex-col items-center justify-center rounded-md px-1 py-1 text-[9px] font-black uppercase tracking-wider transition ${
+                    ativo ? `${p.bg} text-black` : "bg-white/5 text-white/40"
+                  } ${atual ? `ring-2 ${p.ring}` : ""}`}
+                >
+                  <span>N{n.nivel}</span>
+                  <span className="text-[8px] font-bold opacity-80">{n.meta > 0 ? BRL(n.meta) : "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Status */}
+          <div className="flex items-center justify-between gap-2 text-[10px]">
+            <span className={`font-black uppercase ${p.txt}`}>
+              {bateu ? "✓ Meta batida (N3)" : `Nível atual: ${nivelAtual}`}
+            </span>
+            {!bateu && proxNivel && (
+              <span className="text-right text-gray-400">
+                Faltam <span className="font-black text-white">{BRL(proxNivel.faltam)}</span> p/ N{proxNivel.nivel}
+              </span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
