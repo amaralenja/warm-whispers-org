@@ -147,7 +147,13 @@ async function fetchCrmApiLeads(expert: ExpertApiKey) {
     headers: { Authorization: `Bearer ${expert.crm_api_key}` },
   });
   if (!res.ok) throw new Error(`${expert.nome}: /leads retornou HTTP ${res.status}`);
-  const payload = await res.json().catch(() => null);
+  const text = await res.text();
+  let payload: any = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`${expert.nome}: /leads não retornou JSON. Confere se o endpoint público está ativo e não redirecionando para login.`);
+  }
   return extractLeadArray(payload).map((raw, index) => normalizeApiLead(raw, expert.nome, index));
 }
 
