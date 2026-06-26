@@ -336,7 +336,7 @@ function QuizPage() {
   }, [filteredLeads, overrides]);
 
   const grouped = useMemo(() => {
-    const g: Record<OriginKey, Lead[]> = { facebook: [], google: [], tiktok: [], organic: [], unknown: [] };
+    const g: Record<OriginKey, Lead[]> = { facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
     for (const l of filteredLeads) g[classifyLead(l).key].push(l);
     return g;
   }, [filteredLeads]);
