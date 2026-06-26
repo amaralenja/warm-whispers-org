@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Award } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import cashSoundAsset from "@/assets/cash-register.mp3.asset.json";
 
 export const Route = createFileRoute("/ranking-tv")({
   ssr: false,
@@ -112,33 +113,18 @@ function RankingTV() {
   const initializedRef = useRef(false);
   const rankingRef = useRef<PublicRankingItem[]>([]);
   const [pulse, setPulse] = useState(0);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   function playCashSound() {
     try {
-      const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
-      if (!audioCtxRef.current) audioCtxRef.current = new AC();
-      const ctx = audioCtxRef.current;
-      if (ctx.state === "suspended") ctx.resume();
-      const now = ctx.currentTime;
-      // Cha-ching: dois "dings" + brilho
-      const notes = [
-        { f: 1318.5, t: 0,    d: 0.35 }, // E6
-        { f: 1760,   t: 0.09, d: 0.45 }, // A6
-        { f: 2637,   t: 0.18, d: 0.55 }, // E7 brilho
-      ];
-      notes.forEach(({ f, t, d }) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(f, now + t);
-        gain.gain.setValueAtTime(0, now + t);
-        gain.gain.linearRampToValueAtTime(0.35, now + t + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + t + d);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now + t);
-        osc.stop(now + t + d + 0.05);
-      });
+      if (!audioRef.current) {
+        audioRef.current = new Audio(cashSoundAsset.url);
+        audioRef.current.preload = "auto";
+        audioRef.current.volume = 0.9;
+      }
+      const a = audioRef.current;
+      a.currentTime = 0;
+      void a.play().catch(() => { /* navegador bloqueou — clica em simular venda 1x */ });
     } catch { /* sem áudio */ }
   }
 
