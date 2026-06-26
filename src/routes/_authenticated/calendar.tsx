@@ -718,8 +718,9 @@ function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void 
   const person = personLabel(ev);
   const title = ev.summary || "(sem título)";
   const link = getEventLink(ev.id);
-  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
-  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+  const guest = guestOf(ev);
+  const attendeeEmail = guest?.email;
+  const attendeeName = guest?.displayName;
 
   return (
     <div
