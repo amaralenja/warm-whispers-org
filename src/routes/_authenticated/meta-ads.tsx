@@ -338,26 +338,31 @@ function MetaAdsManagerPage() {
       </div>
 
       {/* Breadcrumb sublevel */}
-      {(campaignId || adsetId) && (
+      {(selectedCampaigns.size > 0 || selectedAdsets.size > 0) && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <button onClick={() => { setCampaignId(null); setAdsetId(null); setTab("campaigns"); }} className="hover:text-foreground">
+          <button onClick={clearAll} className="hover:text-foreground">
             Todas campanhas
           </button>
-          {campaignId && (
+          {selectedCampaigns.size > 0 && (
             <>
               <ChevronRight className="h-3 w-3" />
               <span className="text-foreground">
-                {campaigns.find((c) => c.id === campaignId)?.name ?? "Campanha"}
+                {selectedCampaigns.size === 1
+                  ? campaigns.find((c) => selectedCampaigns.has(c.id))?.name ?? "Campanha"
+                  : `${selectedCampaigns.size} campanhas selecionadas`}
               </span>
             </>
           )}
-          {adsetId && (
+          {selectedAdsets.size > 0 && (
             <>
               <ChevronRight className="h-3 w-3" />
               <span className="text-foreground">
-                {adsets.find((a) => a.id === adsetId)?.name ?? "Conjunto"}
+                {selectedAdsets.size === 1
+                  ? adsets.find((a) => selectedAdsets.has(a.id))?.name ?? "Conjunto"
+                  : `${selectedAdsets.size} conjuntos selecionados`}
               </span>
             </>
+          )}
           )}
         </div>
       )}
