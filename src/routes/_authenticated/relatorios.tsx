@@ -32,7 +32,7 @@ const PALETTE = ["#e94560", "#f59e0b", "#10b981", "#3b82f6", "#a855f7", "#ec4899
 function Relatorios() {
   const { workspace } = useWorkspace();
   const fetchStats = useServerFn(getRelatoriosStats);
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("ano"));
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
   const { data, isLoading } = useQuery({
