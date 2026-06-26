@@ -866,3 +866,163 @@ function EventRow({
   );
 }
 
+function fmtBRL(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+function pct(n: number) {
+  if (!isFinite(n) || isNaN(n)) return "0%";
+  return `${n.toFixed(1)}%`;
+}
+
+function MetricsView({
+  events,
+  range,
+  setRange,
+}: {
+  events: CalendarEvent[];
+  range: DateRangeValue;
+  setRange: (v: DateRangeValue) => void;
+}) {
+  const { data: vendasData, isLoading: vendasLoading } = useQuery({
+    queryKey: ["calendar-metrics-vendas", range.from, range.to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_ranking_tv_stats", {
+        _from: range.from || null,
+        _to: range.to || null,
+      });
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  const eventStats = useMemo(() => {
+    const now = new Date();
+    const from = range.from ? new Date(range.from + "T00:00:00") : null;
+    const to = range.to ? new Date(range.to + "T23:59:59") : null;
+    const links = getAllEventLinks();
+    let agendadas = 0;
+    let proximas = 0;
+    let realizadas = 0;
+    let showup = 0;
+    let noshow = 0;
+    let linkadas = 0;
+    for (const ev of events) {
+      const d = new Date(ev.start.dateTime || ev.start.date || "");
+      if (isNaN(d.getTime())) continue;
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      agendadas++;
+      const linked = !!links[ev.id];
+      if (linked) linkadas++;
+      const past = d < now;
+      if (past) {
+        realizadas++;
+        if (linked) showup++;
+        else noshow++;
+      } else {
+        proximas++;
+      }
+    }
+    return { agendadas, proximas, realizadas, showup, noshow, linkadas };
+  }, [events, range]);
+
+  const totalFat = Number(vendasData?.totalFaturamento || 0);
+  const totalVendas = Number(vendasData?.totalVendas || 0);
+  const ticketMedio = Number(vendasData?.ticketMedioGeral || 0);
+
+  const taxaShowup = eventStats.realizadas > 0 ? (eventStats.showup / eventStats.realizadas) * 100 : 0;
+  const taxaNoshow = eventStats.realizadas > 0 ? (eventStats.noshow / eventStats.realizadas) * 100 : 0;
+  const taxaFechamentoShown = eventStats.showup > 0 ? (totalVendas / eventStats.showup) * 100 : 0;
+  const taxaFechamentoAgendadas = eventStats.agendadas > 0 ? (totalVendas / eventStats.agendadas) * 100 : 0;
+  const taxaConexao = eventStats.agendadas > 0 ? (eventStats.linkadas / eventStats.agendadas) * 100 : 0;
+  const valorPorCall = eventStats.agendadas > 0 ? totalFat / eventStats.agendadas : 0;
+  const valorPorShowup = eventStats.showup > 0 ? totalFat / eventStats.showup : 0;
+
+  const groups: { title: string; cards: { label: string; value: string; sub?: string; icon: any; color: string; bg: string }[] }[] = [
+    {
+      title: "Volume de calls",
+      cards: [
+        { label: "Agendadas no período", value: String(eventStats.agendadas), icon: CalendarIcon, color: "text-blue-400", bg: "bg-blue-500/10" },
+        { label: "Próximas calls", value: String(eventStats.proximas), icon: CalendarClock, color: "text-amber-400", bg: "bg-amber-500/10" },
+        { label: "Realizadas", value: String(eventStats.realizadas), icon: PhoneCall, color: "text-violet-400", bg: "bg-violet-500/10" },
+        { label: "Leads linkados ao Quiz", value: String(eventStats.linkadas), sub: pct(taxaConexao) + " das calls", icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10" },
+      ],
+    },
+    {
+      title: "Comparecimento",
+      cards: [
+        { label: "Show-up", value: String(eventStats.showup), sub: pct(taxaShowup) + " das realizadas", icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+        { label: "No-show", value: String(eventStats.noshow), sub: pct(taxaNoshow) + " das realizadas", icon: XCircle, color: "text-rose-400", bg: "bg-rose-500/10" },
+        { label: "Taxa de show-up", value: pct(taxaShowup), icon: Percent, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+        { label: "Taxa de no-show", value: pct(taxaNoshow), icon: Percent, color: "text-rose-400", bg: "bg-rose-500/10" },
+      ],
+    },
+    {
+      title: "Conversão em venda",
+      cards: [
+        { label: "Vendas no período", value: String(totalVendas), icon: TrendingUp, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+        { label: "Fechamento sobre show-up", value: pct(taxaFechamentoShown), sub: totalVendas + " / " + eventStats.showup, icon: Target, color: "text-amber-400", bg: "bg-amber-500/10" },
+        { label: "Fechamento sobre agendadas", value: pct(taxaFechamentoAgendadas), sub: totalVendas + " / " + eventStats.agendadas, icon: Target, color: "text-blue-400", bg: "bg-blue-500/10" },
+        { label: "Ticket médio", value: fmtBRL(ticketMedio), icon: DollarSign, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+      ],
+    },
+    {
+      title: "Faturamento & eficiência",
+      cards: [
+        { label: "Faturamento total", value: fmtBRL(totalFat), icon: DollarSign, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+        { label: "Valor por call agendada", value: fmtBRL(valorPorCall), icon: DollarSign, color: "text-blue-400", bg: "bg-blue-500/10" },
+        { label: "Valor por show-up", value: fmtBRL(valorPorShowup), icon: DollarSign, color: "text-violet-400", bg: "bg-violet-500/10" },
+        { label: "Conversão geral (agendada → venda)", value: pct(taxaFechamentoAgendadas), icon: Percent, color: "text-amber-400", bg: "bg-amber-500/10" },
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-accent" /> Painel SDR
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Métricas completas de calls e conversão {vendasLoading && "· carregando vendas..."}
+          </p>
+        </div>
+        <DateRangeFilter value={range} onChange={setRange} />
+      </div>
+
+      {groups.map((g) => (
+        <div key={g.title} className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.title}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {g.cards.map((c) => (
+              <Card key={c.label}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={"h-10 w-10 rounded-lg flex items-center justify-center " + c.bg + " " + c.color}>
+                      <c.icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">{c.label}</p>
+                      <p className="text-xl font-bold leading-tight">{c.value}</p>
+                      {c.sub && <p className="text-[11px] text-muted-foreground mt-0.5">{c.sub}</p>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <Card className="bg-muted/20">
+        <CardContent className="p-4 text-xs text-muted-foreground">
+          💡 <strong>Como lemos:</strong> uma call vira <strong>show-up</strong> quando você dispara o ShowUp no botão ⚡.
+          As métricas de venda vêm da base de vendas filtrada pelo mesmo período.
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
