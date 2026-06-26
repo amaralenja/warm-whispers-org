@@ -207,9 +207,7 @@ function RankingTV() {
         const nome = seller?.nome ?? "Nova venda";
         const expert = seller?.expert ?? null;
         const avatar = seller?.fotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=4ade80&color=000&size=200&bold=true`;
-        const pop: SalePop = { id: Date.now() + Math.random(), nome, expert, avatar, ticket, left: 20 + Math.random() * 60 };
-        setSalePops((prev) => [...prev, pop]);
-        setTimeout(() => setSalePops((prev) => prev.filter((p) => p.id !== pop.id)), 5200);
+        triggerSalePop({ nome, expert, avatar, ticket });
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vendas" }, () => {
         queryClient.invalidateQueries({ queryKey });
