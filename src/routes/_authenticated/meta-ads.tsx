@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Activity, ChevronRight, Megaphone, Layers, ImageIcon,
-  RefreshCw, Pencil, Loader2, Settings2, MousePointerClick,
+  RefreshCw, Pencil, Loader2, Settings2,
   Eye, PlayCircle, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -115,8 +116,8 @@ function MetricHeaders() {
 
 function MetaAdsManagerPage() {
   const [preset, setPreset] = useState<Preset>("last_7d");
-  const [campaignId, setCampaignId] = useState<string | null>(null);
-  const [adsetId, setAdsetId] = useState<string | null>(null);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [selectedAdsets, setSelectedAdsets] = useState<Set<string>>(new Set());
   const [previewAd, setPreviewAd] = useState<Ad | null>(null);
   const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
   const [pixelOpen, setPixelOpen] = useState(false);
@@ -137,18 +138,20 @@ function MetaAdsManagerPage() {
     staleTime: 30_000,
   });
 
-  const adsetsQ = useQuery({
-    queryKey: ["meta-ads", "adsets", campaignId, preset],
-    queryFn: () => listAdSetsFn({ data: { campaignId: campaignId!, datePreset: preset } }),
-    enabled: !!campaignId,
-    staleTime: 30_000,
+  const adsetsQueries = useQueries({
+    queries: Array.from(selectedCampaigns).map((cid) => ({
+      queryKey: ["meta-ads", "adsets", cid, preset],
+      queryFn: () => listAdSetsFn({ data: { campaignId: cid, datePreset: preset } }),
+      staleTime: 30_000,
+    })),
   });
 
-  const adsQ = useQuery({
-    queryKey: ["meta-ads", "ads", adsetId, preset],
-    queryFn: () => listAdsFn({ data: { adsetId: adsetId!, datePreset: preset } }),
-    enabled: !!adsetId,
-    staleTime: 30_000,
+  const adsQueries = useQueries({
+    queries: Array.from(selectedAdsets).map((aid) => ({
+      queryKey: ["meta-ads", "ads", aid, preset],
+      queryFn: () => listAdsFn({ data: { adsetId: aid, datePreset: preset } }),
+      staleTime: 30_000,
+    })),
   });
 
   const previewQ = useQuery({
@@ -162,13 +165,17 @@ function MetaAdsManagerPage() {
     () => (Array.isArray(campaignsQ.data) ? campaignsQ.data : []),
     [campaignsQ.data],
   );
+  const adsetsLoading = adsetsQueries.some((q) => q.isLoading);
+  const adsetsError = adsetsQueries.find((q) => q.error)?.error as Error | undefined;
   const adsets = useMemo(
-    () => (Array.isArray(adsetsQ.data) ? adsetsQ.data : []),
-    [adsetsQ.data],
+    () => adsetsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as AdSet[],
+    [adsetsQueries],
   );
+  const adsLoading = adsQueries.some((q) => q.isLoading);
+  const adsError = adsQueries.find((q) => q.error)?.error as Error | undefined;
   const ads = useMemo(
-    () => (Array.isArray(adsQ.data) ? adsQ.data : []),
-    [adsQ.data],
+    () => adsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as Ad[],
+    [adsQueries],
   );
 
   const toggleStatus = useMutation({
@@ -219,15 +226,27 @@ function MetaAdsManagerPage() {
     }
   }
 
-  function selectCampaign(id: string) {
-    setCampaignId(id);
-    setAdsetId(null);
-    setTab("adsets");
+  function toggleCampaign(id: string) {
+    setSelectedCampaigns((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    setSelectedAdsets(new Set());
   }
 
-  function selectAdset(id: string) {
-    setAdsetId(id);
-    setTab("ads");
+  function toggleAdset(id: string) {
+    setSelectedAdsets((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function clearAll() {
+    setSelectedCampaigns(new Set());
+    setSelectedAdsets(new Set());
+    setTab("campaigns");
   }
 
   return (
@@ -297,8 +316,8 @@ function MetaAdsManagerPage() {
       <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
         {([
           { v: "campaigns", label: "Campanhas", icon: Megaphone, disabled: false },
-          { v: "adsets", label: "Conjuntos", icon: Layers, disabled: !campaignId },
-          { v: "ads", label: "Anúncios", icon: ImageIcon, disabled: !adsetId },
+          { v: "adsets", label: `Conjuntos${selectedCampaigns.size ? ` (${selectedCampaigns.size})` : ""}`, icon: Layers, disabled: selectedCampaigns.size === 0 },
+          { v: "ads", label: `Anúncios${selectedAdsets.size ? ` (${selectedAdsets.size})` : ""}`, icon: ImageIcon, disabled: selectedAdsets.size === 0 },
         ] as const).map((t) => (
           <button
             key={t.v}
@@ -319,24 +338,28 @@ function MetaAdsManagerPage() {
       </div>
 
       {/* Breadcrumb sublevel */}
-      {(campaignId || adsetId) && (
+      {(selectedCampaigns.size > 0 || selectedAdsets.size > 0) && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <button onClick={() => { setCampaignId(null); setAdsetId(null); setTab("campaigns"); }} className="hover:text-foreground">
+          <button onClick={clearAll} className="hover:text-foreground">
             Todas campanhas
           </button>
-          {campaignId && (
+          {selectedCampaigns.size > 0 && (
             <>
               <ChevronRight className="h-3 w-3" />
               <span className="text-foreground">
-                {campaigns.find((c) => c.id === campaignId)?.name ?? "Campanha"}
+                {selectedCampaigns.size === 1
+                  ? campaigns.find((c) => selectedCampaigns.has(c.id))?.name ?? "Campanha"
+                  : `${selectedCampaigns.size} campanhas selecionadas`}
               </span>
             </>
           )}
-          {adsetId && (
+          {selectedAdsets.size > 0 && (
             <>
               <ChevronRight className="h-3 w-3" />
               <span className="text-foreground">
-                {adsets.find((a) => a.id === adsetId)?.name ?? "Conjunto"}
+                {selectedAdsets.size === 1
+                  ? adsets.find((a) => selectedAdsets.has(a.id))?.name ?? "Conjunto"
+                  : `${selectedAdsets.size} conjuntos selecionados`}
               </span>
             </>
           )}
@@ -366,27 +389,24 @@ function MetaAdsManagerPage() {
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhuma campanha encontrada</td></tr>
                 ) : (
                   campaigns.map((c: Campaign) => (
-                    <tr key={c.id} className={`group transition hover:bg-muted/30 ${campaignId === c.id ? "bg-accent/5" : ""}`}>
+                    <tr key={c.id} className={`group transition hover:bg-muted/30 ${selectedCampaigns.has(c.id) ? "bg-accent/5" : ""}`}>
                       <td className="px-3 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedCampaigns.has(c.id)}
+                            onCheckedChange={() => toggleCampaign(c.id)}
+                            aria-label="Selecionar campanha"
+                          />
                           <MetaToggle
                             active={c.status === "ACTIVE"}
                             disabled={toggleStatus.isPending}
                             onToggle={() => toggleStatus.mutate({ id: c.id, status: c.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
                           />
-                          <button
-                            type="button"
-                            onClick={() => selectCampaign(c.id)}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                          >
-                            <MousePointerClick className="h-3.5 w-3.5" />
-                            Selecionar
-                          </button>
                         </div>
                       </td>
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => selectCampaign(c.id)}
+                          onClick={() => toggleCampaign(c.id)}
                           className="flex items-center gap-2 text-left font-medium hover:text-accent"
                         >
                           <StatusDot effective={c.effectiveStatus} />
@@ -427,35 +447,32 @@ function MetaAdsManagerPage() {
                 ))}
 
               {tab === "adsets" &&
-                (adsetsQ.isLoading ? (
+                (adsetsLoading ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
-                ) : adsetsQ.error ? (
-                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsetsQ.error as any)?.message ?? "Erro ao carregar conjuntos"}</td></tr>
+                ) : adsetsError ? (
+                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsetsError as any)?.message ?? "Erro ao carregar conjuntos"}</td></tr>
                 ) : !adsets.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum conjunto</td></tr>
                 ) : (
                   adsets.map((a: AdSet) => (
-                    <tr key={a.id} className={`group transition hover:bg-muted/30 ${adsetId === a.id ? "bg-accent/5" : ""}`}>
+                    <tr key={a.id} className={`group transition hover:bg-muted/30 ${selectedAdsets.has(a.id) ? "bg-accent/5" : ""}`}>
                       <td className="px-3 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedAdsets.has(a.id)}
+                            onCheckedChange={() => toggleAdset(a.id)}
+                            aria-label="Selecionar conjunto"
+                          />
                           <MetaToggle
                             active={a.status === "ACTIVE"}
                             disabled={toggleStatus.isPending}
                             onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
                           />
-                          <button
-                            type="button"
-                            onClick={() => selectAdset(a.id)}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                          >
-                            <MousePointerClick className="h-3.5 w-3.5" />
-                            Selecionar
-                          </button>
                         </div>
                       </td>
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => selectAdset(a.id)}
+                          onClick={() => toggleAdset(a.id)}
                           className="flex items-center gap-2 text-left font-medium hover:text-accent"
                         >
                           <StatusDot effective={a.effectiveStatus} />
@@ -489,10 +506,10 @@ function MetaAdsManagerPage() {
                 ))}
 
               {tab === "ads" &&
-                (adsQ.isLoading ? (
+                (adsLoading ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
-                ) : adsQ.error ? (
-                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsQ.error as any)?.message ?? "Erro ao carregar anúncios"}</td></tr>
+                ) : adsError ? (
+                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsError as any)?.message ?? "Erro ao carregar anúncios"}</td></tr>
                 ) : !ads.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum anúncio</td></tr>
                 ) : (
