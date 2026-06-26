@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
+import { LeadSearchPicker } from "@/components/lead-search-picker";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 
 import { Button } from "@/components/ui/button";
@@ -373,14 +374,31 @@ function CalendarPage() {
                         )}
                       </div>
                     ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setForm({ ...form, attendees: [...form.attendees, ""] })}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar convidado
-                    </Button>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setForm({ ...form, attendees: [...form.attendees, ""] })}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar convidado
+                      </Button>
+                      <LeadSearchPicker
+                        onPick={(lead) => {
+                          if (!lead.email) {
+                            toast.error("Esse lead não tem e-mail cadastrado");
+                            return;
+                          }
+                          const emails = form.attendees.filter((e) => e.trim());
+                          if (emails.includes(lead.email)) {
+                            toast.info("Lead já adicionado");
+                            return;
+                          }
+                          setForm({ ...form, attendees: [...emails, lead.email, ""] });
+                          toast.success(`${lead.nome || lead.email} adicionado`);
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div>
