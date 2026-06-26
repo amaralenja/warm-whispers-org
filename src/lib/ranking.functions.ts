@@ -62,7 +62,9 @@ export const getRankingStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: RankingInput | undefined) => input ?? {})
   .handler(async (opts): Promise<RankingPayload> => {
-    const { supabase } = opts.context;
+    const context = opts?.context;
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
+    const { supabase } = context;
     const data = opts.data ?? {};
     const expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
     const fromTs = data.from ? isoToTs(data.from) : null;
