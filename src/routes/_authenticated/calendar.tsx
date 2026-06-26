@@ -33,7 +33,7 @@ import {
   LayoutGrid,
   Zap,
 } from "lucide-react";
-import { ShowUpDialog, getEventLink } from "@/components/showup-dialog";
+import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
