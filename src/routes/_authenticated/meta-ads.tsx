@@ -116,8 +116,8 @@ function MetricHeaders() {
 
 function MetaAdsManagerPage() {
   const [preset, setPreset] = useState<Preset>("last_7d");
-  const [campaignId, setCampaignId] = useState<string | null>(null);
-  const [adsetId, setAdsetId] = useState<string | null>(null);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [selectedAdsets, setSelectedAdsets] = useState<Set<string>>(new Set());
   const [previewAd, setPreviewAd] = useState<Ad | null>(null);
   const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
   const [pixelOpen, setPixelOpen] = useState(false);
