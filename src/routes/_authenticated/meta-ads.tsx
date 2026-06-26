@@ -506,10 +506,10 @@ function MetaAdsManagerPage() {
                 ))}
 
               {tab === "ads" &&
-                (adsQ.isLoading ? (
+                (adsLoading ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
-                ) : adsQ.error ? (
-                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsQ.error as any)?.message ?? "Erro ao carregar anúncios"}</td></tr>
+                ) : adsError ? (
+                  <tr><td colSpan={12} className="py-10 text-center text-destructive text-xs">{(adsError as any)?.message ?? "Erro ao carregar anúncios"}</td></tr>
                 ) : !ads.length ? (
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhum anúncio</td></tr>
                 ) : (
