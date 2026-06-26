@@ -274,7 +274,94 @@ function CRMPage() {
         onDelete={editing ? () => remove.mutate(editing.id) : undefined}
         loading={upsert.isPending}
       />
+
+      <ApiKeysDialog open={apiKeysOpen} onClose={() => setApiKeysOpen(false)} />
     </div>
+  );
+}
+
+// ---------- API Keys Dialog ----------
+function ApiKeysDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+
+  const { data: experts = [] } = useQuery({
+    queryKey: ["experts-crm-keys"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("experts")
+        .select("id, nome, ativo, crm_api_key")
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as { id: number; nome: string; ativo: boolean; crm_api_key: string | null }[];
+    },
+    enabled: open,
+  });
+
+  const save = useMutation({
+    mutationFn: async (payload: { id: number; key: string }) => {
+      const { error } = await supabase
+        .from("experts")
+        .update({ crm_api_key: payload.key || null })
+        .eq("id", payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["experts-crm-keys"] });
+      toast.success("API Key salva");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>API Keys do CRM Leads X1</DialogTitle>
+          <DialogDescription>
+            Cole o Bearer Token de cada operação para puxar os leads automaticamente no CRM.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          {experts.filter((e) => e.ativo).map((ex) => {
+            const current = drafts[ex.id] ?? ex.crm_api_key ?? "";
+            return (
+              <div key={ex.id} className="rounded-lg border border-border p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-medium">{ex.nome}</span>
+                  {ex.crm_api_key && (
+                    <Badge variant="secondary" className="text-xs">
+                      ••••{ex.crm_api_key.slice(-6)}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    placeholder="Bearer token…"
+                    value={current}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [ex.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => save.mutate({ id: ex.id, key: current })}
+                    disabled={save.isPending}
+                  >
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {!experts.length && (
+            <p className="text-sm text-muted-foreground">Nenhuma operação ativa cadastrada.</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
