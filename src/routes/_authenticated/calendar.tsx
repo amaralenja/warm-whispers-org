@@ -46,7 +46,8 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 
-import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
+import { ShowUpDialog, getEventLink, getAllEventLinks, getNoShow, getAllNoShows, markNoShow, unmarkNoShow } from "@/components/showup-dialog";
+import { UserX } from "lucide-react";
 import { LeadSearchPicker } from "@/components/lead-search-picker";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 import { DateTimePicker } from "@/components/datetime-picker";
@@ -710,6 +711,7 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
     const from = range.from ? new Date(range.from + "T00:00:00") : null;
     const to = range.to ? new Date(range.to + "T23:59:59") : null;
     const links = getAllEventLinks();
+    const noshows = getAllNoShows();
     let agendadas = 0;
     let showup = 0;
     let noshow = 0;
@@ -722,7 +724,9 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
       agendadas++;
       const past = d < now;
       const linked = !!links[ev.id];
-      if (past && linked) showup++;
+      const isNoShow = !!noshows[ev.id];
+      if (isNoShow) noshow++;
+      else if (past && linked) showup++;
       else if (past && !linked) noshow++;
       else if (!past) proximas++;
     }
@@ -767,11 +771,13 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
 
 function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void }) {
   const [showUpOpen, setShowUpOpen] = useState(false);
+  const [, force] = useState(0);
   const c = colorFor(ev);
   const time = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "";
   const person = personLabel(ev);
   const title = ev.summary || "(sem título)";
   const link = getEventLink(ev.id);
+  const noShow = getNoShow(ev.id);
   const guest = guestOf(ev);
   const attendeeEmail = guest?.email;
   const attendeeName = guest?.displayName;
@@ -802,9 +808,24 @@ function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void 
         >
           <Zap className="h-3 w-3" />
         </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (noShow) { unmarkNoShow(ev.id); toast.success("NoShow removido"); }
+            else { markNoShow(ev.id); toast.success("Marcado como NoShow"); }
+            force((n) => n + 1);
+          }}
+          className={`opacity-0 group-hover/chip:opacity-100 transition shrink-0 rounded p-0.5 hover:bg-black/30 ${noShow ? "text-rose-300" : "text-muted-foreground"}`}
+          title={noShow ? "Desmarcar NoShow" : "Marcar como NoShow"}
+        >
+          <UserX className="h-3 w-3" />
+        </button>
       </div>
       {person && time && (
         <p className={`truncate text-[10px] opacity-80 ${c.text}`}>{title}</p>
+      )}
+      {noShow && (
+        <span className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-background" title="NoShow" />
       )}
       {link && (
         <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-background" />
@@ -830,12 +851,14 @@ function EventRow({
   onDelete: () => void;
 }) {
   const [showUpOpen, setShowUpOpen] = useState(false);
+  const [, force] = useState(0);
   const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
   const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
   const guest = guestOf(ev);
   const attendeeEmail = guest?.email;
   const attendeeName = guest?.displayName;
   const link = getEventLink(ev.id);
+  const noShow = getNoShow(ev.id);
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:border-accent/40">
@@ -863,6 +886,9 @@ function EventRow({
             ✓ Vinculado: {link.nome || link.email}
           </p>
         )}
+        {noShow && (
+          <p className="mt-0.5 text-xs text-rose-400">✗ Marcado como NoShow</p>
+        )}
       </div>
       <div className="flex items-center gap-1">
         <Button
@@ -873,6 +899,20 @@ function EventRow({
         >
           <Zap className="h-3.5 w-3.5" />
           <span className="text-xs font-semibold">{link ? "Re-disparar" : "ShowUp"}</span>
+        </Button>
+        <Button
+          size="sm"
+          variant={noShow ? "destructive" : "outline"}
+          onClick={() => {
+            if (noShow) { unmarkNoShow(ev.id); toast.success("NoShow removido"); }
+            else { markNoShow(ev.id); toast.success("Marcado como NoShow"); }
+            force((n) => n + 1);
+          }}
+          className="h-8 gap-1.5 px-2.5"
+          title={noShow ? "Desmarcar NoShow" : "Marcar como NoShow"}
+        >
+          <UserX className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold">{noShow ? "NoShow ✓" : "NoShow"}</span>
         </Button>
         {ev.htmlLink && (
           <a href={ev.htmlLink} target="_blank" rel="noreferrer" className="rounded p-2 hover:bg-muted">
@@ -932,6 +972,7 @@ function MetricsView({
     const from = range.from ? new Date(range.from + "T00:00:00") : null;
     const to = range.to ? new Date(range.to + "T23:59:59") : null;
     const links = getAllEventLinks();
+    const noshows = getAllNoShows();
     let agendadas = 0;
     let proximas = 0;
     let realizadas = 0;
@@ -945,9 +986,13 @@ function MetricsView({
       if (to && d > to) continue;
       agendadas++;
       const linked = !!links[ev.id];
+      const isNoShow = !!noshows[ev.id];
       if (linked) linkadas++;
       const past = d < now;
-      if (past) {
+      if (isNoShow) {
+        realizadas++;
+        noshow++;
+      } else if (past) {
         realizadas++;
         if (linked) showup++;
         else noshow++;
