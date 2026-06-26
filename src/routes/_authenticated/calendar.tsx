@@ -307,7 +307,7 @@ function CalendarPage() {
             <CalendarIcon className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Calendário Calls</h1>
             <p className="text-sm text-muted-foreground">
               Google Agenda — sincronizado em tempo real
             </p>
