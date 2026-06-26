@@ -336,6 +336,16 @@ function CalendarPage() {
             >
               <List className="h-4 w-4" /> Lista
             </button>
+            <button
+              onClick={() => setView("metrics")}
+              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition ${
+                view === "metrics"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" /> Métricas
+            </button>
           </div>
 
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
