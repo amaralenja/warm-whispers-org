@@ -36,7 +36,15 @@ import {
   XCircle,
   CalendarClock,
   X,
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  Target,
+  Percent,
+  PhoneCall,
 } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
 
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
 import { LeadSearchPicker } from "@/components/lead-search-picker";
