@@ -503,38 +503,8 @@ function CalendarPage() {
               );
             })}
           </div>
-
-
-          {/* Selected day panel */}
-          {selectedDay && (
-            <div className="border-t border-border bg-card/60 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold capitalize">
-                  {format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                </h3>
-                <Button size="sm" variant="outline" onClick={() => openCreate(selectedDay)}>
-                  <Plus className="mr-1 h-3 w-3" /> Adicionar
-                </Button>
-              </div>
-              {selectedDayEvents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
-              ) : (
-                <div className="space-y-2">
-                  {selectedDayEvents.map((ev) => (
-                    <EventRow
-                      key={ev.id}
-                      ev={ev}
-                      onEdit={() => openEdit(ev)}
-                      onDelete={() => {
-                        if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </Card>
+
       ) : (
         <div className="space-y-4">
           {isLoading ? (
