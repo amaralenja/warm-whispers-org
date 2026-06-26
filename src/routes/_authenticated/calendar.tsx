@@ -666,7 +666,7 @@ function CalendarPage() {
             ))
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
