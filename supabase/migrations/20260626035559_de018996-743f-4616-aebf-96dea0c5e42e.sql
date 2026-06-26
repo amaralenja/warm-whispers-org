@@ -1,0 +1,1 @@
+ALTER TABLE public.experts ADD COLUMN IF NOT EXISTS quiz_api_key text;

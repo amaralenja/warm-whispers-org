@@ -370,6 +370,7 @@ export type Database = {
           meta_nivel2: number
           meta_nivel3: number
           nome: string
+          quiz_api_key: string | null
         }
         Insert: {
           ativo?: boolean | null
@@ -382,6 +383,7 @@ export type Database = {
           meta_nivel2?: number
           meta_nivel3?: number
           nome: string
+          quiz_api_key?: string | null
         }
         Update: {
           ativo?: boolean | null
@@ -394,6 +396,7 @@ export type Database = {
           meta_nivel2?: number
           meta_nivel3?: number
           nome?: string
+          quiz_api_key?: string | null
         }
         Relationships: []
       }
