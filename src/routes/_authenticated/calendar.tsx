@@ -218,13 +218,6 @@ function CalendarPage() {
     ? eventsByDay.get(format(selectedDay, "yyyy-MM-dd")) || []
     : [];
 
-  function quickShowUp(ev: CalendarEvent) {
-    // open edit-with-showup via EventRow path: easiest is to set selected day and let user click
-    const d = evDate(ev);
-    setSelectedDay(d);
-  }
-  void quickShowUp;
-
   return (
     <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
