@@ -23,12 +23,16 @@ function colorFor(i: number) {
   return PALETTE[i % PALETTE.length];
 }
 
-function initials(s: string) {
-  const t = s.replace(/[^a-zA-Z0-9 ]/g, "").trim();
+function initials(s: unknown) {
+  const str = typeof s === "string" ? s : s == null ? "" : String(s);
+  const t = str.replace(/[^a-zA-Z0-9 ]/g, "").trim();
   if (!t) return "?";
   const parts = t.split(/\s+/);
   if (parts.length === 1) return t.slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+function asStr(v: unknown) {
+  return typeof v === "string" ? v : v == null ? "" : String(v);
 }
 
 export function ParticipacaoVendedores({
