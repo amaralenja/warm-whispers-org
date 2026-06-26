@@ -547,9 +547,113 @@ function MetaAdsManagerPage() {
         error={previewQ.error as Error | null}
         onOpenChange={(open) => !open && setPreviewAd(null)}
       />
+      <PixelConfigDialog open={pixelOpen} onOpenChange={setPixelOpen} />
     </div>
   );
 }
+
+function PixelConfigDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const getCfg = useServerFn(getMetaAdsConfig);
+  const saveCfg = useServerFn(saveMetaAdsConfig);
+  const qc = useQueryClient();
+  const cfgQ = useQuery({
+    queryKey: ["meta-ads-config"],
+    queryFn: () => getCfg(),
+    enabled: open,
+  });
+  const [pixelId, setPixelId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [testEventCode, setTestEventCode] = useState("");
+
+  useEffect(() => {
+    if (cfgQ.data) {
+      setPixelId(cfgQ.data.pixelId ?? "");
+      setTestEventCode(cfgQ.data.testEventCode ?? "");
+      setAccessToken("");
+    }
+  }, [cfgQ.data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      saveCfg({ data: { pixelId, accessToken: accessToken || undefined, testEventCode } }),
+    onSuccess: () => {
+      toast.success("Pixel salvo! Eventos de Purchase e ShowUp vão usar essa config.");
+      qc.invalidateQueries({ queryKey: ["meta-ads-config"] });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message || "Erro ao salvar"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-accent" /> Configurar Pixel
+          </DialogTitle>
+          <DialogDescription>
+            Pixel da Meta usado pra mandar eventos de <strong>Purchase</strong> (Chase) e <strong>ShowUp</strong> via Conversions API.
+          </DialogDescription>
+        </DialogHeader>
+
+        {cfgQ.isLoading ? (
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando...
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Pixel ID *</label>
+              <Input
+                value={pixelId}
+                onChange={(e) => setPixelId(e.target.value)}
+                placeholder="1234567890"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Access Token {cfgQ.data?.hasToken && <span className="text-emerald-500">(já configurado — preencha só se quiser trocar)</span>}
+              </label>
+              <Input
+                type="password"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                placeholder={cfgQ.data?.hasToken ? "•••••••••• (deixa vazio pra manter)" : "EAAG..."}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Test Event Code (opcional)</label>
+              <Input
+                value={testEventCode}
+                onChange={(e) => setTestEventCode(e.target.value)}
+                placeholder="TEST12345"
+              />
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={!pixelId || save.isPending || (cfgQ.isLoading)}
+          >
+            {save.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</>
+            ) : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function AdPreviewDialog({
   ad,
