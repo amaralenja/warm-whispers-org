@@ -201,7 +201,6 @@ function CalendarPage() {
         start: fromLocalInput(f.start),
         end: fromLocalInput(f.end),
         attendees: f.attendees
-          .split(/[,;\s]+/)
           .map((s) => s.trim())
           .filter((s) => s.includes("@")),
       };
