@@ -35,6 +35,8 @@ import {
   CheckCircle2,
   XCircle,
   CalendarClock,
+  Plus,
+  X,
 } from "lucide-react";
 
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
