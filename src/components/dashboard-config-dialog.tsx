@@ -11,12 +11,14 @@ type Props = {
   scopedName?: string;
 };
 
-function accentFor(name: string): string {
+function accentFor(name?: string | null): string {
   const bases = BASE_WORKSPACES ?? [];
+  const accents = ACCENTS ?? [];
+  const fallback = accents[0]?.hex ?? "#e94560";
+  if (!name || typeof name !== "string") return fallback;
   const base = bases.find((b) => b.nome === name);
   if (base) return base.accent.hex;
-  const accents = ACCENTS ?? [];
-  if (accents.length === 0) return "#e94560";
+  if (accents.length === 0) return fallback;
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return accents[h % accents.length].hex;
