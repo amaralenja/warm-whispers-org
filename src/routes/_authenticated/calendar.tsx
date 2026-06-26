@@ -41,6 +41,7 @@ import {
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
 import { LeadSearchPicker } from "@/components/lead-search-picker";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
+import { DateTimePicker } from "@/components/datetime-picker";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -317,18 +318,16 @@ function CalendarPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Início</Label>
-                    <Input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={form.start}
-                      onChange={(e) => setForm({ ...form, start: e.target.value })}
+                      onChange={(v) => setForm({ ...form, start: v })}
                     />
                   </div>
                   <div>
                     <Label>Fim</Label>
-                    <Input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={form.end}
-                      onChange={(e) => setForm({ ...form, end: e.target.value })}
+                      onChange={(v) => setForm({ ...form, end: v })}
                     />
                   </div>
                 </div>
