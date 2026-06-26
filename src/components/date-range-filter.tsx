@@ -78,12 +78,6 @@ function fmtBR(s: string) {
   return `${d}/${m}/${y.slice(2)}`;
 }
 
-function parseISO(s: string | null): Date | undefined {
-  if (!s) return undefined;
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
 export function DateRangeFilter({
   value,
   onChange,
