@@ -389,27 +389,24 @@ function MetaAdsManagerPage() {
                   <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">Nenhuma campanha encontrada</td></tr>
                 ) : (
                   campaigns.map((c: Campaign) => (
-                    <tr key={c.id} className={`group transition hover:bg-muted/30 ${campaignId === c.id ? "bg-accent/5" : ""}`}>
+                    <tr key={c.id} className={`group transition hover:bg-muted/30 ${selectedCampaigns.has(c.id) ? "bg-accent/5" : ""}`}>
                       <td className="px-3 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedCampaigns.has(c.id)}
+                            onCheckedChange={() => toggleCampaign(c.id)}
+                            aria-label="Selecionar campanha"
+                          />
                           <MetaToggle
                             active={c.status === "ACTIVE"}
                             disabled={toggleStatus.isPending}
                             onToggle={() => toggleStatus.mutate({ id: c.id, status: c.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
                           />
-                          <button
-                            type="button"
-                            onClick={() => selectCampaign(c.id)}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                          >
-                            <MousePointerClick className="h-3.5 w-3.5" />
-                            Selecionar
-                          </button>
                         </div>
                       </td>
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => selectCampaign(c.id)}
+                          onClick={() => toggleCampaign(c.id)}
                           className="flex items-center gap-2 text-left font-medium hover:text-accent"
                         >
                           <StatusDot effective={c.effectiveStatus} />
