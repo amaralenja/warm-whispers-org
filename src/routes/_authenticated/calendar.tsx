@@ -105,6 +105,35 @@ function evDate(ev: CalendarEvent) {
   return new Date(ev.start.dateTime || ev.start.date || "");
 }
 
+// Distinct, high-contrast color per attendee/title — deterministic hash
+const EVENT_PALETTE = [
+  { bg: "bg-rose-500/25",    border: "border-rose-400",    text: "text-rose-100",    dot: "bg-rose-400" },
+  { bg: "bg-amber-500/25",   border: "border-amber-400",   text: "text-amber-100",   dot: "bg-amber-400" },
+  { bg: "bg-emerald-500/25", border: "border-emerald-400", text: "text-emerald-100", dot: "bg-emerald-400" },
+  { bg: "bg-sky-500/25",     border: "border-sky-400",     text: "text-sky-100",     dot: "bg-sky-400" },
+  { bg: "bg-violet-500/25",  border: "border-violet-400",  text: "text-violet-100",  dot: "bg-violet-400" },
+  { bg: "bg-pink-500/25",    border: "border-pink-400",    text: "text-pink-100",    dot: "bg-pink-400" },
+  { bg: "bg-cyan-500/25",    border: "border-cyan-400",    text: "text-cyan-100",    dot: "bg-cyan-400" },
+  { bg: "bg-orange-500/25",  border: "border-orange-400",  text: "text-orange-100",  dot: "bg-orange-400" },
+  { bg: "bg-lime-500/25",    border: "border-lime-400",    text: "text-lime-100",    dot: "bg-lime-400" },
+  { bg: "bg-fuchsia-500/25", border: "border-fuchsia-400", text: "text-fuchsia-100", dot: "bg-fuchsia-400" },
+];
+
+function colorKeyFor(ev: CalendarEvent): string {
+  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  return (att?.displayName || att?.email || ev.summary || ev.id || "x").toLowerCase().trim();
+}
+function colorFor(ev: CalendarEvent) {
+  const key = colorKeyFor(ev);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return EVENT_PALETTE[h % EVENT_PALETTE.length];
+}
+function personLabel(ev: CalendarEvent): string {
+  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  return att?.displayName || att?.email?.split("@")[0] || "";
+}
+
 function CalendarPage() {
   const qc = useQueryClient();
   const list = useServerFn(listEvents);
