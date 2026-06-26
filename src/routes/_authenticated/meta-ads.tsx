@@ -316,8 +316,8 @@ function MetaAdsManagerPage() {
       <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
         {([
           { v: "campaigns", label: "Campanhas", icon: Megaphone, disabled: false },
-          { v: "adsets", label: "Conjuntos", icon: Layers, disabled: !campaignId },
-          { v: "ads", label: "Anúncios", icon: ImageIcon, disabled: !adsetId },
+          { v: "adsets", label: `Conjuntos${selectedCampaigns.size ? ` (${selectedCampaigns.size})` : ""}`, icon: Layers, disabled: selectedCampaigns.size === 0 },
+          { v: "ads", label: `Anúncios${selectedAdsets.size ? ` (${selectedAdsets.size})` : ""}`, icon: ImageIcon, disabled: selectedAdsets.size === 0 },
         ] as const).map((t) => (
           <button
             key={t.v}
