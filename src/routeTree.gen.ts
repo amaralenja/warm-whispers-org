@@ -16,11 +16,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
-import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedMetaAdsConversoesRouteImport } from './routes/_authenticated/meta-ads.conversoes'
 
 const RankingTvRoute = RankingTvRouteImport.update({
   id: '/ranking-tv',
@@ -56,11 +56,6 @@ const AuthenticatedQuizRoute = AuthenticatedQuizRouteImport.update({
   path: '/quiz',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedMetaAdsRoute = AuthenticatedMetaAdsRouteImport.update({
-  id: '/meta-ads',
-  path: '/meta-ads',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
@@ -81,6 +76,12 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMetaAdsConversoesRoute =
+  AuthenticatedMetaAdsConversoesRouteImport.update({
+    id: '/meta-ads/conversoes',
+    path: '/meta-ads/conversoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -90,10 +91,10 @@ export interface FileRoutesByFullPath {
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
-  '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/meta-ads/conversoes': typeof AuthenticatedMetaAdsConversoesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -103,10 +104,10 @@ export interface FileRoutesByTo {
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
-  '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/meta-ads/conversoes': typeof AuthenticatedMetaAdsConversoesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,10 +119,10 @@ export interface FileRoutesById {
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
-  '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/_authenticated/meta-ads/conversoes': typeof AuthenticatedMetaAdsConversoesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -133,10 +134,10 @@ export interface FileRouteTypes {
     | '/crm'
     | '/dashboard'
     | '/financeiro'
-    | '/meta-ads'
     | '/quiz'
     | '/ranking'
     | '/relatorios'
+    | '/meta-ads/conversoes'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -146,10 +147,10 @@ export interface FileRouteTypes {
     | '/crm'
     | '/dashboard'
     | '/financeiro'
-    | '/meta-ads'
     | '/quiz'
     | '/ranking'
     | '/relatorios'
+    | '/meta-ads/conversoes'
   id:
     | '__root__'
     | '/'
@@ -160,10 +161,10 @@ export interface FileRouteTypes {
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
-    | '/_authenticated/meta-ads'
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
+    | '/_authenticated/meta-ads/conversoes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -224,13 +225,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedQuizRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/meta-ads': {
-      id: '/_authenticated/meta-ads'
-      path: '/meta-ads'
-      fullPath: '/meta-ads'
-      preLoaderRoute: typeof AuthenticatedMetaAdsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/financeiro': {
       id: '/_authenticated/financeiro'
       path: '/financeiro'
@@ -259,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meta-ads/conversoes': {
+      id: '/_authenticated/meta-ads/conversoes'
+      path: '/meta-ads/conversoes'
+      fullPath: '/meta-ads/conversoes'
+      preLoaderRoute: typeof AuthenticatedMetaAdsConversoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -267,10 +268,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
-  AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
+  AuthenticatedMetaAdsConversoesRoute: typeof AuthenticatedMetaAdsConversoesRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -278,10 +279,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
-  AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
+  AuthenticatedMetaAdsConversoesRoute: AuthenticatedMetaAdsConversoesRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
