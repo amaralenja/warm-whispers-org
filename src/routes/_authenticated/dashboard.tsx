@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Coins, ArrowUpRight, Users, Settings, Sparkles } from "lucide-react";
+import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Coins, ArrowUpRight, Users, Settings, Sparkles, Zap } from "lucide-react";
 import { getOperacoesStats, type ExpertStats } from "@/lib/operacoes.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useDashboardConfig } from "@/lib/dashboard-config";
@@ -180,6 +180,11 @@ function Dashboard() {
                   )}
                 </div>
               </section>
+            )}
+
+            {/* Comparativo de Operações — só na visão geral */}
+            {workspace.id === "all" && (
+              <ComparativoOperacoes experts={experts} totalFat={totalFat} loading={isLoading} />
             )}
 
             {/* Desempenho diário */}
@@ -394,5 +399,60 @@ function MiniCard({
       <div className={`mt-3 text-2xl ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
       <div className="mt-1 text-[0.7rem] text-muted-foreground">{hint}</div>
     </div>
+  );
+}
+
+function ComparativoOperacoes({
+  experts, totalFat, loading,
+}: { experts: ExpertStats[]; totalFat: number; loading: boolean }) {
+  const visible = experts.filter((e) => e.faturamento > 0 || e.vendas > 0);
+  if (!loading && visible.length === 0) return null;
+
+  const BAR_COLOR: Record<string, string> = {
+    Caio: "bg-indigo-400",
+    Gustavo: "bg-amber-400",
+    Jessica: "bg-emerald-400",
+  };
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border bg-card/40 p-5">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Zap className="h-3.5 w-3.5 text-amber-400" />
+        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Comparativo de Operações</span>
+      </div>
+
+      {loading ? (
+        <div className="mt-4 space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-10 animate-pulse rounded bg-secondary/20" />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {[...visible].sort((a, b) => b.faturamento - a.faturamento).map((e) => {
+            const pct = totalFat > 0 ? (e.faturamento / totalFat) * 100 : 0;
+            const color = BAR_COLOR[e.nome] ?? "bg-accent";
+            return (
+              <div key={e.id}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold">{e.nome}</span>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="text-muted-foreground">{e.vendas} vendas</span>
+                    <span className={`${NUM} text-foreground`}>{BRL(e.faturamento)}</span>
+                    <span className="w-12 text-right text-muted-foreground">{pct.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-secondary/40">
+                  <div
+                    className={`h-full rounded-full ${color} transition-all`}
+                    style={{ width: `${Math.min(100, pct)}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
