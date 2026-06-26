@@ -204,9 +204,10 @@ function RankingTV() {
 
   const ranking = data?.ranking ?? [];
   useEffect(() => { rankingRef.current = ranking; }, [ranking]);
-  const ranked = ranking.filter((v: any) => Number(v.faturamento) > 0);
-  const top3 = ranked.slice(0, 3);
-  const rest = ranked.slice(3, 10);
+  const withSales = ranking.filter((v: any) => Number(v.faturamento) > 0);
+  const top3 = withSales.slice(0, 3);
+  const top3Utms = new Set(top3.map((v: any) => v.utm));
+  const rest = ranking.filter((v: any) => !top3Utms.has(v.utm)).slice(0, 10);
   const metaLogs = data?.metaLogs ?? [];
   const hitCount = metaLogs.filter((l) => l.batida).length;
 
