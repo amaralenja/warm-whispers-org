@@ -14,6 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Users,
   TrendingUp,
   Facebook,
@@ -32,6 +39,8 @@ import {
   List as ListIcon,
   CheckCircle2,
   XCircle,
+  DollarSign,
+  Eye,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
 
