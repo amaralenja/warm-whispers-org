@@ -108,7 +108,7 @@ function CRMPage() {
   const upsert = useMutation({
     mutationFn: async (lead: Partial<Lead> & { id?: string }) => {
       if (lead.id) {
-        const { error } = await supabase.from("crm_leads").update(lead).eq("id", lead.id);
+        const { error } = await supabase.from("crm_leads").update(lead as any).eq("id", lead.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("crm_leads").insert(lead as any);
