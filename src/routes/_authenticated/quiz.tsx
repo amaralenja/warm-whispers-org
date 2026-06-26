@@ -288,6 +288,7 @@ function QuizPage() {
   const [view, setView] = useState<ViewMode>("kanban");
   const [reality, setReality] = useState<RealityFilter>("all");
   const [overrides, setOverrides] = useState<Record<string, Reality>>(() => loadOverrides());
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   function setLeadReality(id: string, r: Reality | null) {
     setOverrides((prev) => {
