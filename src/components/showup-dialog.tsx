@@ -84,15 +84,47 @@ export function ShowUpDialog({
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<QuizLead | null>(null);
 
+  // Form editável — usado no disparo
+  const [form, setForm] = useState({
+    nome: "",
+    email: "",
+    whatsapp: "",
+    fbp: "",
+    fbc: "",
+    externalId: "",
+  });
+
   // Auto-pré-carrega link salvo e busca por email do convidado
   useEffect(() => {
     if (!open) return;
     setSelected(null);
+    setResults([]);
+    setForm({
+      nome: defaultName || "",
+      email: defaultEmail || "",
+      whatsapp: "",
+      fbp: "",
+      fbc: "",
+      externalId: "",
+    });
     const saved = getEventLink(eventId);
     const initial = saved?.email || defaultEmail || defaultName || "";
     setQuery(initial);
     if (initial) doSearch(initial);
   }, [open, eventId, defaultEmail, defaultName]);
+
+  // Quando seleciona um lead, popula o form
+  useEffect(() => {
+    if (!selected) return;
+    setForm({
+      nome: selected.nome ?? "",
+      email: selected.email ?? "",
+      whatsapp: selected.whatsapp ?? "",
+      fbp: selected.fbp ?? "",
+      fbc: selected.fbc ?? "",
+      externalId: selected.id,
+    });
+  }, [selected]);
 
   async function doSearch(term: string) {
     const t = term.trim();
@@ -111,7 +143,6 @@ export function ShowUpDialog({
       if (error) throw error;
       const rows = (data ?? []) as QuizLead[];
       setResults(rows);
-      // auto-pick se exato
       const exact = rows.find((r) => (r.email ?? "").toLowerCase() === t.toLowerCase());
       if (exact && !selected) setSelected(exact);
     } catch (e: any) {
@@ -123,19 +154,21 @@ export function ShowUpDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!selected) throw new Error("Selecione um lead");
-      const [firstName, ...rest] = (selected.nome ?? "").trim().split(/\s+/);
+      if (!form.email && !form.whatsapp) {
+        throw new Error("Informe pelo menos email ou whatsapp");
+      }
+      const [firstName, ...rest] = form.nome.trim().split(/\s+/);
       const lastName = rest.join(" ");
       return send({
         data: {
           eventName: "ShowUp",
-          email: selected.email ?? "",
-          phone: selected.whatsapp ?? undefined,
+          email: form.email,
+          phone: form.whatsapp || undefined,
           firstName: firstName || undefined,
           lastName: lastName || undefined,
-          externalId: selected.id,
-          fbp: selected.fbp ?? undefined,
-          fbc: selected.fbc ?? undefined,
+          externalId: form.externalId || form.email || undefined,
+          fbp: form.fbp || undefined,
+          fbc: form.fbc || undefined,
         },
       });
     },
@@ -148,103 +181,167 @@ export function ShowUpDialog({
   });
 
   const matchScore = useMemo(() => {
-    if (!selected) return 0;
     let s = 10;
-    if (selected.email) s += 28;
-    if (selected.whatsapp) s += 28;
-    if (selected.nome) s += 12;
-    if (selected.fbp) s += 8;
-    if (selected.fbc) s += 8;
+    if (form.email) s += 25;
+    if (form.whatsapp) s += 22;
+    if (form.nome) s += 10;
+    if (form.fbp) s += 15;
+    if (form.fbc) s += 18;
     return Math.min(100, s);
-  }, [selected]);
+  }, [form]);
+
+  const scoreColor =
+    matchScore >= 80 ? "bg-emerald-500/20 text-emerald-300"
+    : matchScore >= 50 ? "bg-amber-500/20 text-amber-300"
+    : "bg-rose-500/20 text-rose-300";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-amber-400" />
-            Disparar ShowUp pro Facebook
+            Conferir dados e disparar ShowUp
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && doSearch(query)}
-              placeholder="Buscar lead no Quiz por email, nome ou whatsapp…"
-              className="pl-8"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7"
-              onClick={() => doSearch(query)}
-              disabled={searching}
-            >
-              {searching ? <Loader2 className="h-3 w-3 animate-spin" /> : "Buscar"}
-            </Button>
-          </div>
+        <div className="space-y-4">
+          {/* Busca de lead */}
+          <div>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              1. Buscar lead no Quiz (opcional)
+            </p>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && doSearch(query)}
+                placeholder="Email, nome ou whatsapp…"
+                className="pl-8 pr-20"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7"
+                onClick={() => doSearch(query)}
+                disabled={searching}
+              >
+                {searching ? <Loader2 className="h-3 w-3 animate-spin" /> : "Buscar"}
+              </Button>
+            </div>
 
-          <div className="max-h-64 overflow-auto rounded-md border border-border">
-            {results.length === 0 ? (
-              <p className="p-4 text-center text-sm text-muted-foreground">
-                {searching ? "Buscando…" : "Nenhum lead encontrado. Digite e busque."}
-              </p>
-            ) : (
-              results.map((r) => {
-                const sel = selected?.id === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    onClick={() => setSelected(r)}
-                    className={`flex w-full items-center gap-3 border-b border-border p-3 text-left transition hover:bg-muted/40 ${
-                      sel ? "bg-accent/15" : ""
-                    }`}
-                  >
-                    <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
-                      {sel ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <User className="h-4 w-4" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{r.nome || "(sem nome)"}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {r.email || "—"} {r.whatsapp ? `· ${r.whatsapp}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {r.fbp && <Badge variant="outline" className="text-[10px]">fbp</Badge>}
-                      {r.fbc && <Badge variant="outline" className="text-[10px]">fbc</Badge>}
-                      {r.utm_source && <Badge variant="outline" className="text-[10px]">{r.utm_source}</Badge>}
-                      {r.caixa_letra && <Badge className="text-[10px]">{r.caixa_letra}</Badge>}
-                    </div>
-                  </button>
-                );
-              })
+            {results.length > 0 && (
+              <div className="mt-2 max-h-48 overflow-auto rounded-md border border-border">
+                {results.map((r) => {
+                  const sel = selected?.id === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => setSelected(r)}
+                      className={`flex w-full items-center gap-3 border-b border-border p-2.5 text-left transition hover:bg-muted/40 ${
+                        sel ? "bg-accent/15" : ""
+                      }`}
+                    >
+                      <div className="h-8 w-8 shrink-0 rounded-full bg-muted flex items-center justify-center">
+                        {sel ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <User className="h-4 w-4" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{r.nome || "(sem nome)"}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {r.email || "—"} {r.whatsapp ? `· ${r.whatsapp}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {r.fbp && <Badge variant="outline" className="text-[10px]">fbp</Badge>}
+                        {r.fbc && <Badge variant="outline" className="text-[10px]">fbc</Badge>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          {selected && (
-            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <p className="font-medium">Pronto pra disparar: {selected.nome}</p>
-                <Badge className="bg-emerald-500/20 text-emerald-300">Match {matchScore}/100</Badge>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Email, telefone, fbp e fbc serão enviados pro Pixel/CAPI vinculando a campanha de origem.
+          {/* Form editável */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                2. Confira e edite os dados antes de enviar
               </p>
+              <Badge className={scoreColor}>Match {matchScore}/100</Badge>
             </div>
-          )}
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Nome completo</label>
+                <Input
+                  value={form.nome}
+                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
+                  placeholder="João da Silva"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Email *</label>
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="joao@email.com"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">WhatsApp / Telefone</label>
+                <Input
+                  value={form.whatsapp}
+                  onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                  placeholder="+55 11 99999-9999"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">External ID</label>
+                <Input
+                  value={form.externalId}
+                  onChange={(e) => setForm({ ...form, externalId: e.target.value })}
+                  placeholder="ID do lead (auto)"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  FBP (cookie _fbp) — deixa vazio se não tiver
+                </label>
+                <Input
+                  value={form.fbp}
+                  onChange={(e) => setForm({ ...form, fbp: e.target.value })}
+                  placeholder="fb.1.1234567890.0987654321"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  FBC (cookie _fbc / fbclid) — deixa vazio se não tiver
+                </label>
+                <Input
+                  value={form.fbc}
+                  onChange={(e) => setForm({ ...form, fbc: e.target.value })}
+                  placeholder="fb.1.1234567890.IwAR..."
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              💡 Quanto mais campos preenchidos (principalmente FBP/FBC), maior a nota de qualidade
+              do evento no Facebook e melhor a atribuição da campanha.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={!selected || mutation.isPending}
+            disabled={(!form.email && !form.whatsapp) || mutation.isPending}
             className="bg-amber-500 text-black hover:bg-amber-400"
           >
             {mutation.isPending ? (
@@ -258,3 +355,4 @@ export function ShowUpDialog({
     </Dialog>
   );
 }
+
