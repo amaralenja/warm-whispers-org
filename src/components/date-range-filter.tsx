@@ -4,7 +4,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
-export type RangePreset = "hoje" | "semana" | "mes" | "ano" | "custom";
+export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
@@ -33,6 +33,11 @@ function todayBR() {
 export function computeRange(preset: RangePreset): DateRangeValue {
   const today = todayBR();
   if (preset === "hoje") return { preset, from: iso(today), to: iso(today) };
+  if (preset === "ontem") {
+    const y = new Date(today);
+    y.setUTCDate(y.getUTCDate() - 1);
+    return { preset, from: iso(y), to: iso(y) };
+  }
   if (preset === "semana") {
     const weekStart = new Date(today);
     const day = weekStart.getUTCDay();
@@ -52,6 +57,7 @@ export function computeRange(preset: RangePreset): DateRangeValue {
 
 const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "hoje", label: "Hoje" },
+  { id: "ontem", label: "Ontem" },
   { id: "semana", label: "Semana" },
   { id: "mes", label: "Mês" },
   { id: "ano", label: "2026" },
