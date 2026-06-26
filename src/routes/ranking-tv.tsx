@@ -119,7 +119,7 @@ function RankingTV() {
   function playCashSound() {
     try {
       if (!audioRef.current) {
-        audioRef.current = new Audio(cashSoundAsset.url);
+        audioRef.current = new Audio(CASH_SOUND_URL);
         audioRef.current.preload = "auto";
         audioRef.current.volume = 0.9;
       }
