@@ -353,13 +353,23 @@ function CRMPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">CRM de Leads</h1>
+          <h1 className="text-2xl font-bold tracking-tight">CRM Leads X1</h1>
           <p className="text-sm text-muted-foreground">
             {filtered.length} {filtered.length === 1 ? "lead" : "leads"}
             {!isGeral && ` em ${workspace?.nome}`}
+            {targetApiExperts.length > 0 && ` · ${targetApiExperts.length} API key${targetApiExperts.length > 1 ? "s" : ""} ativa${targetApiExperts.length > 1 ? "s" : ""}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncLeads.mutate()}
+            disabled={syncLeads.isPending || targetApiExperts.length === 0}
+          >
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${syncLeads.isPending ? "animate-spin" : ""}`} />
+            {syncLeads.isPending ? "Puxando…" : "Puxar leads"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
             <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
           </Button>
@@ -371,6 +381,20 @@ function CRMPage() {
           </Button>
         </div>
       </div>
+
+      {!loadingApiKeys && targetApiExperts.length === 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {isGeral
+            ? "Cadastre pelo menos uma API key nas operações para o CRM puxar leads automaticamente."
+            : `A operação ${workspace?.nome} ainda não tem API key de CRM cadastrada.`}
+        </div>
+      )}
+
+      {syncLeads.data && syncLeads.data.fetched === 0 && targetApiExperts.length > 0 && (
+        <div className="rounded-xl border border-border bg-card/40 px-4 py-3 text-sm text-muted-foreground">
+          A API respondeu, mas não retornou nenhum lead em <code className="text-foreground">/api/public/v1/leads?period=30d</code>.
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/40 p-2">
