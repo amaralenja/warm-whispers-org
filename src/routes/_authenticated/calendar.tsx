@@ -238,7 +238,7 @@ function CalendarPage() {
       location: ev.location || "",
       start: toLocalInput(ev.start.dateTime || ev.start.date),
       end: toLocalInput(ev.end.dateTime || ev.end.date),
-      attendees: (ev.attendees || []).map((a) => a.email).join(", "),
+      attendees: (ev.attendees || []).map((a) => a.email).filter(Boolean).concat(""),
     });
     setDialogOpen(true);
   }
