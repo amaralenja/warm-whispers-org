@@ -216,7 +216,9 @@ function QuizPage() {
   const { workspace } = useWorkspace();
   const isGeral = workspace?.id === "all";
 
-  const [period, setPeriod] = useState<Period>("7d");
+  const [period, setPeriod] = useState<Period>("today");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState<OriginKey | "all">("all");
   const [liveCount, setLiveCount] = useState(0);
