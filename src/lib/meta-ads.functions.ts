@@ -11,7 +11,9 @@ export type MetaAdsConfig = {
 
 export const getMetaAdsConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<MetaAdsConfig> => {
+  .handler(async (opts): Promise<MetaAdsConfig> => {
+    const context = opts?.context;
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const { data, error } = await context.supabase
       .from("meta_ads_config")
       .select("pixel_id, access_token, test_event_code")
@@ -35,7 +37,10 @@ const saveSchema = z.object({
 export const saveMetaAdsConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => saveSchema.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async (opts) => {
+    const context = opts?.context;
+    const data = opts?.data;
+    if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
     const { data: existing } = await context.supabase
       .from("meta_ads_config")
       .select("id")
@@ -185,7 +190,10 @@ function qualityScore(input: {
 export const listMetaEventLogs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => listLogsSchema.parse(d ?? {}))
-  .handler(async ({ data, context }): Promise<MetaEventLog[]> => {
+  .handler(async (opts): Promise<MetaEventLog[]> => {
+    const context = opts?.context;
+    const data = opts?.data ?? {};
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const { data: rows, error } = await context.supabase
       .from("meta_ads_event_logs")
       .select("id,event_name,event_id,status,value,currency,email_hash,phone_hash,first_name_hash,last_name_hash,match_quality_score,events_received,fbtrace_id,error_message,created_at")
@@ -217,7 +225,10 @@ export const listMetaEventLogs = createServerFn({ method: "POST" })
 export const sendMetaEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => sendSchema.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async (opts) => {
+    const context = opts?.context;
+    const data = opts?.data;
+    if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
     const { data: cfg, error } = await context.supabase
       .from("meta_ads_config")
       .select("pixel_id, access_token, test_event_code")
