@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Activity, Play, Pause, ChevronRight, Megaphone, Layers, ImageIcon,
+  Activity, ChevronRight, Megaphone, Layers, ImageIcon,
   RefreshCw, Pencil, Loader2, Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,17 +45,47 @@ function StatusDot({ effective }: { effective: string }) {
   );
 }
 
+function MetaToggle({
+  active,
+  onToggle,
+  disabled,
+}: {
+  active: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      title={active ? "Desativar" : "Ativar"}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+        active ? "bg-emerald-500" : "bg-zinc-600"
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          active ? "translate-x-[18px]" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
+
 function MetricCells({ i }: { i: AdInsights }) {
   return (
     <>
-      <td className="px-3 py-3 text-right font-mono text-sm">{brl(i.spend)}</td>
-      <td className="px-3 py-3 text-right text-sm">{num(i.results)}</td>
-      <td className="px-3 py-3 text-right text-sm">{i.results ? brl(i.costPerResult) : "—"}</td>
-      <td className="px-3 py-3 text-right text-sm">{num(i.impressions)}</td>
-      <td className="px-3 py-3 text-right text-sm">{num(i.clicks)}</td>
-      <td className="px-3 py-3 text-right text-sm">{pct(i.ctr)}</td>
-      <td className="px-3 py-3 text-right text-sm">{brl(i.cpc)}</td>
-      <td className="px-3 py-3 text-right text-sm">{brl(i.cpm)}</td>
+      <td className="px-4 py-4 text-right font-mono text-sm font-semibold">{brl(i.spend)}</td>
+      <td className="px-4 py-4 text-right text-sm">{num(i.results)}</td>
+      <td className="px-4 py-4 text-right text-sm">{i.results ? brl(i.costPerResult) : "—"}</td>
+      <td className="px-4 py-4 text-right text-sm">{num(i.impressions)}</td>
+      <td className="px-4 py-4 text-right text-sm">{num(i.clicks)}</td>
+      <td className="px-4 py-4 text-right text-sm">{pct(i.ctr)}</td>
+      <td className="px-4 py-4 text-right text-sm">{brl(i.cpc)}</td>
+      <td className="px-4 py-4 text-right text-sm">{brl(i.cpm)}</td>
     </>
   );
 }
@@ -167,7 +197,7 @@ function MetaAdsManagerPage() {
             <Activity className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Gerenciador de Anúncios</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Gerenciador de Ads</h1>
             <p className="text-sm text-muted-foreground">
               Campanhas, conjuntos e anúncios direto da sua conta Meta.
             </p>
@@ -214,9 +244,9 @@ function MetaAdsManagerPage() {
           { label: "Cliques", value: num(totals.clicks) },
           { label: "Impressões", value: num(totals.impressions) },
         ].map((k) => (
-          <div key={k.label} className="rounded-xl border border-border bg-card p-4">
-            <div className="text-xs text-muted-foreground">{k.label}</div>
-            <div className="mt-1 text-xl font-bold">{k.value}</div>
+          <div key={k.label} className="rounded-2xl border border-border bg-gradient-to-br from-card to-card/60 p-5 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{k.label}</div>
+            <div className="mt-2 text-2xl font-bold tracking-tight">{k.value}</div>
           </div>
         ))}
       </div>
@@ -295,14 +325,12 @@ function MetaAdsManagerPage() {
                 ) : (
                   campaignsQ.data.map((c: Campaign) => (
                     <tr key={c.id} className={`group transition hover:bg-muted/30 ${campaignId === c.id ? "bg-accent/5" : ""}`}>
-                      <td className="px-3 py-3">
-                        <button
-                          onClick={() => toggleStatus.mutate({ id: c.id, status: c.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
-                          title={c.status === "ACTIVE" ? "Pausar" : "Ativar"}
-                        >
-                          {c.status === "ACTIVE" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </button>
+                      <td className="px-3 py-4">
+                        <MetaToggle
+                          active={c.status === "ACTIVE"}
+                          disabled={toggleStatus.isPending}
+                          onToggle={() => toggleStatus.mutate({ id: c.id, status: c.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         <button
@@ -354,13 +382,12 @@ function MetaAdsManagerPage() {
                 ) : (
                   adsetsQ.data.map((a: AdSet) => (
                     <tr key={a.id} className={`group transition hover:bg-muted/30 ${adsetId === a.id ? "bg-accent/5" : ""}`}>
-                      <td className="px-3 py-3">
-                        <button
-                          onClick={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
-                        >
-                          {a.status === "ACTIVE" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </button>
+                      <td className="px-3 py-4">
+                        <MetaToggle
+                          active={a.status === "ACTIVE"}
+                          disabled={toggleStatus.isPending}
+                          onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         <button
@@ -405,13 +432,12 @@ function MetaAdsManagerPage() {
                 ) : (
                   adsQ.data.map((a: Ad) => (
                     <tr key={a.id} className="group transition hover:bg-muted/30">
-                      <td className="px-3 py-3">
-                        <button
-                          onClick={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
-                        >
-                          {a.status === "ACTIVE" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </button>
+                      <td className="px-3 py-4">
+                        <MetaToggle
+                          active={a.status === "ACTIVE"}
+                          disabled={toggleStatus.isPending}
+                          onToggle={() => toggleStatus.mutate({ id: a.id, status: a.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
