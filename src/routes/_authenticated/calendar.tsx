@@ -266,9 +266,19 @@ function CalendarPage() {
       .sort((a, b) => evDate(a).getTime() - evDate(b).getTime());
   }, [selectedDay, eventsByDay, events, range]);
 
+  const PRESET_LABELS: Record<string, string> = {
+    hoje: "Hoje",
+    ontem: "Ontem",
+    semana: "Esta semana",
+    "7d": "Últimos 7 dias",
+    "15d": "Últimos 15 dias",
+    "30d": "Últimos 30 dias",
+    mes: "Este mês",
+    personalizado: "Período personalizado",
+  };
   const panelTitle = selectedDay
     ? format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })
-    : range.label || "Período selecionado";
+    : PRESET_LABELS[range.preset] || "Período selecionado";
 
   return (
     <div className="p-4 md:p-6 space-y-4">
