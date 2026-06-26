@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   XCircle,
   CalendarClock,
+  X,
 } from "lucide-react";
 
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
@@ -84,7 +85,7 @@ type FormState = {
   location: string;
   start: string;
   end: string;
-  attendees: string;
+  attendees: string[];
 };
 
 const emptyForm = (base?: Date): FormState => {
@@ -98,7 +99,7 @@ const emptyForm = (base?: Date): FormState => {
     location: "",
     start: toLocalInput(start.toISOString()),
     end: toLocalInput(end.toISOString()),
-    attendees: "",
+    attendees: [""],
   };
 };
 
@@ -200,7 +201,6 @@ function CalendarPage() {
         start: fromLocalInput(f.start),
         end: fromLocalInput(f.end),
         attendees: f.attendees
-          .split(/[,;\s]+/)
           .map((s) => s.trim())
           .filter((s) => s.includes("@")),
       };
@@ -238,7 +238,7 @@ function CalendarPage() {
       location: ev.location || "",
       start: toLocalInput(ev.start.dateTime || ev.start.date),
       end: toLocalInput(ev.end.dateTime || ev.end.date),
-      attendees: (ev.attendees || []).map((a) => a.email).join(", "),
+      attendees: (ev.attendees || []).map((a) => a.email).filter(Boolean).concat(""),
     });
     setDialogOpen(true);
   }
@@ -340,12 +340,48 @@ function CalendarPage() {
                   />
                 </div>
                 <div>
-                  <Label>Convidados (e-mails separados por vírgula)</Label>
-                  <Input
-                    value={form.attendees}
-                    onChange={(e) => setForm({ ...form, attendees: e.target.value })}
-                    placeholder="cliente@empresa.com, outro@empresa.com"
-                  />
+                  <Label>Convidados</Label>
+                  <div className="space-y-2 mt-1">
+                    {form.attendees.map((email, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          value={email}
+                          onChange={(e) => {
+                            const next = [...form.attendees];
+                            next[idx] = e.target.value;
+                            // auto-add new empty field when typing in the last one
+                            if (idx === next.length - 1 && e.target.value.trim() !== "") {
+                              next.push("");
+                            }
+                            setForm({ ...form, attendees: next });
+                          }}
+                          placeholder={idx === 0 ? "cliente@empresa.com" : "outro@empresa.com (opcional)"}
+                          type="email"
+                        />
+                        {form.attendees.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const next = form.attendees.filter((_, i) => i !== idx);
+                              setForm({ ...form, attendees: next.length ? next : [""] });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setForm({ ...form, attendees: [...form.attendees, ""] })}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar convidado
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <Label>Descrição</Label>
