@@ -46,7 +46,8 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 
-import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
+import { ShowUpDialog, getEventLink, getAllEventLinks, getNoShow, getAllNoShows, markNoShow, unmarkNoShow } from "@/components/showup-dialog";
+import { UserX } from "lucide-react";
 import { LeadSearchPicker } from "@/components/lead-search-picker";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 import { DateTimePicker } from "@/components/datetime-picker";
