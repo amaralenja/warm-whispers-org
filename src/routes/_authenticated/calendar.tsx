@@ -552,13 +552,15 @@ function EventRow({
         )}
       </div>
       <div className="flex items-center gap-1">
-        <button
-          className="rounded p-2 text-amber-400 hover:bg-amber-500/15"
+        <Button
+          size="sm"
           onClick={() => setShowUpOpen(true)}
-          title="Disparar ShowUp pro Facebook"
+          className="h-8 gap-1.5 bg-amber-500 px-2.5 text-black hover:bg-amber-400"
+          title="Vincular lead e disparar ShowUp manualmente"
         >
-          <Zap className="h-4 w-4" />
-        </button>
+          <Zap className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold">{link ? "Re-disparar" : "ShowUp"}</span>
+        </Button>
         {ev.htmlLink && (
           <a href={ev.htmlLink} target="_blank" rel="noreferrer" className="rounded p-2 hover:bg-muted">
             <ExternalLink className="h-4 w-4" />
@@ -571,6 +573,7 @@ function EventRow({
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
+
       <ShowUpDialog
         open={showUpOpen}
         onOpenChange={setShowUpOpen}
