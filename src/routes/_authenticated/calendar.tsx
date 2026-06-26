@@ -492,7 +492,11 @@ function CalendarPage() {
         </Card>
       ) : null}
 
-      <StatsCards events={events} range={range} setRange={setRange} />
+      {view === "metrics" ? (
+        <MetricsView events={events} range={range} setRange={setRange} />
+      ) : (
+        <StatsCards events={events} range={range} setRange={setRange} />
+      )}
 
       {view === "month" && (
         <Card className="bg-card/60">
