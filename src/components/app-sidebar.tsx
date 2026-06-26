@@ -1,6 +1,20 @@
+import { useState } from "react";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, LineChart, Trophy, Tv, Wallet, Activity, HelpCircle, Users, Calendar, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  LineChart,
+  Trophy,
+  Tv,
+  Wallet,
+  Activity,
+  HelpCircle,
+  Users,
+  Calendar,
+  LogOut,
+  Crown,
+  ChevronDown,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -13,21 +27,29 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import logoMultium from "@/assets/logo-multium.webp";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
-const items = [
+type Item = { title: string; url: string; icon: any };
+
+const mainItems: Item[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Relatórios", url: "/relatorios", icon: LineChart },
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
-  { title: "Meta Ads", url: "/meta-ads", icon: Activity },
-  { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "CRM Leads X1", url: "/crm", icon: Users },
+];
+
+const highTicketItems: Item[] = [
   { title: "Calendário Calls", url: "/calendar", icon: Calendar },
+  { title: "Quiz", url: "/quiz", icon: HelpCircle },
+  { title: "Meta Ads", url: "/meta-ads", icon: Activity },
 ];
 
 export function AppSidebar() {
@@ -37,12 +59,47 @@ export function AppSidebar() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  const highTicketActive = highTicketItems.some((i) => pathname === i.url);
+  const [highTicketOpen, setHighTicketOpen] = useState(highTicketActive);
+
   async function handleSignOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
+
+  const renderMenuItem = (item: Item) => {
+    const active = pathname === item.url;
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton
+          asChild
+          isActive={active}
+          tooltip={item.title}
+          className={[
+            "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+            active
+              ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+              : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+          ].join(" ")}
+        >
+          <Link to={item.url} className="flex items-center gap-3">
+            {active && (
+              <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+            )}
+            <item.icon
+              className={[
+                "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                active ? "text-accent" : "",
+              ].join(" ")}
+            />
+            {!collapsed && <span className="truncate">{item.title}</span>}
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -65,37 +122,76 @@ export function AppSidebar() {
           )}
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
-              {items.map((item) => {
-                const active = pathname === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={item.title}
-                      className={[
-                        "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
-                        active
-                          ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
-                          : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
-                      ].join(" ")}
-                    >
-                      <Link to={item.url} className="flex items-center gap-3">
-                        {active && (
-                          <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
-                        )}
-                        <item.icon
-                          className={[
-                            "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
-                            active ? "text-accent" : "",
-                          ].join(" ")}
-                        />
-                        {!collapsed && <span className="truncate">{item.title}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {mainItems.map(renderMenuItem)}
+
+              {/* High Ticket — colapsável */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="High Ticket"
+                  isActive={highTicketActive && !highTicketOpen}
+                  onClick={() => {
+                    if (collapsed) {
+                      setHighTicketOpen(true);
+                      return;
+                    }
+                    setHighTicketOpen((v) => !v);
+                  }}
+                  className={[
+                    "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+                    highTicketActive
+                      ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                      : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {highTicketActive && (
+                    <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+                  )}
+                  <Crown
+                    className={[
+                      "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                      highTicketActive ? "text-accent" : "",
+                    ].join(" ")}
+                  />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 truncate text-left">High Ticket</span>
+                      <ChevronDown
+                        className={[
+                          "h-4 w-4 transition-transform",
+                          highTicketOpen ? "rotate-180" : "",
+                        ].join(" ")}
+                      />
+                    </>
+                  )}
+                </SidebarMenuButton>
+
+                {!collapsed && highTicketOpen && (
+                  <SidebarMenuSub className="mt-1 gap-1">
+                    {highTicketItems.map((sub) => {
+                      const subActive = pathname === sub.url;
+                      return (
+                        <SidebarMenuSubItem key={sub.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={subActive}
+                            className={[
+                              "h-9 rounded-md px-3 text-[0.9rem]",
+                              subActive
+                                ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                                : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                            ].join(" ")}
+                          >
+                            <Link to={sub.url} className="flex items-center gap-2">
+                              <sub.icon className="!h-4 !w-4 shrink-0" />
+                              <span className="truncate">{sub.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -104,7 +200,6 @@ export function AppSidebar() {
       <div className="px-2 pb-2">
         {!collapsed && <WorkspaceSwitcher />}
       </div>
-
 
       <SidebarFooter className="border-t border-border p-2">
         <SidebarMenu>
