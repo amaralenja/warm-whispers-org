@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "7d" | "30d" | "custom";
+export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "7d" | "15d" | "30d" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
@@ -47,6 +47,11 @@ export function computeRange(preset: RangePreset): DateRangeValue {
     s.setUTCDate(s.getUTCDate() - 6);
     return { preset, from: iso(s), to: iso(today) };
   }
+  if (preset === "15d") {
+    const s = new Date(today);
+    s.setUTCDate(s.getUTCDate() - 14);
+    return { preset, from: iso(s), to: iso(today) };
+  }
   if (preset === "30d") {
     const s = new Date(today);
     s.setUTCDate(s.getUTCDate() - 29);
@@ -68,6 +73,7 @@ const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "ontem", label: "Ontem" },
   { id: "semana", label: "Semana" },
   { id: "7d", label: "7 dias" },
+  { id: "15d", label: "15 dias" },
   { id: "mes", label: "Mês" },
   { id: "30d", label: "30 dias" },
   { id: "ano", label: "2026" },
