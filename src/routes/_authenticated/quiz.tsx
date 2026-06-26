@@ -114,7 +114,7 @@ function periodToRange(
 }
 
 // ---------- Lead Classification ----------
-type OriginKey = "facebook" | "google" | "organic" | "tiktok" | "unknown";
+type OriginKey = "facebook" | "instagram" | "google" | "organic" | "tiktok" | "unknown";
 type LeadOrigin = {
   key: OriginKey;
   label: string;
@@ -126,16 +126,32 @@ type LeadOrigin = {
   border: string;
 };
 
-const ORIGIN_ORDER: OriginKey[] = ["facebook", "google", "tiktok", "organic", "unknown"];
+const ORIGIN_ORDER: OriginKey[] = ["facebook", "instagram", "google", "tiktok", "organic", "unknown"];
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
-  if (l.fbc || l.fbp || l.fbclid || src.includes("fb") || src.includes("facebook") || src.includes("ig") || src.includes("instagram")) {
+  const medium = "";
+  const isInstagram = src.includes("ig") || src.includes("instagram");
+  const hasFbTracking = !!(l.fbc && l.fbp);
+
+  // Instagram tem prioridade quando source explicita IG
+  if (isInstagram) {
     return {
-      key: "facebook", label: "Facebook Ads", icon: Facebook,
-      ring: "ring-blue-500/40", bg: "bg-blue-500/10", text: "text-blue-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
+      key: "instagram", label: "Instagram", icon: Instagram,
+      ring: "ring-pink-500/40", bg: "bg-gradient-to-br from-pink-500/10 to-purple-500/10",
+      text: "text-pink-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
     };
+  }
+  // Facebook Ads SOMENTE com FBC + FBP (regra nova)
+  if (hasFbTracking || src.includes("fb") || src.includes("facebook")) {
+    if (hasFbTracking) {
+      return {
+        key: "facebook", label: "Facebook Ads", icon: Facebook,
+        ring: "ring-blue-500/40", bg: "bg-blue-500/10", text: "text-blue-300",
+        glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
+      };
+    }
   }
   if (l.gclid || src.includes("google") || src.includes("gad")) {
     return {
