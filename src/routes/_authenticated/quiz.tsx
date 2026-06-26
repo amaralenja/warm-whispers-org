@@ -365,19 +365,44 @@ function QuizPage() {
                 className="h-9 w-[260px] pl-8"
               />
             </div>
-            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Hoje</SelectItem>
-                <SelectItem value="yesterday">Ontem</SelectItem>
-                <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                <SelectItem value="all">Tudo</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex rounded-md border border-border overflow-hidden">
+              {([
+                ["today", "Hoje"],
+                ["yesterday", "Ontem"],
+                ["7d", "7d"],
+                ["15d", "15d"],
+                ["30d", "30d"],
+                ["custom", "Personalizado"],
+              ] as [Period, string][]).map(([key, label], i) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPeriod(key)}
+                  className={`px-3 h-9 text-xs transition ${i > 0 ? "border-l border-border" : ""} ${
+                    period === key ? "bg-accent/20 text-accent font-semibold" : "hover:bg-accent/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {period === "custom" && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-9 w-[140px]"
+                />
+                <span className="text-muted-foreground text-xs">até</span>
+                <Input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-9 w-[140px]"
+                />
+              </div>
+            )}
             <Select value={reality} onValueChange={(v) => setReality(v as RealityFilter)}>
               <SelectTrigger className="h-9 w-[140px]">
                 <SelectValue />
