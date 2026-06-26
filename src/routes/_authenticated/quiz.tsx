@@ -530,7 +530,7 @@ function QuizPage() {
       ) : view === "kanban" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           {ORIGIN_ORDER.map((key) => {
-            const items = grouped[key];
+            const items = grouped[key] ?? [];
             if (items.length === 0) return null;
             const sample = items[0];
             const origin = classifyLead(sample);
@@ -545,7 +545,7 @@ function QuizPage() {
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
                   {items.map((l) => (
-                    <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} compact />
+                    <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
                   ))}
                 </div>
               </div>
