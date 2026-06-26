@@ -99,7 +99,7 @@ const emptyForm = (base?: Date): FormState => {
     location: "",
     start: toLocalInput(start.toISOString()),
     end: toLocalInput(end.toISOString()),
-    attendees: "",
+    attendees: [""],
   };
 };
 
