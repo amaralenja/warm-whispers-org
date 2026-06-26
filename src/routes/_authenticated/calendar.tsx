@@ -32,7 +32,11 @@ import {
   List,
   LayoutGrid,
   Zap,
+  CheckCircle2,
+  XCircle,
+  CalendarClock,
 } from "lucide-react";
+
 import { ShowUpDialog, getEventLink, getAllEventLinks } from "@/components/showup-dialog";
 
 import { Button } from "@/components/ui/button";
