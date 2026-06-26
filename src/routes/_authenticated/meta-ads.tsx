@@ -224,7 +224,7 @@ function MetaAdsManagerPage() {
       {/* Tabs */}
       <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
         {([
-          { v: "campaigns", label: "Campanhas", icon: Megaphone },
+          { v: "campaigns", label: "Campanhas", icon: Megaphone, disabled: false },
           { v: "adsets", label: "Conjuntos", icon: Layers, disabled: !campaignId },
           { v: "ads", label: "Anúncios", icon: ImageIcon, disabled: !adsetId },
         ] as const).map((t) => (
