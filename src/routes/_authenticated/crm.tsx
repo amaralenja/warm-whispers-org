@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -58,8 +58,98 @@ type Lead = {
   updated_at: string;
 };
 
+type ExpertApiKey = { id: number; nome: string; ativo: boolean; crm_api_key: string | null };
+
+const API_BASE = "https://19b67e6b-8330-4b05-a7e9-34840c33d6c1.lovableproject.com/api/public/v1";
+
 const BRL = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n || 0);
+
+function firstString(obj: Record<string, any>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = obj?.[key];
+    if (value == null) continue;
+    const str = String(value).trim();
+    if (str) return str;
+  }
+  return null;
+}
+
+function firstNumber(obj: Record<string, any>, keys: string[]): number | null {
+  for (const key of keys) {
+    const raw = obj?.[key];
+    if (raw == null || raw === "") continue;
+    const parsed = Number(String(raw).replace(/R\$\s?/g, "").replace(/\./g, "").replace(",", "."));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function extractLeadArray(payload: any): Record<string, any>[] {
+  if (Array.isArray(payload)) return payload;
+  const candidates = [payload?.leads, payload?.data, payload?.items, payload?.contacts, payload?.results];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (Array.isArray(candidate?.data)) return candidate.data;
+    if (Array.isArray(candidate?.items)) return candidate.items;
+  }
+  return [];
+}
+
+function normalizeApiLead(raw: Record<string, any>, expert: string, index: number): Partial<Lead> & { _syncKey: string } {
+  const externalId = firstString(raw, ["id", "lead_id", "leadId", "contact_id", "contactId", "uuid", "external_id", "externalId"]);
+  const telefone = firstString(raw, ["telefone", "phone", "celular", "whatsapp", "numero", "number", "mobile"]);
+  const email = firstString(raw, ["email", "e_mail"]);
+  const nome = firstString(raw, ["nome", "name", "full_name", "fullName", "lead_name", "leadName", "first_name", "firstName"])
+    ?? email
+    ?? telefone
+    ?? `Lead ${index + 1}`;
+  const fonte = firstString(raw, ["fonte", "source", "origem", "utm_source", "utmSource", "campaign", "campanha"]);
+  const responsavelUtm = firstString(raw, ["responsavel_utm", "utm", "utm_content", "utmContent", "vendedor_utm", "seller_utm"]);
+  const responsavelNome = firstString(raw, ["responsavel_nome", "responsavel", "seller", "seller_name", "vendedor", "vendedor_nome"]);
+  const valor = firstNumber(raw, ["valor_estimado", "valor", "value", "ticket", "revenue"]);
+  const createdAt = firstString(raw, ["created_at", "createdAt", "data", "date", "timestamp"]);
+  const tagsRaw = raw.tags ?? raw.tag;
+  const tags = Array.isArray(tagsRaw)
+    ? tagsRaw.map((tag) => String(tag).trim()).filter(Boolean)
+    : typeof tagsRaw === "string"
+      ? tagsRaw.split(",").map((tag) => tag.trim()).filter(Boolean)
+      : [];
+  const syncKey = `${expert}|${externalId || email || telefone || nome}`.toLowerCase();
+
+  return {
+    _syncKey: syncKey,
+    nome,
+    telefone,
+    email,
+    expert,
+    fonte: fonte ?? "Quiz API",
+    status: "novo",
+    responsavel_utm: responsavelUtm,
+    responsavel_nome: responsavelNome,
+    valor_estimado: valor ?? 0,
+    tags,
+    ultima_interacao: createdAt,
+    dados: {
+      origem: "crm_leads_x1_api",
+      external_id: externalId,
+      sync_key: syncKey,
+      raw,
+    },
+  };
+}
+
+async function fetchCrmApiLeads(expert: ExpertApiKey) {
+  const url = new URL(`${API_BASE}/leads`);
+  url.searchParams.set("period", "30d");
+  url.searchParams.set("limit", "500");
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${expert.crm_api_key}` },
+  });
+  if (!res.ok) throw new Error(`${expert.nome}: /leads retornou HTTP ${res.status}`);
+  const payload = await res.json().catch(() => null);
+  return extractLeadArray(payload).map((raw, index) => normalizeApiLead(raw, expert.nome, index));
+}
 
 // ---------- Page ----------
 function CRMPage() {
