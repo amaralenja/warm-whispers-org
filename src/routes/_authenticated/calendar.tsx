@@ -14,6 +14,7 @@ import {
   MapPin,
   Users,
   ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,7 @@ import {
   deleteEvent,
   listCalendars,
   type CalendarEvent,
+  type CalendarListResult,
 } from "@/lib/google-calendar.functions";
 
 
@@ -91,6 +93,7 @@ function CalendarPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [calendarDebug, setCalendarDebug] = useState<CalendarListResult | null>(null);
 
   const { data, isLoading, refetch, isFetching, error } = useQuery({
     queryKey: ["gcal-events"],
@@ -184,9 +187,10 @@ function CalendarPage() {
             onClick={async () => {
               try {
                 const r = await listCals();
+                setCalendarDebug(r);
                 console.log("[GCAL] calendarios visíveis:", r);
                 toast.success(
-                  `${r.items.length} calendário(s) visível(is). Veja o console (F12) para copiar o ID correto.`,
+                  `${r.items?.length ?? 0} calendário(s) visível(is). Resultado apareceu na tela.`,
                   { duration: 8000 },
                 );
               } catch (e: any) {
@@ -279,6 +283,75 @@ function CalendarPage() {
           </Dialog>
         </div>
       </div>
+
+      {calendarDebug ? (
+        <Card className="border-border bg-card/80">
+          <CardContent className="space-y-4 p-4 text-sm">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="font-semibold">Diagnóstico Google Calendar</p>
+                <p className="mt-1 text-muted-foreground">
+                  Service account: <code>{calendarDebug.serviceAccountEmail || "não detectada"}</code>
+                </p>
+                <p className="text-muted-foreground">
+                  GOOGLE_CALENDAR_ID: <code>{calendarDebug.configuredId || "não configurado"}</code>
+                </p>
+              </div>
+              <div
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
+                  calendarDebug.configuredCalendar.ok
+                    ? "bg-emerald-500/10 text-emerald-600"
+                    : "bg-destructive/10 text-destructive"
+                }`}
+              >
+                {calendarDebug.configuredCalendar.ok ? "Acesso OK" : "Sem acesso ao ID"}
+              </div>
+            </div>
+
+            {calendarDebug.configuredCalendar.ok ? (
+              <div className="rounded-lg border border-border bg-background/60 p-3">
+                <p className="font-medium">{calendarDebug.configuredCalendar.summary}</p>
+                <p className="text-xs text-muted-foreground">
+                  Timezone: {calendarDebug.configuredCalendar.timeZone || "não informado"}
+                </p>
+              </div>
+            ) : (
+              <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    Esse calendário ainda não está visível para a service account.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground break-all">
+                    Status {calendarDebug.configuredCalendar.status || "—"}: {calendarDebug.configuredCalendar.message || "sem detalhes"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Calendários visíveis ({calendarDebug.items?.length ?? 0})
+              </p>
+              {calendarDebug.items?.length ? (
+                <div className="space-y-2">
+                  {calendarDebug.items.map((cal) => (
+                    <div key={cal.id} className="rounded-lg border border-border bg-background/60 p-3">
+                      <p className="font-medium">{cal.summary || "Sem nome"}</p>
+                      <p className="text-xs text-muted-foreground break-all">{cal.id}</p>
+                      <p className="text-xs text-muted-foreground">Permissão: {cal.accessRole || "—"}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-border bg-background/60 p-3 text-muted-foreground">
+                  Nenhum calendário apareceu na lista dessa service account.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {error ? (
         <Card className="border-destructive/40 bg-destructive/5">

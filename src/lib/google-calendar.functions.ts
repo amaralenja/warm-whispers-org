@@ -26,17 +26,23 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
 
 let cachedToken: { token: string; exp: number } | null = null;
 
+type GoogleServiceAccount = {
+  client_email: string;
+  private_key: string;
+  token_uri?: string;
+};
+
+function getServiceAccount(): GoogleServiceAccount {
+  const raw = process.env.GOOGLE_CALENDAR_SERVICE_ACCOUNT;
+  if (!raw) throw new Error("GOOGLE_CALENDAR_SERVICE_ACCOUNT missing");
+  return JSON.parse(raw) as GoogleServiceAccount;
+}
+
 async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
 
-  const raw = process.env.GOOGLE_CALENDAR_SERVICE_ACCOUNT;
-  if (!raw) throw new Error("GOOGLE_CALENDAR_SERVICE_ACCOUNT missing");
-  const sa = JSON.parse(raw) as {
-    client_email: string;
-    private_key: string;
-    token_uri?: string;
-  };
+  const sa = getServiceAccount();
 
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
@@ -108,20 +114,64 @@ export type CalendarEvent = {
   status?: string;
 };
 
+export type CalendarListResult = {
+  configuredId: string | null;
+  serviceAccountEmail: string | null;
+  configuredCalendar: {
+    ok: boolean;
+    status?: number;
+    summary?: string;
+    timeZone?: string;
+    message?: string;
+  };
+  items: { id: string; summary?: string; accessRole?: string }[];
+};
+
 export const listCalendars = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const token = await getAccessToken();
+    const configuredId = process.env.GOOGLE_CALENDAR_ID || null;
+    const serviceAccountEmail = (() => {
+      try {
+        return getServiceAccount().client_email;
+      } catch {
+        return null;
+      }
+    })();
     const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
       headers: { Authorization: `Bearer ${token}` },
     });
     const txt = await res.text();
     if (!res.ok) throw new Error(`calendarList ${res.status}: ${txt}`);
     const json = JSON.parse(txt) as { items?: { id: string; summary?: string; accessRole?: string }[] };
+    const configuredCalendar: CalendarListResult["configuredCalendar"] = { ok: false };
+
+    if (configuredId) {
+      const check = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(configuredId)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const checkText = await check.text();
+      configuredCalendar.ok = check.ok;
+      configuredCalendar.status = check.status;
+      if (check.ok) {
+        const checkJson = JSON.parse(checkText) as { summary?: string; timeZone?: string };
+        configuredCalendar.summary = checkJson.summary;
+        configuredCalendar.timeZone = checkJson.timeZone;
+      } else {
+        configuredCalendar.message = checkText;
+      }
+    } else {
+      configuredCalendar.message = "GOOGLE_CALENDAR_ID missing";
+    }
+
     return {
-      configuredId: process.env.GOOGLE_CALENDAR_ID || null,
+      configuredId,
+      serviceAccountEmail,
+      configuredCalendar,
       items: (json.items || []).map((c) => ({ id: c.id, summary: c.summary, accessRole: c.accessRole })),
-    };
+    } satisfies CalendarListResult;
   });
 
 

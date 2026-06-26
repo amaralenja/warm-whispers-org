@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DateRange as RDPRange } from "react-day-picker";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 
 export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "7d" | "30d" | "custom";
 
@@ -96,15 +94,14 @@ export function DateRangeFilter({
   presets?: Exclude<RangePreset, "custom">[];
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState<RDPRange | undefined>(() => ({
-    from: parseISO(value.from),
-    to: parseISO(value.to),
-  }));
+  const [pendingFrom, setPendingFrom] = useState(value.from ?? "");
+  const [pendingTo, setPendingTo] = useState(value.to ?? "");
 
   // Sincroniza quando abre o popover ou quando value muda externamente
   useEffect(() => {
     if (open) {
-      setPending({ from: parseISO(value.from), to: parseISO(value.to) });
+      setPendingFrom(value.from ?? "");
+      setPendingTo(value.to ?? value.from ?? "");
     }
   }, [open, value.from, value.to]);
 
@@ -154,19 +151,39 @@ export function DateRangeFilter({
               Personalizado
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-auto border-border bg-popover p-0">
-            <Calendar
-              mode="range"
-              numberOfMonths={2}
-              defaultMonth={pending?.from ?? parseISO(value.from)}
-              selected={pending}
-              onSelect={(r) => setPending(r)}
-              className="pointer-events-auto p-3"
-            />
+          <PopoverContent align="end" className="w-72 border-border bg-popover p-4">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Início
+                </label>
+                <input
+                  type="date"
+                  value={pendingFrom}
+                  onChange={(e) => setPendingFrom(e.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Fim
+                </label>
+                <input
+                  type="date"
+                  value={pendingTo}
+                  min={pendingFrom || undefined}
+                  onChange={(e) => setPendingTo(e.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+            </div>
             <div className="flex items-center justify-between gap-2 border-t border-border p-2">
               <button
                 type="button"
-                onClick={() => setPending(undefined)}
+                onClick={() => {
+                  setPendingFrom("");
+                  setPendingTo("");
+                }}
                 className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/50"
               >
                 Limpar
@@ -181,11 +198,11 @@ export function DateRangeFilter({
                 </button>
                 <button
                   type="button"
-                  disabled={!pending?.from}
+                  disabled={!pendingFrom}
                   onClick={() => {
-                    if (!pending?.from) return;
-                    const from = iso(pending.from);
-                    const to = iso(pending.to ?? pending.from);
+                    if (!pendingFrom) return;
+                    const from = pendingFrom;
+                    const to = pendingTo || pendingFrom;
                     onChange({ preset: "custom", from, to });
                     setOpen(false);
                   }}
