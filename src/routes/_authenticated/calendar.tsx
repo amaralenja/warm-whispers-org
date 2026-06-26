@@ -105,6 +105,35 @@ function evDate(ev: CalendarEvent) {
   return new Date(ev.start.dateTime || ev.start.date || "");
 }
 
+// Distinct, high-contrast color per attendee/title — deterministic hash
+const EVENT_PALETTE = [
+  { bg: "bg-rose-500/25",    border: "border-rose-400",    text: "text-rose-100",    dot: "bg-rose-400" },
+  { bg: "bg-amber-500/25",   border: "border-amber-400",   text: "text-amber-100",   dot: "bg-amber-400" },
+  { bg: "bg-emerald-500/25", border: "border-emerald-400", text: "text-emerald-100", dot: "bg-emerald-400" },
+  { bg: "bg-sky-500/25",     border: "border-sky-400",     text: "text-sky-100",     dot: "bg-sky-400" },
+  { bg: "bg-violet-500/25",  border: "border-violet-400",  text: "text-violet-100",  dot: "bg-violet-400" },
+  { bg: "bg-pink-500/25",    border: "border-pink-400",    text: "text-pink-100",    dot: "bg-pink-400" },
+  { bg: "bg-cyan-500/25",    border: "border-cyan-400",    text: "text-cyan-100",    dot: "bg-cyan-400" },
+  { bg: "bg-orange-500/25",  border: "border-orange-400",  text: "text-orange-100",  dot: "bg-orange-400" },
+  { bg: "bg-lime-500/25",    border: "border-lime-400",    text: "text-lime-100",    dot: "bg-lime-400" },
+  { bg: "bg-fuchsia-500/25", border: "border-fuchsia-400", text: "text-fuchsia-100", dot: "bg-fuchsia-400" },
+];
+
+function colorKeyFor(ev: CalendarEvent): string {
+  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  return (att?.displayName || att?.email || ev.summary || ev.id || "x").toLowerCase().trim();
+}
+function colorFor(ev: CalendarEvent) {
+  const key = colorKeyFor(ev);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return EVENT_PALETTE[h % EVENT_PALETTE.length];
+}
+function personLabel(ev: CalendarEvent): string {
+  const att = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"));
+  return att?.displayName || att?.email?.split("@")[0] || "";
+}
+
 function CalendarPage() {
   const qc = useQueryClient();
   const list = useServerFn(listEvents);
@@ -398,54 +427,46 @@ function CalendarPage() {
               const selected = selectedDay && isSameDay(day, selectedDay);
 
               return (
-                <button
+                <div
                   key={key}
                   onClick={() => setSelectedDay(day)}
                   onDoubleClick={() => openCreate(day)}
-                  className={`group relative min-h-[110px] border-b border-r border-border p-1.5 text-left transition hover:bg-muted/40 ${
-                    inMonth ? "bg-background" : "bg-muted/20"
+                  className={`group relative min-h-[150px] border-b border-r border-border p-2 text-left transition hover:bg-muted/30 ${
+                    inMonth ? "bg-background" : "bg-muted/10"
                   } ${selected ? "ring-2 ring-accent ring-inset" : ""}`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1.5">
                     <span
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
                         today
                           ? "bg-accent text-accent-foreground"
                           : inMonth
                             ? "text-foreground"
-                            : "text-muted-foreground/60"
+                            : "text-muted-foreground/50"
                       }`}
                     >
                       {format(day, "d")}
                     </span>
-                    {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        +{dayEvents.length - 3}
+                    {dayEvents.length > 2 && (
+                      <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        +{dayEvents.length - 2}
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 space-y-0.5">
-                    {dayEvents.slice(0, 3).map((ev) => (
-                      <div
+                  <div className="space-y-1">
+                    {dayEvents.slice(0, 2).map((ev) => (
+                      <MonthEventChip
                         key={ev.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEdit(ev);
-                        }}
-                        className="truncate rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground hover:bg-accent/30"
-                        title={ev.summary}
-                      >
-                        {ev.start.dateTime
-                          ? format(new Date(ev.start.dateTime), "HH:mm") + " "
-                          : ""}
-                        {ev.summary || "(sem título)"}
-                      </div>
+                        ev={ev}
+                        onEdit={() => openEdit(ev)}
+                      />
                     ))}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
+
 
           {/* Selected day panel */}
           {selectedDay && (
@@ -565,6 +586,60 @@ function StatsCards({ events }: { events: CalendarEvent[] }) {
   );
 }
 
+
+function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void }) {
+  const [showUpOpen, setShowUpOpen] = useState(false);
+  const c = colorFor(ev);
+  const time = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "";
+  const person = personLabel(ev);
+  const title = ev.summary || "(sem título)";
+  const link = getEventLink(ev.id);
+  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
+  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit();
+      }}
+      className={`group/chip relative rounded-md border-l-4 ${c.border} ${c.bg} px-2 py-1.5 cursor-pointer hover:brightness-125 transition`}
+      title={`${time} ${title}${person ? " — " + person : ""}`}
+    >
+      <div className="flex items-center gap-1.5 min-w-0">
+        {time && (
+          <span className={`text-[10px] font-bold tabular-nums ${c.text} shrink-0`}>{time}</span>
+        )}
+        <span className={`truncate text-[11px] font-semibold ${c.text} flex-1`}>
+          {person || title}
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowUpOpen(true);
+          }}
+          className={`opacity-0 group-hover/chip:opacity-100 transition shrink-0 rounded p-0.5 hover:bg-black/30 ${link ? "text-emerald-300" : "text-amber-300"}`}
+          title={link ? "Re-disparar ShowUp" : "Disparar ShowUp"}
+        >
+          <Zap className="h-3 w-3" />
+        </button>
+      </div>
+      {person && time && (
+        <p className={`truncate text-[10px] opacity-80 ${c.text}`}>{title}</p>
+      )}
+      {link && (
+        <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-background" />
+      )}
+      <ShowUpDialog
+        open={showUpOpen}
+        onOpenChange={setShowUpOpen}
+        eventId={ev.id}
+        defaultEmail={attendeeEmail}
+        defaultName={attendeeName}
+      />
+    </div>
+  );
+}
 
 function EventRow({
   ev,
