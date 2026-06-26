@@ -22,10 +22,12 @@ const BRL = (n: number) =>
 const NUM = "font-sans tabular-nums tracking-tight font-semibold";
 
 function Ranking() {
-  const { workspace } = useWorkspace();
+  const { workspace, workspaces } = useWorkspace();
   const fetchStats = useServerFn(getRankingStats);
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("ano"));
-  const expertFilter = workspace.id === "all" ? null : workspace.id;
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("semana"));
+  const [opFilter, setOpFilter] = useState<string>("all"); // só usado quando workspace="all"
+  const expertFilter =
+    workspace.id === "all" ? (opFilter === "all" ? null : opFilter) : workspace.id;
 
   const { data, isLoading } = useQuery({
     queryKey: ["ranking", range.from, range.to, expertFilter],
@@ -36,6 +38,8 @@ function Ranking() {
   const top3 = ranking.slice(0, 3);
   const rest = ranking.slice(3);
   const maxFat = top3[0]?.faturamento ?? 1;
+
+  const operacoes = workspaces.filter((w) => w.id !== "all");
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
@@ -53,7 +57,43 @@ function Ranking() {
               Quem tá puxando o time no período selecionado.
             </p>
           </div>
-          <DateRangeFilter value={range} onChange={setRange} />
+          <div className="flex flex-col items-end gap-3">
+            {workspace.id === "all" && operacoes.length > 0 && (
+              <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setOpFilter("all")}
+                  className={[
+                    "rounded-md px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors",
+                    opFilter === "all"
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+                  ].join(" ")}
+                >
+                  Todas
+                </button>
+                {operacoes.map((op) => {
+                  const active = opFilter === op.id;
+                  return (
+                    <button
+                      key={op.id}
+                      type="button"
+                      onClick={() => setOpFilter(op.id)}
+                      className={[
+                        "rounded-md px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors",
+                        active
+                          ? `${op.accent.bg} ${op.accent.text} border ${op.accent.border}`
+                          : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {op.nome}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <DateRangeFilter value={range} onChange={setRange} />
+          </div>
         </div>
 
         {/* KPIs */}
