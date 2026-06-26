@@ -140,19 +140,19 @@ function normalizeApiLead(raw: Record<string, any>, expert: string, index: numbe
 }
 
 async function fetchCrmApiLeads(expert: ExpertApiKey) {
-  const url = new URL(`${API_BASE}/leads`);
-  url.searchParams.set("period", "30d");
+  const url = new URL(`${API_BASE}/contacts`);
+  url.searchParams.set("period", "all");
   url.searchParams.set("limit", "500");
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${expert.crm_api_key}` },
   });
-  if (!res.ok) throw new Error(`${expert.nome}: /leads retornou HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${expert.nome}: /contacts retornou HTTP ${res.status}`);
   const text = await res.text();
   let payload: any = null;
   try {
     payload = text ? JSON.parse(text) : null;
   } catch {
-    throw new Error(`${expert.nome}: /leads não retornou JSON. Confere se o endpoint público está ativo e não redirecionando para login.`);
+    throw new Error(`${expert.nome}: /contacts não retornou JSON. Confere a API key.`);
   }
   return extractLeadArray(payload).map((raw, index) => normalizeApiLead(raw, expert.nome, index));
 }
