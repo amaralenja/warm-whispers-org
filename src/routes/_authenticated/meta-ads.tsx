@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -9,13 +9,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   listCampaigns, listAdSets, listAds,
   updateEntityStatus, updateAdSetBudget, updateCampaignBudget, getAdPreview,
   type Campaign, type AdSet, type Ad, type AdInsights, type AdPreview,
 } from "@/lib/meta-ads-manager.functions";
+import { getMetaAdsConfig, saveMetaAdsConfig } from "@/lib/meta-ads.functions";
+
 
 export const Route = createFileRoute("/_authenticated/meta-ads")({
   component: MetaAdsManagerPage,
