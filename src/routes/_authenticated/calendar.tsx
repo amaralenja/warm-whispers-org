@@ -31,7 +31,10 @@ import {
   ChevronRight,
   List,
   LayoutGrid,
+  Zap,
 } from "lucide-react";
+import { ShowUpDialog, getEventLink } from "@/components/showup-dialog";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -514,8 +517,13 @@ function EventRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [showUpOpen, setShowUpOpen] = useState(false);
   const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
   const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
+  const attendeeEmail = ev.attendees?.find((a) => a.email && !a.email.includes("calendar.google"))?.email;
+  const attendeeName = ev.attendees?.find((a) => a.displayName)?.displayName;
+  const link = getEventLink(ev.id);
+
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:border-accent/40">
       <div className="flex w-20 shrink-0 items-center gap-1 text-xs text-muted-foreground">
@@ -537,28 +545,40 @@ function EventRow({
             {ev.attendees.length} convidado(s)
           </p>
         )}
+        {link && (
+          <p className="mt-0.5 text-xs text-emerald-400">
+            ✓ Vinculado: {link.nome || link.email}
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-1">
+        <button
+          className="rounded p-2 text-amber-400 hover:bg-amber-500/15"
+          onClick={() => setShowUpOpen(true)}
+          title="Disparar ShowUp pro Facebook"
+        >
+          <Zap className="h-4 w-4" />
+        </button>
         {ev.htmlLink && (
-          <a
-            href={ev.htmlLink}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded p-2 hover:bg-muted"
-          >
+          <a href={ev.htmlLink} target="_blank" rel="noreferrer" className="rounded p-2 hover:bg-muted">
             <ExternalLink className="h-4 w-4" />
           </a>
         )}
         <button className="rounded p-2 hover:bg-muted" onClick={onEdit}>
           <Pencil className="h-4 w-4" />
         </button>
-        <button
-          className="rounded p-2 text-destructive hover:bg-destructive/10"
-          onClick={onDelete}
-        >
+        <button className="rounded p-2 text-destructive hover:bg-destructive/10" onClick={onDelete}>
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
+      <ShowUpDialog
+        open={showUpOpen}
+        onOpenChange={setShowUpOpen}
+        eventId={ev.id}
+        defaultEmail={attendeeEmail}
+        defaultName={attendeeName}
+      />
     </div>
   );
 }
+
