@@ -232,6 +232,66 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_leads: {
+        Row: {
+          created_at: string
+          dados: Json | null
+          email: string | null
+          expert: string | null
+          fonte: string | null
+          id: string
+          nome: string
+          notas: string | null
+          ordem: number | null
+          responsavel_nome: string | null
+          responsavel_utm: string | null
+          status: string
+          tags: string[] | null
+          telefone: string | null
+          ultima_interacao: string | null
+          updated_at: string
+          valor_estimado: number | null
+        }
+        Insert: {
+          created_at?: string
+          dados?: Json | null
+          email?: string | null
+          expert?: string | null
+          fonte?: string | null
+          id?: string
+          nome: string
+          notas?: string | null
+          ordem?: number | null
+          responsavel_nome?: string | null
+          responsavel_utm?: string | null
+          status?: string
+          tags?: string[] | null
+          telefone?: string | null
+          ultima_interacao?: string | null
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Update: {
+          created_at?: string
+          dados?: Json | null
+          email?: string | null
+          expert?: string | null
+          fonte?: string | null
+          id?: string
+          nome?: string
+          notas?: string | null
+          ordem?: number | null
+          responsavel_nome?: string | null
+          responsavel_utm?: string | null
+          status?: string
+          tags?: string[] | null
+          telefone?: string | null
+          ultima_interacao?: string | null
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Relationships: []
+      }
       crm_materiais: {
         Row: {
           created_at: string | null
