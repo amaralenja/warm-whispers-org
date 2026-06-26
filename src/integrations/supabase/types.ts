@@ -362,6 +362,7 @@ export type Database = {
         Row: {
           ativo: boolean | null
           created_at: string | null
+          crm_api_key: string | null
           drive_url: string | null
           foto_url: string | null
           id: number
@@ -375,6 +376,7 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           created_at?: string | null
+          crm_api_key?: string | null
           drive_url?: string | null
           foto_url?: string | null
           id?: never
@@ -388,6 +390,7 @@ export type Database = {
         Update: {
           ativo?: boolean | null
           created_at?: string | null
+          crm_api_key?: string | null
           drive_url?: string | null
           foto_url?: string | null
           id?: never

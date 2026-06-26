@@ -1,0 +1,1 @@
+ALTER TABLE public.experts ADD COLUMN IF NOT EXISTS crm_api_key text;
