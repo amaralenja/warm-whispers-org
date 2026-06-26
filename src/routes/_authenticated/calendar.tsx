@@ -395,7 +395,15 @@ function CalendarPage() {
                     <Label>Início</Label>
                     <DateTimePicker
                       value={form.start}
-                      onChange={(v) => setForm({ ...form, start: v })}
+                      onChange={(v) => {
+                        const next: Partial<FormState> = { start: v };
+                        const d = new Date(v);
+                        if (!isNaN(d.getTime())) {
+                          const endDate = new Date(d.getTime() + 60 * 60 * 1000);
+                          next.end = toLocalInput(endDate.toISOString());
+                        }
+                        setForm({ ...form, ...next });
+                      }}
                     />
                   </div>
                   <div>
