@@ -246,12 +246,12 @@ function MetaAdsManagerPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            to="/meta-ads/conversoes"
+          <button
+            onClick={() => setPixelOpen(true)}
             className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted"
           >
-            <Settings2 className="h-4 w-4" /> Conversões API
-          </Link>
+            <Settings2 className="h-4 w-4" /> Configurar Pixel
+          </button>
           <button
             onClick={() => qc.invalidateQueries({ queryKey: ["meta-ads"] })}
             className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted"
