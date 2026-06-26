@@ -538,10 +538,12 @@ function CalendarPage() {
 }
 
 function StatsCards({ events }: { events: CalendarEvent[] }) {
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("mes"));
+
   const stats = useMemo(() => {
     const now = new Date();
-    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const from = range.from ? new Date(range.from + "T00:00:00") : null;
+    const to = range.to ? new Date(range.to + "T23:59:59") : null;
     const links = getAllEventLinks();
     let agendadas = 0;
     let showup = 0;
@@ -550,7 +552,9 @@ function StatsCards({ events }: { events: CalendarEvent[] }) {
     for (const ev of events) {
       const d = new Date(ev.start.dateTime || ev.start.date || "");
       if (isNaN(d.getTime())) continue;
-      if (d >= startMonth && d <= endMonth) agendadas++;
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      agendadas++;
       const past = d < now;
       const linked = !!links[ev.id];
       if (past && linked) showup++;
@@ -558,33 +562,42 @@ function StatsCards({ events }: { events: CalendarEvent[] }) {
       else if (!past) proximas++;
     }
     return { agendadas, showup, noshow, proximas };
-  }, [events]);
+  }, [events, range]);
 
   const cards = [
-    { label: "Agendadas no mês", value: stats.agendadas, icon: CalendarIcon, color: "text-blue-400", bg: "bg-blue-500/10" },
+    { label: "Agendadas no período", value: stats.agendadas, icon: CalendarIcon, color: "text-blue-400", bg: "bg-blue-500/10" },
     { label: "Próximas calls", value: stats.proximas, icon: CalendarClock, color: "text-amber-400", bg: "bg-amber-500/10" },
     { label: "Show-up confirmado", value: stats.showup, icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10" },
     { label: "No-show", value: stats.noshow, icon: XCircle, color: "text-rose-400", bg: "bg-rose-500/10" },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {cards.map((c) => (
-        <Card key={c.label}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${c.bg} ${c.color}`}>
-              <c.icon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">{c.label}</p>
-              <p className="text-2xl font-bold tabular-nums">{c.value}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-2">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          📊 Filtro afeta <strong>apenas os cards de métricas</strong> abaixo — o calendário sempre mostra o mês inteiro.
+        </p>
+        <DateRangeFilter value={range} onChange={setRange} />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {cards.map((c) => (
+          <Card key={c.label}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${c.bg} ${c.color}`}>
+                <c.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">{c.label}</p>
+                <p className="text-2xl font-bold tabular-nums">{c.value}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
+
 
 
 function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void }) {
