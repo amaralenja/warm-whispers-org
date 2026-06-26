@@ -108,6 +108,24 @@ export type CalendarEvent = {
   status?: string;
 };
 
+export const listCalendars = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const token = await getAccessToken();
+    const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const txt = await res.text();
+    if (!res.ok) throw new Error(`calendarList ${res.status}: ${txt}`);
+    const json = JSON.parse(txt) as { items?: { id: string; summary?: string; accessRole?: string }[] };
+    return {
+      configuredId: process.env.GOOGLE_CALENDAR_ID || null,
+      items: (json.items || []).map((c) => ({ id: c.id, summary: c.summary, accessRole: c.accessRole })),
+    };
+  });
+
+
+
 export const listEvents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { timeMin?: string; timeMax?: string; q?: string }) => d)
