@@ -621,6 +621,8 @@ function QuizPage() {
           </CardContent>
         </Card>
       )}
+
+      <LeadDetailDialog lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
   );
 }
