@@ -112,6 +112,62 @@ function RankingTV() {
   const initializedRef = useRef(false);
   const rankingRef = useRef<PublicRankingItem[]>([]);
   const [pulse, setPulse] = useState(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  function playCashSound() {
+    try {
+      const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      if (!audioCtxRef.current) audioCtxRef.current = new AC();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const now = ctx.currentTime;
+      // Cha-ching: dois "dings" + brilho
+      const notes = [
+        { f: 1318.5, t: 0,    d: 0.35 }, // E6
+        { f: 1760,   t: 0.09, d: 0.45 }, // A6
+        { f: 2637,   t: 0.18, d: 0.55 }, // E7 brilho
+      ];
+      notes.forEach(({ f, t, d }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(f, now + t);
+        gain.gain.setValueAtTime(0, now + t);
+        gain.gain.linearRampToValueAtTime(0.35, now + t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + t);
+        osc.stop(now + t + d + 0.05);
+      });
+    } catch { /* sem áudio */ }
+  }
+
+  function triggerSalePop(opts: { nome: string; expert: string | null; avatar: string; ticket: number }) {
+    const pop: SalePop = {
+      id: Date.now() + Math.random(),
+      nome: opts.nome,
+      expert: opts.expert,
+      avatar: opts.avatar,
+      ticket: opts.ticket,
+      left: 20 + Math.random() * 60,
+    };
+    setSalePops((prev) => [...prev, pop]);
+    setTimeout(() => setSalePops((prev) => prev.filter((p) => p.id !== pop.id)), 5200);
+    playCashSound();
+  }
+
+  function simulateSale() {
+    const fakes = [
+      { nome: "Carlos Silva",   ticket: 997 },
+      { nome: "Ana Santos",     ticket: 1497 },
+      { nome: "Pedro Oliveira", ticket: 2997 },
+      { nome: "Maria Costa",    ticket: 497 },
+      { nome: "João Ferreira",  ticket: 3997 },
+    ];
+    const pick = fakes[Math.floor(Math.random() * fakes.length)];
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(pick.nome)}&background=4ade80&color=000&size=200&bold=true`;
+    triggerSalePop({ nome: pick.nome, expert: "DEMO", avatar, ticket: pick.ticket });
+  }
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
