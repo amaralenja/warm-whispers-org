@@ -205,15 +205,33 @@ export const createEvent = createServerFn({ method: "POST" })
     }) => d,
   )
   .handler(async ({ data }) => {
-    const body = {
+    const emails = (data.attendees || []).map((e) => e.trim()).filter(Boolean);
+    const descWithGuests = emails.length
+      ? `${data.description ? data.description + "\n\n" : ""}Convidados:\n${emails.map((e) => `• ${e}`).join("\n")}`
+      : data.description;
+    const buildBody = (withAttendees: boolean) => ({
       summary: data.summary,
-      description: data.description,
+      description: withAttendees ? data.description : descWithGuests,
       location: data.location,
       start: { dateTime: data.start, timeZone: "America/Sao_Paulo" },
       end: { dateTime: data.end, timeZone: "America/Sao_Paulo" },
-      attendees: data.attendees?.filter(Boolean).map((email) => ({ email })),
-    };
-    return (await gcal(`/events`, { method: "POST", body: JSON.stringify(body) })) as CalendarEvent;
+      ...(withAttendees && emails.length ? { attendees: emails.map((email) => ({ email })) } : {}),
+    });
+    try {
+      return (await gcal(`/events?sendUpdates=none`, {
+        method: "POST",
+        body: JSON.stringify(buildBody(true)),
+      })) as CalendarEvent;
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (emails.length && /forbiddenForServiceAccounts|Domain-Wide Delegation|without Domain/i.test(msg)) {
+        return (await gcal(`/events?sendUpdates=none`, {
+          method: "POST",
+          body: JSON.stringify(buildBody(false)),
+        })) as CalendarEvent;
+      }
+      throw e;
+    }
   });
 
 export const updateEvent = createServerFn({ method: "POST" })
@@ -230,18 +248,33 @@ export const updateEvent = createServerFn({ method: "POST" })
     }) => d,
   )
   .handler(async ({ data }) => {
-    const body = {
+    const emails = (data.attendees || []).map((e) => e.trim()).filter(Boolean);
+    const descWithGuests = emails.length
+      ? `${data.description ? data.description + "\n\n" : ""}Convidados:\n${emails.map((e) => `• ${e}`).join("\n")}`
+      : data.description;
+    const buildBody = (withAttendees: boolean) => ({
       summary: data.summary,
-      description: data.description,
+      description: withAttendees ? data.description : descWithGuests,
       location: data.location,
       start: { dateTime: data.start, timeZone: "America/Sao_Paulo" },
       end: { dateTime: data.end, timeZone: "America/Sao_Paulo" },
-      attendees: data.attendees?.filter(Boolean).map((email) => ({ email })),
-    };
-    return (await gcal(`/events/${encodeURIComponent(data.id)}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    })) as CalendarEvent;
+      ...(withAttendees && emails.length ? { attendees: emails.map((email) => ({ email })) } : {}),
+    });
+    try {
+      return (await gcal(`/events/${encodeURIComponent(data.id)}?sendUpdates=none`, {
+        method: "PATCH",
+        body: JSON.stringify(buildBody(true)),
+      })) as CalendarEvent;
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (emails.length && /forbiddenForServiceAccounts|Domain-Wide Delegation|without Domain/i.test(msg)) {
+        return (await gcal(`/events/${encodeURIComponent(data.id)}?sendUpdates=none`, {
+          method: "PATCH",
+          body: JSON.stringify(buildBody(false)),
+        })) as CalendarEvent;
+      }
+      throw e;
+    }
   });
 
 export const deleteEvent = createServerFn({ method: "POST" })
