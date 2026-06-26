@@ -148,6 +148,7 @@ function CalendarPage() {
   const [view, setView] = useState<"month" | "list">("month");
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
 
@@ -246,9 +247,28 @@ function CalendarPage() {
   }
 
   const weekdayLabels = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  const selectedDayEvents = selectedDay
-    ? eventsByDay.get(format(selectedDay, "yyyy-MM-dd")) || []
-    : [];
+
+  // Panel events: if user clicked a day → that day only; otherwise filtered by global range
+  const panelEvents = useMemo(() => {
+    if (selectedDay) {
+      return eventsByDay.get(format(selectedDay, "yyyy-MM-dd")) || [];
+    }
+    const from = range.from ? new Date(range.from + "T00:00:00") : null;
+    const to = range.to ? new Date(range.to + "T23:59:59") : null;
+    return events
+      .filter((ev) => {
+        const d = evDate(ev);
+        if (isNaN(d.getTime())) return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      })
+      .sort((a, b) => evDate(a).getTime() - evDate(b).getTime());
+  }, [selectedDay, eventsByDay, events, range]);
+
+  const panelTitle = selectedDay
+    ? format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })
+    : range.label || "Período selecionado";
 
   return (
     <div className="p-4 md:p-6 space-y-4">
