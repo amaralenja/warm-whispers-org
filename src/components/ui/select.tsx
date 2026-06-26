@@ -6,13 +6,15 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const Select = ({ value, defaultValue, ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) => (
-  <SelectPrimitive.Root
-    value={value == null ? undefined : String(value)}
-    defaultValue={defaultValue == null ? undefined : String(defaultValue)}
-    {...props}
-  />
-);
+const Select = ({ value, defaultValue, ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) => {
+  const safeProps: React.ComponentProps<typeof SelectPrimitive.Root> = {
+    ...props,
+    ...(value != null ? { value: String(value) } : {}),
+    ...(defaultValue != null ? { defaultValue: String(defaultValue) } : {}),
+  };
+
+  return <SelectPrimitive.Root {...safeProps} />;
+};
 Select.displayName = "Select";
 
 const SelectGroup = SelectPrimitive.Group;
