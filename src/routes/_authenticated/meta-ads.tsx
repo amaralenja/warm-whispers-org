@@ -138,18 +138,20 @@ function MetaAdsManagerPage() {
     staleTime: 30_000,
   });
 
-  const adsetsQ = useQuery({
-    queryKey: ["meta-ads", "adsets", campaignId, preset],
-    queryFn: () => listAdSetsFn({ data: { campaignId: campaignId!, datePreset: preset } }),
-    enabled: !!campaignId,
-    staleTime: 30_000,
+  const adsetsQueries = useQueries({
+    queries: Array.from(selectedCampaigns).map((cid) => ({
+      queryKey: ["meta-ads", "adsets", cid, preset],
+      queryFn: () => listAdSetsFn({ data: { campaignId: cid, datePreset: preset } }),
+      staleTime: 30_000,
+    })),
   });
 
-  const adsQ = useQuery({
-    queryKey: ["meta-ads", "ads", adsetId, preset],
-    queryFn: () => listAdsFn({ data: { adsetId: adsetId!, datePreset: preset } }),
-    enabled: !!adsetId,
-    staleTime: 30_000,
+  const adsQueries = useQueries({
+    queries: Array.from(selectedAdsets).map((aid) => ({
+      queryKey: ["meta-ads", "ads", aid, preset],
+      queryFn: () => listAdsFn({ data: { adsetId: aid, datePreset: preset } }),
+      staleTime: 30_000,
+    })),
   });
 
   const previewQ = useQuery({
@@ -163,13 +165,17 @@ function MetaAdsManagerPage() {
     () => (Array.isArray(campaignsQ.data) ? campaignsQ.data : []),
     [campaignsQ.data],
   );
+  const adsetsLoading = adsetsQueries.some((q) => q.isLoading);
+  const adsetsError = adsetsQueries.find((q) => q.error)?.error as Error | undefined;
   const adsets = useMemo(
-    () => (Array.isArray(adsetsQ.data) ? adsetsQ.data : []),
-    [adsetsQ.data],
+    () => adsetsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as AdSet[],
+    [adsetsQueries],
   );
+  const adsLoading = adsQueries.some((q) => q.isLoading);
+  const adsError = adsQueries.find((q) => q.error)?.error as Error | undefined;
   const ads = useMemo(
-    () => (Array.isArray(adsQ.data) ? adsQ.data : []),
-    [adsQ.data],
+    () => adsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as Ad[],
+    [adsQueries],
   );
 
   const toggleStatus = useMutation({
