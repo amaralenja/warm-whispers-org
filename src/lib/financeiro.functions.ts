@@ -19,7 +19,9 @@ export type Lancamento = {
 
 export const listLancamentos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<Lancamento[]> => {
+  .handler(async (opts): Promise<Lancamento[]> => {
+    const context = opts?.context;
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const { data, error } = await context.supabase
       .from("financeiro")
       .select("*")
@@ -48,7 +50,10 @@ export const upsertLancamento = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ id: z.number().int().positive().optional(), data: lancamentoInput }).parse(input),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async (opts) => {
+    const context = opts?.context;
+    const data = opts?.data;
+    if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
     if (data.id) {
       const { error } = await context.supabase
         .from("financeiro")
@@ -69,7 +74,10 @@ export const upsertLancamento = createServerFn({ method: "POST" })
 export const deleteLancamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.number().int().positive() }).parse(input))
-  .handler(async ({ data, context }) => {
+  .handler(async (opts) => {
+    const context = opts?.context;
+    const data = opts?.data;
+    if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
     const { error } = await context.supabase.from("financeiro").delete().eq("id", data.id);
     if (error) throw error;
     return { ok: true };
@@ -122,7 +130,10 @@ export type RelatorioPayload = {
 export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { mes?: string } | undefined) => input ?? {})
-  .handler(async ({ data, context }): Promise<RelatorioPayload> => {
+  .handler(async (opts): Promise<RelatorioPayload> => {
+    const context = opts?.context;
+    const data = opts?.data ?? {};
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const refMes = data.mes ?? new Date().toISOString().slice(0, 7);
     const { data: rows, error } = await context.supabase
       .from("financeiro")
@@ -207,7 +218,10 @@ export const getDRE = createServerFn({ method: "POST" })
       to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(i.to),
     };
   })
-  .handler(async ({ data, context }): Promise<DrePayload> => {
+  .handler(async (opts): Promise<DrePayload> => {
+    const context = opts?.context;
+    const data = opts?.data;
+    if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
     const { from, to } = data;
     const { supabase } = context;
 
