@@ -427,54 +427,46 @@ function CalendarPage() {
               const selected = selectedDay && isSameDay(day, selectedDay);
 
               return (
-                <button
+                <div
                   key={key}
                   onClick={() => setSelectedDay(day)}
                   onDoubleClick={() => openCreate(day)}
-                  className={`group relative min-h-[110px] border-b border-r border-border p-1.5 text-left transition hover:bg-muted/40 ${
-                    inMonth ? "bg-background" : "bg-muted/20"
+                  className={`group relative min-h-[150px] border-b border-r border-border p-2 text-left transition hover:bg-muted/30 ${
+                    inMonth ? "bg-background" : "bg-muted/10"
                   } ${selected ? "ring-2 ring-accent ring-inset" : ""}`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1.5">
                     <span
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
                         today
                           ? "bg-accent text-accent-foreground"
                           : inMonth
                             ? "text-foreground"
-                            : "text-muted-foreground/60"
+                            : "text-muted-foreground/50"
                       }`}
                     >
                       {format(day, "d")}
                     </span>
-                    {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        +{dayEvents.length - 3}
+                    {dayEvents.length > 2 && (
+                      <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        +{dayEvents.length - 2}
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 space-y-0.5">
-                    {dayEvents.slice(0, 3).map((ev) => (
-                      <div
+                  <div className="space-y-1">
+                    {dayEvents.slice(0, 2).map((ev) => (
+                      <MonthEventChip
                         key={ev.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEdit(ev);
-                        }}
-                        className="truncate rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground hover:bg-accent/30"
-                        title={ev.summary}
-                      >
-                        {ev.start.dateTime
-                          ? format(new Date(ev.start.dateTime), "HH:mm") + " "
-                          : ""}
-                        {ev.summary || "(sem título)"}
-                      </div>
+                        ev={ev}
+                        onEdit={() => openEdit(ev)}
+                      />
                     ))}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
+
 
           {/* Selected day panel */}
           {selectedDay && (
