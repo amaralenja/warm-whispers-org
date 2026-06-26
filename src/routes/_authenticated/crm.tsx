@@ -60,7 +60,7 @@ type Lead = {
 
 type ExpertApiKey = { id: number; nome: string; ativo: boolean; crm_api_key: string | null };
 
-const API_BASE = "https://19b67e6b-8330-4b05-a7e9-34840c33d6c1.lovableproject.com/api/public/v1";
+const API_BASE = "https://vyzap.lovable.app/api/public/v1";
 
 const BRL = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n || 0);
