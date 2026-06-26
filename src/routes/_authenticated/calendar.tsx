@@ -711,6 +711,7 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
     const from = range.from ? new Date(range.from + "T00:00:00") : null;
     const to = range.to ? new Date(range.to + "T23:59:59") : null;
     const links = getAllEventLinks();
+    const noshows = getAllNoShows();
     let agendadas = 0;
     let showup = 0;
     let noshow = 0;
@@ -723,7 +724,9 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
       agendadas++;
       const past = d < now;
       const linked = !!links[ev.id];
-      if (past && linked) showup++;
+      const isNoShow = !!noshows[ev.id];
+      if (isNoShow) noshow++;
+      else if (past && linked) showup++;
       else if (past && !linked) noshow++;
       else if (!past) proximas++;
     }
@@ -933,6 +936,7 @@ function MetricsView({
     const from = range.from ? new Date(range.from + "T00:00:00") : null;
     const to = range.to ? new Date(range.to + "T23:59:59") : null;
     const links = getAllEventLinks();
+    const noshows = getAllNoShows();
     let agendadas = 0;
     let proximas = 0;
     let realizadas = 0;
@@ -946,9 +950,13 @@ function MetricsView({
       if (to && d > to) continue;
       agendadas++;
       const linked = !!links[ev.id];
+      const isNoShow = !!noshows[ev.id];
       if (linked) linkadas++;
       const past = d < now;
-      if (past) {
+      if (isNoShow) {
+        realizadas++;
+        noshow++;
+      } else if (past) {
         realizadas++;
         if (linked) showup++;
         else noshow++;
