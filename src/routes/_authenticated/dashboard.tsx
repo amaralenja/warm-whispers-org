@@ -34,7 +34,7 @@ function Dashboard() {
   const { config, getShare } = useDashboardConfig();
   const fetchOps = useServerFn(getOperacoesStats);
 
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("ano"));
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [configOpen, setConfigOpen] = useState(false);
 
   const expertFilter = workspace.id === "all" ? null : workspace.id;
@@ -213,6 +213,13 @@ function Dashboard() {
                 />
               </section>
             )}
+
+            {/* Vendas Reembolsadas — sempre na aba Geral, respeita workspace + filtro */}
+            <ReembolsosList
+              reembolsos={data?.reembolsos ?? []}
+              totalValor={data?.totalValorReembolsado ?? 0}
+              loading={isLoading}
+            />
           </TabsContent>
 
           {/* ============ ABA VENDEDORES ============ */}
