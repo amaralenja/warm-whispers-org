@@ -177,10 +177,28 @@ function CalendarPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const r = await useServerFn(listCalendars)();
+                console.log("[GCAL] calendarios visíveis:", r);
+                toast.success(
+                  `${r.items.length} calendário(s) visível(is). Veja o console (F12) para copiar o ID correto.`,
+                  { duration: 8000 },
+                );
+              } catch (e: any) {
+                toast.error(e.message);
+              }
+            }}
+          >
+            Listar calendários
+          </Button>
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
+
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={openCreate}>
