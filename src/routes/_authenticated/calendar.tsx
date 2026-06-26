@@ -183,7 +183,7 @@ function CalendarPage() {
             variant="outline"
             onClick={async () => {
               try {
-                const r = await useServerFn(listCalendars)();
+                const r = await listCals();
                 console.log("[GCAL] calendarios visíveis:", r);
                 toast.success(
                   `${r.items.length} calendário(s) visível(is). Veja o console (F12) para copiar o ID correto.`,
