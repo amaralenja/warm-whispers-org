@@ -47,6 +47,11 @@ export function computeRange(preset: RangePreset): DateRangeValue {
     s.setUTCDate(s.getUTCDate() - 6);
     return { preset, from: iso(s), to: iso(today) };
   }
+  if (preset === "15d") {
+    const s = new Date(today);
+    s.setUTCDate(s.getUTCDate() - 14);
+    return { preset, from: iso(s), to: iso(today) };
+  }
   if (preset === "30d") {
     const s = new Date(today);
     s.setUTCDate(s.getUTCDate() - 29);
