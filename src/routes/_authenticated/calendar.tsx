@@ -676,7 +676,7 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
     <div className="space-y-2">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          📊 Filtro afeta <strong>apenas os cards de métricas</strong> abaixo — o calendário sempre mostra o mês inteiro.
+          📊 Filtro afeta as <strong>métricas</strong> e a <strong>lista de eventos</strong> abaixo do calendário. Clique num dia pra ver só ele.
         </p>
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
