@@ -85,7 +85,7 @@ type FormState = {
   location: string;
   start: string;
   end: string;
-  attendees: string;
+  attendees: string[];
 };
 
 const emptyForm = (base?: Date): FormState => {
