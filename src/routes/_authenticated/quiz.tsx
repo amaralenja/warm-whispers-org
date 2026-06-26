@@ -243,10 +243,10 @@ function QuizPage() {
     return isRealHeuristic(l);
   }
 
-  const fromIso = periodToFrom(period);
+  const { from: fromIso, to: toIso } = periodToRange(period, customFrom, customTo);
 
   const { data: leads = [], isLoading, error } = useQuery({
-    queryKey: ["quiz-leads", period],
+    queryKey: ["quiz-leads", period, fromIso, toIso],
     queryFn: async () => {
       let q = quizSb
         .from("leads")
@@ -254,6 +254,7 @@ function QuizPage() {
         .order("data_criacao", { ascending: false })
         .limit(1000);
       if (fromIso) q = q.gte("data_criacao", fromIso);
+      if (toIso) q = q.lt("data_criacao", toIso);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Lead[];
