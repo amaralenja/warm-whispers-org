@@ -72,7 +72,7 @@ type HallOfFamePayload = {
 };
 
 type NivelItem = { nivel: number; meta: number; pct: number; batida: boolean; faltam: number; porSemana: number; porVendedor: number };
-type ColetivaItem = { expert: string; faturamento: number; vendas: number; qtdVendedores: number; diasRestantes: number; nivelAtual: number; niveis: NivelItem[] };
+type ColetivaItem = { expert: string; faturamento: number; vendas: number; qtdVendedores: number; diasRestantes: number; nivelAtual: number; semMeta?: boolean; niveis: NivelItem[] };
 
 type Balao = { num: number; icon: string; label: string; desc: string; tier: "nada" | "pix" | "vale" | "ouro" | "extra" };
 
