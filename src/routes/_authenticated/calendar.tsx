@@ -163,7 +163,7 @@ function CalendarPage() {
   const update = useServerFn(updateEvent);
   const del = useServerFn(deleteEvent);
 
-  const [view, setView] = useState<"month" | "list">("month");
+  const [view, setView] = useState<"month" | "list" | "metrics">("month");
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
