@@ -887,8 +887,8 @@ function MetricsView({
     queryKey: ["calendar-metrics-vendas", range.from, range.to],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_ranking_tv_stats", {
-        _from: range.from || null,
-        _to: range.to || null,
+        _from: range.from || undefined,
+        _to: range.to || undefined,
       });
       if (error) throw error;
       return data as any;
