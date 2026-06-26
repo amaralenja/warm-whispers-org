@@ -197,7 +197,7 @@ function MetaAdsManagerPage() {
             <Activity className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Gerenciador de Anúncios</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Gerenciador de Ads</h1>
             <p className="text-sm text-muted-foreground">
               Campanhas, conjuntos e anúncios direto da sua conta Meta.
             </p>
