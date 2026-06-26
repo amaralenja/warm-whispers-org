@@ -39,11 +39,11 @@ export function ReembolsosList({
         <div className="flex items-center gap-4 text-xs">
           <div className="flex flex-col items-end">
             <span className="text-[0.55rem] uppercase tracking-[0.18em] text-muted-foreground">Qtd</span>
-            <span className="text-sm font-semibold tabular-nums text-foreground">{reembolsos.length}</span>
+            <span className="text-sm font-semibold tabular-nums text-foreground">{items.length}</span>
           </div>
           <div className="flex flex-col items-end">
             <span className="text-[0.55rem] uppercase tracking-[0.18em] text-muted-foreground">Valor total</span>
-            <span className="text-sm font-semibold tabular-nums text-rose-400">{BRL(totalValor)}</span>
+            <span className="text-sm font-semibold tabular-nums text-rose-400">{BRL(total)}</span>
           </div>
         </div>
       </div>
@@ -55,7 +55,7 @@ export function ReembolsosList({
               <div key={i} className="h-12 animate-pulse rounded-md bg-secondary/30" />
             ))}
           </div>
-        ) : reembolsos.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-muted-foreground">
             Nenhum reembolso no período. 🎉
           </div>
@@ -72,7 +72,7 @@ export function ReembolsosList({
               </tr>
             </thead>
             <tbody>
-              {reembolsos.map((r, i) => (
+              {items.map((r, i) => (
                 <tr
                   key={`${r.idVenda}-${i}`}
                   className="border-b border-border/30 transition hover:bg-secondary/20"
