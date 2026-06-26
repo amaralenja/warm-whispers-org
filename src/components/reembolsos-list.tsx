@@ -19,10 +19,12 @@ export function ReembolsosList({
   totalValor,
   loading,
 }: {
-  reembolsos: ReembolsoItem[];
-  totalValor: number;
+  reembolsos?: ReembolsoItem[] | null;
+  totalValor?: number | null;
   loading?: boolean;
 }) {
+  const items = Array.isArray(reembolsos) ? reembolsos : [];
+  const total = typeof totalValor === "number" ? totalValor : 0;
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card/60 to-card/20 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
