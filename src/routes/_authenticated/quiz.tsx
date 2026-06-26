@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,162 +10,172 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "@/components/ui/dialog";
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Users, TrendingUp, DollarSign, Phone, Settings, KeyRound, RefreshCw,
+  Users, TrendingUp, DollarSign, Facebook, RefreshCw, Search, Radio,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/quiz")({
   component: QuizPage,
 });
 
-// ---------- Types ----------
-type Expert = { id: number; nome: string; ativo: boolean; quiz_api_key: string | null };
-type Period = "today" | "yesterday" | "7d" | "30d" | "90d" | "custom";
+// ---------- External Supabase (Quiz API) ----------
+const QUIZ_SUPABASE_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
 
-type Overview = {
-  total_sales: number;
-  total_revenue: number;
-  total_leads: number;
-  total_numbers: number;
-  response_rate: number;
+const quizSb = createClient(QUIZ_SUPABASE_URL, QUIZ_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+  realtime: { params: { eventsPerSecond: 5 } },
+});
+
+type Lead = {
+  id: string;
+  data_criacao: string;
+  nome: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  fbc: string | null;
+  fbp: string | null;
+  fbclid: string | null;
+  gclid: string | null;
+  caixa_letra: string | null;
+  caixa_label: string | null;
+  lead_score: number | null;
+  faturamento: string | null;
+  status: string | null;
+  crm_status: string | null;
+  origem: string | null;
 };
-type NumberItem = {
-  numero?: string; nome?: string; leads?: number; vendas?: number; faturamento?: number;
-  [k: string]: unknown;
-};
-type ApiResp<T extends string, V> = { ok: boolean; period?: { from: string; to: string } } & Record<T, V>;
 
-const API_BASE = "https://19b67e6b-8330-4b05-a7e9-34840c33d6c1.lovableproject.com/api/public/v1";
+type Period = "today" | "yesterday" | "7d" | "30d" | "90d" | "all";
 
-async function apiGet<T>(path: string, key: string, period: Period, customFrom?: string, customTo?: string): Promise<T> {
-  const url = new URL(`${API_BASE}${path}`);
-  if (period === "custom" && customFrom && customTo) {
-    url.searchParams.set("period", "custom");
-    url.searchParams.set("from", customFrom);
-    url.searchParams.set("to", customTo);
-  } else {
-    url.searchParams.set("period", period);
+function periodToFrom(p: Period): string | null {
+  const now = new Date();
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  switch (p) {
+    case "today": return d.toISOString();
+    case "yesterday": { const y = new Date(d); y.setDate(y.getDate() - 1); return y.toISOString(); }
+    case "7d": { const x = new Date(d); x.setDate(x.getDate() - 7); return x.toISOString(); }
+    case "30d": { const x = new Date(d); x.setDate(x.getDate() - 30); return x.toISOString(); }
+    case "90d": { const x = new Date(d); x.setDate(x.getDate() - 90); return x.toISOString(); }
+    case "all": return null;
   }
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!res.ok) throw new Error(`API ${path} → HTTP ${res.status}`);
-  return (await res.json()) as T;
 }
 
-const BRL = (n: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(n || 0);
-
-// ---------- Page ----------
 function QuizPage() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();
   const isGeral = workspace?.id === "all";
 
-  const [period, setPeriod] = useState<Period>("30d");
-  const [customFrom, setCustomFrom] = useState<string>("");
-  const [customTo, setCustomTo] = useState<string>("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [period, setPeriod] = useState<Period>("7d");
+  const [search, setSearch] = useState("");
+  const [onlyFb, setOnlyFb] = useState(false);
+  const [liveCount, setLiveCount] = useState(0);
 
-  // Load experts + their keys
-  const { data: experts = [], isLoading: loadingExperts } = useQuery({
-    queryKey: ["experts-quiz-keys"],
+  const fromIso = periodToFrom(period);
+
+  const { data: leads = [], isLoading, error } = useQuery({
+    queryKey: ["quiz-leads", period, onlyFb],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("experts")
-        .select("id, nome, ativo, quiz_api_key")
-        .order("nome");
+      let q = quizSb
+        .from("leads")
+        .select("*")
+        .order("data_criacao", { ascending: false })
+        .limit(1000);
+      if (fromIso) q = q.gte("data_criacao", fromIso);
+      if (onlyFb) q = q.not("fbc", "is", null);
+      const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Expert[];
+      return (data ?? []) as Lead[];
     },
+    refetchInterval: 30000,
   });
 
-  // Decide which experts to query
-  const targetExperts = useMemo(() => {
-    if (isGeral) return experts.filter((e) => e.ativo && e.quiz_api_key);
-    return experts.filter((e) => e.nome === workspace?.nome && e.quiz_api_key);
-  }, [experts, isGeral, workspace]);
+  // Realtime
+  useEffect(() => {
+    const ch = quizSb
+      .channel("quiz-leads-stream")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "leads" }, () => {
+        setLiveCount((n) => n + 1);
+        qc.invalidateQueries({ queryKey: ["quiz-leads"] });
+      })
+      .subscribe();
+    return () => { quizSb.removeChannel(ch); };
+  }, [qc]);
 
-  // Per-expert overview
-  const overviewQueries = useQueries({
-    queries: targetExperts.map((e) => ({
-      queryKey: ["quiz-overview", e.id, period, customFrom, customTo],
-      queryFn: () => apiGet<ApiResp<"overview", Overview>>("/overview", e.quiz_api_key!, period, customFrom, customTo),
-      enabled: !!e.quiz_api_key && (period !== "custom" || (!!customFrom && !!customTo)),
-      refetchInterval: 60000,
-      retry: 0,
-    })),
-  });
-
-  // Per-expert numbers
-  const numbersQueries = useQueries({
-    queries: targetExperts.map((e) => ({
-      queryKey: ["quiz-numbers", e.id, period, customFrom, customTo],
-      queryFn: () => apiGet<ApiResp<"numbers", NumberItem[]>>("/numbers", e.quiz_api_key!, period, customFrom, customTo),
-      enabled: !!e.quiz_api_key && (period !== "custom" || (!!customFrom && !!customTo)),
-      refetchInterval: 60000,
-      retry: 0,
-    })),
-  });
-
-  const isLoadingData = overviewQueries.some((q) => q.isLoading) || numbersQueries.some((q) => q.isLoading);
-  const anyError = overviewQueries.find((q) => q.error)?.error || numbersQueries.find((q) => q.error)?.error;
-
-  // Aggregate
-  const aggregate = useMemo(() => {
-    const acc: Overview = { total_sales: 0, total_revenue: 0, total_leads: 0, total_numbers: 0, response_rate: 0 };
-    let count = 0;
-    overviewQueries.forEach((q) => {
-      const ov = q.data?.overview;
-      if (!ov) return;
-      acc.total_sales += Number(ov.total_sales) || 0;
-      acc.total_revenue += Number(ov.total_revenue) || 0;
-      acc.total_leads += Number(ov.total_leads) || 0;
-      acc.total_numbers += Number(ov.total_numbers) || 0;
-      acc.response_rate += Number(ov.response_rate) || 0;
-      count++;
-    });
-    if (count > 0) acc.response_rate = acc.response_rate / count;
-    return acc;
-  }, [overviewQueries]);
-
-  const numbersFlat = useMemo(() => {
-    const rows: (NumberItem & { _expert: string })[] = [];
-    numbersQueries.forEach((q, i) => {
-      const items = q.data?.numbers ?? [];
-      const ex = targetExperts[i];
-      items.forEach((n) => rows.push({ ...n, _expert: ex?.nome ?? "" }));
-    });
+  // Optional: scope by workspace if a UTM matches operation name
+  const scopedLeads = useMemo(() => {
+    let rows = leads;
+    if (!isGeral && workspace?.nome) {
+      const w = workspace.nome.toLowerCase();
+      rows = rows.filter(
+        (l) =>
+          (l.utm_campaign ?? "").toLowerCase().includes(w) ||
+          (l.utm_source ?? "").toLowerCase().includes(w) ||
+          (l.utm_content ?? "").toLowerCase().includes(w),
+      );
+    }
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      rows = rows.filter(
+        (l) =>
+          (l.nome ?? "").toLowerCase().includes(s) ||
+          (l.email ?? "").toLowerCase().includes(s) ||
+          (l.whatsapp ?? "").toLowerCase().includes(s) ||
+          (l.instagram ?? "").toLowerCase().includes(s),
+      );
+    }
     return rows;
-  }, [numbersQueries, targetExperts]);
+  }, [leads, isGeral, workspace, search]);
 
-  function refreshAll() {
-    qc.invalidateQueries({ queryKey: ["quiz-overview"] });
-    qc.invalidateQueries({ queryKey: ["quiz-numbers"] });
+  const stats = useMemo(() => {
+    const total = scopedLeads.length;
+    const withFb = scopedLeads.filter((l) => l.fbc || l.fbp).length;
+    const withGoogle = scopedLeads.filter((l) => l.gclid).length;
+    const scoreAlto = scopedLeads.filter((l) => ["E", "F", "G"].includes((l.caixa_letra ?? "").toUpperCase())).length;
+    const fbRate = total > 0 ? (withFb / total) * 100 : 0;
+    return { total, withFb, withGoogle, scoreAlto, fbRate };
+  }, [scopedLeads]);
+
+  function refresh() {
+    setLiveCount(0);
+    qc.invalidateQueries({ queryKey: ["quiz-leads"] });
   }
-
-  const missingKey = !isGeral && targetExperts.length === 0 && !loadingExperts;
-  const noKeysAtAll = isGeral && targetExperts.length === 0 && !loadingExperts;
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quiz</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">Quiz · Leads</h1>
+            <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-400">
+              <Radio className="h-3 w-3 animate-pulse" /> Tempo real
+            </Badge>
+          </div>
           <p className="text-sm text-muted-foreground">
-            {isGeral ? "Visão geral de todas as operações" : `Operação · ${workspace?.nome}`}
-            {targetExperts.length > 0 && ` · ${targetExperts.length} chave${targetExperts.length > 1 ? "s" : ""} ativa${targetExperts.length > 1 ? "s" : ""}`}
+            {isGeral ? "Todos os leads do quiz" : `Filtrado por operação · ${workspace?.nome}`}
+            {liveCount > 0 && ` · ${liveCount} novo${liveCount > 1 ? "s" : ""} desde a última atualização`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar nome, email, whatsapp…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 w-[260px] pl-8"
+            />
+          </div>
           <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
             <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -174,145 +184,100 @@ function QuizPage() {
               <SelectItem value="7d">Últimos 7 dias</SelectItem>
               <SelectItem value="30d">Últimos 30 dias</SelectItem>
               <SelectItem value="90d">Últimos 90 dias</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
+              <SelectItem value="all">Tudo</SelectItem>
             </SelectContent>
           </Select>
-          {period === "custom" && (
-            <>
-              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 w-[150px]" />
-              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 w-[150px]" />
-            </>
-          )}
-          <Button variant="outline" size="sm" onClick={refreshAll}>
-            <RefreshCw className="mr-1.5 h-4 w-4" /> Atualizar
+          <Button
+            variant={onlyFb ? "default" : "outline"}
+            size="sm"
+            onClick={() => setOnlyFb((v) => !v)}
+          >
+            <Facebook className="mr-1.5 h-4 w-4" /> Só Facebook
           </Button>
-          <Button size="sm" onClick={() => setSettingsOpen(true)}>
-            <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
+          <Button variant="outline" size="sm" onClick={refresh}>
+            <RefreshCw className="mr-1.5 h-4 w-4" /> Atualizar
           </Button>
         </div>
       </div>
 
-      {/* Empty states */}
-      {missingKey && (
-        <EmptyState
-          title="Operação sem API key"
-          message={`A operação ${workspace?.nome} ainda não tem uma chave da API do Quiz cadastrada.`}
-          onConfigure={() => setSettingsOpen(true)}
-        />
-      )}
-      {noKeysAtAll && (
-        <EmptyState
-          title="Nenhuma API key cadastrada"
-          message="Cadastre o bearer token de pelo menos uma operação para começar a ver os dados do Quiz."
-          onConfigure={() => setSettingsOpen(true)}
-        />
-      )}
-      {anyError && (
+      {error && (
         <Card className="border-rose-500/40 bg-rose-500/5">
           <CardContent className="p-4 text-sm text-rose-300">
-            Erro ao consultar API: {String((anyError as Error).message)} — verifique se a key está correta.
+            Erro ao consultar API: {(error as Error).message}
           </CardContent>
         </Card>
       )}
 
-      {/* Stats */}
-      {targetExperts.length > 0 && (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <StatCard icon={<Users className="h-4 w-4" />} label="Total de leads" value={aggregate.total_leads.toLocaleString("pt-BR")} loading={isLoadingData} />
-            <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Vendas" value={aggregate.total_sales.toLocaleString("pt-BR")} loading={isLoadingData} />
-            <StatCard icon={<DollarSign className="h-4 w-4" />} label="Faturamento" value={BRL(aggregate.total_revenue)} loading={isLoadingData} />
-            <StatCard icon={<Phone className="h-4 w-4" />} label="Números" value={aggregate.total_numbers.toLocaleString("pt-BR")} loading={isLoadingData} />
-            <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Taxa de resposta" value={`${aggregate.response_rate.toFixed(1)}%`} loading={isLoadingData} />
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard icon={<Users className="h-4 w-4" />} label="Total de leads" value={stats.total.toLocaleString("pt-BR")} loading={isLoading} />
+        <StatCard icon={<Facebook className="h-4 w-4" />} label="Com tracking FB" value={`${stats.withFb.toLocaleString("pt-BR")} (${stats.fbRate.toFixed(1)}%)`} loading={isLoading} />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Com Google (gclid)" value={stats.withGoogle.toLocaleString("pt-BR")} loading={isLoading} />
+        <StatCard icon={<DollarSign className="h-4 w-4" />} label="Score alto (E/F/G)" value={stats.scoreAlto.toLocaleString("pt-BR")} loading={isLoading} />
+      </div>
 
-          {/* Per operation breakdown (geral) */}
-          {isGeral && overviewQueries.length > 1 && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Por operação</CardTitle></CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Operação</TableHead>
-                      <TableHead className="text-right">Leads</TableHead>
-                      <TableHead className="text-right">Vendas</TableHead>
-                      <TableHead className="text-right">Faturamento</TableHead>
-                      <TableHead className="text-right">Números</TableHead>
-                      <TableHead className="text-right">Resp.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {overviewQueries.map((q, i) => {
-                      const ex = targetExperts[i];
-                      const ov = q.data?.overview;
-                      return (
-                        <TableRow key={ex.id}>
-                          <TableCell className="font-medium">{ex.nome}</TableCell>
-                          <TableCell className="text-right tabular-nums">{ov?.total_leads?.toLocaleString("pt-BR") ?? (q.isLoading ? "…" : "—")}</TableCell>
-                          <TableCell className="text-right tabular-nums">{ov?.total_sales?.toLocaleString("pt-BR") ?? "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums">{ov ? BRL(ov.total_revenue) : "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums">{ov?.total_numbers ?? "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums">{ov ? `${ov.response_rate?.toFixed(1)}%` : "—"}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Leads ({scopedLeads.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-auto">
+          {scopedLeads.length === 0 && !isLoading ? (
+            <p className="text-sm text-muted-foreground">Nenhum lead no período.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>UTM</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead className="text-center">FB</TableHead>
+                  <TableHead className="text-center">Google</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scopedLeads.slice(0, 200).map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(l.data_criacao).toLocaleString("pt-BR")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{l.nome ?? "—"}</div>
+                      {l.instagram && <div className="text-[11px] text-muted-foreground">@{l.instagram.replace(/^@/, "")}</div>}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <div>{l.email ?? "—"}</div>
+                      <div className="text-muted-foreground">{l.whatsapp ?? ""}</div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {l.utm_source ? <Badge variant="outline">{l.utm_source}</Badge> : <span className="text-muted-foreground">—</span>}
+                      {l.utm_campaign && <div className="text-muted-foreground mt-1 max-w-[180px] truncate">{l.utm_campaign}</div>}
+                    </TableCell>
+                    <TableCell>
+                      {l.caixa_letra ? (
+                        <Badge className="font-mono">{l.caixa_letra}</Badge>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {l.fbc || l.fbp ? <span className="text-emerald-400">✓</span> : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {l.gclid ? <span className="text-emerald-400">✓</span> : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-
-          {/* Numbers list */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Números ({numbersFlat.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-auto">
-              {numbersFlat.length === 0 && !isLoadingData ? (
-                <p className="text-sm text-muted-foreground">Nenhum número no período.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {isGeral && <TableHead>Operação</TableHead>}
-                      <TableHead>Número</TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead className="text-right">Leads</TableHead>
-                      <TableHead className="text-right">Vendas</TableHead>
-                      <TableHead className="text-right">Faturamento</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {numbersFlat.map((n, i) => (
-                      <TableRow key={i}>
-                        {isGeral && <TableCell><Badge variant="outline">{n._expert}</Badge></TableCell>}
-                        <TableCell className="font-mono text-xs">{n.numero ?? "—"}</TableCell>
-                        <TableCell>{n.nome ?? "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{Number(n.leads ?? 0).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-right tabular-nums">{Number(n.vendas ?? 0).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-right tabular-nums">{BRL(Number(n.faturamento ?? 0))}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      <ApiKeysDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        experts={experts}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["experts-quiz-keys"] })}
-      />
+          {scopedLeads.length > 200 && (
+            <p className="mt-3 text-xs text-muted-foreground">Mostrando 200 de {scopedLeads.length} — refine o filtro pra ver mais.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-// ---------- Helpers ----------
 function StatCard({ icon, label, value, loading }: { icon: React.ReactNode; label: string; value: string; loading?: boolean }) {
   return (
     <Card>
@@ -323,99 +288,5 @@ function StatCard({ icon, label, value, loading }: { icon: React.ReactNode; labe
         <div className="text-2xl font-bold mt-2 tabular-nums">{loading ? "…" : value}</div>
       </CardContent>
     </Card>
-  );
-}
-
-function EmptyState({ title, message, onConfigure }: { title: string; message: string; onConfigure: () => void }) {
-  return (
-    <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-        <Settings className="h-8 w-8 text-muted-foreground" />
-        <div>
-          <p className="font-semibold">{title}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{message}</p>
-        </div>
-        <Button onClick={onConfigure}><KeyRound className="mr-1.5 h-4 w-4" /> Configurar API Keys</Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ApiKeysDialog({
-  open, onClose, experts, onSaved,
-}: {
-  open: boolean;
-  onClose: () => void;
-  experts: Expert[];
-  onSaved: () => void;
-}) {
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
-
-  const save = useMutation({
-    mutationFn: async (payload: { id: number; key: string }) => {
-      const { error } = await supabase
-        .from("experts")
-        .update({ quiz_api_key: payload.key || null })
-        .eq("id", payload.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("API key salva");
-      onSaved();
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>API Keys do Quiz</DialogTitle>
-          <DialogDescription>
-            Cole o bearer token de cada operação. As métricas serão puxadas usando a key correspondente.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-3">
-          {experts.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhuma operação cadastrada.</p>
-          )}
-          {experts.map((ex) => {
-            const current = drafts[ex.id] ?? ex.quiz_api_key ?? "";
-            return (
-              <div key={ex.id} className="grid gap-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  {ex.nome}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder="Bearer token"
-                    value={current}
-                    onChange={(e) => setDrafts((p) => ({ ...p, [ex.id]: e.target.value }))}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => save.mutate({ id: ex.id, key: current })}
-                    disabled={save.isPending}
-                  >
-                    Salvar
-                  </Button>
-                </div>
-                {ex.quiz_api_key && (
-                  <p className="text-[10px] text-muted-foreground">
-                    Atual: ••••{ex.quiz_api_key.slice(-6)}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
