@@ -14,6 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Users,
   TrendingUp,
   Facebook,
@@ -32,6 +39,8 @@ import {
   List as ListIcon,
   CheckCircle2,
   XCircle,
+  DollarSign,
+  Eye,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
 
@@ -66,12 +75,44 @@ type Lead = {
   gclid: string | null;
   caixa_letra: string | null;
   caixa_label: string | null;
-  lead_score: number | null;
+  lead_score: number | string | null;
   faturamento: string | null;
+  momento: string | null;
+  momento_letra: string | null;
+  situacao: string | null;
+  renda: string | null;
+  objetivo: string | null;
+  socio: string | null;
+  investir: string | null;
+  porque: string | null;
+  comprometimento: string | null;
+  minicurso: string | null;
+  funil: string | null;
+  last_step: string | null;
+  referrer: string | null;
+  user_agent: string | null;
+  respostas_json: Record<string, unknown> | null;
   status: string | null;
   crm_status: string | null;
   origem: string | null;
 };
+
+const TICKET_TIERS: Record<string, { label: string; cls: string }> = {
+  A: { label: "Até R$ 1k", cls: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
+  B: { label: "R$ 1k–5k", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+  C: { label: "R$ 5k–10k", cls: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" },
+  D: { label: "R$ 10k–30k", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+  E: { label: "R$ 30k–50k", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+  F: { label: "R$ 50k–100k", cls: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
+  G: { label: "R$ 100k+", cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40" },
+};
+
+function ticketLabel(l: Lead): string {
+  const fat = (l.faturamento ?? "").trim();
+  if (fat) return fat;
+  const letter = (l.caixa_letra ?? "").toUpperCase();
+  return TICKET_TIERS[letter]?.label ?? "—";
+}
 
 type Period = "today" | "yesterday" | "7d" | "15d" | "30d" | "custom" | "all";
 type ViewMode = "kanban" | "list";
@@ -247,6 +288,7 @@ function QuizPage() {
   const [view, setView] = useState<ViewMode>("kanban");
   const [reality, setReality] = useState<RealityFilter>("all");
   const [overrides, setOverrides] = useState<Record<string, Reality>>(() => loadOverrides());
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   function setLeadReality(id: string, r: Reality | null) {
     setOverrides((prev) => {
@@ -488,7 +530,7 @@ function QuizPage() {
       ) : view === "kanban" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           {ORIGIN_ORDER.map((key) => {
-            const items = grouped[key];
+            const items = grouped[key] ?? [];
             if (items.length === 0) return null;
             const sample = items[0];
             const origin = classifyLead(sample);
@@ -503,7 +545,7 @@ function QuizPage() {
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
                   {items.map((l) => (
-                    <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} compact />
+                    <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
                   ))}
                 </div>
               </div>
@@ -519,9 +561,11 @@ function QuizPage() {
                   <th className="text-left px-3 py-2">Lead</th>
                   <th className="text-left px-3 py-2">Origem</th>
                   <th className="text-left px-3 py-2">Contato</th>
+                  <th className="text-left px-3 py-2">Ticket</th>
                   <th className="text-left px-3 py-2">Score</th>
                   <th className="text-left px-3 py-2">Quando</th>
                   <th className="text-left px-3 py-2">Status</th>
+                  <th className="text-left px-3 py-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -530,8 +574,9 @@ function QuizPage() {
                   const Icon = o.icon;
                   const real = leadIsReal(l);
                   const letter = (l.caixa_letra ?? "").toUpperCase();
+                  const tier = TICKET_TIERS[letter];
                   return (
-                    <tr key={l.id} className="border-t border-border hover:bg-accent/5">
+                    <tr key={l.id} className="border-t border-border hover:bg-accent/5 cursor-pointer" onClick={() => setSelectedLead(l)}>
                       <td className="px-3 py-2 font-medium">{l.nome || <span className="italic text-muted-foreground">sem nome</span>}</td>
                       <td className="px-3 py-2">
                         <Badge variant="outline" className={`gap-1 ${o.text} ${o.bg}`}>
@@ -543,6 +588,11 @@ function QuizPage() {
                         <div>{l.whatsapp || ""}</div>
                       </td>
                       <td className="px-3 py-2">
+                        <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${tier?.cls ?? "bg-muted text-muted-foreground border-border"}`}>
+                          <DollarSign className="h-3 w-3" /> {ticketLabel(l)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
                         {letter ? (
                           <Badge className={HIGH_SCORE.has(letter) ? "bg-yellow-500/20 text-yellow-300" : "bg-muted text-muted-foreground"}>
                             {letter}
@@ -550,8 +600,13 @@ function QuizPage() {
                         ) : "—"}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{timeAgo(l.data_criacao)}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                         <RealityToggle real={real} onChange={(r) => setLeadReality(l.id, r)} />
+                      </td>
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setSelectedLead(l)}>
+                          <Eye className="h-3 w-3" /> Ver
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -566,6 +621,8 @@ function QuizPage() {
           </CardContent>
         </Card>
       )}
+
+      <LeadDetailDialog lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
   );
 }
@@ -625,11 +682,12 @@ function RealityToggle({ real, onChange }: { real: boolean; onChange: (r: Realit
 }
 
 function LeadCard({
-  lead, real, onToggle, compact,
+  lead, real, onToggle, onOpen, compact,
 }: {
   lead: Lead;
   real: boolean;
   onToggle: (r: Reality | null) => void;
+  onOpen?: () => void;
   compact?: boolean;
 }) {
   const origin = classifyLead(lead);
@@ -637,6 +695,8 @@ function LeadCard({
   const isHigh = HIGH_SCORE.has(letter);
   const isMid = MID_SCORE.has(letter);
   const cleanIg = lead.instagram?.replace(/^@/, "");
+  const ticket = ticketLabel(lead);
+  const tier = TICKET_TIERS[letter];
 
   return (
     <div
@@ -645,7 +705,9 @@ function LeadCard({
         real ? "" : "opacity-70",
         isHigh ? "border-yellow-500/40" : "border-border",
         compact ? "" : "hover:-translate-y-0.5",
+        onOpen ? "cursor-pointer hover:border-accent/50" : "",
       ].join(" ")}
+      onClick={onOpen}
     >
       <div className={`absolute left-0 top-0 h-full w-1 ${origin.bg}`} />
 
@@ -669,6 +731,12 @@ function LeadCard({
           <div className="mt-0.5 text-[10px] text-muted-foreground">{timeAgo(lead.data_criacao)}</div>
         </div>
       </div>
+
+      {ticket !== "—" && (
+        <div className={`mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold ${tier?.cls ?? "bg-accent/10 text-accent border-accent/30"}`}>
+          <DollarSign className="h-3 w-3" /> {ticket}
+        </div>
+      )}
 
       <div className="mt-2 space-y-0.5 text-xs">
         {lead.email && (
@@ -699,9 +767,113 @@ function LeadCard({
         </div>
       )}
 
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+        {onOpen && (
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] gap-1" onClick={onOpen}>
+            <Eye className="h-3 w-3" /> Respostas
+          </Button>
+        )}
         <RealityToggle real={real} onChange={onToggle} />
       </div>
     </div>
+  );
+}
+
+const ANSWER_LABELS: Record<string, string> = {
+  nome: "Nome",
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  faturamento: "Faturamento atual",
+  momento: "Momento de vida",
+  situacao: "Situação",
+  renda: "Renda",
+  objetivo: "Objetivo",
+  socio: "Tem sócio?",
+  investir: "Quanto pode investir",
+  porque: "Por quê",
+  comprometimento: "Comprometimento",
+  ideia: "Ideia",
+  lucro: "Lucro desejado",
+  tentou: "Já tentou antes",
+  meta: "Meta",
+  caixa: "Caixa",
+  caixa_label: "Faixa de ticket",
+};
+
+function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
+  const open = !!lead;
+  if (!lead) return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent />
+    </Dialog>
+  );
+  const r = (lead.respostas_json ?? {}) as Record<string, unknown>;
+  const tier = TICKET_TIERS[(lead.caixa_letra ?? "").toUpperCase()];
+  const entries = Object.entries(r).filter(([k, v]) => {
+    if (["id", "status", "last_step", "updated_at", "user_agent", "referrer", "lead_score", "funil", "origem"].includes(k)) return false;
+    if (v == null) return false;
+    if (typeof v === "string" && !v.trim()) return false;
+    return true;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {lead.nome || <span className="italic text-muted-foreground">sem nome</span>}
+            {lead.caixa_letra && (
+              <Badge className="bg-yellow-500/20 text-yellow-300">{lead.caixa_letra.toUpperCase()}</Badge>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {timeAgo(lead.data_criacao)} · {lead.email || "sem email"} · {lead.whatsapp || "sem whatsapp"}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className={`rounded-lg border p-4 ${tier?.cls ?? "bg-accent/5 border-accent/30 text-accent"}`}>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider opacity-80">
+              <DollarSign className="h-4 w-4" /> Ticket / Faturamento
+            </div>
+            <div className="mt-1 text-2xl font-bold">{ticketLabel(lead)}</div>
+            {lead.caixa_label && <div className="text-xs opacity-70 mt-0.5">{lead.caixa_label}</div>}
+          </div>
+
+          <div>
+            <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Respostas do Quiz</h4>
+            {entries.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Nenhuma resposta registrada.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {entries.map(([k, v]) => (
+                  <div key={k} className="rounded-md border border-border bg-muted/20 p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {ANSWER_LABELS[k] ?? k}
+                    </div>
+                    <div className="text-sm font-medium mt-0.5 break-words">
+                      {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {(lead.utm_source || lead.utm_campaign) && (
+            <div>
+              <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Atribuição</h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {lead.utm_source && <div><span className="text-muted-foreground">source:</span> {lead.utm_source}</div>}
+                {lead.utm_medium && <div><span className="text-muted-foreground">medium:</span> {lead.utm_medium}</div>}
+                {lead.utm_campaign && <div className="col-span-2"><span className="text-muted-foreground">campaign:</span> {lead.utm_campaign}</div>}
+                {lead.utm_content && <div className="col-span-2"><span className="text-muted-foreground">content:</span> {lead.utm_content}</div>}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
