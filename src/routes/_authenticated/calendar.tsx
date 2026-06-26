@@ -317,18 +317,16 @@ function CalendarPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Início</Label>
-                    <Input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={form.start}
-                      onChange={(e) => setForm({ ...form, start: e.target.value })}
+                      onChange={(v) => setForm({ ...form, start: v })}
                     />
                   </div>
                   <div>
                     <Label>Fim</Label>
-                    <Input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={form.end}
-                      onChange={(e) => setForm({ ...form, end: e.target.value })}
+                      onChange={(v) => setForm({ ...form, end: v })}
                     />
                   </div>
                 </div>
