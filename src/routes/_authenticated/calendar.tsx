@@ -340,12 +340,48 @@ function CalendarPage() {
                   />
                 </div>
                 <div>
-                  <Label>Convidados (e-mails separados por vírgula)</Label>
-                  <Input
-                    value={form.attendees}
-                    onChange={(e) => setForm({ ...form, attendees: e.target.value })}
-                    placeholder="cliente@empresa.com, outro@empresa.com"
-                  />
+                  <Label>Convidados</Label>
+                  <div className="space-y-2 mt-1">
+                    {form.attendees.map((email, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          value={email}
+                          onChange={(e) => {
+                            const next = [...form.attendees];
+                            next[idx] = e.target.value;
+                            // auto-add new empty field when typing in the last one
+                            if (idx === next.length - 1 && e.target.value.trim() !== "") {
+                              next.push("");
+                            }
+                            setForm({ ...form, attendees: next });
+                          }}
+                          placeholder={idx === 0 ? "cliente@empresa.com" : "outro@empresa.com (opcional)"}
+                          type="email"
+                        />
+                        {form.attendees.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const next = form.attendees.filter((_, i) => i !== idx);
+                              setForm({ ...form, attendees: next.length ? next : [""] });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setForm({ ...form, attendees: [...form.attendees, ""] })}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar convidado
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <Label>Descrição</Label>
