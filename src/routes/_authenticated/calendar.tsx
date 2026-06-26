@@ -86,6 +86,8 @@ function CalendarPage() {
   const create = useServerFn(createEvent);
   const update = useServerFn(updateEvent);
   const del = useServerFn(deleteEvent);
+  const listCals = useServerFn(listCalendars);
+
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
