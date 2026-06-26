@@ -27,7 +27,7 @@ const items = [
   { title: "Meta Ads", url: "/meta-ads", icon: Activity },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "CRM Leads X1", url: "/crm", icon: Users },
-  { title: "Calendário", url: "/calendar", icon: Calendar },
+  { title: "Calendário Calls", url: "/calendar", icon: Calendar },
 ];
 
 export function AppSidebar() {
