@@ -1,9 +1,9 @@
-import { useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
-  User, DollarSign, Tag as TagIcon, MoreVertical, KeyRound,
+  User, MoreVertical, KeyRound, RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -58,8 +58,104 @@ type Lead = {
   updated_at: string;
 };
 
+type ExpertApiKey = { id: number; nome: string; ativo: boolean; crm_api_key: string | null };
+
+const API_BASE = "https://19b67e6b-8330-4b05-a7e9-34840c33d6c1.lovableproject.com/api/public/v1";
+
 const BRL = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n || 0);
+
+function firstString(obj: Record<string, any>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = obj?.[key];
+    if (value == null) continue;
+    const str = String(value).trim();
+    if (str) return str;
+  }
+  return null;
+}
+
+function firstNumber(obj: Record<string, any>, keys: string[]): number | null {
+  for (const key of keys) {
+    const raw = obj?.[key];
+    if (raw == null || raw === "") continue;
+    const parsed = Number(String(raw).replace(/R\$\s?/g, "").replace(/\./g, "").replace(",", "."));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function extractLeadArray(payload: any): Record<string, any>[] {
+  if (Array.isArray(payload)) return payload;
+  const candidates = [payload?.leads, payload?.data, payload?.items, payload?.contacts, payload?.results];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (Array.isArray(candidate?.data)) return candidate.data;
+    if (Array.isArray(candidate?.items)) return candidate.items;
+  }
+  return [];
+}
+
+function normalizeApiLead(raw: Record<string, any>, expert: string, index: number): Partial<Lead> & { _syncKey: string } {
+  const externalId = firstString(raw, ["id", "lead_id", "leadId", "contact_id", "contactId", "uuid", "external_id", "externalId"]);
+  const telefone = firstString(raw, ["telefone", "phone", "celular", "whatsapp", "numero", "number", "mobile"]);
+  const email = firstString(raw, ["email", "e_mail"]);
+  const nome = firstString(raw, ["nome", "name", "full_name", "fullName", "lead_name", "leadName", "first_name", "firstName"])
+    ?? email
+    ?? telefone
+    ?? `Lead ${index + 1}`;
+  const fonte = firstString(raw, ["fonte", "source", "origem", "utm_source", "utmSource", "campaign", "campanha"]);
+  const responsavelUtm = firstString(raw, ["responsavel_utm", "utm", "utm_content", "utmContent", "vendedor_utm", "seller_utm"]);
+  const responsavelNome = firstString(raw, ["responsavel_nome", "responsavel", "seller", "seller_name", "vendedor", "vendedor_nome"]);
+  const valor = firstNumber(raw, ["valor_estimado", "valor", "value", "ticket", "revenue"]);
+  const createdAt = firstString(raw, ["created_at", "createdAt", "data", "date", "timestamp"]);
+  const tagsRaw = raw.tags ?? raw.tag;
+  const tags = Array.isArray(tagsRaw)
+    ? tagsRaw.map((tag) => String(tag).trim()).filter(Boolean)
+    : typeof tagsRaw === "string"
+      ? tagsRaw.split(",").map((tag) => tag.trim()).filter(Boolean)
+      : [];
+  const syncKey = `${expert}|${externalId || email || telefone || nome}`.toLowerCase();
+
+  return {
+    _syncKey: syncKey,
+    nome,
+    telefone,
+    email,
+    expert,
+    fonte: fonte ?? "Quiz API",
+    status: "novo",
+    responsavel_utm: responsavelUtm,
+    responsavel_nome: responsavelNome,
+    valor_estimado: valor ?? 0,
+    tags,
+    ultima_interacao: createdAt,
+    dados: {
+      origem: "crm_leads_x1_api",
+      external_id: externalId,
+      sync_key: syncKey,
+      raw,
+    },
+  };
+}
+
+async function fetchCrmApiLeads(expert: ExpertApiKey) {
+  const url = new URL(`${API_BASE}/leads`);
+  url.searchParams.set("period", "30d");
+  url.searchParams.set("limit", "500");
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${expert.crm_api_key}` },
+  });
+  if (!res.ok) throw new Error(`${expert.nome}: /leads retornou HTTP ${res.status}`);
+  const text = await res.text();
+  let payload: any = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`${expert.nome}: /leads não retornou JSON. Confere se o endpoint público está ativo e não redirecionando para login.`);
+  }
+  return extractLeadArray(payload).map((raw, index) => normalizeApiLead(raw, expert.nome, index));
+}
 
 // ---------- Page ----------
 function CRMPage() {
@@ -79,6 +175,24 @@ function CRMPage() {
     [workspaces],
   );
 
+  const { data: expertsWithKeys = [], isLoading: loadingApiKeys } = useQuery({
+    queryKey: ["experts-crm-keys"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("experts")
+        .select("id, nome, ativo, crm_api_key")
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as ExpertApiKey[];
+    },
+  });
+
+  const targetApiExperts = useMemo(() => {
+    const active = expertsWithKeys.filter((e) => e.ativo && e.crm_api_key);
+    if (isGeral) return active;
+    return active.filter((e) => e.nome === workspace?.nome);
+  }, [expertsWithKeys, isGeral, workspace?.nome]);
+
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["crm-leads"],
     queryFn: async () => {
@@ -91,6 +205,73 @@ function CRMPage() {
       return (data ?? []) as Lead[];
     },
   });
+
+  const syncLeads = useMutation({
+    mutationFn: async () => {
+      if (targetApiExperts.length === 0) {
+        return { fetched: 0, inserted: 0, skipped: 0 };
+      }
+
+      const batches = await Promise.all(targetApiExperts.map(fetchCrmApiLeads));
+      const fetched = batches.flat();
+      if (fetched.length === 0) {
+        return { fetched: 0, inserted: 0, skipped: 0 };
+      }
+
+      const { data: existingRows, error: existingError } = await supabase
+        .from("crm_leads")
+        .select("id,nome,telefone,email,expert,dados");
+      if (existingError) throw existingError;
+
+      const existingKeys = new Set<string>();
+      for (const row of (existingRows ?? []) as any[]) {
+        const dados = row.dados && typeof row.dados === "object" ? row.dados : {};
+        if (dados.sync_key) existingKeys.add(String(dados.sync_key).toLowerCase());
+        const fallback = `${row.expert ?? ""}|${row.email || row.telefone || row.nome || ""}`.toLowerCase();
+        if (fallback !== "|") existingKeys.add(fallback);
+      }
+
+      const seenThisSync = new Set<string>();
+      const toInsert = fetched
+        .filter((lead) => {
+          if (existingKeys.has(lead._syncKey) || seenThisSync.has(lead._syncKey)) return false;
+          seenThisSync.add(lead._syncKey);
+          return true;
+        })
+        .map(({ _syncKey, ...lead }) => lead)
+        .filter((lead) => lead.nome?.trim());
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("crm_leads").insert(toInsert as any[]);
+        if (error) throw error;
+      }
+
+      return {
+        fetched: fetched.length,
+        inserted: toInsert.length,
+        skipped: fetched.length - toInsert.length,
+      };
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["crm-leads"] });
+      if (result.inserted > 0) {
+        toast.success(`${result.inserted} lead${result.inserted === 1 ? "" : "s"} importado${result.inserted === 1 ? "" : "s"}`);
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao puxar leads da API"),
+  });
+
+  const lastAutoSyncKey = useRef("");
+  const autoSyncKey = useMemo(
+    () => targetApiExperts.map((e) => `${e.id}:${e.crm_api_key}`).join("|"),
+    [targetApiExperts],
+  );
+
+  useEffect(() => {
+    if (loadingApiKeys || !autoSyncKey || lastAutoSyncKey.current === autoSyncKey) return;
+    lastAutoSyncKey.current = autoSyncKey;
+    syncLeads.mutate();
+  }, [autoSyncKey, loadingApiKeys]);
 
   // Apply filters
   const filtered = useMemo(() => {
@@ -183,13 +364,23 @@ function CRMPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">CRM de Leads</h1>
+          <h1 className="text-2xl font-bold tracking-tight">CRM Leads X1</h1>
           <p className="text-sm text-muted-foreground">
             {filtered.length} {filtered.length === 1 ? "lead" : "leads"}
             {!isGeral && ` em ${workspace?.nome}`}
+            {targetApiExperts.length > 0 && ` · ${targetApiExperts.length} API key${targetApiExperts.length > 1 ? "s" : ""} ativa${targetApiExperts.length > 1 ? "s" : ""}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncLeads.mutate()}
+            disabled={syncLeads.isPending || targetApiExperts.length === 0}
+          >
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${syncLeads.isPending ? "animate-spin" : ""}`} />
+            {syncLeads.isPending ? "Puxando…" : "Puxar leads"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
             <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
           </Button>
@@ -201,6 +392,20 @@ function CRMPage() {
           </Button>
         </div>
       </div>
+
+      {!loadingApiKeys && targetApiExperts.length === 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {isGeral
+            ? "Cadastre pelo menos uma API key nas operações para o CRM puxar leads automaticamente."
+            : `A operação ${workspace?.nome} ainda não tem API key de CRM cadastrada.`}
+        </div>
+      )}
+
+      {syncLeads.data && syncLeads.data.fetched === 0 && targetApiExperts.length > 0 && (
+        <div className="rounded-xl border border-border bg-card/40 px-4 py-3 text-sm text-muted-foreground">
+          A API respondeu, mas não retornou nenhum lead em <code className="text-foreground">/api/public/v1/leads?period=30d</code>.
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/40 p-2">
