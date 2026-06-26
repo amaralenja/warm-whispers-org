@@ -632,7 +632,7 @@ function CalendarPage() {
           </div>
         </Card>
 
-      ) : (
+      ) : view === "list" ? (
         <div className="space-y-4">
           {isLoading ? (
             <p className="text-muted-foreground text-sm">Carregando eventos...</p>
