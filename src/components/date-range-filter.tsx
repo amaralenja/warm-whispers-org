@@ -69,7 +69,9 @@ const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "hoje", label: "Hoje" },
   { id: "ontem", label: "Ontem" },
   { id: "semana", label: "Semana" },
+  { id: "7d", label: "7 dias" },
   { id: "mes", label: "Mês" },
+  { id: "30d", label: "30 dias" },
   { id: "ano", label: "2026" },
 ];
 
