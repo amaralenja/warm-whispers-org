@@ -64,6 +64,38 @@ export function getAllEventLinks(): Record<string, LinkRecord> {
   return loadLinks();
 }
 
+// ---- NoShow marker (localStorage) ----
+const NOSHOW_KEY = "calendar_noshow_v1";
+
+function loadNoShows(): Record<string, { eventId: string; markedAt: string }> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(NOSHOW_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function markNoShow(eventId: string) {
+  const all = loadNoShows();
+  all[eventId] = { eventId, markedAt: new Date().toISOString() };
+  localStorage.setItem(NOSHOW_KEY, JSON.stringify(all));
+}
+
+export function unmarkNoShow(eventId: string) {
+  const all = loadNoShows();
+  delete all[eventId];
+  localStorage.setItem(NOSHOW_KEY, JSON.stringify(all));
+}
+
+export function getNoShow(eventId: string): boolean {
+  return !!loadNoShows()[eventId];
+}
+
+export function getAllNoShows(): Record<string, { eventId: string; markedAt: string }> {
+  return loadNoShows();
+}
+
 
 export function ShowUpDialog({
   open,
