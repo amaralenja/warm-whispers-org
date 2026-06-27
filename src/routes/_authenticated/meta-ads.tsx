@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Activity, ChevronRight, Megaphone, Layers, ImageIcon,
   RefreshCw, Pencil, Loader2, Settings2,
-  Eye, PlayCircle, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown,
+  Eye, PlayCircle, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown, BarChart3, Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,9 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  listCampaigns, listAdSets, listAds,
+  listCampaigns, listAdSets, listAds, listAccountAds,
   updateEntityStatus, updateAdSetBudget, updateCampaignBudget, getAdPreview,
-  type Campaign, type AdSet, type Ad, type AdInsights, type AdPreview,
+  type Campaign, type AdSet, type Ad, type AdInsights, type AdPreview, type AccountAd,
 } from "@/lib/meta-ads-manager.functions";
 import { getMetaAdsConfig, saveMetaAdsConfig } from "@/lib/meta-ads.functions";
 
