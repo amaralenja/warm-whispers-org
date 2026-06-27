@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Activity, ChevronRight, Megaphone, Layers, ImageIcon,
   RefreshCw, Pencil, Loader2, Settings2,
-  Eye, PlayCircle, ExternalLink,
+  Eye, PlayCircle, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
