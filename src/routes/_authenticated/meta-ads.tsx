@@ -184,6 +184,7 @@ function MetaAdsManagerPage() {
   const [previewAd, setPreviewAd] = useState<Ad | null>(null);
   const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
   const [pixelOpen, setPixelOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "default", dir: "desc" });
   const onSort = (k: SortKey) =>
     setSort((s) => s.key === k ? { key: k, dir: s.dir === "desc" ? "asc" : "desc" } : { key: k, dir: "desc" });
