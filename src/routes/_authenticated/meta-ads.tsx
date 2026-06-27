@@ -443,9 +443,9 @@ function MetaAdsManagerPage() {
             <thead className="border-b border-border bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="w-36 px-3 py-2 text-left">Ações</th>
-                <th className="px-3 py-2 text-left">Nome</th>
-                <th className="px-3 py-2 text-right">Orçamento</th>
-                <MetricHeaders />
+                <SortTh label="Nome" k="name" sort={sort} onSort={onSort} align="left" />
+                <SortTh label="Orçamento" k="budget" sort={sort} onSort={onSort} />
+                <MetricHeaders sort={sort} onSort={onSort} />
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
