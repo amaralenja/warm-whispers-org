@@ -343,6 +343,12 @@ function MetaAdsManagerPage() {
             <Settings2 className="h-4 w-4" /> Configurar Pixel
           </button>
           <button
+            onClick={() => setReportsOpen(true)}
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted"
+          >
+            <BarChart3 className="h-4 w-4" /> Relatórios
+          </button>
+          <button
             onClick={() => qc.invalidateQueries({ queryKey: ["meta-ads"] })}
             className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted"
           >
