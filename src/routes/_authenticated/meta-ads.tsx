@@ -642,6 +642,7 @@ function MetaAdsManagerPage() {
         onOpenChange={(open) => !open && setPreviewAd(null)}
       />
       <PixelConfigDialog open={pixelOpen} onOpenChange={setPixelOpen} />
+      <ReportsDialog open={reportsOpen} onOpenChange={setReportsOpen} preset={preset} onPreviewAd={setPreviewAd} />
     </div>
   );
 }
