@@ -852,3 +852,170 @@ function AdPreviewDialog({
     </Dialog>
   );
 }
+
+function ReportsDialog({
+  open, onOpenChange, preset, onPreviewAd,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  preset: Preset;
+  onPreviewAd: (a: Ad) => void;
+}) {
+  const listAccountAdsFn = useServerFn(listAccountAds);
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [metric, setMetric] = useState<"results" | "costPerResult" | "spend" | "ctr" | "cpc">("results");
+  const q = useQuery({
+    queryKey: ["meta-ads", "report-ads", preset, activeOnly],
+    queryFn: () => listAccountAdsFn({ data: { datePreset: preset, activeOnly } }),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
+  const ads = q.data ?? [];
+  const sorted = useMemo(() => {
+    const arr = [...ads];
+    arr.sort((a, b) => {
+      if (metric === "costPerResult") {
+        const av = a.insights.costPerResult || Number.POSITIVE_INFINITY;
+        const bv = b.insights.costPerResult || Number.POSITIVE_INFINITY;
+        return av - bv;
+      }
+      return (b.insights as any)[metric] - (a.insights as any)[metric];
+    });
+    return arr;
+  }, [ads, metric]);
+
+  const totals = useMemo(() => sorted.reduce((acc, a) => {
+    acc.spend += a.insights.spend;
+    acc.results += a.insights.results;
+    acc.impressions += a.insights.impressions;
+    acc.clicks += a.insights.clicks;
+    return acc;
+  }, { spend: 0, results: 0, impressions: 0, clicks: 0 }), [sorted]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-amber-500" /> Ranking de Criativos
+          </DialogTitle>
+          <DialogDescription>
+            Período: {PRESETS.find((p) => p.v === preset)?.label}. Ordene por métrica e veja os criativos com melhor desempenho.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-center gap-2 pb-2">
+          <label className="inline-flex items-center gap-2 text-xs">
+            <Checkbox checked={activeOnly} onCheckedChange={(v) => setActiveOnly(!!v)} />
+            Apenas ativos
+          </label>
+          <div className="ml-auto flex flex-wrap gap-1">
+            {[
+              { v: "results", label: "Mais resultados" },
+              { v: "costPerResult", label: "Menor custo/result." },
+              { v: "spend", label: "Maior gasto" },
+              { v: "ctr", label: "Melhor CTR" },
+              { v: "cpc", label: "Menor CPC" },
+            ].map((m) => (
+              <button
+                key={m.v}
+                onClick={() => setMetric(m.v as any)}
+                className={`h-7 rounded-full px-3 text-xs ${
+                  metric === m.v
+                    ? "bg-accent text-accent-foreground"
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2 pb-2 text-xs">
+          {[
+            { label: "Gasto", value: brl(totals.spend) },
+            { label: "Resultados", value: num(totals.results) },
+            { label: "Cliques", value: num(totals.clicks) },
+            { label: "Impressões", value: num(totals.impressions) },
+          ].map((k) => (
+            <div key={k.label} className="rounded-lg border border-border bg-muted/30 p-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{k.label}</div>
+              <div className="text-sm font-bold">{k.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="max-h-[55vh] overflow-auto rounded-md border border-border">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-muted/50 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="w-10 px-2 py-2 text-center">#</th>
+                <th className="px-2 py-2 text-left">Criativo</th>
+                <th className="px-2 py-2 text-right">Gasto</th>
+                <th className="px-2 py-2 text-right">Result.</th>
+                <th className="px-2 py-2 text-right">CPR</th>
+                <th className="px-2 py-2 text-right">CTR</th>
+                <th className="px-2 py-2 text-right">CPC</th>
+                <th className="px-2 py-2 text-right">Impr.</th>
+                <th className="px-2 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {q.isLoading ? (
+                <tr><td colSpan={9} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
+              ) : q.error ? (
+                <tr><td colSpan={9} className="py-10 text-center text-destructive">{(q.error as any)?.message}</td></tr>
+              ) : !sorted.length ? (
+                <tr><td colSpan={9} className="py-10 text-center text-muted-foreground">Nenhum criativo no período</td></tr>
+              ) : (
+                sorted.map((a, idx) => (
+                  <tr key={a.id} className="hover:bg-muted/30">
+                    <td className="px-2 py-2 text-center font-bold">
+                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center gap-2">
+                        {a.thumbnail ? (
+                          <img src={a.thumbnail} alt="" className="h-9 w-9 rounded object-cover" />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded bg-muted">
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <StatusDot effective={a.effectiveStatus} />
+                            <span className="line-clamp-1">{a.name}</span>
+                          </div>
+                          <div className="line-clamp-1 text-[10px] text-muted-foreground">
+                            {a.campaignName ?? "—"} {a.adsetName ? `· ${a.adsetName}` : ""}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">{brl(a.insights.spend)}</td>
+                    <td className="px-2 py-2 text-right">{num(a.insights.results)}</td>
+                    <td className="px-2 py-2 text-right">{a.insights.results ? brl(a.insights.costPerResult) : "—"}</td>
+                    <td className="px-2 py-2 text-right">{pct(a.insights.ctr)}</td>
+                    <td className="px-2 py-2 text-right">{brl(a.insights.cpc)}</td>
+                    <td className="px-2 py-2 text-right">{num(a.insights.impressions)}</td>
+                    <td className="px-2 py-2">
+                      <button
+                        onClick={() => { onPreviewAd(a); onOpenChange(false); }}
+                        className="inline-flex h-7 items-center gap-1 rounded border border-border bg-background px-2 text-[10px] hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Eye className="h-3 w-3" /> Ver
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
