@@ -227,22 +227,26 @@ function MetaAdsManagerPage() {
     staleTime: 5 * 60_000,
   });
 
-  const campaigns = useMemo(
+  const campaignsRaw = useMemo(
     () => (Array.isArray(campaignsQ.data) ? campaignsQ.data : []),
     [campaignsQ.data],
   );
+  const campaigns = useMemo(() => sortRows(campaignsRaw, sort), [campaignsRaw, sort]);
   const adsetsLoading = adsetsQueries.some((q) => q.isLoading);
   const adsetsError = adsetsQueries.find((q) => q.error)?.error as Error | undefined;
-  const adsets = useMemo(
+  const adsetsRaw = useMemo(
     () => adsetsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as AdSet[],
     [adsetsQueries],
   );
+  const adsets = useMemo(() => sortRows(adsetsRaw, sort), [adsetsRaw, sort]);
   const adsLoading = adsQueries.some((q) => q.isLoading);
   const adsError = adsQueries.find((q) => q.error)?.error as Error | undefined;
-  const ads = useMemo(
+  const adsRaw = useMemo(
     () => adsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as Ad[],
     [adsQueries],
   );
+  const ads = useMemo(() => sortRows(adsRaw as any, sort) as Ad[], [adsRaw, sort]);
+
 
   const toggleStatus = useMutation({
     mutationFn: (v: { id: string; status: "ACTIVE" | "PAUSED" }) =>
