@@ -256,35 +256,25 @@ export const listAccountAds = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<AccountAd[]> => {
     const { accountId } = env();
     const preset = data?.datePreset ?? "last_7d";
-    const filtering = data?.activeOnly
-      ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]))}`
-      : "";
-    const out: AccountAd[] = [];
-    let url: string | null =
-      `${accountId}/ads?fields=id,name,status,effective_status,adset_id,adset{name},campaign{name},creative{thumbnail_url},insights.date_preset(${preset}){${INSIGHT_FIELDS}}&limit=200${filtering}`;
-    let safety = 0;
-    while (url && safety++ < 10) {
-      const json: any = await graphGet(url, {});
-      for (const a of (json.data ?? [])) {
-        out.push({
-          id: a.id,
-          name: a.name,
-          status: a.status,
-          effectiveStatus: a.effective_status,
-          adsetId: a.adset_id,
-          thumbnail: a.creative?.thumbnail_url ?? null,
-          insights: parseInsights(a.insights),
-          campaignName: a.campaign?.name ?? null,
-          adsetName: a.adset?.name ?? null,
-        });
-      }
-      const next: string | undefined = json.paging?.next;
-      if (!next) break;
-      // strip host to reuse graphGet with relative path
-      const u = new URL(next);
-      url = `${u.pathname.replace(/^\/v\d+(\.\d+)?\//, "")}${u.search}`;
+    const params: Record<string, string> = {
+      fields: `id,name,status,effective_status,adset_id,adset{name},campaign{name},creative{thumbnail_url},insights.date_preset(${preset}){${INSIGHT_FIELDS}}`,
+      limit: "300",
+    };
+    if (data?.activeOnly) {
+      params.filtering = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]);
     }
-    return out;
+    const json = await graphGet(`${accountId}/ads`, params);
+    return (json.data ?? []).map((a: any) => ({
+      id: a.id,
+      name: a.name,
+      status: a.status,
+      effectiveStatus: a.effective_status,
+      adsetId: a.adset_id,
+      thumbnail: a.creative?.thumbnail_url ?? null,
+      insights: parseInsights(a.insights),
+      campaignName: a.campaign?.name ?? null,
+      adsetName: a.adset?.name ?? null,
+    }));
   });
 
 export const getAdPreview = createServerFn({ method: "POST" })
