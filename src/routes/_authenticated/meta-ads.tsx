@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Activity, ChevronRight, Megaphone, Layers, ImageIcon,
   RefreshCw, Pencil, Loader2, Settings2,
-  Eye, PlayCircle, ExternalLink,
+  Eye, PlayCircle, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -99,20 +99,83 @@ function MetricCells({ i }: { i: AdInsights }) {
   );
 }
 
-function MetricHeaders() {
+type SortKey =
+  | "default" | "status" | "name" | "budget"
+  | "spend" | "results" | "costPerResult" | "impressions"
+  | "clicks" | "ctr" | "cpc" | "cpm";
+type SortDir = "asc" | "desc";
+
+function SortTh({
+  label, k, sort, onSort, align = "right",
+}: {
+  label: string; k: SortKey; sort: { key: SortKey; dir: SortDir };
+  onSort: (k: SortKey) => void; align?: "left" | "right";
+}) {
+  const active = sort.key === k;
+  const Icon = !active ? ArrowUpDown : sort.dir === "desc" ? ArrowDown : ArrowUp;
+  return (
+    <th className={`px-3 py-2 text-${align}`}>
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${
+          active ? "text-foreground" : ""
+        } ${align === "right" ? "ml-auto" : ""}`}
+      >
+        {label}
+        <Icon className="h-3 w-3" />
+      </button>
+    </th>
+  );
+}
+
+function MetricHeaders({
+  sort, onSort,
+}: { sort: { key: SortKey; dir: SortDir }; onSort: (k: SortKey) => void }) {
   return (
     <>
-      <th className="px-3 py-2 text-right">Gasto</th>
-      <th className="px-3 py-2 text-right">Resultados</th>
-      <th className="px-3 py-2 text-right">Custo/Result.</th>
-      <th className="px-3 py-2 text-right">Impressões</th>
-      <th className="px-3 py-2 text-right">Cliques</th>
-      <th className="px-3 py-2 text-right">CTR</th>
-      <th className="px-3 py-2 text-right">CPC</th>
-      <th className="px-3 py-2 text-right">CPM</th>
+      <SortTh label="Gasto" k="spend" sort={sort} onSort={onSort} />
+      <SortTh label="Resultados" k="results" sort={sort} onSort={onSort} />
+      <SortTh label="Custo/Result." k="costPerResult" sort={sort} onSort={onSort} />
+      <SortTh label="Impressões" k="impressions" sort={sort} onSort={onSort} />
+      <SortTh label="Cliques" k="clicks" sort={sort} onSort={onSort} />
+      <SortTh label="CTR" k="ctr" sort={sort} onSort={onSort} />
+      <SortTh label="CPC" k="cpc" sort={sort} onSort={onSort} />
+      <SortTh label="CPM" k="cpm" sort={sort} onSort={onSort} />
     </>
   );
 }
+
+function sortRows<T extends { status: string; name: string; insights: AdInsights; dailyBudget?: number | null; lifetimeBudget?: number | null }>(
+  rows: T[], sort: { key: SortKey; dir: SortDir },
+): T[] {
+  const arr = [...rows];
+  const dirMul = sort.dir === "asc" ? 1 : -1;
+  const getVal = (r: T): number | string => {
+    switch (sort.key) {
+      case "status": return r.status === "ACTIVE" ? 1 : 0;
+      case "name": return r.name?.toLowerCase() ?? "";
+      case "budget": return (r.dailyBudget ?? r.lifetimeBudget ?? 0) as number;
+      case "default": return 0;
+      default: return (r.insights as any)[sort.key] ?? 0;
+    }
+  };
+  arr.sort((a, b) => {
+    if (sort.key === "default") {
+      // ACTIVE first, then results desc
+      const sa = a.status === "ACTIVE" ? 1 : 0;
+      const sb = b.status === "ACTIVE" ? 1 : 0;
+      if (sa !== sb) return sb - sa;
+      return (b.insights.results ?? 0) - (a.insights.results ?? 0) ||
+             (b.insights.spend ?? 0) - (a.insights.spend ?? 0);
+    }
+    const va = getVal(a); const vb = getVal(b);
+    if (typeof va === "string" && typeof vb === "string") return va.localeCompare(vb) * dirMul;
+    return ((va as number) - (vb as number)) * dirMul;
+  });
+  return arr;
+}
+
 
 function MetaAdsManagerPage() {
   const [preset, setPreset] = useState<Preset>("last_7d");
@@ -121,6 +184,9 @@ function MetaAdsManagerPage() {
   const [previewAd, setPreviewAd] = useState<Ad | null>(null);
   const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
   const [pixelOpen, setPixelOpen] = useState(false);
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "default", dir: "desc" });
+  const onSort = (k: SortKey) =>
+    setSort((s) => s.key === k ? { key: k, dir: s.dir === "desc" ? "asc" : "desc" } : { key: k, dir: "desc" });
 
 
   const qc = useQueryClient();
@@ -161,22 +227,26 @@ function MetaAdsManagerPage() {
     staleTime: 5 * 60_000,
   });
 
-  const campaigns = useMemo(
+  const campaignsRaw = useMemo(
     () => (Array.isArray(campaignsQ.data) ? campaignsQ.data : []),
     [campaignsQ.data],
   );
+  const campaigns = useMemo(() => sortRows(campaignsRaw, sort), [campaignsRaw, sort]);
   const adsetsLoading = adsetsQueries.some((q) => q.isLoading);
   const adsetsError = adsetsQueries.find((q) => q.error)?.error as Error | undefined;
-  const adsets = useMemo(
+  const adsetsRaw = useMemo(
     () => adsetsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as AdSet[],
     [adsetsQueries],
   );
+  const adsets = useMemo(() => sortRows(adsetsRaw, sort), [adsetsRaw, sort]);
   const adsLoading = adsQueries.some((q) => q.isLoading);
   const adsError = adsQueries.find((q) => q.error)?.error as Error | undefined;
-  const ads = useMemo(
+  const adsRaw = useMemo(
     () => adsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as Ad[],
     [adsQueries],
   );
+  const ads = useMemo(() => sortRows(adsRaw as any, sort) as Ad[], [adsRaw, sort]);
+
 
   const toggleStatus = useMutation({
     mutationFn: (v: { id: string; status: "ACTIVE" | "PAUSED" }) =>
@@ -373,9 +443,9 @@ function MetaAdsManagerPage() {
             <thead className="border-b border-border bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="w-36 px-3 py-2 text-left">Ações</th>
-                <th className="px-3 py-2 text-left">Nome</th>
-                <th className="px-3 py-2 text-right">Orçamento</th>
-                <MetricHeaders />
+                <SortTh label="Nome" k="name" sort={sort} onSort={onSort} align="left" />
+                <SortTh label="Orçamento" k="budget" sort={sort} onSort={onSort} />
+                <MetricHeaders sort={sort} onSort={onSort} />
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
