@@ -53,7 +53,7 @@ function withConnectUrl(ch: any): EvoChannel {
     operacaoId: (meta && typeof meta.operacao_id === "string") ? meta.operacao_id : null,
     created_at: ch.created_at,
     updated_at: ch.updated_at,
-    connectUrl: ch.token ? `${EVOHUB_BASE}/connect/${ch.token}` : "",
+    connectUrl: ch.token ? `${EVOHUB_CONNECT_BASE}/connect/${ch.token}` : "",
   };
 }
 
