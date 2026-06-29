@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   XCircle,
   Phone,
   Loader2,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +28,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useWorkspace } from "@/lib/workspace-context";
 import {
   listWhatsappChannels,
   createWhatsappChannel,
+  setChannelOperacao,
   deleteWhatsappChannel,
   regenerateWhatsappToken,
   type EvoChannel,
@@ -65,13 +75,19 @@ function statusBadge(status: string) {
 
 function WhatsAppPage() {
   const qc = useQueryClient();
+  const { workspace, workspaces } = useWorkspace();
   const listFn = useServerFn(listWhatsappChannels);
   const createFn = useServerFn(createWhatsappChannel);
   const deleteFn = useServerFn(deleteWhatsappChannel);
   const regenFn = useServerFn(regenerateWhatsappToken);
+  const setOpFn = useServerFn(setChannelOperacao);
+
+  const isGeral = workspace.id === "all";
+  const operacoes = useMemo(() => workspaces.filter((w) => w.id !== "all"), [workspaces]);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [newOp, setNewOp] = useState<string>(isGeral ? "" : workspace.id);
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["whatsapp-channels"],
@@ -80,7 +96,8 @@ function WhatsAppPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (n: string) => createFn({ data: { name: n } }),
+    mutationFn: (vars: { name: string; operacaoId: string }) =>
+      createFn({ data: vars }),
     onSuccess: () => {
       toast.success("Conexão criada! Compartilhe o link pra ativar.");
       setName("");
@@ -108,7 +125,29 @@ function WhatsAppPage() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao regenerar"),
   });
 
-  const channels = (data ?? []) as EvoChannel[];
+  const setOpMut = useMutation({
+    mutationFn: (vars: { id: string; operacaoId: string; currentMetadata: any }) =>
+      setOpFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("Operação atualizada");
+      qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar operação"),
+  });
+
+  const allChannels = (data ?? []) as EvoChannel[];
+  const channels = isGeral
+    ? allChannels
+    : allChannels.filter((c) => c.operacaoId === workspace.id);
+
+  function opLabel(id: string | null) {
+    if (!id) return "Sem operação";
+    return operacoes.find((o) => o.id === id)?.nome ?? id;
+  }
+  function opAccent(id: string | null) {
+    if (!id) return null;
+    return operacoes.find((o) => o.id === id)?.accent ?? null;
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -118,7 +157,10 @@ function WhatsAppPage() {
             <Phone className="h-6 w-6 text-emerald-500" /> WhatsApp
           </h1>
           <p className="text-sm text-muted-foreground">
-            Conecte números via EvoHub (WhatsApp Business Cloud API). Crie uma conexão e compartilhe o link pra ativar o número.
+            Conecte números via EvoHub (WhatsApp Business Cloud API).{" "}
+            {isGeral
+              ? "Mostrando todos os números de todas as operações."
+              : `Mostrando apenas números da operação "${workspace.nome}".`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -126,7 +168,13 @@ function WhatsAppPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(v) => {
+              setOpen(v);
+              if (v) setNewOp(isGeral ? "" : workspace.id);
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white">
                 <Plus className="h-4 w-4 mr-2" /> Nova conexão
@@ -136,25 +184,42 @@ function WhatsAppPage() {
               <DialogHeader>
                 <DialogTitle>Nova conexão WhatsApp</DialogTitle>
               </DialogHeader>
-              <div className="space-y-2 pt-2">
-                <Label htmlFor="ch-name">Nome da conexão</Label>
-                <Input
-                  id="ch-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex.: Atendimento Principal"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Após criar, copie o link e abra no navegador onde o WhatsApp Business tá logado.
-                </p>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="ch-name">Nome da conexão</Label>
+                  <Input
+                    id="ch-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ex.: Atendimento Principal"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Operação</Label>
+                  <Select value={newOp} onValueChange={setNewOp}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a operação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {operacoes.map((op) => (
+                        <SelectItem key={op.id} value={op.id}>
+                          {op.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Esse número vai ficar vinculado à operação selecionada.
+                  </p>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => createMut.mutate(name)}
-                  disabled={!name.trim() || createMut.isPending}
+                  onClick={() => createMut.mutate({ name, operacaoId: newOp })}
+                  disabled={!name.trim() || !newOp || createMut.isPending}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white"
                 >
                   {createMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -179,13 +244,18 @@ function WhatsAppPage() {
       ) : channels.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center">
           <Phone className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">Nenhuma conexão ainda. Clica em "Nova conexão" pra começar.</p>
+          <p className="text-muted-foreground">
+            {isGeral
+              ? 'Nenhuma conexão ainda. Clica em "Nova conexão" pra começar.'
+              : `Nenhum número vinculado à operação "${workspace.nome}".`}
+          </p>
         </div>
       ) : (
         <div className="grid gap-3">
           {channels.map((ch) => {
             const phone = ch.metadata?.meta_connection?.phone_number;
             const display = ch.metadata?.meta_connection?.display_name;
+            const accent = opAccent(ch.operacaoId);
             return (
               <div
                 key={ch.id}
@@ -195,10 +265,17 @@ function WhatsAppPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-foreground truncate">{ch.name}</h3>
                     {statusBadge(ch.status)}
+                    <Badge
+                      variant="outline"
+                      className={`gap-1 ${accent ? `${accent.bg} ${accent.text} ${accent.border}` : ""}`}
+                    >
+                      <Tag className="h-3 w-3" /> {opLabel(ch.operacaoId)}
+                    </Badge>
                   </div>
                   {phone && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      {display ? `${display} · ` : ""}{phone}
+                      {display ? `${display} · ` : ""}
+                      {phone}
                     </p>
                   )}
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -224,7 +301,24 @@ function WhatsAppPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <Select
+                    value={ch.operacaoId ?? ""}
+                    onValueChange={(v) =>
+                      setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[150px] text-xs">
+                      <SelectValue placeholder="Operação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {operacoes.map((op) => (
+                        <SelectItem key={op.id} value={op.id}>
+                          {op.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     size="sm"
                     variant="outline"
