@@ -310,8 +310,6 @@ function Editor({ flowId }: { flowId: string }) {
             fitView
           >
             <Background gap={16} color="#374151" />
-            <Controls />
-            <MiniMap pannable zoomable maskColor="rgba(0,0,0,0.7)" />
           </ReactFlow>
         </div>
 
