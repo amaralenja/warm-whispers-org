@@ -990,6 +990,125 @@ export type Database = {
           },
         ]
       }
+      wa_conversations: {
+        Row: {
+          channel_id: string
+          contact_name: string | null
+          contact_wa_id: string
+          created_at: string
+          id: string
+          last_message_at: string
+          last_message_direction: string | null
+          last_message_preview: string | null
+          operacao_id: string | null
+          phone_number_id: string | null
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          channel_id: string
+          contact_name?: string | null
+          contact_wa_id: string
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          last_message_direction?: string | null
+          last_message_preview?: string | null
+          operacao_id?: string | null
+          phone_number_id?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string
+          contact_name?: string | null
+          contact_wa_id?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          last_message_direction?: string | null
+          last_message_preview?: string | null
+          operacao_id?: string | null
+          phone_number_id?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wa_messages: {
+        Row: {
+          caption: string | null
+          channel_id: string
+          conversation_id: string
+          created_at: string
+          direction: string
+          from_wa_id: string | null
+          id: string
+          media_filename: string | null
+          media_id: string | null
+          media_mime: string | null
+          media_url: string | null
+          msg_type: string
+          raw: Json | null
+          reply_to: string | null
+          sent_by: string | null
+          status: string | null
+          text_body: string | null
+          to_wa_id: string | null
+          wa_message_id: string | null
+        }
+        Insert: {
+          caption?: string | null
+          channel_id: string
+          conversation_id: string
+          created_at?: string
+          direction: string
+          from_wa_id?: string | null
+          id?: string
+          media_filename?: string | null
+          media_id?: string | null
+          media_mime?: string | null
+          media_url?: string | null
+          msg_type?: string
+          raw?: Json | null
+          reply_to?: string | null
+          sent_by?: string | null
+          status?: string | null
+          text_body?: string | null
+          to_wa_id?: string | null
+          wa_message_id?: string | null
+        }
+        Update: {
+          caption?: string | null
+          channel_id?: string
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          from_wa_id?: string | null
+          id?: string
+          media_filename?: string | null
+          media_id?: string | null
+          media_mime?: string | null
+          media_url?: string | null
+          msg_type?: string
+          raw?: Json | null
+          reply_to?: string | null
+          sent_by?: string | null
+          status?: string | null
+          text_body?: string | null
+          to_wa_id?: string | null
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
