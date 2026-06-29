@@ -10,13 +10,11 @@ import {
   ExternalLink,
   Trash2,
   RotateCw,
-  CheckCircle2,
   Clock,
   XCircle,
   Loader2,
   Tag,
   MessageCircle,
-  X,
   X,
   QrCode,
 } from "lucide-react";
