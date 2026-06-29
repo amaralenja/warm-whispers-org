@@ -51,6 +51,7 @@ const mainItems: Item[] = [
 
 const operacaoX1Items: Item[] = [
   { title: "CRM Leads X1", url: "/crm", icon: Users },
+  { title: "Vendedores", url: "/vendedores", icon: Briefcase },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },
