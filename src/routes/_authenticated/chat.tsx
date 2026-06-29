@@ -439,11 +439,11 @@ function MessageBubble({ msg }: { msg: Msg }) {
 
 function MediaContent({ msg }: { msg: Msg }) {
   if (msg.msg_type === "text") return null;
-  // Outgoing: we have media_url already (signed Supabase URL)
-  if (msg.direction === "out" && msg.media_url) {
+  // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
+  if (msg.media_url) {
     return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} />;
   }
-  // Incoming: we have media_id, need to resolve via EvoHub
+  // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
     return <IncomingMedia msg={msg} />;
   }
