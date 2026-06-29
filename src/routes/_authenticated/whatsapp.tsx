@@ -515,39 +515,45 @@ function ChannelCard({
       </div>
 
       {/* Footer */}
-      <div className="mt-4 px-5 py-3 border-t border-border flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="truncate">{stateMeta.footer}</span>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
+      <div className="mt-4 px-5 py-3 border-t border-border space-y-2">
+        <div className="text-[11px] text-muted-foreground truncate">{stateMeta.footer}</div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 h-8 text-xs"
             onClick={() => window.open(ch.connectUrl, "_blank")}
-            className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted transition"
-            title="Abrir link"
           >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => { navigator.clipboard.writeText(ch.connectUrl); toast.success("Link copiado"); }}
-            className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted transition"
+            <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0"
             title="Copiar link"
+            onClick={() => { navigator.clipboard.writeText(ch.connectUrl); toast.success("Link copiado"); }}
           >
             <Copy className="h-3.5 w-3.5" />
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0"
+            title="Gerar novo link"
             onClick={onRegen}
             disabled={regenPending}
-            className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted transition disabled:opacity-50"
-            title="Gerar novo link"
           >
             <RotateCw className="h-3.5 w-3.5" />
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-8 px-3 text-xs"
             onClick={onDelete}
             disabled={deletePending}
-            className="h-7 w-7 rounded flex items-center justify-center hover:bg-rose-500/10 hover:text-rose-400 transition disabled:opacity-50"
-            title="Remover"
           >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+            {deletePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir</>}
+          </Button>
         </div>
       </div>
     </div>
