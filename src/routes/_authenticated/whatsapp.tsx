@@ -45,6 +45,8 @@ import {
   regenerateWhatsappToken,
   type EvoChannel,
 } from "@/lib/evohub.functions";
+import { registerWhatsappWebhook } from "@/lib/whatsapp-chat.functions";
+
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   component: WhatsAppPage,
@@ -168,6 +170,22 @@ function WhatsAppPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                const url = `${window.location.origin}/api/public/whatsapp/webhook`;
+                const res = await registerWhatsappWebhook({ data: { webhookUrl: url } });
+                toast.success(res.message ?? "Webhook configurado");
+              } catch (e: any) {
+                toast.error(e?.message ?? "Erro ao configurar webhook");
+              }
+            }}
+          >
+            <RotateCw className="h-4 w-4 mr-2" /> Configurar Webhook
+          </Button>
+
           <Dialog
             open={open}
             onOpenChange={(v) => {
