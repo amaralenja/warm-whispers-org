@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { getFlow, saveFlow, saveTriggers, triggerFlowManually } from "@/lib/flow-engine.functions";
+import { listWhatsappChannels } from "@/lib/evohub.functions";
 
 export const Route = createFileRoute("/_authenticated/flows/$flowId")({
   component: FlowEditorPage,
@@ -319,10 +320,21 @@ function Editor({ flowId }: { flowId: string }) {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [name, setName] = useState("");
   const [ativo, setAtivo] = useState(false);
+  const [operacaoId, setOperacaoId] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<any[]>([]);
   const [testOpen, setTestOpen] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testChannel, setTestChannel] = useState("");
+
+  const listChannelsFn = useServerFn(listWhatsappChannels);
+  const { data: allChannels = [] } = useQuery({
+    queryKey: ["wa-channels-all"],
+    queryFn: () => listChannelsFn(),
+  });
+  const channels = useMemo(() => {
+    if (!operacaoId) return allChannels as any[];
+    return (allChannels as any[]).filter((c) => String(c?.metadata?.operacao_id ?? "") === String(operacaoId));
+  }, [allChannels, operacaoId]);
 
   // Hydrate from server
   useEffect(() => {
@@ -330,6 +342,7 @@ function Editor({ flowId }: { flowId: string }) {
     const f = flow as any;
     setName(f.nome ?? "");
     setAtivo(f.ativo ?? false);
+    setOperacaoId(f.operacao_id ?? null);
     setNodes((f.nodes ?? []) as Node[]);
     setEdges((f.edges ?? []) as Edge[]);
     setTriggers(f.wa_flow_triggers ?? []);
@@ -449,7 +462,7 @@ function Editor({ flowId }: { flowId: string }) {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Palette */}
-        <Palette onAdd={addNode} triggers={triggers} setTriggers={setTriggers} />
+        <Palette onAdd={addNode} triggers={triggers} setTriggers={setTriggers} channels={channels} operacaoId={operacaoId} />
 
         {/* Canvas */}
         <div className="flex-1 relative">
@@ -511,8 +524,8 @@ function Editor({ flowId }: { flowId: string }) {
 // ============================================================
 
 function Palette({
-  onAdd, triggers, setTriggers,
-}: { onAdd: (t: string) => void; triggers: any[]; setTriggers: (t: any[]) => void }) {
+  onAdd, triggers, setTriggers, channels, operacaoId,
+}: { onAdd: (t: string) => void; triggers: any[]; setTriggers: (t: any[]) => void; channels: any[]; operacaoId: string | null }) {
   const groups: Array<{ label: string; types: string[] }> = [
     { label: "Conteúdo", types: ["send_text", "send_image", "send_video", "send_audio", "send_document"] },
     { label: "Interativo", types: ["send_buttons"] },
@@ -568,6 +581,29 @@ function Palette({
                   />
                 </>
               )}
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase text-muted-foreground">Número (WhatsApp)</Label>
+                <Select
+                  value={t.channel_id ?? "__any__"}
+                  onValueChange={(v) => { const c = [...triggers]; c[i] = { ...t, channel_id: v === "__any__" ? null : v }; setTriggers(c); }}
+                >
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Selecionar número" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__any__">Qualquer número da operação</SelectItem>
+                    {channels.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name ?? c.display_phone_number ?? c.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!operacaoId && (
+                  <p className="text-[10px] text-amber-500">Defina a operação do fluxo para listar apenas os números dela.</p>
+                )}
+                {operacaoId && channels.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">Nenhum número conectado nessa operação.</p>
+                )}
+              </div>
             </div>
           ))}
           <Button
