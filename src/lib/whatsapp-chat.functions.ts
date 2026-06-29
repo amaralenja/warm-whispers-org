@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const EVOHUB_BASE = "https://app.evohub.evolutionfoundation.com.br";
+const EVOHUB_BASE = "https://api.evohub.ai";
 
 function getEvoKey() {
   const k = process.env.EVOHUB_API_KEY;
