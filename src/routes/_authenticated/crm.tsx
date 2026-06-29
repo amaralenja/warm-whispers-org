@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { TagsManagerDialog } from "@/components/tags-manager-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
