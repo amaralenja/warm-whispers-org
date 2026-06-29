@@ -524,6 +524,38 @@ Deno.serve(async (req) => {
           .update({ unread_count: ((conv as any).unread_count ?? 0) + 1 })
           .eq("id", (conv as any).id);
 
+        // Cria lead no CRM da operação se ainda não existir (por telefone + expert)
+        if (matched.operacao_id) {
+          const phone = String(m.from);
+          const { data: existing } = await supabase
+            .from("crm_leads")
+            .select("id")
+            .eq("expert", matched.operacao_id)
+            .eq("telefone", phone)
+            .limit(1)
+            .maybeSingle();
+          if (!existing) {
+            await supabase.from("crm_leads").insert({
+              nome: contactName || phone,
+              telefone: phone,
+              expert: matched.operacao_id,
+              fonte: "WhatsApp",
+              status: "novo",
+              ultima_interacao: new Date(timestampMs).toISOString(),
+              dados: {
+                origem: "whatsapp_webhook",
+                channel_id: channelId,
+                conversation_id: (conv as any).id,
+              },
+            });
+          } else {
+            await supabase
+              .from("crm_leads")
+              .update({ ultima_interacao: new Date(timestampMs).toISOString() })
+              .eq("id", (existing as any).id);
+          }
+        }
+
         const media = extractMedia(m);
         const interactive = m.interactive;
         const buttonId = interactive?.button_reply?.id ?? interactive?.list_reply?.id ?? m.button?.payload ?? null;
