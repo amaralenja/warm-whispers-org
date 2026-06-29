@@ -18,6 +18,9 @@ import {
   Download,
   Smile,
   Zap,
+  Radio,
+  Headphones,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,6 +133,8 @@ function ChatPage() {
   const markReadFn = useServerFn(markConversationRead);
   const sendFn = useServerFn(sendWhatsappMessage);
   const downloadMediaFn = useServerFn(downloadIncomingMediaBase64);
+  const listFlowsFn = useServerFn(listFlows);
+  const triggerFlowFn = useServerFn(triggerFlowManually);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -307,182 +312,226 @@ function ChatPage() {
 
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full bg-background overflow-hidden">
-      {/* Sidebar de conversas */}
-      <aside className="w-[320px] xl:w-[360px] border-r border-border flex flex-col min-h-0 shrink-0">
-        <div className="p-3 border-b border-border space-y-2 shrink-0">
-          <div className="flex items-center gap-2">
-            <MessagesSquare className="h-5 w-5 text-emerald-500" />
-            <h2 className="font-semibold">Chat ao Vivo</h2>
-            <Badge variant="outline" className="ml-auto text-xs">
-              {workspace.id === "all" ? "Geral" : workspace.nome}
-            </Badge>
+    <div className="h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-chat-shell p-3 text-foreground">
+      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden rounded-[28px] border border-chat-line bg-chat-thread shadow-[0_24px_80px_color-mix(in_oklab,var(--background)_78%,transparent)]">
+        <aside className="flex min-h-0 flex-col border-r border-chat-line bg-chat-sidebar">
+          <div className="shrink-0 border-b border-chat-line p-5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-chat-soft text-chat-accent">
+                  <MessagesSquare className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-xl font-semibold tracking-normal">Chat ao Vivo</h2>
+                  <p className="truncate text-xs text-muted-foreground">Conversas dos números conectados</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="h-8 rounded-full border-chat-line px-3 text-xs">
+                {workspace.id === "all" ? "Geral" : workspace.nome}
+              </Badge>
+            </div>
+
+            <div className="relative mt-5">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar contato ou mensagem"
+                className="h-12 rounded-2xl border-chat-line bg-chat-panel pl-11 text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
+              />
+            </div>
           </div>
-          <div className="relative">
-            <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar contato ou mensagem"
-              className="pl-8 h-9"
-            />
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 scrollbar-fancy">
+            {filtered.length === 0 ? (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filtered.map((c) => {
+                  const isActive = c.id === activeId;
+                  const preview = toText(c.last_message_preview);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setActiveId(c.id)}
+                      className={`group w-full rounded-3xl border p-3.5 text-left transition-all ${
+                        isActive
+                          ? "border-chat-accent/55 bg-chat-soft shadow-[0_14px_34px_color-mix(in_oklab,var(--chat-accent)_12%,transparent)]"
+                          : "border-transparent hover:border-chat-line hover:bg-chat-panel"
+                      }`}
+                    >
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                        <Avatar className="h-12 w-12 shrink-0 rounded-2xl border border-chat-line">
+                          <AvatarFallback className="rounded-2xl bg-chat-soft text-sm font-bold text-chat-accent">
+                            {initials(c.contact_name, c.contact_wa_id)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-[15px] font-semibold tracking-normal">
+                              {c.contact_name || c.contact_wa_id}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                            {c.last_message_direction === "out" && <CheckCheck className="h-3.5 w-3.5 shrink-0" />}
+                            <span className="truncate">{preview || "Sem prévia"}</span>
+                          </div>
+                        </div>
+                        <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
+                          <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                            {formatTime(c.last_message_at)}
+                          </span>
+                          {c.unread_count > 0 ? (
+                            <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">
+                              {c.unread_count}
+                            </span>
+                          ) : (
+                            <span className={`h-2 w-2 rounded-full ${isActive ? "bg-chat-accent" : "bg-transparent"}`} />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
+        </aside>
+
+        <main className="flex min-h-0 min-w-0 flex-col bg-chat-thread">
+          {!active ? (
+            <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
+              <div className="max-w-sm text-center">
+                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-chat-line bg-chat-panel text-chat-accent">
+                  <Headphones className="h-9 w-9" />
+                </div>
+                <p className="text-lg font-semibold text-foreground">Selecione uma conversa</p>
+                <p className="mt-1 text-sm">O histórico abre aqui com mídia, áudio e disparo de fluxo.</p>
+              </div>
             </div>
           ) : (
-            filtered.map((c) => {
-              const isActive = c.id === activeId;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setActiveId(c.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 border-b border-border/50 text-left transition-colors ${isActive ? "bg-accent/10" : "hover:bg-accent/5"}`}
-                >
-                  <Avatar className="h-10 w-10 shrink-0">
-                    <AvatarFallback className="bg-emerald-500/15 text-emerald-500 text-sm font-semibold">
-                      {initials(c.contact_name, c.contact_wa_id)}
+            <>
+              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
+                <div className="flex min-w-0 items-center gap-4">
+                  <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
+                    <AvatarFallback className="rounded-2xl bg-chat-soft text-base font-bold text-chat-accent">
+                      {initials(active.contact_name, active.contact_wa_id)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{c.contact_name || c.contact_wa_id}</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
-                        {formatTime(c.last_message_at)}
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h3 className="truncate text-lg font-semibold tracking-normal">
+                        {active.contact_name || active.contact_wa_id}
+                      </h3>
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
+                        <Radio className="h-3 w-3" /> ativo
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground truncate flex-1">
-                        {c.last_message_preview ?? ""}
-                      </span>
-                      {c.unread_count > 0 && (
-                        <Badge className="bg-emerald-500 text-white text-[10px] h-5 min-w-5 px-1.5">
-                          {c.unread_count}
-                        </Badge>
-                      )}
-                    </div>
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{active.contact_wa_id}</p>
                   </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
+                </div>
+                <FlowDispatcher
+                  conversation={active}
+                  listFlowsFn={listFlowsFn}
+                  triggerFn={triggerFlowFn}
+                />
+              </header>
 
-      {/* Janela do chat */}
-      <main className="flex-1 flex flex-col min-w-0 min-h-0">
-        {!active ? (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <MessagesSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>Selecione uma conversa pra começar</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <header className="px-4 py-3 border-b border-border flex items-center gap-3 shrink-0 bg-card">
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className="bg-emerald-500/15 text-emerald-500 font-semibold">
-                  {initials(active.contact_name, active.contact_wa_id)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold truncate">{active.contact_name || active.contact_wa_id}</h3>
-                <p className="text-xs text-muted-foreground">{active.contact_wa_id}</p>
-              </div>
-              <FlowDispatcher conversation={active} />
-            </header>
-
-            <div
-              ref={scrollRef}
-              className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 bg-muted/20"
-            >
-              {((messages as unknown as Msg[]) ?? []).map((m, i, arr) => {
-                const prev = arr[i - 1];
-                const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
-                return (
-                  <div key={m.id}>
-                    {showDate && (
-                      <div className="flex justify-center my-3">
-                        <span className="text-xs bg-muted/50 px-3 py-1 rounded-full text-muted-foreground">
-                          {formatDateLabel(m.created_at)}
-                        </span>
+              <div
+                ref={scrollRef}
+                className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklab,var(--chat-accent)_8%,transparent),transparent_34%)] px-6 py-6 scrollbar-fancy"
+              >
+                <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
+                  {((messages as unknown as Msg[]) ?? []).map((m, i, arr) => {
+                    const prev = arr[i - 1];
+                    const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+                    return (
+                      <div key={m.id}>
+                        {showDate && (
+                          <div className="my-5 flex justify-center">
+                            <span className="rounded-full border border-chat-line bg-chat-panel px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+                              {formatDateLabel(m.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <MessageBubble msg={m} mediaState={mediaCache[m.id]} onLoadMedia={() => loadMedia(m)} />
                       </div>
-                    )}
-                    <MessageBubble msg={m} mediaState={mediaCache[m.id]} onLoadMedia={() => loadMedia(m)} />
-                  </div>
-                );
-              })}
-            </div>
-
-            <footer className="p-3 border-t border-border bg-card shrink-0">
-              <div className="flex items-end gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="shrink-0">
-                      <Paperclip className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => { setPendingType("image"); fileInputRef.current?.click(); }}>
-                      <ImageIcon className="h-4 w-4 mr-2" /> Imagem
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPendingType("video"); fileInputRef.current?.click(); }}>
-                      <Video className="h-4 w-4 mr-2" /> Vídeo
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPendingType("audio"); fileInputRef.current?.click(); }}>
-                      <Mic className="h-4 w-4 mr-2" /> Áudio
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPendingType("document"); fileInputRef.current?.click(); }}>
-                      <FileText className="h-4 w-4 mr-2" /> Documento
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept={
-                    pendingType === "image" ? "image/*"
-                    : pendingType === "video" ? "video/*"
-                    : pendingType === "audio" ? "audio/*"
-                    : "*"
-                  }
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFileUpload(f);
-                    e.target.value = "";
-                  }}
-                />
-                <Textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendText();
-                    }
-                  }}
-                  placeholder="Mensagem"
-                  rows={1}
-                  className="resize-none min-h-[40px] max-h-32"
-                />
-                <Button
-                  size="icon"
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white shrink-0"
-                  onClick={handleSendText}
-                  disabled={!draft.trim() || sendMut.isPending}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                    );
+                  })}
+                </div>
               </div>
-            </footer>
-          </>
-        )}
-      </main>
+
+              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
+                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-[26px] border border-chat-line bg-chat-thread p-2 shadow-[0_18px_44px_color-mix(in_oklab,var(--background)_45%,transparent)]">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
+                        <Paperclip className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-52 rounded-2xl border-chat-line bg-popover">
+                      <DropdownMenuItem onClick={() => { setPendingType("image"); fileInputRef.current?.click(); }}>
+                        <ImageIcon className="mr-2 h-4 w-4" /> Imagem
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPendingType("video"); fileInputRef.current?.click(); }}>
+                        <Video className="mr-2 h-4 w-4" /> Vídeo
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPendingType("audio"); fileInputRef.current?.click(); }}>
+                        <Mic className="mr-2 h-4 w-4" /> Áudio
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPendingType("document"); fileInputRef.current?.click(); }}>
+                        <FileText className="mr-2 h-4 w-4" /> Documento
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept={
+                      pendingType === "image" ? "image/*"
+                      : pendingType === "video" ? "video/*"
+                      : pendingType === "audio" ? "audio/*"
+                      : "*"
+                    }
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFileUpload(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendText();
+                      }
+                    }}
+                    placeholder="Digite uma mensagem"
+                    rows={1}
+                    className="max-h-36 min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-3 text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+                  />
+                  <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
+                    <Smile className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground shadow-[0_12px_30px_color-mix(in_oklab,var(--chat-accent)_22%,transparent)] hover:bg-chat-accent/90"
+                    onClick={handleSendText}
+                    disabled={!draft.trim() || sendMut.isPending}
+                  >
+                    {sendMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  </Button>
+                </div>
+              </footer>
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -491,17 +540,21 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
   const isOut = msg.direction === "out";
+  const body = toText(msg.text_body);
+  const caption = toText(msg.caption);
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[70%] rounded-lg px-3 py-2 shadow-sm ${
-          isOut ? "bg-emerald-500/90 text-white" : "bg-card border border-border"
+        className={`max-w-[min(74%,760px)] overflow-hidden rounded-[24px] border px-4 py-3 shadow-[0_12px_28px_color-mix(in_oklab,var(--background)_32%,transparent)] ${
+          isOut
+            ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
+            : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
         }`}
       >
         <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} outgoing={isOut} />
-        {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
-        {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
-        <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
+        {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
+        {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
+        <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
           <span>{formatTime(msg.created_at)}</span>
           {isOut && <StatusTick status={msg.status} />}
         </div>
@@ -519,28 +572,28 @@ function MediaContent({ msg, mediaState, onLoadMedia, outgoing }: { msg: Msg; me
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
     if (mediaState?.error) {
-      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} />;
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
       return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} />;
     }
     if (mediaState?.loading) {
-      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading />;
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading outgoing={outgoing} />;
     }
     if (msg.msg_type === "document") {
       return (
         <button
           type="button"
           onClick={onLoadMedia}
-          className="flex items-center gap-2 bg-background/30 rounded px-2 py-1.5 text-sm hover:bg-background/50"
+          className="mb-1 flex min-w-64 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-medium transition hover:bg-background/40"
         >
-          <Download className="h-4 w-4" /> {msg.media_filename || "Baixar documento"}
+          <Download className="h-5 w-5" /> {msg.media_filename || "Baixar documento"}
         </button>
       );
     }
-    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} />;
+    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} outgoing={outgoing} />;
   }
-  return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} />;
+  return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} outgoing={outgoing} />;
 }
 
 function MediaPlaceholder({
@@ -549,20 +602,22 @@ function MediaPlaceholder({
   loading,
   error,
   onRetry,
+  outgoing,
 }: {
   type: string;
   filename: string | null;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  outgoing?: boolean;
 }) {
   const icon = type === "image" || type === "sticker"
-    ? <ImageIcon className="h-4 w-4" />
+    ? <ImageIcon className="h-5 w-5" />
     : type === "video"
-      ? <Video className="h-4 w-4" />
+      ? <Video className="h-5 w-5" />
       : type === "audio"
-        ? <Mic className="h-4 w-4" />
-        : <FileText className="h-4 w-4" />;
+        ? <Mic className="h-5 w-5" />
+        : <FileText className="h-5 w-5" />;
   const label = type === "image" ? "Imagem"
     : type === "sticker" ? "Figurinha"
     : type === "video" ? "Vídeo"
@@ -570,20 +625,25 @@ function MediaPlaceholder({
     : filename || "Documento";
 
   return (
-    <div className="mb-1 min-w-[220px] rounded-md border border-border/70 bg-background/40 p-2 text-sm">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="font-medium">{loading ? "Carregando mídia…" : label}</span>
+    <div className={`mb-1 min-w-[280px] rounded-2xl border p-4 text-sm ${outgoing ? "border-chat-accent/25 bg-background/10" : "border-chat-line bg-background/25"}`}>
+      <div className="flex items-center gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-chat-soft text-chat-accent">
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold">{loading ? "Carregando mídia…" : label}</div>
+          {loading && <div className="mt-0.5 text-xs opacity-70">Processando arquivo recebido</div>}
+        </div>
       </div>
       {error && (
-        <p className="mt-1 text-xs text-destructive break-words">
+        <p className="mt-3 break-words rounded-xl bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
           {error.includes("Meta token")
             ? "O EvoHub recebeu a mídia, mas esse canal está sem token Meta ativo. Reabra/reconecte o número na EvoHub."
             : error}
         </p>
       )}
       {!loading && onRetry && (
-        <button type="button" onClick={onRetry} className="mt-2 text-xs underline underline-offset-2">
+        <button type="button" onClick={onRetry} className="mt-3 rounded-full border border-chat-line px-3 py-1.5 text-xs font-semibold transition hover:bg-chat-soft">
           Tentar carregar
         </button>
       )}
@@ -595,27 +655,42 @@ function RenderMedia({
   type, url, mime, filename, outgoing,
 }: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean }) {
   if (type === "image" || type === "sticker") {
-    return <img src={url} alt={filename ?? ""} className={`rounded mb-1 ${type === "sticker" ? "max-w-[120px]" : "max-w-full"}`} />;
+    return (
+      <img
+        src={url}
+        alt={filename ?? (type === "sticker" ? "Figurinha recebida" : "Imagem recebida")}
+        loading="lazy"
+        className={`mb-2 block rounded-2xl border border-chat-line object-contain ${type === "sticker" ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
+      />
+    );
   }
   if (type === "video") {
-    return <video src={url} controls className="rounded mb-1 max-w-full" />;
+    return <video src={url} controls className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
   if (type === "audio") {
     return <WhatsappAudioPlayer url={url} outgoing={outgoing} />;
   }
   if (type === "document") {
     return (
-      <a href={url} download={filename ?? "documento"} className="flex items-center gap-2 underline text-sm">
-        <FileText className="h-4 w-4" /> {filename ?? "Documento"}
+      <a href={url} download={filename ?? "documento"} className="mb-1 flex min-w-72 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-semibold transition hover:bg-background/40">
+        <FileText className="h-5 w-5 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{filename ?? "Documento"}</span>
+        <Download className="h-4 w-4 shrink-0" />
       </a>
     );
   }
   return null;
 }
 
-function FlowDispatcher({ conversation }: { conversation: Conv }) {
-  const listFlowsFn = useServerFn(listFlows);
-  const triggerFn = useServerFn(triggerFlowManually);
+function FlowDispatcher({
+  conversation,
+  listFlowsFn,
+  triggerFn,
+}: {
+  conversation: Conv;
+  listFlowsFn: any;
+  triggerFn: any;
+}) {
   const [open, setOpen] = useState(false);
   const [firing, setFiring] = useState<string | null>(null);
 
@@ -659,12 +734,12 @@ function FlowDispatcher({ conversation }: { conversation: Conv }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Zap className="h-4 w-4 text-emerald-500" />
+        <Button variant="outline" size="sm" className="h-11 rounded-2xl border-chat-line bg-chat-thread px-4 font-semibold hover:bg-chat-soft">
+          <Zap className="mr-2 h-4 w-4 text-chat-accent" />
           Disparar fluxo
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
+      <DropdownMenuContent align="end" className="w-80 rounded-2xl border-chat-line bg-popover p-2">
         {compatible.length === 0 ? (
           <div className="px-3 py-4 text-xs text-muted-foreground text-center">
             Nenhum fluxo ativo compatível com esta operação.
@@ -675,9 +750,9 @@ function FlowDispatcher({ conversation }: { conversation: Conv }) {
               key={f.id}
               disabled={firing === f.id}
               onSelect={(e) => { e.preventDefault(); fire(f.id); }}
-              className="flex items-start gap-2"
+              className="flex items-start gap-3 rounded-xl p-3"
             >
-              <Zap className="h-3.5 w-3.5 mt-0.5 text-emerald-500 shrink-0" />
+              <Zap className="mt-0.5 h-4 w-4 shrink-0 text-chat-accent" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{f.nome}</div>
                 {f.operacao_id && (
