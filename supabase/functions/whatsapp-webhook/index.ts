@@ -87,6 +87,18 @@ async function downloadMetaMedia(token: string, mediaId: string): Promise<{ byte
   }
 }
 
+async function probeMetaToken(token: string, phoneNumberId?: string | null): Promise<boolean> {
+  if (!token || !phoneNumberId) return false;
+  try {
+    const res = await fetch(`${EVOHUB_BASE}/meta/v23.0/${phoneNumberId}?fields=id`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 function extToMime(mime: string) {
   const m = mime.split(";")[0].trim().toLowerCase();
   const map: Record<string, string> = {
@@ -108,6 +120,7 @@ type ChannelInfo = {
   operacao_id: string | null;
   display_phone_number?: string | null;
   token?: string | null;
+  usable_token?: string | null;
 };
 
 type NormalizedChange = {
@@ -121,6 +134,7 @@ type NormalizedChange = {
 
 // Cache connected channels for 60s to avoid hitting EvoHub on every webhook
 let channelsCache: { at: number; list: ChannelInfo[] } | null = null;
+let evoRawChannelsCache: { at: number; list: any[] } | null = null;
 
 function normalizeMetadata(metadata: any): Record<string, any> {
   if (!metadata) return {};
@@ -276,6 +290,61 @@ async function getConnectedChannels(supabase: any): Promise<ChannelInfo[]> {
   const list = Array.from(byId.values());
   channelsCache = { at: now, list };
   return list;
+}
+
+async function getEvoRawChannels(): Promise<any[]> {
+  const now = Date.now();
+  if (evoRawChannelsCache && now - evoRawChannelsCache.at < 60_000) return evoRawChannelsCache.list;
+
+  const key = Deno.env.get("EVOHUB_API_KEY");
+  if (!key) return [];
+  try {
+    const res = await fetch(`${EVOHUB_BASE}/api/v1/channels`, {
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
+    const full = await Promise.all(list.map(async (c) => {
+      try {
+        const detail = await fetch(`${EVOHUB_BASE}/api/v1/channels/${c.id}`, {
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        });
+        return detail.ok ? await detail.json() : c;
+      } catch {
+        return c;
+      }
+    }));
+    evoRawChannelsCache = { at: now, list: full };
+    return full;
+  } catch (e) {
+    console.warn("[wa-webhook] erro buscando tokens EvoHub", (e as any)?.message ?? e);
+    return [];
+  }
+}
+
+async function resolveUsableToken(channel: ChannelInfo): Promise<string | null> {
+  if (channel.usable_token) return channel.usable_token;
+  if (channel.token && await probeMetaToken(channel.token, channel.phone_number_id)) {
+    channel.usable_token = channel.token;
+    return channel.token;
+  }
+
+  const all = await getEvoRawChannels();
+  for (const c of all) {
+    const token = c?.token ? String(c.token) : "";
+    if (!token || token === channel.token) continue;
+    if (await probeMetaToken(token, channel.phone_number_id)) {
+      console.warn("[wa-webhook] usando token Meta alternativo para mídia", {
+        channelId: channel.id,
+        phoneNumberId: channel.phone_number_id,
+        tokenChannelId: c.id,
+      });
+      channel.usable_token = token;
+      return token;
+    }
+  }
+  return channel.token ?? null;
 }
 
 function normalizeTimestamp(value: any): string {
@@ -628,7 +697,8 @@ Deno.serve(async (req) => {
         // que o chat renderize via media_url (sem precisar baixar via browser).
         if (media?.id && matched.token) {
           try {
-            const downloaded = await downloadMetaMedia(matched.token, media.id);
+            const mediaToken = await resolveUsableToken(matched);
+            const downloaded = mediaToken ? await downloadMetaMedia(mediaToken, media.id) : null;
             if (downloaded) {
               const ext = (media.filename?.split(".").pop()) || extToMime(downloaded.mime);
               const safeName = (media.filename ?? `${media.id}.${ext}`).replace(/[^a-zA-Z0-9._-]/g, "_");
