@@ -1035,6 +1035,199 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_flow_executions: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          input: Json | null
+          node_id: string
+          node_type: string
+          output: Json | null
+          run_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input?: Json | null
+          node_id: string
+          node_type: string
+          output?: Json | null
+          run_id: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input?: Json | null
+          node_id?: string
+          node_type?: string
+          output?: Json | null
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_flow_executions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "wa_flow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_flow_runs: {
+        Row: {
+          channel_id: string
+          contact_wa_id: string
+          context: Json
+          conversation_id: string | null
+          created_at: string
+          current_node_id: string | null
+          error: string | null
+          expires_at: string | null
+          flow_id: string
+          id: string
+          status: string
+          updated_at: string
+          waiting_for: string | null
+        }
+        Insert: {
+          channel_id: string
+          contact_wa_id: string
+          context?: Json
+          conversation_id?: string | null
+          created_at?: string
+          current_node_id?: string | null
+          error?: string | null
+          expires_at?: string | null
+          flow_id: string
+          id?: string
+          status?: string
+          updated_at?: string
+          waiting_for?: string | null
+        }
+        Update: {
+          channel_id?: string
+          contact_wa_id?: string
+          context?: Json
+          conversation_id?: string | null
+          created_at?: string
+          current_node_id?: string | null
+          error?: string | null
+          expires_at?: string | null
+          flow_id?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          waiting_for?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_flow_runs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_flow_runs_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "wa_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_flow_triggers: {
+        Row: {
+          ativo: boolean
+          channel_id: string | null
+          created_at: string
+          flow_id: string
+          id: string
+          match_mode: string
+          tipo: string
+          valor: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          channel_id?: string | null
+          created_at?: string
+          flow_id: string
+          id?: string
+          match_mode?: string
+          tipo: string
+          valor?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          channel_id?: string | null
+          created_at?: string
+          flow_id?: string
+          id?: string
+          match_mode?: string
+          tipo?: string
+          valor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_flow_triggers_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "wa_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_flows: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          edges: Json
+          entry_node_id: string | null
+          id: string
+          nodes: Json
+          nome: string
+          operacao_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          edges?: Json
+          entry_node_id?: string | null
+          id?: string
+          nodes?: Json
+          nome: string
+          operacao_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          edges?: Json
+          entry_node_id?: string | null
+          id?: string
+          nodes?: Json
+          nome?: string
+          operacao_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wa_messages: {
         Row: {
           caption: string | null
