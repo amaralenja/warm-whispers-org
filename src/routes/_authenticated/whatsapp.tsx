@@ -296,32 +296,29 @@ function WhatsAppPage() {
 
 
         {quotaError && (
-          <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-background p-5 shadow-lg shadow-amber-500/10 animate-in fade-in slide-in-from-top-2">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 p-4">
             <button
               onClick={() => setQuotaError(false)}
-              className="absolute top-3 right-3 h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition"
+              className="float-right h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition"
               aria-label="Fechar"
             >
               <X className="h-4 w-4" />
             </button>
-            <div className="flex items-start gap-3 pr-8">
-              <div className="h-10 w-10 rounded-xl bg-amber-500/20 ring-2 ring-amber-500/40 flex items-center justify-center shrink-0">
-                <XCircle className="h-5 w-5 text-amber-500" />
-              </div>
+            <div className="flex items-start gap-3">
+              <XCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-bold text-foreground">Limite EvoHub excedido</h3>
+                <h3 className="font-semibold text-foreground text-sm">Limite EvoHub excedido</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Sua conta EvoHub atingiu o limite de conexões WhatsApp do plano atual. Pra criar uma nova, libere um slot removendo uma conexão existente, ou faça upgrade do plano no painel da EvoHub.
+                  Sua conta EvoHub atingiu o limite de conexões do plano atual. Remova uma conexão existente ou faça upgrade no painel da EvoHub.
                 </p>
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.open("https://app.evohub.ai", "_blank", "noopener,noreferrer")}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir painel EvoHub
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => window.open("https://app.evohub.ai", "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir painel EvoHub
+                </Button>
               </div>
             </div>
           </div>
@@ -329,33 +326,29 @@ function WhatsAppPage() {
 
         {/* Just-created highlight card */}
         {justCreated && (
-          <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-background p-6 shadow-xl shadow-emerald-500/10 animate-in fade-in slide-in-from-top-4">
+          <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-4">
             <button
               onClick={() => setJustCreated(null)}
-              className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition"
+              className="float-right h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition"
               aria-label="Fechar"
             >
               <X className="h-4 w-4" />
             </button>
-            <div className="flex items-start gap-4 flex-wrap">
-              <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 ring-2 ring-emerald-500/40 flex items-center justify-center shrink-0">
-                <QrCode className="h-7 w-7 text-emerald-500" />
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-white dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center shrink-0">
+                <QrCode className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div className="flex-1 min-w-[280px]">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-emerald-500" />
-                  <span className="text-xs uppercase tracking-wider font-semibold text-emerald-500">
-                    Conexão criada
-                  </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] uppercase tracking-wider font-medium text-emerald-700 dark:text-emerald-400">
+                  Conexão criada
                 </div>
-                <h3 className="text-lg font-bold text-foreground mt-1">{justCreated.name}</h3>
+                <h3 className="text-base font-semibold text-foreground mt-0.5">{justCreated.name}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Abre o link da EvoHub pra fazer login no Meta e vincular o número. Depois volta aqui — o status atualiza sozinho.
+                  Abre o link da EvoHub pra fazer login no Meta e vincular o número. O status atualiza sozinho.
                 </p>
                 <div className="mt-3 flex gap-2 flex-wrap">
                   <Button
                     size="sm"
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white shadow shadow-emerald-500/30"
                     onClick={() => window.open(justCreated.connectUrl, "_blank", "noopener,noreferrer")}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" /> Abrir link de conexão
@@ -377,31 +370,31 @@ function WhatsAppPage() {
         )}
 
         {error && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             {(error as Error)?.message ?? "Erro ao carregar conexões"}
           </div>
         )}
 
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-card p-16 text-center text-muted-foreground">
-            <Loader2 className="h-7 w-7 animate-spin mx-auto" />
+          <div className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
           </div>
         ) : channels.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-emerald-500/30 bg-card/50 p-16 text-center">
-            <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 mx-auto mb-4 flex items-center justify-center">
-              <MessageCircle className="h-8 w-8 text-emerald-500" />
+          <div className="rounded-lg border border-dashed border-border bg-card/50 p-16 text-center">
+            <div className="h-12 w-12 rounded-lg bg-muted mx-auto mb-4 flex items-center justify-center">
+              <MessageCircle className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">
+            <h3 className="text-base font-semibold text-foreground mb-1">
               Nenhuma conexão por aqui ainda
             </h3>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
               {isGeral
-                ? 'Clica em "Nova conexão" pra começar a receber e mandar mensagens.'
+                ? 'Clica em "Nova conexão" pra começar.'
                 : `Nenhum número vinculado à operação "${workspace.nome}".`}
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             {channels.map((ch) => {
               const phone = ch.metadata?.meta_connection?.phone_number;
               const display = ch.metadata?.meta_connection?.display_name;
@@ -410,46 +403,33 @@ function WhatsAppPage() {
               return (
                 <div
                   key={ch.id}
-                  className={`group relative overflow-hidden rounded-2xl border bg-card p-5 transition-all hover:shadow-lg ${
-                    isActive
-                      ? "border-emerald-500/30 hover:border-emerald-500/60 hover:shadow-emerald-500/10"
-                      : "border-border hover:border-foreground/20"
-                  }`}
+                  className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/20"
                 >
-                  {isActive && (
-                    <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
-                  )}
                   <div className="flex items-start gap-3">
-                    <div
-                      className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center ${
-                        isActive
-                          ? "bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-md shadow-emerald-500/30"
-                          : "bg-muted"
-                      }`}
-                    >
+                    <div className="h-10 w-10 shrink-0 rounded-lg bg-muted flex items-center justify-center">
                       <MessageCircle
-                        className={`h-6 w-6 ${isActive ? "text-white" : "text-muted-foreground"}`}
+                        className={`h-5 w-5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-bold text-foreground truncate">{ch.name}</h3>
+                        <h3 className="font-semibold text-foreground truncate">{ch.name}</h3>
                         {statusPill(ch.status)}
                       </div>
                       {phone ? (
-                        <p className="text-sm text-foreground/80 mt-1 font-medium">
+                        <p className="text-sm text-muted-foreground mt-0.5 truncate">
                           {display ? `${display} · ` : ""}
                           {phone}
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground mt-1 italic">
+                        <p className="text-sm text-muted-foreground mt-0.5 italic">
                           Aguardando login no Meta…
                         </p>
                       )}
                       <div className="mt-2">
                         <Badge
                           variant="outline"
-                          className={`gap-1 ${
+                          className={`gap-1 font-normal ${
                             accent ? `${accent.bg} ${accent.text} ${accent.border}` : ""
                           }`}
                         >
@@ -459,7 +439,7 @@ function WhatsAppPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-border/60 flex items-center gap-2 flex-wrap">
+                  <div className="mt-4 pt-3 border-t border-border flex items-center gap-2 flex-wrap">
                     <Button
                       size="sm"
                       variant="outline"
@@ -508,11 +488,11 @@ function WhatsAppPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => {
                         if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
                       }}
                       disabled={deleteMut.isPending}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       title="Remover"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
