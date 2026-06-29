@@ -90,6 +90,19 @@ function formatTime(iso: string) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// Garante que renderizamos só string (algumas mensagens antigas guardaram objeto em text_body/caption).
+function toText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    const anyV = v as any;
+    if (typeof anyV.body === "string") return anyV.body;
+    if (typeof anyV.text === "string") return anyV.text;
+    return "";
+  }
+  return String(v);
+}
+
 function formatDateLabel(iso: string) {
   const d = new Date(iso);
   const today = new Date();
