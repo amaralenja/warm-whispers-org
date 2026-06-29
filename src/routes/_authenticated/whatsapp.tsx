@@ -174,137 +174,126 @@ function WhatsAppPage() {
   }
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-emerald-500/5 via-background to-background">
+    <div className="min-h-full bg-background">
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent p-6">
-          <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
-          <div className="relative flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                <MessageCircle className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">WhatsApp</h1>
-                <p className="text-sm text-muted-foreground max-w-xl">
-                  Conecte números via EvoHub (WhatsApp Business Cloud API).{" "}
-                  {isGeral
-                    ? "Mostrando todas as operações."
-                    : `Filtrado por "${workspace.nome}".`}
-                </p>
-              </div>
+        <div className="flex items-start justify-between gap-4 flex-wrap border-b border-border pb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
+              <MessageCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <div className="flex gap-2 items-center">
-              <div className="hidden md:flex gap-2 mr-2">
-                <div className="rounded-xl bg-card border border-border px-3 py-2 text-center min-w-[80px]">
-                  <div className="text-lg font-bold text-emerald-500">{connectedCount}</div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Ativos</div>
-                </div>
-                <div className="rounded-xl bg-card border border-border px-3 py-2 text-center min-w-[80px]">
-                  <div className="text-lg font-bold text-amber-500">{pendingCount}</div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Pendentes</div>
-                </div>
-                <div className="rounded-xl bg-card border border-border px-3 py-2 text-center min-w-[80px]">
-                  <div className="text-lg font-bold text-foreground">{channels.length}</div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
-                </div>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-                Atualizar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const url = `${window.location.origin}/api/public/whatsapp/webhook`;
-                    const res = await registerWhatsappWebhook({ data: { webhookUrl: url } });
-                    toast.success(res.message ?? "Webhook configurado");
-                  } catch (e: any) {
-                    toast.error(e?.message ?? "Erro ao configurar webhook");
-                  }
-                }}
-              >
-                <RotateCw className="h-4 w-4 mr-2" /> Webhook
-              </Button>
-
-              <Dialog
-                open={open}
-                onOpenChange={(v) => {
-                  setOpen(v);
-                  if (v) {
-                    const fallback = isGeral ? operacoes[0]?.id ?? "" : workspace.id;
-                    setNewOp(fallback);
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    size="sm"
-                    className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md shadow-emerald-500/30"
-                  >
-                    <Plus className="h-4 w-4 mr-2" /> Nova conexão
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-emerald-500" />
-                      Nova conexão WhatsApp
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="ch-name">Nome da conexão</Label>
-                      <Input
-                        id="ch-name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Ex.: Atendimento Principal"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Operação</Label>
-                      <Select value={newOp} onValueChange={setNewOp}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a operação" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {operacoes.map((op) => (
-                            <SelectItem key={op.id} value={op.id}>
-                              {op.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Esse número vai ficar vinculado à operação selecionada.
-                      </p>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        if (!name.trim()) return toast.error("Informe o nome da conexão");
-                        if (!newOp) return toast.error("Selecione uma operação");
-                        createMut.mutate({ name: name.trim(), operacaoId: newOp });
-                      }}
-                      disabled={createMut.isPending}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                    >
-                      {createMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Criar
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground tracking-tight">WhatsApp</h1>
+              <p className="text-sm text-muted-foreground">
+                Conecte números via EvoHub.{" "}
+                {isGeral ? "Todas as operações." : `Filtrado por "${workspace.nome}".`}
+              </p>
             </div>
           </div>
+          <div className="flex gap-2 items-center">
+            <div className="hidden md:flex gap-4 mr-2 text-sm">
+              <div className="text-center">
+                <div className="font-semibold text-foreground">{connectedCount}</div>
+                <div className="text-[11px] text-muted-foreground">Ativos</div>
+              </div>
+              <div className="text-center">
+                <div className="font-semibold text-foreground">{pendingCount}</div>
+                <div className="text-[11px] text-muted-foreground">Pendentes</div>
+              </div>
+              <div className="text-center">
+                <div className="font-semibold text-foreground">{channels.length}</div>
+                <div className="text-[11px] text-muted-foreground">Total</div>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const url = `${window.location.origin}/api/public/whatsapp/webhook`;
+                  const res = await registerWhatsappWebhook({ data: { webhookUrl: url } });
+                  toast.success(res.message ?? "Webhook configurado");
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Erro ao configurar webhook");
+                }
+              }}
+            >
+              <RotateCw className="h-4 w-4 mr-2" /> Webhook
+            </Button>
+
+            <Dialog
+              open={open}
+              onOpenChange={(v) => {
+                setOpen(v);
+                if (v) {
+                  const fallback = isGeral ? operacoes[0]?.id ?? "" : workspace.id;
+                  setNewOp(fallback);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" /> Nova conexão
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova conexão WhatsApp</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="ch-name">Nome da conexão</Label>
+                    <Input
+                      id="ch-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ex.: Atendimento Principal"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Operação</Label>
+                    <Select value={newOp} onValueChange={setNewOp}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a operação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {operacoes.map((op) => (
+                          <SelectItem key={op.id} value={op.id}>
+                            {op.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Esse número vai ficar vinculado à operação selecionada.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (!name.trim()) return toast.error("Informe o nome da conexão");
+                      if (!newOp) return toast.error("Selecione uma operação");
+                      createMut.mutate({ name: name.trim(), operacaoId: newOp });
+                    }}
+                    disabled={createMut.isPending}
+                  >
+                    {createMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Criar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
 
         {quotaError && (
           <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-background p-5 shadow-lg shadow-amber-500/10 animate-in fade-in slide-in-from-top-2">
