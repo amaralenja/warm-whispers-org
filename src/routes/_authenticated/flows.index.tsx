@@ -17,7 +17,7 @@ import {
 import { listFlows, createFlow, deleteFlow, saveFlow } from "@/lib/flow-engine.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 
-export const Route = createFileRoute("/_authenticated/flows")({
+export const Route = createFileRoute("/_authenticated/flows/")({
   component: FlowsListPage,
 });
 
