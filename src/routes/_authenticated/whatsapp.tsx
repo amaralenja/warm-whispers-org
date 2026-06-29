@@ -196,7 +196,10 @@ function WhatsAppPage() {
             open={open}
             onOpenChange={(v) => {
               setOpen(v);
-              if (v) setNewOp(isGeral ? "" : workspace.id);
+              if (v) {
+                const fallback = isGeral ? (operacoes[0]?.id ?? "") : workspace.id;
+                setNewOp(fallback);
+              }
             }}
           >
             <DialogTrigger asChild>
