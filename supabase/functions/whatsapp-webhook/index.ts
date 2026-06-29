@@ -57,6 +57,46 @@ function extractMedia(m: any) {
   };
 }
 
+// Baixa a mídia direto do Meta Graph com o token do canal e devolve bytes + mime.
+async function downloadMetaMedia(token: string, mediaId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  try {
+    // 1) pega URL da mídia
+    const metaRes = await fetch(`https://graph.facebook.com/v23.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!metaRes.ok) {
+      console.warn("[wa-webhook] meta media metadata HTTP", metaRes.status, await metaRes.text().catch(() => ""));
+      return null;
+    }
+    const meta = await metaRes.json();
+    const url = meta?.url as string | undefined;
+    const mime = (meta?.mime_type as string | undefined) ?? "application/octet-stream";
+    if (!url) return null;
+    // 2) baixa os bytes (Meta exige o mesmo Bearer)
+    const fileRes = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!fileRes.ok) {
+      console.warn("[wa-webhook] meta media download HTTP", fileRes.status);
+      return null;
+    }
+    const buf = new Uint8Array(await fileRes.arrayBuffer());
+    return { bytes: buf, mime };
+  } catch (e) {
+    console.warn("[wa-webhook] downloadMetaMedia erro", (e as any)?.message ?? e);
+    return null;
+  }
+}
+
+function extToMime(mime: string) {
+  const m = mime.split(";")[0].trim().toLowerCase();
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+    "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac", "audio/wav": "wav",
+    "video/mp4": "mp4", "video/3gpp": "3gp", "video/quicktime": "mov",
+    "application/pdf": "pdf",
+  };
+  return map[m] ?? (m.split("/")[1] || "bin");
+}
+
 const APP_SOURCE = "lovable-crm";
 const EVOHUB_BASE = "https://api.evohub.ai";
 const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
@@ -66,6 +106,7 @@ type ChannelInfo = {
   phone_number_id: string | null;
   operacao_id: string | null;
   display_phone_number?: string | null;
+  token?: string | null;
 };
 
 type NormalizedChange = {
@@ -139,6 +180,7 @@ function toChannelInfo(c: any, fallbackOperacao?: string | null): ChannelInfo | 
       : (typeof meta.operacao_id === "string" && meta.operacao_id) ? meta.operacao_id
       : fallbackOperacao ?? null,
     display_phone_number: info.displayPhoneNumber ? String(info.displayPhoneNumber) : null,
+    token: c.token ? String(c.token) : null,
   };
 }
 
@@ -580,6 +622,40 @@ Deno.serve(async (req) => {
         }, { onConflict: "channel_id,wa_message_id" });
 
         if (msgErr) console.error("[wa-webhook] upsert msg error", msgErr);
+
+        // Baixa a mídia direto do Meta Graph e armazena no bucket wa-media para
+        // que o chat renderize via media_url (sem precisar baixar via browser).
+        if (media?.id && matched.token) {
+          try {
+            const downloaded = await downloadMetaMedia(matched.token, media.id);
+            if (downloaded) {
+              const ext = (media.filename?.split(".").pop()) || extToMime(downloaded.mime);
+              const safeName = (media.filename ?? `${media.id}.${ext}`).replace(/[^a-zA-Z0-9._-]/g, "_");
+              const path = `${channelId}/${(conv as any).id}/${media.id}-${safeName}`;
+              const up = await supabase.storage.from("wa-media").upload(path, downloaded.bytes, {
+                contentType: downloaded.mime,
+                upsert: true,
+              });
+              if (!up.error) {
+                const signed = await supabase.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24 * 7);
+                if (signed.data?.signedUrl) {
+                  await supabase
+                    .from("wa_messages")
+                    .update({
+                      media_url: signed.data.signedUrl,
+                      media_mime: downloaded.mime,
+                    })
+                    .eq("channel_id", channelId)
+                    .eq("wa_message_id", String(m.id));
+                }
+              } else {
+                console.warn("[wa-webhook] upload mídia falhou", up.error.message);
+              }
+            }
+          } catch (e) {
+            console.warn("[wa-webhook] erro processando mídia", (e as any)?.message ?? e);
+          }
+        }
       }
 
       const statuses: any[] = Array.isArray(change.statuses) ? change.statuses : [];

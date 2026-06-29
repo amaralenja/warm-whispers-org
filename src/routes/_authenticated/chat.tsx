@@ -90,6 +90,19 @@ function formatTime(iso: string) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// Garante que renderizamos só string (algumas mensagens antigas guardaram objeto em text_body/caption).
+function toText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    const anyV = v as any;
+    if (typeof anyV.body === "string") return anyV.body;
+    if (typeof anyV.text === "string") return anyV.text;
+    return "";
+  }
+  return String(v);
+}
+
 function formatDateLabel(iso: string) {
   const d = new Date(iso);
   const today = new Date();
@@ -426,8 +439,8 @@ function MessageBubble({ msg }: { msg: Msg }) {
         }`}
       >
         <MediaContent msg={msg} />
-        {msg.text_body && <p className="text-sm whitespace-pre-wrap break-words">{msg.text_body}</p>}
-        {msg.caption && <p className="text-xs mt-1 opacity-90">{msg.caption}</p>}
+        {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
+        {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
         <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
           <span>{formatTime(msg.created_at)}</span>
           {isOut && <StatusTick status={msg.status} />}
@@ -439,11 +452,11 @@ function MessageBubble({ msg }: { msg: Msg }) {
 
 function MediaContent({ msg }: { msg: Msg }) {
   if (msg.msg_type === "text") return null;
-  // Outgoing: we have media_url already (signed Supabase URL)
-  if (msg.direction === "out" && msg.media_url) {
+  // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
+  if (msg.media_url) {
     return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} />;
   }
-  // Incoming: we have media_id, need to resolve via EvoHub
+  // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
     return <IncomingMedia msg={msg} />;
   }
