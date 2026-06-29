@@ -128,12 +128,14 @@ function ChatPage() {
   const listMsgFn = useServerFn(listMessages);
   const markReadFn = useServerFn(markConversationRead);
   const sendFn = useServerFn(sendWhatsappMessage);
+  const downloadMediaFn = useServerFn(downloadIncomingMediaBase64);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingType, setPendingType] = useState<"image" | "video" | "document" | "audio">("image");
+  const [mediaCache, setMediaCache] = useState<Record<string, { url?: string; mime?: string; loading?: boolean; error?: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
@@ -222,6 +224,7 @@ function ChatPage() {
 
   async function handleFileUpload(file: File) {
     if (!active) return;
+    toast.loading("Enviando mídia…", { id: "wa-media-upload" });
     const ext = file.name.split(".").pop() || "bin";
     const path = `${active.channel_id}/${active.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const up = await supabase.storage.from("wa-media").upload(path, file, {
@@ -229,11 +232,13 @@ function ChatPage() {
       upsert: false,
     });
     if (up.error) {
+      toast.dismiss("wa-media-upload");
       toast.error("Upload falhou: " + up.error.message);
       return;
     }
     const signed = await supabase.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24);
     if (signed.error || !signed.data?.signedUrl) {
+      toast.dismiss("wa-media-upload");
       toast.error("Erro ao gerar URL");
       return;
     }
@@ -246,7 +251,49 @@ function ChatPage() {
       filename: file.name,
       caption: draft.trim() || undefined,
     });
+    toast.dismiss("wa-media-upload");
   }
+
+  async function downloadMedia(msg: Msg) {
+    if (!msg.media_id) throw new Error("Mídia sem ID");
+    const res = await downloadMediaFn({ data: { channelId: msg.channel_id, mediaId: msg.media_id } });
+    return {
+      url: `data:${res.mime};base64,${res.base64}`,
+      mime: res.mime,
+    };
+  }
+
+  async function loadMedia(msg: Msg) {
+    if (!msg.media_id) return;
+    const cached = mediaCache[msg.id];
+    if (cached?.url || cached?.loading) return;
+    setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: true, error: undefined } }));
+    try {
+      const res = await downloadMedia(msg);
+      setMediaCache((prev) => ({ ...prev, [msg.id]: { url: res.url, mime: res.mime, loading: false } }));
+    } catch (e: any) {
+      const error = e?.message ? String(e.message) : "Não foi possível carregar a mídia";
+      setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: false, error } }));
+      toast.error("Erro ao baixar mídia: " + error);
+    }
+  }
+
+  useEffect(() => {
+    const list = (messages as unknown as Msg[]) ?? [];
+    for (const msg of list) {
+      if (
+        !msg.media_url &&
+        msg.media_id &&
+        (msg.msg_type === "image" || msg.msg_type === "audio" || msg.msg_type === "video" || msg.msg_type === "sticker") &&
+        !mediaCache[msg.id]?.url &&
+        !mediaCache[msg.id]?.loading &&
+        !mediaCache[msg.id]?.error
+      ) {
+        loadMedia(msg);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] w-full bg-background overflow-hidden">
@@ -354,7 +401,7 @@ function ChatPage() {
                         </span>
                       </div>
                     )}
-                    <MessageBubble msg={m} />
+                    <MessageBubble msg={m} mediaState={mediaCache[m.id]} onLoadMedia={() => loadMedia(m)} />
                   </div>
                 );
               })}
@@ -429,7 +476,9 @@ function ChatPage() {
   );
 }
 
-function MessageBubble({ msg }: { msg: Msg }) {
+type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
+
+function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
   const isOut = msg.direction === "out";
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
@@ -438,7 +487,7 @@ function MessageBubble({ msg }: { msg: Msg }) {
           isOut ? "bg-emerald-500/90 text-white" : "bg-card border border-border"
         }`}
       >
-        <MediaContent msg={msg} />
+        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} />
         {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
         {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
         <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
@@ -450,7 +499,7 @@ function MessageBubble({ msg }: { msg: Msg }) {
   );
 }
 
-function MediaContent({ msg }: { msg: Msg }) {
+function MediaContent({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
   if (msg.msg_type === "text") return null;
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
@@ -458,54 +507,77 @@ function MediaContent({ msg }: { msg: Msg }) {
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
-    return <IncomingMedia msg={msg} />;
+    if (mediaState?.error) {
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} />;
+    }
+    if (mediaState?.url) {
+      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} />;
+    }
+    if (mediaState?.loading) {
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading />;
+    }
+    if (msg.msg_type === "document") {
+      return (
+        <button
+          type="button"
+          onClick={onLoadMedia}
+          className="flex items-center gap-2 bg-background/30 rounded px-2 py-1.5 text-sm hover:bg-background/50"
+        >
+          <Download className="h-4 w-4" /> {msg.media_filename || "Baixar documento"}
+        </button>
+      );
+    }
+    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} onRetry={onLoadMedia} />;
   }
-  return null;
+  return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} />;
 }
 
-function IncomingMedia({ msg }: { msg: Msg }) {
-  const downloadFn = useServerFn(downloadIncomingMediaBase64);
-  const [url, setUrl] = useState<string | null>(null);
-  const [mime, setMime] = useState<string | null>(msg.media_mime);
-  const [loading, setLoading] = useState(false);
+function MediaPlaceholder({
+  type,
+  filename,
+  loading,
+  error,
+  onRetry,
+}: {
+  type: string;
+  filename: string | null;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+}) {
+  const icon = type === "image" || type === "sticker"
+    ? <ImageIcon className="h-4 w-4" />
+    : type === "video"
+      ? <Video className="h-4 w-4" />
+      : type === "audio"
+        ? <Mic className="h-4 w-4" />
+        : <FileText className="h-4 w-4" />;
+  const label = type === "image" ? "Imagem"
+    : type === "sticker" ? "Figurinha"
+    : type === "video" ? "Vídeo"
+    : type === "audio" ? "Áudio"
+    : filename || "Documento";
 
-  async function load() {
-    if (url || loading || !msg.media_id) return;
-    setLoading(true);
-    try {
-      const res = await downloadFn({ data: { channelId: msg.channel_id, mediaId: msg.media_id } });
-      const dataUrl = `data:${res.mime};base64,${res.base64}`;
-      setUrl(dataUrl);
-      setMime(res.mime);
-    } catch (e: any) {
-      toast.error("Erro ao baixar mídia: " + (e?.message ?? ""));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    // Auto-load images/audio/stickers; documents on click
-    if (msg.msg_type === "image" || msg.msg_type === "audio" || msg.msg_type === "sticker") {
-      load();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [msg.id]);
-
-  if (!url && !loading && msg.msg_type === "document") {
-    return (
-      <button
-        onClick={load}
-        className="flex items-center gap-2 bg-background/30 rounded px-2 py-1.5 text-sm hover:bg-background/50"
-      >
-        <Download className="h-4 w-4" /> {msg.media_filename || "Baixar documento"}
-      </button>
-    );
-  }
-
-  if (loading) return <div className="text-xs opacity-70 py-2">Carregando mídia…</div>;
-  if (!url) return null;
-  return <RenderMedia type={msg.msg_type} url={url} mime={mime} filename={msg.media_filename} />;
+  return (
+    <div className="mb-1 min-w-[220px] rounded-md border border-border/70 bg-background/40 p-2 text-sm">
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="font-medium">{loading ? "Carregando mídia…" : label}</span>
+      </div>
+      {error && (
+        <p className="mt-1 text-xs text-destructive break-words">
+          {error.includes("Meta token")
+            ? "O EvoHub recebeu a mídia, mas esse canal está sem token Meta ativo. Reabra/reconecte o número na EvoHub."
+            : error}
+        </p>
+      )}
+      {!loading && onRetry && (
+        <button type="button" onClick={onRetry} className="mt-2 text-xs underline underline-offset-2">
+          Tentar carregar
+        </button>
+      )}
+    </div>
+  );
 }
 
 function RenderMedia({
