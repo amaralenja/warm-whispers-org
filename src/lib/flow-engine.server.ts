@@ -289,6 +289,27 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       return { handle: matched ? "true" : "false", log: { matched, op, msgType } };
     }
 
+    case "random": {
+      const outs: Array<{ id: string; weight: number }> = Array.isArray(node.data?.outputs) ? node.data.outputs : [];
+      const valid = outs.filter((o) => o && typeof o.id === "string");
+      if (valid.length === 0) return { handle: "out" };
+      const weights = valid.map((o) => Math.max(0, Number(o.weight ?? 0)));
+      const total = weights.reduce((a, b) => a + b, 0);
+      let pickIdx = 0;
+      if (total <= 0) {
+        pickIdx = Math.floor(Math.random() * valid.length);
+      } else {
+        const r = Math.random() * total;
+        let acc = 0;
+        for (let i = 0; i < valid.length; i++) {
+          acc += weights[i];
+          if (r <= acc) { pickIdx = i; break; }
+        }
+      }
+      const chosen = valid[pickIdx];
+      return { handle: chosen.id, log: { chosen: chosen.id, weight: weights[pickIdx], total } };
+    }
+
     case "end":
       return { end: true };
 
