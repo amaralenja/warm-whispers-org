@@ -198,6 +198,13 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
             🎲 {(d.outputs ?? []).length || 2} saídas aleatórias
           </div>
         )}
+        {type === "tag_action" && (
+          <div className="text-[13px] bg-emerald-500/10 rounded-md px-3 py-2 space-y-0.5">
+            {(d.addTags ?? []).length > 0 && <div>➕ Adicionar {(d.addTags ?? []).length} etiqueta(s)</div>}
+            {(d.removeTags ?? []).length > 0 && <div>➖ Remover {(d.removeTags ?? []).length} etiqueta(s)</div>}
+            {(d.addTags ?? []).length === 0 && (d.removeTags ?? []).length === 0 && <div className="italic text-muted-foreground">Nenhuma etiqueta configurada</div>}
+          </div>
+        )}
         {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
         {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
       </div>
