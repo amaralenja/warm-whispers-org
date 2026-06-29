@@ -170,6 +170,7 @@ function CRMPage() {
   const [editing, setEditing] = useState<Lead | null>(null);
   const [creating, setCreating] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
   const operacoes = useMemo(
     () => workspaces.filter((w) => w.id !== "all").map((w) => w.nome),
