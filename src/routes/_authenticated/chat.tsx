@@ -347,7 +347,7 @@ function ChatPage() {
               })}
             </div>
 
-            <footer className="p-3 border-t border-border bg-card">
+            <footer className="p-3 border-t border-border bg-card shrink-0">
               <div className="flex items-end gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
