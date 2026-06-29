@@ -52,6 +52,51 @@ function extractMedia(m: any) {
   };
 }
 
+const APP_SOURCE = "lovable-crm";
+const EVOHUB_BASE = "https://api.evohub.ai";
+
+type ChannelInfo = { id: string; phone_number_id: string; operacao_id: string | null };
+
+// Cache connected channels for 60s to avoid hitting EvoHub on every webhook
+let channelsCache: { at: number; list: ChannelInfo[] } | null = null;
+
+async function getConnectedChannels(): Promise<ChannelInfo[]> {
+  const now = Date.now();
+  if (channelsCache && now - channelsCache.at < 60_000) return channelsCache.list;
+  const key = Deno.env.get("EVOHUB_API_KEY");
+  if (!key) {
+    console.warn("[wa-webhook] EVOHUB_API_KEY ausente; nenhum número será aceito");
+    return [];
+  }
+  try {
+    const res = await fetch(`${EVOHUB_BASE}/api/v1/channels`, {
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) {
+      console.error("[wa-webhook] EvoHub channels HTTP", res.status);
+      return channelsCache?.list ?? [];
+    }
+    const data = await res.json();
+    const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
+    const mapped: ChannelInfo[] = list
+      .filter((c) =>
+        (c?.type === "whatsapp" || c?.type === "unified") &&
+        c?.metadata?.app_source === APP_SOURCE &&
+        c?.metadata?.meta_connection?.phone_number_id,
+      )
+      .map((c) => ({
+        id: String(c.id),
+        phone_number_id: String(c.metadata.meta_connection.phone_number_id),
+        operacao_id: typeof c.metadata.operacao_id === "string" ? c.metadata.operacao_id : null,
+      }));
+    channelsCache = { at: now, list: mapped };
+    return mapped;
+  } catch (e) {
+    console.error("[wa-webhook] erro buscando channels", e);
+    return channelsCache?.list ?? [];
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
