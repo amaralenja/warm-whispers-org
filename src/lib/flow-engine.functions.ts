@@ -168,3 +168,12 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       triggerContext: { manual: true },
     });
   });
+
+export const fireNewLeadTrigger = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { lead_id: string }) => ({ lead_id: String(d?.lead_id ?? "") }))
+  .handler(async ({ data }) => {
+    if (!data.lead_id) return { matched: 0 };
+    const { dispatchNewLead } = await import("@/lib/flow-engine.server");
+    return dispatchNewLead({ leadId: data.lead_id });
+  });
