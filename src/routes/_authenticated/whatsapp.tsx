@@ -40,6 +40,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import {
   listWhatsappChannels,
   createWhatsappChannel,
+  syncWhatsappChannelByName,
   setChannelOperacao,
   deleteWhatsappChannel,
   regenerateWhatsappToken,
@@ -65,9 +66,11 @@ function WhatsAppPage() {
   const { workspace, workspaces } = useWorkspace();
   const listFn = useServerFn(listWhatsappChannels);
   const createFn = useServerFn(createWhatsappChannel);
+  const syncByNameFn = useServerFn(syncWhatsappChannelByName);
   const deleteFn = useServerFn(deleteWhatsappChannel);
   const regenFn = useServerFn(regenerateWhatsappToken);
   const setOpFn = useServerFn(setChannelOperacao);
+  const registerWebhookFn = useServerFn(registerWhatsappWebhook);
 
   const isGeral = workspace.id === "all";
   const operacoes = useMemo(() => workspaces.filter((w) => w.id !== "all"), [workspaces]);
@@ -103,6 +106,15 @@ function WhatsAppPage() {
       }
       toast.error(e?.message ?? "Erro ao criar conexão");
     },
+  });
+
+  const syncAmaralMut = useMutation({
+    mutationFn: () => syncByNameFn({ data: { name: "Amaral", operacaoId: isGeral ? operacoes[0]?.id ?? null : workspace.id } }),
+    onSuccess: (ch) => {
+      toast.success(`Conexão "${ch.name}" puxada da EvoHub`);
+      qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Não consegui puxar a conexão Amaral"),
   });
 
   const deleteMut = useMutation({
@@ -187,7 +199,7 @@ function WhatsAppPage() {
                 onClick={async () => {
                   try {
                     const url = `${window.location.origin}/api/public/whatsapp/webhook`;
-                    const res = await registerWhatsappWebhook({ data: { webhookUrl: url } });
+                    const res = await registerWebhookFn({ data: { webhookUrl: url } });
                     toast.success(res.message ?? "Webhook configurado");
                   } catch (e: any) {
                     toast.error(e?.message ?? "Erro ao configurar webhook");
@@ -195,6 +207,19 @@ function WhatsAppPage() {
                 }}
               >
                 <RotateCw className="h-4 w-4 mr-2" /> Webhook
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncAmaralMut.mutate()}
+                disabled={syncAmaralMut.isPending}
+              >
+                {syncAmaralMut.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Puxar Amaral
               </Button>
 
               <Dialog
@@ -325,6 +350,19 @@ function WhatsAppPage() {
                 ? 'Clica em "Nova conexão" pra começar.'
                 : `Nenhum número vinculado à operação "${workspace.nome}".`}
             </p>
+            <Button
+              variant="outline"
+              className="mt-5"
+              onClick={() => syncAmaralMut.mutate()}
+              disabled={syncAmaralMut.isPending}
+            >
+              {syncAmaralMut.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Puxar conexão Amaral da EvoHub
+            </Button>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

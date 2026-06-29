@@ -37,7 +37,6 @@ import {
   listMessages,
   markConversationRead,
   sendWhatsappMessage,
-  resolveIncomingMedia,
   downloadIncomingMediaBase64,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
