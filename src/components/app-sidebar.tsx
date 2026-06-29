@@ -137,6 +137,77 @@ export function AppSidebar() {
             <SidebarMenu className="gap-1.5">
               {mainItems.map(renderMenuItem)}
 
+              {/* Operação X1 — colapsável */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Operação X1"
+                  isActive={operacaoX1Active && !operacaoX1Open}
+                  onClick={() => {
+                    if (collapsed) {
+                      setOperacaoX1Open(true);
+                      return;
+                    }
+                    setOperacaoX1Open((v) => !v);
+                  }}
+                  className={[
+                    "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+                    operacaoX1Active
+                      ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                      : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {operacaoX1Active && (
+                    <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+                  )}
+                  <Briefcase
+                    className={[
+                      "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                      operacaoX1Active ? "text-accent" : "",
+                    ].join(" ")}
+                  />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 truncate text-left">Operação X1</span>
+                      <ChevronDown
+                        className={[
+                          "h-4 w-4 transition-transform",
+                          operacaoX1Open ? "rotate-180" : "",
+                        ].join(" ")}
+                      />
+                    </>
+                  )}
+                </SidebarMenuButton>
+
+                {!collapsed && operacaoX1Open && (
+                  <SidebarMenuSub className="mt-1 gap-1">
+                    {operacaoX1Items.map((sub) => {
+                      const subActive = pathname === sub.url;
+                      return (
+                        <SidebarMenuSubItem key={sub.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={subActive}
+                            className={[
+                              "h-9 rounded-md px-3 text-[0.9rem]",
+                              subActive
+                                ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                                : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                            ].join(" ")}
+                          >
+                            <Link to={sub.url} className="flex items-center gap-2">
+                              <sub.icon className="!h-4 !w-4 shrink-0" />
+                              <span className="truncate">{sub.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
+
+
+
               {/* High Ticket — colapsável */}
               <SidebarMenuItem>
                 <SidebarMenuButton
