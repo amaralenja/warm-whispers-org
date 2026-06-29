@@ -215,9 +215,24 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
         }),
     );
 
-    return list
-      .filter((c) => isWhatsappChannel(c) && (belongsToMotion(c) || localById.has(String(c.id)) || shouldAutoImport(c)))
-      .map((c) => withConnectUrl(mergeLocalIntoRemote(c, localById.get(String(c.id)))));
+    const visible = list.filter((c) => isWhatsappChannel(c) && (belongsToMotion(c) || localById.has(String(c.id)) || shouldAutoImport(c)));
+
+    // EvoHub /channels list doesn't include meta_connection; fetch full detail per channel so phone + name render.
+    const enriched = await Promise.all(
+      visible.map(async (c) => {
+        if (getMetaConnection(c)) return c;
+        try {
+          const full = await evoFetch(`/api/v1/channels/${c.id}`);
+          // Persist phone info locally so subsequent renders are instant.
+          await upsertLocalChannel(context.supabase, full, localById.get(String(c.id))?.operacao_id ?? null).catch(() => null);
+          return full;
+        } catch {
+          return c;
+        }
+      }),
+    );
+
+    return enriched.map((c) => withConnectUrl(mergeLocalIntoRemote(c, localById.get(String(c.id)))));
   });
 
 export const syncWhatsappChannelByName = createServerFn({ method: "POST" })
