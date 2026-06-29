@@ -231,12 +231,25 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
     }
 
     case "wait_message": {
-      const ttl = Number(node.data?.timeoutSeconds ?? 86400);
-      return {
-        pause: true,
-        waitingFor: "message",
-        expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
-      };
+      const infinite = !!node.data?.infinite;
+      const remarketing = node.data?.remarketing;
+      let expiresAt: string | null = null;
+      let waitingFor: "message" | "remarketing" = "message";
+      if (remarketing?.enabled) {
+        const secs = Math.max(1, Number(remarketing.afterSeconds ?? 3600));
+        expiresAt = new Date(Date.now() + secs * 1000).toISOString();
+        waitingFor = "remarketing";
+        ctx.variables.__remarketing = {
+          nodeId: node.id,
+          text: String(remarketing.text ?? ""),
+          sent: false,
+          finalTimeoutSeconds: infinite ? null : Number(node.data?.timeoutSeconds ?? 86400),
+        };
+      } else if (!infinite) {
+        const ttl = Math.max(1, Number(node.data?.timeoutSeconds ?? 86400));
+        expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
+      }
+      return { pause: true, waitingFor: waitingFor as any, expiresAt };
     }
 
     case "wait_button": {
