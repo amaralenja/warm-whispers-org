@@ -152,7 +152,9 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
           <div className="text-[13px]">⏱ Espera {d.seconds ?? 2} segundos</div>
         )}
         {type === "condition" && (
-          <div className="text-[13px]">Se texto <b>{d.operator ?? "contains"}</b> “{d.value ?? ""}”</div>
+          <div className="text-[13px] bg-muted/40 rounded-md px-3 py-2">
+            {conditionSummary(d)}
+          </div>
         )}
         {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
         {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
