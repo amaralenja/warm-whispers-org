@@ -920,7 +920,7 @@ function TagActionInspector({ d, onChange }: { d: any; onChange: (patch: any) =>
           <div>
             <Label className="text-xs text-emerald-600">➕ Adicionar etiquetas</Label>
             <div className="flex flex-wrap gap-1.5 mt-1">
-              {tags.map((t) => (
+              {tags.map((t: CrmTag) => (
                 <button
                   key={t.id}
                   type="button"
@@ -936,7 +936,7 @@ function TagActionInspector({ d, onChange }: { d: any; onChange: (patch: any) =>
           <div>
             <Label className="text-xs text-rose-600">➖ Remover etiquetas</Label>
             <div className="flex flex-wrap gap-1.5 mt-1">
-              {tags.map((t) => (
+              {tags.map((t: CrmTag) => (
                 <button
                   key={t.id}
                   type="button"
