@@ -75,6 +75,7 @@ export const createFlow = createServerFn({ method: "POST" })
       .insert({
         nome: data.nome,
         operacao_id: data.operacao_id,
+        ativo: true,
         entry_node_id: startId,
         nodes: [
           {
