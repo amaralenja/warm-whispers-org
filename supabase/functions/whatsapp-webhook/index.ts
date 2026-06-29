@@ -57,25 +57,26 @@ function extractMedia(m: any) {
   };
 }
 
-// Baixa a mídia direto do Meta Graph com o token do canal e devolve bytes + mime.
+// Baixa a mídia VIA PROXY do EvoHub (/meta/*). Bater direto em graph.facebook.com
+// com o channel token retorna 401 — o Hub que troca pelo token oficial Meta.
 async function downloadMetaMedia(token: string, mediaId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
   try {
-    // 1) pega URL da mídia
-    const metaRes = await fetch(`https://graph.facebook.com/v23.0/${mediaId}`, {
+    // 1) resolve media_id pelo proxy — o Hub reescreve a URL para /meta/_media?token=...
+    const metaRes = await fetch(`https://api.evohub.ai/meta/v23.0/${mediaId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!metaRes.ok) {
-      console.warn("[wa-webhook] meta media metadata HTTP", metaRes.status, await metaRes.text().catch(() => ""));
+      console.warn("[wa-webhook] evohub media metadata HTTP", metaRes.status, await metaRes.text().catch(() => ""));
       return null;
     }
     const meta = await metaRes.json();
     const url = meta?.url as string | undefined;
     const mime = (meta?.mime_type as string | undefined) ?? "application/octet-stream";
     if (!url) return null;
-    // 2) baixa os bytes (Meta exige o mesmo Bearer)
+    // 2) baixa os bytes da URL reescrita (precisa do channel token também)
     const fileRes = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!fileRes.ok) {
-      console.warn("[wa-webhook] meta media download HTTP", fileRes.status);
+      console.warn("[wa-webhook] evohub media download HTTP", fileRes.status);
       return null;
     }
     const buf = new Uint8Array(await fileRes.arrayBuffer());
