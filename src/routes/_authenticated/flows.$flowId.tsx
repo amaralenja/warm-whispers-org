@@ -14,7 +14,7 @@ import "@xyflow/react/dist/style.css";
 import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
-  MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle,
+  MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle, Tag as TagIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
