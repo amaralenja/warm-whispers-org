@@ -236,10 +236,10 @@ function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-1rem)] bg-background">
+    <div className="flex h-[calc(100vh-3.5rem)] w-full bg-background overflow-hidden">
       {/* Sidebar de conversas */}
-      <aside className="w-[340px] border-r border-border flex flex-col">
-        <div className="p-3 border-b border-border space-y-2">
+      <aside className="w-[320px] xl:w-[360px] border-r border-border flex flex-col min-h-0 shrink-0">
+        <div className="p-3 border-b border-border space-y-2 shrink-0">
           <div className="flex items-center gap-2">
             <MessagesSquare className="h-5 w-5 text-emerald-500" />
             <h2 className="font-semibold">Chat ao Vivo</h2>
