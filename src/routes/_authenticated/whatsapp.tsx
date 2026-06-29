@@ -394,115 +394,205 @@ function WhatsAppPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {channels.map((ch) => {
-              const phone = ch.metadata?.meta_connection?.phone_number;
-              const display = ch.metadata?.meta_connection?.display_name;
-              const accent = opAccent(ch.operacaoId);
-              const isActive = (ch.status || "").toLowerCase() === "active";
-              return (
-                <div
-                  key={ch.id}
-                  className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/20"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 shrink-0 rounded-lg bg-muted flex items-center justify-center">
-                      <MessageCircle
-                        className={`h-5 w-5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-foreground truncate">{ch.name}</h3>
-                        {statusPill(ch.status)}
-                      </div>
-                      {phone ? (
-                        <p className="text-sm text-muted-foreground mt-0.5 truncate">
-                          {display ? `${display} · ` : ""}
-                          {phone}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground mt-0.5 italic">
-                          Aguardando login no Meta…
-                        </p>
-                      )}
-                      <div className="mt-2">
-                        <Badge
-                          variant="outline"
-                          className={`gap-1 font-normal ${
-                            accent ? `${accent.bg} ${accent.text} ${accent.border}` : ""
-                          }`}
-                        >
-                          <Tag className="h-3 w-3" /> {opLabel(ch.operacaoId)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-border flex items-center gap-2 flex-wrap">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => window.open(ch.connectUrl, "_blank")}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir link
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(ch.connectUrl);
-                        toast.success("Link copiado");
-                      }}
-                      title="Copiar link"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Select
-                      value={ch.operacaoId ?? ""}
-                      onValueChange={(v) =>
-                        setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })
-                      }
-                    >
-                      <SelectTrigger className="h-9 w-[130px] text-xs">
-                        <SelectValue placeholder="Operação" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {operacoes.map((op) => (
-                          <SelectItem key={op.id} value={op.id}>
-                            {op.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => regenMut.mutate(ch.id)}
-                      disabled={regenMut.isPending}
-                      title="Gerar novo link (invalida o anterior)"
-                    >
-                      <RotateCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
-                      }}
-                      disabled={deleteMut.isPending}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title="Remover"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {channels.map((ch) => (
+              <ChannelCard
+                key={ch.id}
+                ch={ch}
+                opLabel={opLabel(ch.operacaoId)}
+                opAccent={opAccent(ch.operacaoId)}
+                operacoes={operacoes}
+                onChangeOp={(v) =>
+                  setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })
+                }
+                onRegen={() => regenMut.mutate(ch.id)}
+                regenPending={regenMut.isPending}
+                onDelete={() => {
+                  if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
+                }}
+                deletePending={deleteMut.isPending}
+              />
+            ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+type Accent = { bg: string; text: string; border: string } | null;
+
+function ChannelCard({
+  ch,
+  opLabel,
+  opAccent,
+  operacoes,
+  onChangeOp,
+  onRegen,
+  regenPending,
+  onDelete,
+  deletePending,
+}: {
+  ch: EvoChannel;
+  opLabel: string;
+  opAccent: Accent;
+  operacoes: { id: string; nome: string }[];
+  onChangeOp: (v: string) => void;
+  onRegen: () => void;
+  regenPending: boolean;
+  onDelete: () => void;
+  deletePending: boolean;
+}) {
+  const qualityFn = useServerFn(getWhatsappQuality);
+  const status = (ch.status || "").toLowerCase();
+  const isActive = status === "active";
+  const isPending = status === "pending" || status === "connecting";
+
+  const { data: q } = useQuery({
+    queryKey: ["wa-quality", ch.id, status],
+    queryFn: () => qualityFn({ data: { id: ch.id } }),
+    enabled: isActive,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const phone = q?.displayPhoneNumber ?? ch.metadata?.meta_connection?.phone_number ?? null;
+  const display = q?.verifiedName ?? ch.metadata?.meta_connection?.display_name ?? null;
+  const hasNumber = !!phone;
+
+  // connection state: connected / no_number / down / pending
+  let state: "connected" | "no_number" | "down" | "pending" = "down";
+  if (isPending) state = "pending";
+  else if (isActive && hasNumber) state = "connected";
+  else if (isActive && !hasNumber) state = "no_number";
+  else state = "down";
+
+  const stateMeta = {
+    connected: { label: "Conectado", dot: "bg-emerald-500", ring: "ring-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400" },
+    pending:   { label: "Aguardando", dot: "bg-amber-500 animate-pulse", ring: "ring-amber-500/30", text: "text-amber-700 dark:text-amber-400" },
+    no_number: { label: "Sem número", dot: "bg-slate-400", ring: "ring-slate-400/30", text: "text-slate-600 dark:text-slate-400" },
+    down:      { label: "Conexão caiu", dot: "bg-rose-500", ring: "ring-rose-500/30", text: "text-rose-700 dark:text-rose-400" },
+  }[state];
+
+  const quality = q?.qualityRating?.toUpperCase() ?? null;
+  const qualityMeta =
+    quality === "GREEN"
+      ? { label: "Alta", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500" }
+      : quality === "YELLOW"
+        ? { label: "Média", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500" }
+        : quality === "RED"
+          ? { label: "Baixa", color: "text-rose-700 dark:text-rose-400", bg: "bg-rose-500" }
+          : { label: "—", color: "text-muted-foreground", bg: "bg-muted-foreground/40" };
+
+  return (
+    <div className="aspect-square flex flex-col rounded-xl border border-border bg-card p-5 transition hover:border-foreground/30 hover:shadow-sm">
+      {/* Top: state + name */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`h-2 w-2 rounded-full ${stateMeta.dot} ring-4 ${stateMeta.ring}`} />
+          <span className={`text-[11px] font-medium uppercase tracking-wider ${stateMeta.text}`}>
+            {stateMeta.label}
+          </span>
+        </div>
+        <Badge
+          variant="outline"
+          className={`gap-1 font-normal text-[10px] ${
+            opAccent ? `${opAccent.bg} ${opAccent.text} ${opAccent.border}` : ""
+          }`}
+        >
+          <Tag className="h-2.5 w-2.5" /> {opLabel}
+        </Badge>
+      </div>
+
+      {/* Middle: identity */}
+      <div className="flex-1 mt-4 min-w-0">
+        <h3 className="text-base font-semibold text-foreground truncate">{ch.name}</h3>
+        {display ? (
+          <p className="text-sm text-foreground/80 mt-1 truncate">{display}</p>
+        ) : null}
+        {phone ? (
+          <p className="text-sm text-muted-foreground tabular-nums mt-0.5 truncate">{phone}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground italic mt-1">
+            {isPending ? "Aguardando login no Meta…" : "Nenhum número vinculado"}
+          </p>
+        )}
+
+        {/* Quality block */}
+        {isActive && hasNumber && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-border bg-background/50 p-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Qualidade</div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={`h-2 w-2 rounded-full ${qualityMeta.bg}`} />
+                <span className={`text-sm font-semibold ${qualityMeta.color}`}>{qualityMeta.label}</span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/50 p-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Verificação</div>
+              <div className="text-sm font-semibold text-foreground mt-1 truncate">
+                {q?.codeVerificationStatus === "VERIFIED" ? "Verificado" : (q?.codeVerificationStatus?.toLowerCase() ?? "—")}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="mt-4 pt-3 border-t border-border flex items-center gap-1.5">
+        <Select value={ch.operacaoId ?? ""} onValueChange={onChangeOp}>
+          <SelectTrigger className="h-8 flex-1 text-xs">
+            <SelectValue placeholder="Operação" />
+          </SelectTrigger>
+          <SelectContent>
+            {operacoes.map((op) => (
+              <SelectItem key={op.id} value={op.id}>
+                {op.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => window.open(ch.connectUrl, "_blank")}
+          title="Abrir link de conexão"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => {
+            navigator.clipboard.writeText(ch.connectUrl);
+            toast.success("Link copiado");
+          }}
+          title="Copiar link"
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={onRegen}
+          disabled={regenPending}
+          title="Gerar novo link"
+        >
+          <RotateCw className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={onDelete}
+          disabled={deletePending}
+          title="Remover"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </div>
   );
