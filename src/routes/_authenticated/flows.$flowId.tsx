@@ -186,12 +186,17 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
             {conditionSummary(d)}
           </div>
         )}
+        {type === "random" && (
+          <div className="text-[13px] bg-muted/40 rounded-md px-3 py-2">
+            🎲 {(d.outputs ?? []).length || 2} saídas aleatórias
+          </div>
+        )}
         {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
         {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
       </div>
 
       {/* Outputs */}
-      {!isEnd && !isCondition && !isButtons && (
+      {!isEnd && !isCondition && !isButtons && !isRandom && (
         <Handle type="source" position={Position.Bottom} id="out" style={{ background: meta.color, width: 14, height: 14 }} />
       )}
       {isCondition && (
