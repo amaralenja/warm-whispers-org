@@ -135,6 +135,7 @@ function ChatPage() {
   const [draft, setDraft] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingType, setPendingType] = useState<"image" | "video" | "document" | "audio">("image");
+  const [mediaCache, setMediaCache] = useState<Record<string, { url?: string; mime?: string; loading?: boolean; error?: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
@@ -262,6 +263,38 @@ function ChatPage() {
     };
   }
 
+  async function loadMedia(msg: Msg) {
+    if (!msg.media_id) return;
+    const cached = mediaCache[msg.id];
+    if (cached?.url || cached?.loading) return;
+    setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: true, error: undefined } }));
+    try {
+      const res = await downloadMedia(msg);
+      setMediaCache((prev) => ({ ...prev, [msg.id]: { url: res.url, mime: res.mime, loading: false } }));
+    } catch (e: any) {
+      const error = e?.message ? String(e.message) : "Não foi possível carregar a mídia";
+      setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: false, error } }));
+      toast.error("Erro ao baixar mídia: " + error);
+    }
+  }
+
+  useEffect(() => {
+    const list = (messages as unknown as Msg[]) ?? [];
+    for (const msg of list) {
+      if (
+        !msg.media_url &&
+        msg.media_id &&
+        (msg.msg_type === "image" || msg.msg_type === "audio" || msg.msg_type === "video" || msg.msg_type === "sticker") &&
+        !mediaCache[msg.id]?.url &&
+        !mediaCache[msg.id]?.loading &&
+        !mediaCache[msg.id]?.error
+      ) {
+        loadMedia(msg);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] w-full bg-background overflow-hidden">
       {/* Sidebar de conversas */}
@@ -368,7 +401,7 @@ function ChatPage() {
                         </span>
                       </div>
                     )}
-                    <MessageBubble msg={m} onDownloadMedia={downloadMedia} />
+                    <MessageBubble msg={m} mediaState={mediaCache[m.id]} onLoadMedia={() => loadMedia(m)} />
                   </div>
                 );
               })}
