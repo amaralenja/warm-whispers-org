@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Loader2 } from "lucide-react";
+import { Play, Pause, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WhatsappAudioPlayerProps {
@@ -26,6 +26,11 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setPlaying(false);
+    setLoading(false);
+    setDuration(0);
+    setCurrent(0);
+    setError(null);
     const audio = new Audio();
     audio.preload = "metadata";
     audio.src = url;
@@ -108,38 +113,50 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-2xl px-3 py-2 min-w-[260px] max-w-[320px]",
+        "mb-2 flex min-w-[320px] max-w-[420px] items-center gap-4 rounded-[22px] border px-4 py-3",
         outgoing
-          ? "bg-emerald-600/30 border border-emerald-500/40"
-          : "bg-background/40 border border-border/60",
+          ? "border-chat-accent/30 bg-background/15"
+          : "border-chat-line bg-background/25",
       )}
     >
       <button
         type="button"
         onClick={toggle}
         className={cn(
-          "shrink-0 h-9 w-9 rounded-full flex items-center justify-center transition",
+          "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition",
           outgoing
-            ? "bg-emerald-500 text-white hover:bg-emerald-400"
-            : "bg-foreground text-background hover:opacity-90",
+            ? "bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
+            : "bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90",
         )}
         aria-label={playing ? "Pausar" : "Tocar"}
       >
         {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="h-5 w-5 animate-spin" />
         ) : playing ? (
-          <Pause className="h-4 w-4" fill="currentColor" />
+          <Pause className="h-5 w-5" fill="currentColor" />
         ) : (
-          <Play className="h-4 w-4 ml-0.5" fill="currentColor" />
+          <Play className="ml-0.5 h-5 w-5" fill="currentColor" />
         )}
       </button>
 
       <div className="flex-1 min-w-0">
-        <div className="relative h-1.5 rounded-full bg-foreground/15 overflow-hidden">
+        <div className="mb-2 flex h-7 items-end gap-1" aria-hidden="true">
+          {Array.from({ length: 22 }).map((_, idx) => {
+            const active = duration > 0 && (idx / 22) * 100 <= progress;
+            const height = 8 + ((idx * 7) % 17);
+            return (
+              <span
+                key={idx}
+                className={cn("w-1.5 rounded-full transition-colors", active ? "bg-chat-accent" : "bg-foreground/18")}
+                style={{ height }}
+              />
+            );
+          })}
+        </div>
+        <div className="relative h-2 overflow-hidden rounded-full bg-foreground/12">
           <div
             className={cn(
-              "absolute inset-y-0 left-0 rounded-full",
-              outgoing ? "bg-emerald-300" : "bg-foreground/70",
+              "absolute inset-y-0 left-0 rounded-full bg-chat-accent",
             )}
             style={{ width: `${progress}%` }}
           />
@@ -154,8 +171,11 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
             aria-label="Buscar áudio"
           />
         </div>
-        <div className="flex items-center justify-between mt-1 text-[10px] tabular-nums text-muted-foreground">
-          <span>{formatTime(current)}</span>
+        <div className="mt-2 flex items-center justify-between text-[11px] font-medium tabular-nums text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Volume2 className="h-3.5 w-3.5" />
+            {formatTime(current)}
+          </span>
           <span>{formatTime(duration)}</span>
         </div>
         {error && <p className="text-[10px] text-destructive mt-0.5">{error}</p>}
@@ -165,9 +185,9 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
         type="button"
         onClick={cycleSpeed}
         className={cn(
-          "shrink-0 h-7 min-w-[36px] px-2 rounded-full text-[11px] font-semibold tabular-nums transition",
+          "h-9 min-w-12 shrink-0 rounded-full px-3 text-xs font-bold tabular-nums transition",
           outgoing
-            ? "bg-emerald-500/40 text-white hover:bg-emerald-500/60"
+            ? "bg-chat-accent/18 text-chat-accent hover:bg-chat-accent/28"
             : "bg-foreground/10 text-foreground hover:bg-foreground/20",
         )}
         aria-label="Mudar velocidade"
