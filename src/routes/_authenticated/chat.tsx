@@ -312,7 +312,7 @@ function ChatPage() {
           </div>
         ) : (
           <>
-            <header className="px-4 py-3 border-b border-border flex items-center gap-3">
+            <header className="px-4 py-3 border-b border-border flex items-center gap-3 shrink-0 bg-card">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-emerald-500/15 text-emerald-500 font-semibold">
                   {initials(active.contact_name, active.contact_wa_id)}
