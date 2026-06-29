@@ -312,8 +312,9 @@ function ChatPage() {
 
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-chat-shell p-3 text-foreground">
-      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden rounded-[28px] border border-chat-line bg-chat-thread shadow-[0_24px_80px_color-mix(in_oklab,var(--background)_78%,transparent)]">
+    <div className="h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-chat-shell text-foreground">
+      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden border border-chat-line bg-chat-thread">
+
         <aside className="flex min-h-0 flex-col border-r border-chat-line bg-chat-sidebar">
           <div className="shrink-0 border-b border-chat-line p-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -342,13 +343,13 @@ function ChatPage() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 scrollbar-fancy">
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy">
             {filtered.length === 0 ? (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
                 Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
               </div>
             ) : (
-              <div className="space-y-2">
+              <div>
                 {filtered.map((c) => {
                   const isActive = c.id === activeId;
                   const preview = toText(c.last_message_preview);
@@ -356,15 +357,15 @@ function ChatPage() {
                     <button
                       key={c.id}
                       onClick={() => setActiveId(c.id)}
-                      className={`group w-full rounded-3xl border p-3.5 text-left transition-all ${
+                      className={`group w-full border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive
-                          ? "border-chat-accent/55 bg-chat-soft shadow-[0_14px_34px_color-mix(in_oklab,var(--chat-accent)_12%,transparent)]"
-                          : "border-transparent hover:border-chat-line hover:bg-chat-panel"
+                          ? "bg-chat-soft"
+                          : "hover:bg-chat-panel"
                       }`}
                     >
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                        <Avatar className="h-12 w-12 shrink-0 rounded-2xl border border-chat-line">
-                          <AvatarFallback className="rounded-2xl bg-chat-soft text-sm font-bold text-chat-accent">
+                        <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
+                          <AvatarFallback className="rounded-full bg-chat-soft text-sm font-bold text-chat-accent">
                             {initials(c.contact_name, c.contact_wa_id)}
                           </AvatarFallback>
                         </Avatar>
@@ -398,6 +399,7 @@ function ChatPage() {
               </div>
             )}
           </div>
+
         </aside>
 
         <main className="flex min-h-0 min-w-0 flex-col bg-chat-thread">
@@ -464,7 +466,7 @@ function ChatPage() {
               </div>
 
               <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
-                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-[26px] border border-chat-line bg-chat-thread p-2 shadow-[0_18px_44px_color-mix(in_oklab,var(--background)_45%,transparent)]">
+                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
@@ -520,7 +522,7 @@ function ChatPage() {
                   </Button>
                   <Button
                     size="icon"
-                    className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground shadow-[0_12px_30px_color-mix(in_oklab,var(--chat-accent)_22%,transparent)] hover:bg-chat-accent/90"
+                    className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
                     onClick={handleSendText}
                     disabled={!draft.trim() || sendMut.isPending}
                   >
@@ -545,7 +547,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[min(74%,760px)] overflow-hidden rounded-[24px] border px-4 py-3 shadow-[0_12px_28px_color-mix(in_oklab,var(--background)_32%,transparent)] ${
+        className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
           isOut
             ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
             : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"

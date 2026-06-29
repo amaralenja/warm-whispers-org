@@ -157,7 +157,7 @@
 }
 
 @utility chat-thread-glow {
-  background-image: radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--chat-accent) 8%, transparent), transparent 34%);
+  background-image: none;
 }
 
 /* Fix browser autofill yellow/white background */
