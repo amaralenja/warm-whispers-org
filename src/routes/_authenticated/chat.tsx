@@ -522,7 +522,7 @@ function ChatPage() {
                   </Button>
                   <Button
                     size="icon"
-                    className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground shadow-[0_12px_30px_color-mix(in_oklab,var(--chat-accent)_22%,transparent)] hover:bg-chat-accent/90"
+                    className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
                     onClick={handleSendText}
                     disabled={!draft.trim() || sendMut.isPending}
                   >
