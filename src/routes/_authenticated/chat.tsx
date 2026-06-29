@@ -426,8 +426,8 @@ function MessageBubble({ msg }: { msg: Msg }) {
         }`}
       >
         <MediaContent msg={msg} />
-        {msg.text_body && <p className="text-sm whitespace-pre-wrap break-words">{msg.text_body}</p>}
-        {msg.caption && <p className="text-xs mt-1 opacity-90">{msg.caption}</p>}
+        {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
+        {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
         <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
           <span>{formatTime(msg.created_at)}</span>
           {isOut && <StatusTick status={msg.status} />}
