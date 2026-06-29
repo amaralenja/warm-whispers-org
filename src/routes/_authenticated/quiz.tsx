@@ -574,7 +574,7 @@ function QuizPage() {
                   <th className="text-left px-3 py-2">Lead</th>
                   <th className="text-left px-3 py-2">Origem</th>
                   <th className="text-left px-3 py-2">Contato</th>
-                  <th className="text-left px-3 py-2">Ticket</th>
+                  <th className="text-left px-3 py-2">Caixa</th>
                   <th className="text-left px-3 py-2">Score</th>
                   <th className="text-left px-3 py-2">Quando</th>
                   <th className="text-left px-3 py-2">Status</th>
