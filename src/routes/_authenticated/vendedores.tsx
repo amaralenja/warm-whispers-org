@@ -202,15 +202,44 @@ function VendedoresPage() {
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-3 text-xs">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Target className="h-3.5 w-3.5" />
-                  Meta
+              <div className="mt-3 space-y-2 border-t border-border/40 pt-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Target className="h-3.5 w-3.5" />
+                    Meta
+                  </div>
+                  <div className="font-display font-semibold tabular-nums text-emerald-400">
+                    {BRL(Number(v.meta ?? 0))}
+                  </div>
                 </div>
-                <div className="font-display font-semibold tabular-nums text-emerald-400">
-                  {BRL(Number(v.meta ?? 0))}
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="font-mono text-sm font-bold tracking-widest text-foreground">
+                      {v.codigo ?? "——————"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {v.codigo && (
+                      <button
+                        onClick={() => copyCode(v.codigo!)}
+                        title="Copiar código"
+                        className="rounded p-1 text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => regenerateCode(v.id)}
+                      title="Gerar novo código"
+                      className="rounded p-1 text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
+
             </div>
           ))}
         </div>
