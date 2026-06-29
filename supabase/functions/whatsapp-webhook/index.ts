@@ -66,6 +66,7 @@ type ChannelInfo = {
   phone_number_id: string | null;
   operacao_id: string | null;
   display_phone_number?: string | null;
+  token?: string | null;
 };
 
 type NormalizedChange = {
