@@ -153,6 +153,10 @@
     background-clip: padding-box;
     border: 2px solid transparent;
   }
+
+  .chat-thread-glow {
+    background-image: radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--chat-accent) 8%, transparent), transparent 34%);
+  }
 }
 
 /* Fix browser autofill yellow/white background */
