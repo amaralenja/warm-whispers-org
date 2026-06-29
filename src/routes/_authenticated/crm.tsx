@@ -245,9 +245,15 @@ function CRMPage() {
         .map(({ _syncKey, ...lead }) => lead)
         .filter((lead) => lead.nome?.trim());
 
+      let insertedIds: string[] = [];
       if (toInsert.length > 0) {
-        const { error } = await supabase.from("crm_leads").insert(toInsert as any[]);
+        const { data: ins, error } = await supabase.from("crm_leads").insert(toInsert as any[]).select("id");
         if (error) throw error;
+        insertedIds = (ins ?? []).map((r: any) => r.id);
+      }
+      // Fire "new_lead" triggers (non-blocking)
+      for (const id of insertedIds) {
+        fireNewLead({ data: { lead_id: id } }).catch(() => {});
       }
 
       return {
