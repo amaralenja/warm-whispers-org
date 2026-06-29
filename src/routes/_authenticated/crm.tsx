@@ -386,6 +386,10 @@ function CRMPage() {
           <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
             <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setTagsOpen(true)}>
+            <TagIcon className="mr-1.5 h-4 w-4" /> Etiquetas
+          </Button>
+          </Button>
           <Button variant="outline" size="sm" onClick={exportCSV}>
             <Download className="mr-1.5 h-4 w-4" /> Exportar
           </Button>
