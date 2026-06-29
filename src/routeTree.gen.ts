@@ -18,11 +18,13 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
+import { Route as AuthenticatedFlowsRouteImport } from './routes/_authenticated/flows'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 
 const RankingTvRoute = RankingTvRouteImport.update({
@@ -69,6 +71,11 @@ const AuthenticatedMetaAdsRoute = AuthenticatedMetaAdsRouteImport.update({
   path: '/meta-ads',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFlowsRoute = AuthenticatedFlowsRouteImport.update({
+  id: '/flows',
+  path: '/flows',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
@@ -94,6 +101,12 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFlowsFlowIdRoute =
+  AuthenticatedFlowsFlowIdRouteImport.update({
+    id: '/$flowId',
+    path: '/$flowId',
+    getParentRoute: () => AuthenticatedFlowsRoute,
+  } as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp/webhook',
@@ -110,11 +123,13 @@ export interface FileRoutesByFullPath {
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -126,11 +141,13 @@ export interface FileRoutesByTo {
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
@@ -144,11 +161,13 @@ export interface FileRoutesById {
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/_authenticated/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
@@ -162,11 +181,13 @@ export interface FileRouteTypes {
     | '/crm'
     | '/dashboard'
     | '/financeiro'
+    | '/flows'
     | '/meta-ads'
     | '/quiz'
     | '/ranking'
     | '/relatorios'
     | '/whatsapp'
+    | '/flows/$flowId'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -178,11 +199,13 @@ export interface FileRouteTypes {
     | '/crm'
     | '/dashboard'
     | '/financeiro'
+    | '/flows'
     | '/meta-ads'
     | '/quiz'
     | '/ranking'
     | '/relatorios'
     | '/whatsapp'
+    | '/flows/$flowId'
     | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
@@ -195,11 +218,13 @@ export interface FileRouteTypes {
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
+    | '/_authenticated/flows'
     | '/_authenticated/meta-ads'
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
     | '/_authenticated/whatsapp'
+    | '/_authenticated/flows/$flowId'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -276,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMetaAdsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/flows': {
+      id: '/_authenticated/flows'
+      path: '/flows'
+      fullPath: '/flows'
+      preLoaderRoute: typeof AuthenticatedFlowsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/financeiro': {
       id: '/_authenticated/financeiro'
       path: '/financeiro'
@@ -311,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/flows/$flowId': {
+      id: '/_authenticated/flows/$flowId'
+      path: '/$flowId'
+      fullPath: '/flows/$flowId'
+      preLoaderRoute: typeof AuthenticatedFlowsFlowIdRouteImport
+      parentRoute: typeof AuthenticatedFlowsRoute
+    }
     '/api/public/whatsapp/webhook': {
       id: '/api/public/whatsapp/webhook'
       path: '/api/public/whatsapp/webhook'
@@ -321,12 +360,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedFlowsRouteChildren {
+  AuthenticatedFlowsFlowIdRoute: typeof AuthenticatedFlowsFlowIdRoute
+}
+
+const AuthenticatedFlowsRouteChildren: AuthenticatedFlowsRouteChildren = {
+  AuthenticatedFlowsFlowIdRoute: AuthenticatedFlowsFlowIdRoute,
+}
+
+const AuthenticatedFlowsRouteWithChildren =
+  AuthenticatedFlowsRoute._addFileChildren(AuthenticatedFlowsRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
+  AuthenticatedFlowsRoute: typeof AuthenticatedFlowsRouteWithChildren
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
@@ -340,6 +391,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
+  AuthenticatedFlowsRoute: AuthenticatedFlowsRouteWithChildren,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
