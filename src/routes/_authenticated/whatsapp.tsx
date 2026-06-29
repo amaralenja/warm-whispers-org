@@ -101,6 +101,8 @@ function WhatsAppPage() {
     refetchInterval: 15000,
   });
 
+  const [quotaError, setQuotaError] = useState(false);
+
   const createMut = useMutation({
     mutationFn: (vars: { name: string; operacaoId: string }) => createFn({ data: vars }),
     onSuccess: (ch) => {
@@ -108,10 +110,17 @@ function WhatsAppPage() {
       setName("");
       setOpen(false);
       setJustCreated(ch);
+      setQuotaError(false);
       qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
     },
     onError: (e: any) => {
       console.error("[whatsapp:create]", e);
+      if (e?.message === "EVOHUB_QUOTA_EXCEEDED") {
+        setQuotaError(true);
+        setOpen(false);
+        toast.error("Limite de conexões da EvoHub atingido");
+        return;
+      }
       toast.error(e?.message ?? "Erro ao criar conexão");
     },
   });
