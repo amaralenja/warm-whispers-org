@@ -175,6 +175,7 @@ Deno.serve(async (req) => {
               phone_number_id: phoneNumberId,
               contact_wa_id: m.from,
               contact_name: contactName,
+              operacao_id: matched.operacao_id,
               last_message_at: new Date(parseInt(m.timestamp, 10) * 1000).toISOString(),
               last_message_preview: previewFor(m),
               last_message_direction: "in",
