@@ -320,6 +320,7 @@ function ChatPage() {
                 <h3 className="font-semibold truncate">{active.contact_name || active.contact_wa_id}</h3>
                 <p className="text-xs text-muted-foreground">{active.contact_wa_id}</p>
               </div>
+              <FlowDispatcher conversation={active} />
             </header>
 
             <div
