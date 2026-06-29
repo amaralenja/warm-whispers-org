@@ -679,12 +679,65 @@ function Inspector({
           </div>
         )}
 
-        {node.type === "wait_message" && (
-          <div className="space-y-1.5">
-            <Label>Timeout (segundos)</Label>
-            <Input type="number" value={d.timeoutSeconds ?? 86400} onChange={(e) => onChange({ timeoutSeconds: Number(e.target.value) })} />
-          </div>
-        )}
+        {node.type === "wait_message" && (() => {
+          const totalSecs = Number(d.timeoutSeconds ?? 86400);
+          const h = Math.floor(totalSecs / 3600);
+          const m = Math.floor((totalSecs % 3600) / 60);
+          const s = totalSecs % 60;
+          const setHMS = (nh: number, nm: number, ns: number) =>
+            onChange({ timeoutSeconds: Math.max(1, nh * 3600 + nm * 60 + ns) });
+          const rm = d.remarketing ?? { enabled: false, afterSeconds: 3600, text: "" };
+          const rh = Math.floor((rm.afterSeconds ?? 0) / 3600);
+          const rmin = Math.floor(((rm.afterSeconds ?? 0) % 3600) / 60);
+          const rs = (rm.afterSeconds ?? 0) % 60;
+          const setRm = (patch: any) => onChange({ remarketing: { ...rm, ...patch } });
+          const setRmHMS = (nh: number, nm: number, ns: number) =>
+            setRm({ afterSeconds: Math.max(1, nh * 3600 + nm * 60 + ns) });
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-md border p-2">
+                <div>
+                  <Label className="text-xs">Aguardar indefinidamente</Label>
+                  <p className="text-[10px] text-muted-foreground">Fica aguardando para sempre a resposta</p>
+                </div>
+                <Switch checked={!!d.infinite} onCheckedChange={(v) => onChange({ infinite: v })} />
+              </div>
+
+              {!d.infinite && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Tempo máximo de espera</Label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <div><Input type="number" min={0} value={h} onChange={(e) => setHMS(Number(e.target.value), m, s)} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">horas</p></div>
+                    <div><Input type="number" min={0} max={59} value={m} onChange={(e) => setHMS(h, Number(e.target.value), s)} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">min</p></div>
+                    <div><Input type="number" min={0} max={59} value={s} onChange={(e) => setHMS(h, m, Number(e.target.value))} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">seg</p></div>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-md border p-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-xs">Remarketing</Label>
+                    <p className="text-[10px] text-muted-foreground">Enviar mensagem se o lead não responder</p>
+                  </div>
+                  <Switch checked={!!rm.enabled} onCheckedChange={(v) => setRm({ enabled: v })} />
+                </div>
+                {rm.enabled && (
+                  <>
+                    <Label className="text-xs">Disparar após</Label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div><Input type="number" min={0} value={rh} onChange={(e) => setRmHMS(Number(e.target.value), rmin, rs)} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">horas</p></div>
+                      <div><Input type="number" min={0} max={59} value={rmin} onChange={(e) => setRmHMS(rh, Number(e.target.value), rs)} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">min</p></div>
+                      <div><Input type="number" min={0} max={59} value={rs} onChange={(e) => setRmHMS(rh, rmin, Number(e.target.value))} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">seg</p></div>
+                    </div>
+                    <Label className="text-xs">Mensagem de remarketing</Label>
+                    <Textarea rows={3} value={rm.text ?? ""} onChange={(e) => setRm({ text: e.target.value })} placeholder="Ex: Oi! Vi que você não respondeu, ainda quer continuar?" />
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {node.type === "delay" && (
           <div className="space-y-1.5">
