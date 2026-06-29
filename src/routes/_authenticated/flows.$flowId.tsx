@@ -524,8 +524,8 @@ function Editor({ flowId }: { flowId: string }) {
 // ============================================================
 
 function Palette({
-  onAdd, triggers, setTriggers,
-}: { onAdd: (t: string) => void; triggers: any[]; setTriggers: (t: any[]) => void }) {
+  onAdd, triggers, setTriggers, channels, operacaoId,
+}: { onAdd: (t: string) => void; triggers: any[]; setTriggers: (t: any[]) => void; channels: any[]; operacaoId: string | null }) {
   const groups: Array<{ label: string; types: string[] }> = [
     { label: "Conteúdo", types: ["send_text", "send_image", "send_video", "send_audio", "send_document"] },
     { label: "Interativo", types: ["send_buttons"] },
