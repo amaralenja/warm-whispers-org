@@ -17,6 +17,7 @@ import {
   MessagesSquare,
   Download,
   Smile,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ import {
   resolveIncomingMedia,
   downloadIncomingMediaBase64,
 } from "@/lib/whatsapp-chat.functions";
+import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -318,6 +320,7 @@ function ChatPage() {
                 <h3 className="font-semibold truncate">{active.contact_name || active.contact_wa_id}</h3>
                 <p className="text-xs text-muted-foreground">{active.contact_wa_id}</p>
               </div>
+              <FlowDispatcher conversation={active} />
             </header>
 
             <div
@@ -510,4 +513,84 @@ function RenderMedia({
     );
   }
   return null;
+}
+
+function FlowDispatcher({ conversation }: { conversation: Conv }) {
+  const listFlowsFn = useServerFn(listFlows);
+  const triggerFn = useServerFn(triggerFlowManually);
+  const [open, setOpen] = useState(false);
+  const [firing, setFiring] = useState<string | null>(null);
+
+  const { data: flows = [] } = useQuery({
+    queryKey: ["flows-for-dispatch"],
+    queryFn: () => listFlowsFn(),
+    enabled: open,
+  });
+
+  const compatible = useMemo(() => {
+    const op = conversation.operacao_id;
+    return ((flows as any[]) ?? []).filter((f) => {
+      if (f?.ativo === false) return false;
+      // Coerente com a operação: fluxo sem operação roda em qualquer; com operação só na mesma
+      if (!f.operacao_id) return true;
+      if (!op) return false;
+      return f.operacao_id === op;
+    });
+  }, [flows, conversation.operacao_id]);
+
+  async function fire(flowId: string) {
+    setFiring(flowId);
+    try {
+      await triggerFn({
+        data: {
+          flow_id: flowId,
+          channel_id: conversation.channel_id,
+          contact_wa_id: conversation.contact_wa_id,
+          conversation_id: conversation.id,
+        },
+      });
+      toast.success("Fluxo disparado");
+      setOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao disparar fluxo");
+    } finally {
+      setFiring(null);
+    }
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Zap className="h-4 w-4 text-emerald-500" />
+          Disparar fluxo
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        {compatible.length === 0 ? (
+          <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+            Nenhum fluxo ativo compatível com esta operação.
+          </div>
+        ) : (
+          compatible.map((f: any) => (
+            <DropdownMenuItem
+              key={f.id}
+              disabled={firing === f.id}
+              onSelect={(e) => { e.preventDefault(); fire(f.id); }}
+              className="flex items-start gap-2"
+            >
+              <Zap className="h-3.5 w-3.5 mt-0.5 text-emerald-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{f.nome}</div>
+                {f.operacao_id && (
+                  <div className="text-[10px] text-muted-foreground">Operação: {f.operacao_id}</div>
+                )}
+              </div>
+              {firing === f.id && <span className="text-[10px] text-muted-foreground">…</span>}
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
