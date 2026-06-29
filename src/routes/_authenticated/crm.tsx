@@ -163,6 +163,7 @@ async function fetchCrmApiLeads(expert: ExpertApiKey) {
 // ---------- Page ----------
 function CRMPage() {
   const qc = useQueryClient();
+  const fireNewLead = useServerFn(fireNewLeadTrigger);
   const { workspace, workspaces } = useWorkspace();
   const isGeral = workspace?.id === "all";
 
