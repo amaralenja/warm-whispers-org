@@ -10,7 +10,7 @@ import {
   type Node, type Edge, type Connection, type NodeChange, type EdgeChange,
   type NodeProps, type EdgeProps, Handle, Position,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+// xyflow css é importado globalmente em src/styles.css
 import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
