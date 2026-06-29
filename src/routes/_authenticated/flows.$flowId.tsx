@@ -17,6 +17,7 @@ import {
   MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle, Tag as TagIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCrmTags, type CrmTag } from "@/components/tags-manager-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
