@@ -182,6 +182,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     contactWaId: m.from,
                     text: m.text?.body ?? buttonText ?? null,
                     buttonId,
+                    messageType: m.type ?? null,
                     isFirstMessage,
                   });
                 } catch (e) {
