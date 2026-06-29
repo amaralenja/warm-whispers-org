@@ -204,7 +204,15 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
     await Promise.all(
       list
         .filter((c) => isWhatsappChannel(c) && shouldAutoImport(c) && !localById.has(String(c.id)))
-        .map((c) => upsertLocalChannel(context.supabase, c, "Caio").then((saved) => localById.set(String(saved.id), { id: saved.id, operacao_id: "Caio", metadata: saved.metadata })).catch(() => null)),
+        .map(async (c) => {
+          try {
+            const full = await evoFetch(`/api/v1/channels/${c.id}`).catch(() => c);
+            const saved = await upsertLocalChannel(context.supabase, full, "Caio");
+            localById.set(String(saved.id), { id: saved.id, operacao_id: "Caio", metadata: saved.metadata });
+          } catch {
+            localById.set(String(c.id), { id: c.id, operacao_id: "Caio", metadata: { app_source: APP_SOURCE, operacao_id: "Caio", meta_connection: getMetaConnection(c) } });
+          }
+        }),
     );
 
     return list
