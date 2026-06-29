@@ -40,6 +40,7 @@ import {
   CheckCircle2,
   XCircle,
   DollarSign,
+  Wallet,
   Eye,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
