@@ -46,6 +46,7 @@ export type EvoChannel = {
 };
 
 const APP_SOURCE = "lovable-crm";
+const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
 
 function normalizeMetadata(metadata: any): Record<string, any> | null {
   if (!metadata) return null;
@@ -91,6 +92,22 @@ function normalizeText(value: string) {
     .trim();
 }
 
+function shouldAutoImport(ch: any) {
+  const name = normalizeText(String(ch?.name ?? ""));
+  return AUTO_IMPORT_WHATSAPP_NAMES.some((allowed) => name === normalizeText(allowed));
+}
+
+function getPhoneInfo(ch: any) {
+  const metaConnection = getMetaConnection(ch);
+  const firstPhone = Array.isArray(metaConnection?.phone_numbers) ? metaConnection.phone_numbers[0] : null;
+  return {
+    phoneNumberId: metaConnection?.phone_number_id ?? firstPhone?.id ?? null,
+    displayPhoneNumber: metaConnection?.phone_number ?? firstPhone?.display_phone_number ?? null,
+    verifiedName: metaConnection?.display_name ?? firstPhone?.verified_name ?? null,
+    qualityRating: firstPhone?.quality_rating ?? null,
+  };
+}
+
 function withConnectUrl(ch: any): EvoChannel {
   const normalized = normalizeChannel(ch);
   const meta = normalizeMetadata(normalized.metadata);
@@ -108,14 +125,91 @@ function withConnectUrl(ch: any): EvoChannel {
   };
 }
 
+async function loadLocalChannels(supabase: any): Promise<any[]> {
+  const { data, error } = await supabase
+    .from("wa_channels" as any)
+    .select("*")
+    .eq("app_source", APP_SOURCE);
+  if (error) {
+    // A migration can still be pending in preview; don't break EvoHub listing because of it.
+    console.warn("[wa_channels] load failed", error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | null) {
+  const normalized = normalizeChannel(ch);
+  const meta = normalizeMetadata(normalized.metadata) ?? {};
+  const info = getPhoneInfo(normalized);
+  const currentLocal = await supabase
+    .from("wa_channels" as any)
+    .select("operacao_id")
+    .eq("id", String(normalized.id))
+    .maybeSingle()
+    .then(({ data }: any) => data)
+    .catch(() => null);
+
+  const finalOperacao = operacaoId ?? currentLocal?.operacao_id ?? (typeof meta.operacao_id === "string" ? meta.operacao_id : null);
+
+  const { error } = await supabase.from("wa_channels" as any).upsert({
+    id: String(normalized.id),
+    name: String(normalized.name ?? "WhatsApp"),
+    type: String(normalized.type ?? "whatsapp"),
+    status: String(normalized.status ?? ""),
+    token: String(normalized.token ?? ""),
+    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null },
+    operacao_id: finalOperacao,
+    phone_number_id: info.phoneNumberId,
+    display_phone_number: info.displayPhoneNumber,
+    verified_name: info.verifiedName,
+    quality_rating: info.qualityRating,
+    connect_url: normalized.token ? `${EVOHUB_CONNECT_BASE}/connect/${normalized.token}` : "",
+    app_source: APP_SOURCE,
+    created_at: normalized.created_at ?? null,
+    updated_at: normalized.updated_at ?? null,
+    synced_at: new Date().toISOString(),
+  }, { onConflict: "id" });
+
+  if (error) console.warn("[wa_channels] upsert failed", error.message);
+  return { ...normalized, metadata: { ...meta, app_source: APP_SOURCE, operacao_id: finalOperacao, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null } };
+}
+
+function mergeLocalIntoRemote(ch: any, local?: any) {
+  if (!local) return ch;
+  const normalized = normalizeChannel(ch);
+  const meta = normalizeMetadata(normalized.metadata) ?? {};
+  return {
+    ...normalized,
+    metadata: {
+      ...meta,
+      ...(normalizeMetadata(local.metadata) ?? {}),
+      app_source: APP_SOURCE,
+      operacao_id: local.operacao_id ?? meta.operacao_id ?? null,
+      meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? local.metadata?.meta_connection ?? null,
+    },
+  };
+}
+
 export const listWhatsappChannels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     const data = await evoFetch("/api/v1/channels");
     const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
+    const local = await loadLocalChannels(context.supabase);
+    const localById = new Map(local.map((row: any) => [String(row.id), row]));
+
+    // If Amaral already exists in EvoHub but wasn't created from Motion, register only this channel locally.
+    // We intentionally do not auto-import other numbers, so webhooks from unrelated EvoHub channels stay ignored.
+    await Promise.all(
+      list
+        .filter((c) => isWhatsappChannel(c) && shouldAutoImport(c) && !localById.has(String(c.id)))
+        .map((c) => upsertLocalChannel(context.supabase, c, "Caio").then((saved) => localById.set(String(saved.id), { id: saved.id, operacao_id: "Caio", metadata: saved.metadata })).catch(() => null)),
+    );
+
     return list
-      .filter((c) => isWhatsappChannel(c) && belongsToMotion(c))
-      .map(withConnectUrl);
+      .filter((c) => isWhatsappChannel(c) && (belongsToMotion(c) || localById.has(String(c.id)) || shouldAutoImport(c)))
+      .map((c) => withConnectUrl(mergeLocalIntoRemote(c, localById.get(String(c.id)))));
   });
 
 export const syncWhatsappChannelByName = createServerFn({ method: "POST" })
@@ -124,7 +218,7 @@ export const syncWhatsappChannelByName = createServerFn({ method: "POST" })
     name: String(d?.name ?? "").trim(),
     operacaoId: d?.operacaoId ? String(d.operacaoId).trim() : null,
   }))
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
     if (!data.name) throw new Error("Nome obrigatório");
     const payload = await evoFetch("/api/v1/channels");
     const list: any[] = Array.isArray(payload) ? payload : payload?.data ?? payload?.channels ?? [];
@@ -137,21 +231,25 @@ export const syncWhatsappChannelByName = createServerFn({ method: "POST" })
       candidates.find((c) => ["active", "connected", "open"].includes(String(c?.status ?? "").toLowerCase())) ??
       candidates[0];
 
-    const current: Record<string, any> = normalizeMetadata(picked.metadata) ?? {};
+    const currentFull = await evoFetch(`/api/v1/channels/${picked.id}`).catch(() => picked);
+    const normalized = normalizeChannel(currentFull);
+    const current: Record<string, any> = normalizeMetadata(normalized.metadata) ?? {};
     const merged: Record<string, any> = {
       ...current,
       app_source: APP_SOURCE,
       ...(data.operacaoId ? { operacao_id: data.operacaoId } : {}),
     };
 
-    const currentFull = await evoFetch(`/api/v1/channels/${picked.id}`).catch(() => picked);
-    const normalized = normalizeChannel(currentFull);
-    const updated = await evoFetch(`/api/v1/channels/${picked.id}/metadata`, {
+    // EvoHub does not expose metadata in the list response for channels connected in its own UI.
+    // So Motion keeps a local registry as the source of truth for "which numbers belong to Motion".
+    const saved = await upsertLocalChannel(context.supabase, { ...normalized, metadata: merged }, data.operacaoId ?? null);
+
+    await evoFetch(`/api/v1/channels/${picked.id}/metadata`, {
       method: "PUT",
       body: JSON.stringify({ metadata: { ...merged, meta_connection: getMetaConnection(normalized) ?? merged.meta_connection } }),
-    }).catch(() => ({ ...normalized, metadata: { ...merged, meta_connection: getMetaConnection(normalized) ?? merged.meta_connection } }));
+    }).catch(() => null);
 
-    return withConnectUrl(updated?.id ? updated : { ...picked, metadata: merged });
+    return withConnectUrl(saved);
   });
 
 export const createWhatsappChannel = createServerFn({ method: "POST" })
@@ -160,7 +258,7 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
     name: String(d?.name ?? "").trim(),
     operacaoId: String(d?.operacaoId ?? "").trim(),
   }))
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
     if (!data.name) throw new Error("Nome obrigatório");
     if (!data.operacaoId) throw new Error("Operação obrigatória");
     const ch = await evoFetch("/api/v1/channels", {
@@ -171,6 +269,7 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
         metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE },
       }),
     });
+    await upsertLocalChannel(context.supabase, ch, data.operacaoId);
     return withConnectUrl(ch);
   });
 
@@ -182,15 +281,17 @@ export const setChannelOperacao = createServerFn({ method: "POST" })
     operacaoId: String(d?.operacaoId ?? "").trim(),
     currentMetadata: d?.currentMetadata ?? null,
   }))
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
     if (!data.id) throw new Error("ID obrigatório");
     if (!data.operacaoId) throw new Error("Operação obrigatória");
     const merged = { ...(normalizeMetadata(data.currentMetadata) ?? {}), app_source: APP_SOURCE, operacao_id: data.operacaoId };
-    const ch = await evoFetch(`/api/v1/channels/${data.id}/metadata`, {
+    const currentFull = await evoFetch(`/api/v1/channels/${data.id}`).catch(() => ({ id: data.id, metadata: merged }));
+    await upsertLocalChannel(context.supabase, { ...currentFull, metadata: merged }, data.operacaoId);
+    await evoFetch(`/api/v1/channels/${data.id}/metadata`, {
       method: "PUT",
       body: JSON.stringify({ metadata: merged }),
-    });
-    return withConnectUrl(ch);
+    }).catch(() => null);
+    return withConnectUrl({ ...currentFull, metadata: merged });
   });
 
 export const deleteWhatsappChannel = createServerFn({ method: "POST" })
