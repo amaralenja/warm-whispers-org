@@ -275,6 +275,37 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       };
     }
 
+
+    case "tag_action": {
+      const addIds: string[] = Array.isArray(node.data?.addTags) ? node.data.addTags : [];
+      const removeIds: string[] = Array.isArray(node.data?.removeTags) ? node.data.removeTags : [];
+      if (addIds.length === 0 && removeIds.length === 0) return { log: { skipped: true } };
+
+      // Resolve tag names from ids
+      const allIds = [...new Set([...addIds, ...removeIds])];
+      const { data: tagRows } = await supabaseAdmin
+        .from("crm_tags" as any).select("id,nome").in("id", allIds);
+      const nameById = new Map<string, string>((tagRows ?? []).map((t: any) => [t.id, t.nome]));
+      const addNames = addIds.map((id) => nameById.get(id)).filter(Boolean) as string[];
+      const removeNames = removeIds.map((id) => nameById.get(id)).filter(Boolean) as string[];
+
+      // Find matching CRM lead by phone (last 10-13 digits)
+      const phone = String(ctx.contactWaId ?? "").replace(/\D/g, "");
+      if (!phone) return { log: { skipped: "no phone" } };
+      const tail = phone.slice(-10);
+      const { data: leads } = await supabaseAdmin
+        .from("crm_leads" as any).select("id,tags,telefone").ilike("telefone", `%${tail}%`).limit(5);
+
+      for (const l of leads ?? []) {
+        const cur: string[] = Array.isArray((l as any).tags) ? (l as any).tags : [];
+        const next = new Set(cur);
+        for (const n of addNames) next.add(n);
+        for (const n of removeNames) next.delete(n);
+        await supabaseAdmin.from("crm_leads" as any).update({ tags: Array.from(next) }).eq("id", (l as any).id);
+      }
+      return { log: { added: addNames, removed: removeNames, leads: leads?.length ?? 0 } };
+    }
+
     case "condition": {
       const op = String(node.data?.operator ?? "text_contains");
       const rawText = ctx.lastInput?.text ?? "";
