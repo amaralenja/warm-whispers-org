@@ -540,6 +540,7 @@ function Palette({
                     <SelectItem value="keyword">Palavra-chave</SelectItem>
                     <SelectItem value="new_conversation">Nova conversa</SelectItem>
                     <SelectItem value="any_message">Qualquer mensagem</SelectItem>
+                    <SelectItem value="new_lead">Novo lead no CRM</SelectItem>
                     <SelectItem value="manual">Manual</SelectItem>
                   </SelectContent>
                 </Select>
@@ -548,10 +549,24 @@ function Palette({
                 </Button>
               </div>
               {t.tipo === "keyword" && (
-                <Input
-                  value={t.valor ?? ""} onChange={(e) => { const c = [...triggers]; c[i] = { ...t, valor: e.target.value }; setTriggers(c); }}
-                  placeholder="ex: oi, menu" className="h-7 text-xs"
-                />
+                <>
+                  <Select
+                    value={t.match_mode ?? "contains"}
+                    onValueChange={(v) => { const c = [...triggers]; c[i] = { ...t, match_mode: v }; setTriggers(c); }}
+                  >
+                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contains">Contém</SelectItem>
+                      <SelectItem value="equals">Igual a</SelectItem>
+                      <SelectItem value="starts_with">Começa com</SelectItem>
+                      <SelectItem value="regex">Regex</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={t.valor ?? ""} onChange={(e) => { const c = [...triggers]; c[i] = { ...t, valor: e.target.value }; setTriggers(c); }}
+                    placeholder="ex: oi, menu" className="h-7 text-xs"
+                  />
+                </>
               )}
             </div>
           ))}
