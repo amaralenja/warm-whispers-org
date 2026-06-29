@@ -622,6 +622,40 @@ Deno.serve(async (req) => {
         }, { onConflict: "channel_id,wa_message_id" });
 
         if (msgErr) console.error("[wa-webhook] upsert msg error", msgErr);
+
+        // Baixa a mídia direto do Meta Graph e armazena no bucket wa-media para
+        // que o chat renderize via media_url (sem precisar baixar via browser).
+        if (media?.id && matched.token) {
+          try {
+            const downloaded = await downloadMetaMedia(matched.token, media.id);
+            if (downloaded) {
+              const ext = (media.filename?.split(".").pop()) || extToMime(downloaded.mime);
+              const safeName = (media.filename ?? `${media.id}.${ext}`).replace(/[^a-zA-Z0-9._-]/g, "_");
+              const path = `${channelId}/${(conv as any).id}/${media.id}-${safeName}`;
+              const up = await supabase.storage.from("wa-media").upload(path, downloaded.bytes, {
+                contentType: downloaded.mime,
+                upsert: true,
+              });
+              if (!up.error) {
+                const signed = await supabase.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24 * 7);
+                if (signed.data?.signedUrl) {
+                  await supabase
+                    .from("wa_messages")
+                    .update({
+                      media_url: signed.data.signedUrl,
+                      media_mime: downloaded.mime,
+                    })
+                    .eq("channel_id", channelId)
+                    .eq("wa_message_id", String(m.id));
+                }
+              } else {
+                console.warn("[wa-webhook] upload mídia falhou", up.error.message);
+              }
+            }
+          } catch (e) {
+            console.warn("[wa-webhook] erro processando mídia", (e as any)?.message ?? e);
+          }
+        }
       }
 
       const statuses: any[] = Array.isArray(change.statuses) ? change.statuses : [];
