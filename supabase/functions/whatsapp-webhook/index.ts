@@ -135,6 +135,10 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Load connected numbers from EvoHub (channels created via Motion)
+  const connected = await getConnectedChannels();
+  const allowedByPhoneId = new Map(connected.map((c) => [c.phone_number_id, c]));
+
   try {
     const entries: any[] = Array.isArray(payload?.entry) ? payload.entry : [];
     for (const entry of entries) {
@@ -144,7 +148,15 @@ Deno.serve(async (req) => {
         const value = change.value ?? {};
         const phoneNumberId = value?.metadata?.phone_number_id ?? null;
         const displayPhone = value?.metadata?.display_phone_number ?? null;
-        const channelId = phoneNumberId ?? "unknown";
+
+        // FILTER: only process messages for numbers connected via Motion
+        if (!phoneNumberId || !allowedByPhoneId.has(phoneNumberId)) {
+          console.log("[wa-webhook] ignorando número não conectado:", phoneNumberId);
+          continue;
+        }
+        const matched = allowedByPhoneId.get(phoneNumberId)!;
+        const channelId = matched.id;
+
 
         const contacts: any[] = Array.isArray(value?.contacts) ? value.contacts : [];
         const nameByWaId: Record<string, string> = {};
