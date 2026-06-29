@@ -148,15 +148,17 @@ function ChatPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return convs as Conv[];
-    return (convs as Conv[]).filter((c) =>
+    const list = (convs as unknown as Conv[]) ?? [];
+    if (!q) return list;
+    return list.filter((c) =>
       (c.contact_name ?? "").toLowerCase().includes(q) ||
       c.contact_wa_id.includes(q) ||
       (c.last_message_preview ?? "").toLowerCase().includes(q)
     );
   }, [convs, search]);
 
-  const active = (convs as Conv[]).find((c) => c.id === activeId) ?? null;
+  const active = ((convs as unknown as Conv[]) ?? []).find((c) => c.id === activeId) ?? null;
+
 
   const { data: messages = [] } = useQuery({
     queryKey: ["wa-messages", activeId],
@@ -322,7 +324,7 @@ function ChatPage() {
               ref={scrollRef}
               className="flex-1 overflow-y-auto p-4 space-y-2 bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2230%22%20height=%2230%22%3E%3Crect%20width=%2230%22%20height=%2230%22%20fill=%22%23111%22/%3E%3C/svg%3E')]"
             >
-              {(messages as Msg[]).map((m, i, arr) => {
+              {((messages as unknown as Msg[]) ?? []).map((m, i, arr) => {
                 const prev = arr[i - 1];
                 const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
                 return (
