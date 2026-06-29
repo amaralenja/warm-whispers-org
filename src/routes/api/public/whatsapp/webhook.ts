@@ -118,14 +118,16 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   continue;
                 }
 
-                // increment unread
-                await supabaseAdmin.rpc("increment" as any, { x: 1 }).then(() => {}).catch(() => {});
-                await supabaseAdmin
-                  .from("wa_conversations" as any)
-                  .update({ unread_count: ((conv as any).unread_count ?? 0) + 1 })
-                  .eq("id", (conv as any).id)
-                  .then(() => {})
-                  .catch(() => {});
+                // increment unread on conversation
+                try {
+                  await supabaseAdmin
+                    .from("wa_conversations" as any)
+                    .update({ unread_count: ((conv as any).unread_count ?? 0) + 1 })
+                    .eq("id", (conv as any).id);
+                } catch (e) {
+                  console.error("[wa-webhook] unread bump error", e);
+                }
+
 
                 const media = extractMedia(m);
                 const insertPayload: any = {
