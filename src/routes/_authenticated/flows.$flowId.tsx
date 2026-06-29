@@ -731,7 +731,7 @@ function defaultDataFor(type: string, label: string): any {
     case "send_buttons": return { text: "Escolha uma opção:", buttons: [{ id: `btn-${Date.now()}-1`, label: "Opção 1" }] };
     case "wait_message": return { timeoutSeconds: 86400 };
     case "delay": return { seconds: 2 };
-    case "condition": return { operator: "contains", value: "" };
+    case "condition": return { operator: "text_contains", value: "" };
     case "send_document": return { mediaUrl: "", filename: "" };
     default: return { label };
   }
