@@ -119,7 +119,7 @@ function formatDateLabel(iso: string) {
 }
 
 function StatusTick({ status }: { status: string | null }) {
-  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 text-sky-400" />;
+  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 text-chat-accent" />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-muted-foreground" />;
   return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
@@ -441,7 +441,7 @@ function ChatPage() {
 
               <div
                 ref={scrollRef}
-                className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklab,var(--chat-accent)_8%,transparent),transparent_34%)] px-6 py-6 scrollbar-fancy"
+                className="chat-thread-glow min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-fancy"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
                   {((messages as unknown as Msg[]) ?? []).map((m, i, arr) => {
