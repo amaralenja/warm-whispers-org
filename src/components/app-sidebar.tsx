@@ -48,13 +48,14 @@ const mainItems: Item[] = [
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
+];
+
+const operacaoX1Items: Item[] = [
   { title: "CRM Leads X1", url: "/crm", icon: Users },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },
 ];
-
-
 
 const highTicketItems: Item[] = [
   { title: "Calendário Calls", url: "/calendar", icon: Calendar },
@@ -71,6 +72,9 @@ export function AppSidebar() {
 
   const highTicketActive = highTicketItems.some((i) => pathname === i.url);
   const [highTicketOpen, setHighTicketOpen] = useState(highTicketActive);
+  const operacaoX1Active = operacaoX1Items.some((i) => pathname === i.url);
+  const [operacaoX1Open, setOperacaoX1Open] = useState(operacaoX1Active);
+
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
