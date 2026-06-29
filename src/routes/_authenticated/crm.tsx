@@ -3,8 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
-  User, MoreVertical, KeyRound, RefreshCw,
+  User, MoreVertical, KeyRound, RefreshCw, Tag as TagIcon,
 } from "lucide-react";
+import { TagsManagerDialog } from "@/components/tags-manager-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
