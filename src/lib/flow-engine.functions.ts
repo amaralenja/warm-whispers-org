@@ -62,6 +62,28 @@ export const getFlow = createServerFn({ method: "GET" })
     return flow;
   });
 
+// Helper — gera nome único checando os fluxos existentes (case-insensitive)
+async function uniqueFlowName(
+  supabase: any,
+  desired: string,
+  excludeId: string | null = null,
+): Promise<string> {
+  const base = (desired || "").trim() || "Novo Fluxo";
+  const { data: rows } = await supabase.from("wa_flows" as any).select("id, nome");
+  const taken = new Set<string>(
+    ((rows ?? []) as any[])
+      .filter((r) => !excludeId || r.id !== excludeId)
+      .map((r) => String(r.nome ?? "").trim().toLowerCase()),
+  );
+  if (!taken.has(base.toLowerCase())) return base;
+  const stripped = base.replace(/\s+cópia(\s+\d+)?$/i, "").trim();
+  for (let i = 1; i < 1000; i++) {
+    const candidate = `${stripped} cópia ${i}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+  return `${base}-${Date.now()}`;
+}
+
 export const createFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { nome: string; operacao_id?: string | null }) => ({
@@ -70,20 +92,21 @@ export const createFlow = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const startId = "n-trigger";
+    const nome = data.nome.trim();
+    const { data: dup } = await context.supabase
+      .from("wa_flows" as any).select("id").ilike("nome", nome).limit(1);
+    if (dup && dup.length > 0) {
+      throw new Error(`Já existe um fluxo com o nome "${nome}". Escolha outro nome.`);
+    }
     const { data: row, error } = await context.supabase
       .from("wa_flows" as any)
       .insert({
-        nome: data.nome,
+        nome,
         operacao_id: data.operacao_id,
         ativo: true,
         entry_node_id: startId,
         nodes: [
-          {
-            id: startId,
-            type: "trigger",
-            position: { x: 100, y: 100 },
-            data: { label: "Início" },
-          },
+          { id: startId, type: "trigger", position: { x: 100, y: 100 }, data: { label: "Início" } },
         ],
         edges: [],
         created_by: context.userId,
@@ -110,10 +133,17 @@ export const saveFlow = createServerFn({ method: "POST" })
     for (const k of ["nome", "operacao_id", "ativo", "entry_node_id", "nodes", "edges"]) {
       if ((data as any)[k] !== undefined) patch[k] = (data as any)[k];
     }
+    if (typeof patch.nome === "string" && patch.nome.trim()) {
+      const novoNome = patch.nome.trim();
+      const { data: dup } = await context.supabase
+        .from("wa_flows" as any).select("id").ilike("nome", novoNome).neq("id", data.id).limit(1);
+      if (dup && dup.length > 0) {
+        throw new Error(`Já existe outro fluxo com o nome "${novoNome}".`);
+      }
+      patch.nome = novoNome;
+    }
     const { error } = await context.supabase
-      .from("wa_flows" as any)
-      .update(patch)
-      .eq("id", data.id);
+      .from("wa_flows" as any).update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -125,6 +155,136 @@ export const deleteFlow = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("wa_flows" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ============================================================
+// Duplicate / Export / Import
+// ============================================================
+
+const FLOW_EXPORT_PREFIX = "FLOWV1:";
+
+function encodeFlowCode(payload: unknown): string {
+  const json = JSON.stringify(payload);
+  const b64 = typeof Buffer !== "undefined"
+    ? Buffer.from(json, "utf-8").toString("base64")
+    : btoa(unescape(encodeURIComponent(json)));
+  return FLOW_EXPORT_PREFIX + b64;
+}
+
+function decodeFlowCode(code: string): any {
+  const raw = code.trim();
+  const body = raw.startsWith(FLOW_EXPORT_PREFIX) ? raw.slice(FLOW_EXPORT_PREFIX.length) : raw;
+  let json: string;
+  try {
+    json = typeof Buffer !== "undefined"
+      ? Buffer.from(body, "base64").toString("utf-8")
+      : decodeURIComponent(escape(atob(body)));
+  } catch { throw new Error("Código inválido — não foi possível decodificar."); }
+  let parsed: any;
+  try { parsed = JSON.parse(json); } catch { throw new Error("Código inválido — JSON corrompido."); }
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.nodes)) {
+    throw new Error("Código inválido — formato não reconhecido.");
+  }
+  return parsed;
+}
+
+export const duplicateFlow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
+  .handler(async ({ context, data }) => {
+    const { data: src, error } = await context.supabase
+      .from("wa_flows" as any)
+      .select("*, wa_flow_triggers(*)")
+      .eq("id", data.id).single();
+    if (error || !src) throw new Error(error?.message ?? "Fluxo não encontrado");
+    const newName = await uniqueFlowName(context.supabase, (src as any).nome);
+    const { data: row, error: insErr } = await context.supabase
+      .from("wa_flows" as any)
+      .insert({
+        nome: newName,
+        operacao_id: (src as any).operacao_id,
+        ativo: false,
+        entry_node_id: (src as any).entry_node_id,
+        nodes: (src as any).nodes ?? [],
+        edges: (src as any).edges ?? [],
+        created_by: context.userId,
+      })
+      .select("id").single();
+    if (insErr) throw new Error(insErr.message);
+    const triggers = ((src as any).wa_flow_triggers ?? []) as any[];
+    if (triggers.length > 0) {
+      const rows = triggers.map((t) => ({
+        flow_id: (row as any).id,
+        tipo: t.tipo, valor: t.valor ?? null,
+        match_mode: t.match_mode ?? "contains",
+        channel_id: null,
+        ativo: t.ativo ?? true,
+      }));
+      await context.supabase.from("wa_flow_triggers" as any).insert(rows);
+    }
+    return { id: (row as any).id, nome: newName };
+  });
+
+export const exportFlow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
+  .handler(async ({ context, data }) => {
+    const { data: src, error } = await context.supabase
+      .from("wa_flows" as any)
+      .select("nome, entry_node_id, nodes, edges, wa_flow_triggers(tipo, valor, match_mode, ativo)")
+      .eq("id", data.id).single();
+    if (error || !src) throw new Error(error?.message ?? "Fluxo não encontrado");
+    const payload = {
+      version: 1,
+      exported_at: new Date().toISOString(),
+      nome: (src as any).nome,
+      entry_node_id: (src as any).entry_node_id,
+      nodes: (src as any).nodes ?? [],
+      edges: (src as any).edges ?? [],
+      triggers: ((src as any).wa_flow_triggers ?? []).map((t: any) => ({
+        tipo: t.tipo, valor: t.valor, match_mode: t.match_mode, ativo: t.ativo,
+      })),
+    };
+    return { code: encodeFlowCode(payload), nome: payload.nome };
+  });
+
+export const importFlow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { code: string; operacao_id?: string | null; nome?: string | null }) => ({
+    code: String(d?.code ?? ""),
+    operacao_id: d?.operacao_id ?? null,
+    nome: d?.nome ?? null,
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.code.trim()) throw new Error("Cole um código de fluxo.");
+    const payload = decodeFlowCode(data.code);
+    const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString();
+    const finalName = await uniqueFlowName(context.supabase, desired);
+    const { data: row, error } = await context.supabase
+      .from("wa_flows" as any)
+      .insert({
+        nome: finalName,
+        operacao_id: data.operacao_id,
+        ativo: false,
+        entry_node_id: payload.entry_node_id ?? null,
+        nodes: payload.nodes ?? [],
+        edges: payload.edges ?? [],
+        created_by: context.userId,
+      })
+      .select("id").single();
+    if (error) throw new Error(error.message);
+    const triggers = Array.isArray(payload.triggers) ? payload.triggers : [];
+    if (triggers.length > 0) {
+      const rows = triggers.map((t: any) => ({
+        flow_id: (row as any).id,
+        tipo: t.tipo, valor: t.valor ?? null,
+        match_mode: t.match_mode ?? "contains",
+        channel_id: null,
+        ativo: t.ativo ?? true,
+      }));
+      await context.supabase.from("wa_flow_triggers" as any).insert(rows);
+    }
+    return { id: (row as any).id, nome: finalName };
   });
 
 // ============================================================
