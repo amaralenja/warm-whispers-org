@@ -312,8 +312,9 @@ function ChatPage() {
 
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-chat-shell p-3 text-foreground">
-      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden rounded-[28px] border border-chat-line bg-chat-thread shadow-[0_24px_80px_color-mix(in_oklab,var(--background)_78%,transparent)]">
+    <div className="h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-chat-shell text-foreground">
+      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden border border-chat-line bg-chat-thread">
+
         <aside className="flex min-h-0 flex-col border-r border-chat-line bg-chat-sidebar">
           <div className="shrink-0 border-b border-chat-line p-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
