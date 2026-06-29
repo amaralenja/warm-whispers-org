@@ -262,9 +262,17 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
     }
 
     case "delay": {
-      const secs = Math.min(30, Number(node.data?.seconds ?? 2));
-      await new Promise((r) => setTimeout(r, secs * 1000));
-      return {};
+      const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
+      if (secs <= 30) {
+        await new Promise((r) => setTimeout(r, secs * 1000));
+        return {};
+      }
+      // Long delay: pause the run and let the timer worker resume it.
+      return {
+        pause: true,
+        waitingFor: "timer",
+        expiresAt: new Date(Date.now() + secs * 1000).toISOString(),
+      };
     }
 
     case "condition": {

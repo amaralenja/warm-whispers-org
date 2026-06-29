@@ -181,9 +181,12 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
             {d.remarketing?.enabled && <div className="text-[11px] text-yellow-700 mt-0.5">↪ Remarketing em {d.remarketing.afterSeconds}s</div>}
           </div>
         )}
-        {type === "delay" && (
-          <div className="text-[13px]">⏱ Espera {d.seconds ?? 2} segundos</div>
-        )}
+        {type === "delay" && (() => {
+          const t = Number(d.seconds ?? 2);
+          const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+          const parts = [h && `${h}h`, m && `${m}m`, s && `${s}s`].filter(Boolean).join(" ") || "0s";
+          return <div className="text-[13px]">⏱ Espera {parts}</div>;
+        })()}
         {type === "condition" && (
           <div className="text-[13px] bg-muted/40 rounded-md px-3 py-2">
             {conditionSummary(d)}
@@ -742,12 +745,27 @@ function Inspector({
           );
         })()}
 
-        {node.type === "delay" && (
-          <div className="space-y-1.5">
-            <Label>Segundos (máx 30)</Label>
-            <Input type="number" max={30} value={d.seconds ?? 2} onChange={(e) => onChange({ seconds: Math.min(30, Number(e.target.value)) })} />
-          </div>
-        )}
+        {node.type === "delay" && (() => {
+          const total = Math.max(1, Math.min(86400, Number(d.seconds ?? 2)));
+          const h = Math.floor(total / 3600);
+          const m = Math.floor((total % 3600) / 60);
+          const s = total % 60;
+          const setHMS = (nh: number, nm: number, ns: number) =>
+            onChange({ seconds: Math.max(1, Math.min(86400, nh * 3600 + nm * 60 + ns)) });
+          return (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Duração da espera (até 24h)</Label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <div><Input type="number" min={0} max={24} value={h} onChange={(e) => setHMS(Number(e.target.value), m, s)} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">horas</p></div>
+                <div><Input type="number" min={0} max={59} value={m} onChange={(e) => setHMS(h, Number(e.target.value), s)} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">min</p></div>
+                <div><Input type="number" min={0} max={59} value={s} onChange={(e) => setHMS(h, m, Number(e.target.value))} /><p className="text-[10px] text-center text-muted-foreground mt-0.5">seg</p></div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Até 30s o fluxo aguarda no mesmo passo. Acima disso, é agendado e retomado depois.
+              </p>
+            </div>
+          );
+        })()}
 
         {node.type === "condition" && (() => {
           const opt = conditionOption(d.operator);
