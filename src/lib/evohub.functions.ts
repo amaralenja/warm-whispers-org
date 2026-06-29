@@ -57,13 +57,15 @@ function withConnectUrl(ch: any): EvoChannel {
   };
 }
 
+const APP_SOURCE = "lovable-crm";
+
 export const listWhatsappChannels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const data = await evoFetch("/api/v1/channels");
     const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
     return list
-      .filter((c) => c.type === "whatsapp" || c.type === "unified")
+      .filter((c) => (c.type === "whatsapp" || c.type === "unified") && c?.metadata?.app_source === APP_SOURCE)
       .map(withConnectUrl);
   });
 
@@ -81,11 +83,12 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
       body: JSON.stringify({
         name: data.name,
         type: "whatsapp",
-        metadata: { operacao_id: data.operacaoId },
+        metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE },
       }),
     });
     return withConnectUrl(ch);
   });
+
 
 export const setChannelOperacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
