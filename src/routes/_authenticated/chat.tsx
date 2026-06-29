@@ -537,7 +537,7 @@ function MediaContent({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?:
         </button>
       );
     }
-    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} onRetry={onLoadMedia} />;
+    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} />;
   }
   return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} />;
 }
