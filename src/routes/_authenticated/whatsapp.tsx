@@ -16,7 +16,7 @@ import {
   Loader2,
   Tag,
   MessageCircle,
-  Sparkles,
+  MessageCircle,
   X,
   QrCode,
 } from "lucide-react";
