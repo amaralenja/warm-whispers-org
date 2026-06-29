@@ -872,7 +872,7 @@ function defaultDataFor(type: string, label: string): any {
   switch (type) {
     case "send_text": return { text: "Olá! 👋" };
     case "send_buttons": return { text: "Escolha uma opção:", buttons: [{ id: `btn-${Date.now()}-1`, label: "Opção 1" }] };
-    case "wait_message": return { timeoutSeconds: 86400 };
+    case "wait_message": return { timeoutSeconds: 86400, infinite: false, remarketing: { enabled: false, afterSeconds: 3600, text: "" } };
     case "delay": return { seconds: 2 };
     case "condition": return { operator: "text_contains", value: "" };
     case "random": {
