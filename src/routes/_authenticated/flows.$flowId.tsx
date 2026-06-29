@@ -60,19 +60,19 @@ function CustomNode({ data, type, selected }: NodeProps) {
 
   return (
     <div
-      className={`rounded-lg border-2 bg-card shadow-md min-w-[200px] ${selected ? "ring-2 ring-emerald-500" : ""}`}
+      className={`rounded-xl border-2 bg-card shadow-lg min-w-[300px] max-w-[340px] ${selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background" : ""}`}
       style={{ borderColor: meta.color }}
     >
       {!isTrigger && (
-        <Handle type="target" position={Position.Top} style={{ background: meta.color, width: 10, height: 10 }} />
+        <Handle type="target" position={Position.Top} style={{ background: meta.color, width: 14, height: 14 }} />
       )}
-      <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ borderColor: `${meta.color}40` }}>
-        <div className="rounded p-1.5" style={{ backgroundColor: `${meta.color}25` }}>
-          <Icon className="h-3.5 w-3.5" style={{ color: meta.color }} />
+      <div className="px-4 py-3 flex items-center gap-3 border-b" style={{ borderColor: `${meta.color}40` }}>
+        <div className="rounded-lg p-2.5" style={{ backgroundColor: `${meta.color}25` }}>
+          <Icon className="h-5 w-5" style={{ color: meta.color }} />
         </div>
-        <span className="text-xs font-semibold">{meta.label}</span>
+        <span className="text-base font-semibold">{meta.label}</span>
       </div>
-      <div className="px-3 py-2 text-xs text-muted-foreground min-h-[28px]">
+      <div className="px-4 py-3 text-sm text-muted-foreground min-h-[44px] leading-relaxed">
         {nodePreview(type as string, (data as any) ?? {})}
       </div>
 
