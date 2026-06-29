@@ -497,7 +497,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
           isOut ? "bg-emerald-500/90 text-white" : "bg-card border border-border"
         }`}
       >
-        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} />
+        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} outgoing={isOut} />
         {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
         {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
         <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
