@@ -88,6 +88,7 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
   const isEnd = type === "end";
   const isButtons = type === "send_buttons";
   const isCondition = type === "condition";
+  const isRandom = type === "random";
   const d = (data as any) ?? {};
 
   function handleDelete(e: React.MouseEvent) {
