@@ -527,3 +527,37 @@ export async function dispatchIncomingForFlows(args: {
 
   return null;
 }
+
+// Dispatch flows tied to "new_lead" trigger when a CRM lead is inserted.
+export async function dispatchNewLead(args: { leadId: string }) {
+  const { data: lead } = await supabaseAdmin
+    .from("crm_leads" as any).select("*").eq("id", args.leadId).maybeSingle();
+  if (!lead) return { matched: 0, reason: "lead not found" };
+  const l: any = lead;
+  const phoneDigits = String(l.telefone ?? "").replace(/\D/g, "");
+  if (!phoneDigits) return { matched: 0, reason: "no phone" };
+
+  const { data: triggers } = await supabaseAdmin
+    .from("wa_flow_triggers" as any)
+    .select("*, wa_flows!inner(id, ativo, entry_node_id, operacao_id)")
+    .eq("ativo", true)
+    .eq("tipo", "new_lead");
+
+  let started = 0;
+  for (const trg of (triggers ?? []) as any[]) {
+    if (!trg.wa_flows?.ativo) continue;
+    // Optional operacao match
+    const flowOp = trg.wa_flows?.operacao_id;
+    if (flowOp && l.expert && String(flowOp) !== String(l.expert) && String(flowOp) !== String(l.operacao_id ?? "")) continue;
+    if (!trg.channel_id) continue; // requires a channel selected on the trigger
+    await runFlowAdmin({
+      flowId: trg.flow_id,
+      channelId: trg.channel_id,
+      contactWaId: phoneDigits,
+      conversationId: null,
+      triggerContext: { tipo: "new_lead", lead: { id: l.id, nome: l.nome, telefone: l.telefone, email: l.email } },
+    });
+    started++;
+  }
+  return { matched: started };
+}
