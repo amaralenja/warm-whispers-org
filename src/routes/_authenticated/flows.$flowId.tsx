@@ -222,6 +222,22 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
           ))}
         </div>
       )}
+      {isRandom && (
+        <div className="px-4 pb-3 space-y-2">
+          {(d.outputs ?? []).map((o: any, i: number) => (
+            <div key={o.id ?? i} className="relative">
+              <div className="text-sm bg-muted rounded-md px-3 py-2 flex items-center justify-between border">
+                <span className="truncate">Saída {i + 1}</span>
+                <span className="text-xs font-semibold text-violet-500">{Number(o.weight ?? 0).toFixed(0)}%</span>
+              </div>
+              <Handle
+                type="source" position={Position.Right} id={o.id}
+                style={{ top: "50%", background: meta.color, width: 12, height: 12 }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
