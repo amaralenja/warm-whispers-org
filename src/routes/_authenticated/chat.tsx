@@ -40,6 +40,7 @@ import {
   downloadIncomingMediaBase64,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
+import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -497,7 +498,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
           isOut ? "bg-emerald-500/90 text-white" : "bg-card border border-border"
         }`}
       >
-        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} />
+        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} outgoing={isOut} />
         {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
         {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
         <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
@@ -509,11 +510,11 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
   );
 }
 
-function MediaContent({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
+function MediaContent({ msg, mediaState, onLoadMedia, outgoing }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; outgoing?: boolean }) {
   if (msg.msg_type === "text") return null;
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} />;
+    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
@@ -521,7 +522,7 @@ function MediaContent({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?:
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} />;
+      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} />;
     }
     if (mediaState?.loading) {
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading />;
@@ -591,8 +592,8 @@ function MediaPlaceholder({
 }
 
 function RenderMedia({
-  type, url, mime, filename,
-}: { type: string; url: string; mime: string | null; filename: string | null }) {
+  type, url, mime, filename, outgoing,
+}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean }) {
   if (type === "image" || type === "sticker") {
     return <img src={url} alt={filename ?? ""} className={`rounded mb-1 ${type === "sticker" ? "max-w-[120px]" : "max-w-full"}`} />;
   }
@@ -600,7 +601,7 @@ function RenderMedia({
     return <video src={url} controls className="rounded mb-1 max-w-full" />;
   }
   if (type === "audio") {
-    return <audio src={url} controls className="mb-1 w-full max-w-[260px]" />;
+    return <WhatsappAudioPlayer url={url} outgoing={outgoing} />;
   }
   if (type === "document") {
     return (
