@@ -60,6 +60,24 @@ type ChannelInfo = { id: string; phone_number_id: string; operacao_id: string | 
 // Cache connected channels for 60s to avoid hitting EvoHub on every webhook
 let channelsCache: { at: number; list: ChannelInfo[] } | null = null;
 
+function normalizeMetadata(metadata: any): Record<string, any> {
+  if (!metadata) return {};
+  if (typeof metadata === "string") {
+    try {
+      const parsed = JSON.parse(metadata);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return typeof metadata === "object" ? metadata : {};
+}
+
+function getMetaConnection(c: any) {
+  const meta = normalizeMetadata(c?.metadata);
+  return c?.meta_connection ?? meta?.meta_connection ?? null;
+}
+
 async function getConnectedChannels(): Promise<ChannelInfo[]> {
   const now = Date.now();
   if (channelsCache && now - channelsCache.at < 60_000) return channelsCache.list;
@@ -79,16 +97,20 @@ async function getConnectedChannels(): Promise<ChannelInfo[]> {
     const data = await res.json();
     const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
     const mapped: ChannelInfo[] = list
-      .filter((c) =>
-        (c?.type === "whatsapp" || c?.type === "unified") &&
-        c?.metadata?.app_source === APP_SOURCE &&
-        c?.metadata?.meta_connection?.phone_number_id,
-      )
-      .map((c) => ({
-        id: String(c.id),
-        phone_number_id: String(c.metadata.meta_connection.phone_number_id),
-        operacao_id: typeof c.metadata.operacao_id === "string" ? c.metadata.operacao_id : null,
-      }));
+      .filter((c) => c?.type === "whatsapp" || c?.type === "unified")
+      .map((c) => {
+        const meta = normalizeMetadata(c?.metadata);
+        const metaConnection = getMetaConnection(c);
+        const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id;
+        const isMotion = meta?.app_source === APP_SOURCE || meta?.appSource === APP_SOURCE;
+        if (!isMotion || !phoneNumberId) return null;
+        return {
+          id: String(c.id),
+          phone_number_id: String(phoneNumberId),
+          operacao_id: typeof meta.operacao_id === "string" ? meta.operacao_id : null,
+        };
+      })
+      .filter(Boolean) as ChannelInfo[];
     channelsCache = { at: now, list: mapped };
     return mapped;
   } catch (e) {
