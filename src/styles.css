@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "@xyflow/react/dist/style.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -159,6 +160,15 @@
 @utility chat-thread-glow {
   background-image: none;
 }
+
+/* React Flow — garantir que nós fiquem acima do background e sejam clicáveis */
+.react-flow__background { z-index: 0 !important; pointer-events: none !important; }
+.react-flow__viewport { z-index: 1 !important; }
+.react-flow__edges { z-index: 2 !important; }
+.react-flow__nodes { z-index: 3 !important; }
+.react-flow__node { pointer-events: all !important; }
+.react-flow__handle { z-index: 10 !important; pointer-events: all !important; }
+.react-flow__pane { cursor: grab; }
 
 /* Fix browser autofill yellow/white background */
 input:-webkit-autofill,
