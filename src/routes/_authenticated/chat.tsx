@@ -119,7 +119,7 @@ function formatDateLabel(iso: string) {
 }
 
 function StatusTick({ status }: { status: string | null }) {
-  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 text-sky-400" />;
+  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 text-chat-accent" />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-muted-foreground" />;
   return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
