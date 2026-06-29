@@ -304,8 +304,9 @@ function CRMPage() {
         const { error } = await supabase.from("crm_leads").update(lead as any).eq("id", lead.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("crm_leads").insert(lead as any);
+        const { data: ins, error } = await supabase.from("crm_leads").insert(lead as any).select("id").single();
         if (error) throw error;
+        if (ins?.id) fireNewLead({ data: { lead_id: ins.id } }).catch(() => {});
       }
     },
     onSuccess: () => {
