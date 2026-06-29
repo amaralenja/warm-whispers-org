@@ -462,7 +462,7 @@ function Editor({ flowId }: { flowId: string }) {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Palette */}
-        <Palette onAdd={addNode} triggers={triggers} setTriggers={setTriggers} />
+        <Palette onAdd={addNode} triggers={triggers} setTriggers={setTriggers} channels={channels} operacaoId={operacaoId} />
 
         {/* Canvas */}
         <div className="flex-1 relative">
