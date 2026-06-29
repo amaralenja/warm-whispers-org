@@ -581,6 +581,29 @@ function Palette({
                   />
                 </>
               )}
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase text-muted-foreground">Número (WhatsApp)</Label>
+                <Select
+                  value={t.channel_id ?? "__any__"}
+                  onValueChange={(v) => { const c = [...triggers]; c[i] = { ...t, channel_id: v === "__any__" ? null : v }; setTriggers(c); }}
+                >
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Selecionar número" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__any__">Qualquer número da operação</SelectItem>
+                    {channels.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name ?? c.display_phone_number ?? c.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!operacaoId && (
+                  <p className="text-[10px] text-amber-500">Defina a operação do fluxo para listar apenas os números dela.</p>
+                )}
+                {operacaoId && channels.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">Nenhum número conectado nessa operação.</p>
+                )}
+              </div>
             </div>
           ))}
           <Button
