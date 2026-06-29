@@ -591,8 +591,8 @@ function MediaPlaceholder({
 }
 
 function RenderMedia({
-  type, url, mime, filename,
-}: { type: string; url: string; mime: string | null; filename: string | null }) {
+  type, url, mime, filename, outgoing,
+}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean }) {
   if (type === "image" || type === "sticker") {
     return <img src={url} alt={filename ?? ""} className={`rounded mb-1 ${type === "sticker" ? "max-w-[120px]" : "max-w-full"}`} />;
   }
@@ -600,7 +600,7 @@ function RenderMedia({
     return <video src={url} controls className="rounded mb-1 max-w-full" />;
   }
   if (type === "audio") {
-    return <audio src={url} controls className="mb-1 w-full max-w-[260px]" />;
+    return <WhatsappAudioPlayer url={url} outgoing={outgoing} />;
   }
   if (type === "document") {
     return (
