@@ -502,7 +502,7 @@ function Palette({
     { label: "Conteúdo", types: ["send_text", "send_image", "send_video", "send_audio", "send_document"] },
     { label: "Interativo", types: ["send_buttons"] },
     { label: "Espera", types: ["wait_message", "delay"] },
-    { label: "Lógica", types: ["condition", "end"] },
+    { label: "Lógica", types: ["condition", "random", "end"] },
   ];
 
   return (
