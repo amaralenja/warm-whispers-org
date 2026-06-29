@@ -132,3 +132,83 @@ export const regenerateWhatsappToken = createServerFn({ method: "POST" })
     return withConnectUrl(ch);
   });
 
+export type WhatsappQuality = {
+  id: string;
+  phoneNumberId: string | null;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  qualityRating: string | null; // GREEN | YELLOW | RED | UNKNOWN
+  platformType: string | null;
+  codeVerificationStatus: string | null;
+  nameStatus: string | null;
+  throughputLevel: string | null;
+};
+
+// Fetches phone quality info from Meta Graph through the EvoHub Meta proxy.
+export const getWhatsappQuality = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
+  .handler(async ({ data }): Promise<WhatsappQuality | null> => {
+    if (!data.id) throw new Error("ID obrigatório");
+    // Load the channel to get its token + phone_number_id
+    const all = await evoFetch("/api/v1/channels");
+    const list: any[] = Array.isArray(all) ? all : all?.data ?? all?.channels ?? [];
+    const ch = list.find((c) => c.id === data.id);
+    if (!ch) return null;
+    const pnid: string | undefined = ch?.metadata?.meta_connection?.phone_number_id;
+    const token: string | undefined = ch?.token;
+    if (!pnid || !token) {
+      return {
+        id: data.id,
+        phoneNumberId: null,
+        displayPhoneNumber: null,
+        verifiedName: null,
+        qualityRating: null,
+        platformType: null,
+        codeVerificationStatus: null,
+        nameStatus: null,
+        throughputLevel: null,
+      };
+    }
+    const fields = [
+      "display_phone_number",
+      "verified_name",
+      "quality_rating",
+      "platform_type",
+      "code_verification_status",
+      "name_status",
+      "throughput",
+    ].join(",");
+    const res = await fetch(
+      `${EVOHUB_BASE}/meta/v23.0/${pnid}?fields=${fields}`,
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
+    );
+    const text = await res.text();
+    let body: any = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    if (!res.ok) {
+      return {
+        id: data.id,
+        phoneNumberId: pnid,
+        displayPhoneNumber: ch?.metadata?.meta_connection?.phone_number ?? null,
+        verifiedName: ch?.metadata?.meta_connection?.display_name ?? null,
+        qualityRating: null,
+        platformType: null,
+        codeVerificationStatus: null,
+        nameStatus: null,
+        throughputLevel: null,
+      };
+    }
+    return {
+      id: data.id,
+      phoneNumberId: pnid,
+      displayPhoneNumber: body?.display_phone_number ?? ch?.metadata?.meta_connection?.phone_number ?? null,
+      verifiedName: body?.verified_name ?? ch?.metadata?.meta_connection?.display_name ?? null,
+      qualityRating: body?.quality_rating ?? null,
+      platformType: body?.platform_type ?? null,
+      codeVerificationStatus: body?.code_verification_status ?? null,
+      nameStatus: body?.name_status ?? null,
+      throughputLevel: body?.throughput?.level ?? null,
+    };
+  });
+
