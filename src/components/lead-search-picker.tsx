@@ -51,7 +51,7 @@ export function LeadSearchPicker({
     setLoading(true);
     try {
       const isEmail = t.includes("@");
-      let q = quizSb
+      let q = getQuizSb()
         .from("leads")
         .select("id,nome,email,whatsapp")
         .order("data_criacao", { ascending: false })
