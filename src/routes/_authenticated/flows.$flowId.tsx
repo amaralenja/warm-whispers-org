@@ -51,6 +51,34 @@ const NODE_META: Record<string, { label: string; icon: any; color: string; descr
   end:            { label: "Fim",              icon: StopIcon,           color: "#ef4444", description: "Encerra o fluxo" },
 };
 
+const CONDITION_OPTIONS: { value: string; label: string; needsValue?: "text" | "number" }[] = [
+  { value: "text_contains", label: "Texto contém", needsValue: "text" },
+  { value: "text_equals", label: "Texto é igual a", needsValue: "text" },
+  { value: "text_starts_with", label: "Texto começa com", needsValue: "text" },
+  { value: "text_regex", label: "Texto bate com Regex", needsValue: "text" },
+  { value: "text_word_count_gte", label: "Tem ao menos X palavras", needsValue: "number" },
+  { value: "is_text", label: "Lead mandou texto" },
+  { value: "is_audio", label: "Lead mandou áudio" },
+  { value: "is_image", label: "Lead mandou imagem" },
+  { value: "is_video", label: "Lead mandou vídeo" },
+  { value: "is_document", label: "Lead mandou documento" },
+  { value: "is_sticker", label: "Lead mandou figurinha" },
+  { value: "is_location", label: "Lead mandou localização" },
+  { value: "is_contact", label: "Lead mandou contato" },
+  { value: "is_button_reply", label: "Lead clicou em algum botão" },
+  { value: "button_id_equals", label: "Lead clicou no botão ID =", needsValue: "text" },
+];
+
+function conditionOption(op?: string) {
+  return CONDITION_OPTIONS.find((o) => o.value === op) ?? CONDITION_OPTIONS[0];
+}
+
+function conditionSummary(d: any) {
+  const opt = conditionOption(d?.operator);
+  if (opt.needsValue) return `${opt.label} "${d?.value ?? ""}"`;
+  return opt.label;
+}
+
 function CustomNode({ id, data, type, selected }: NodeProps) {
   const rf = useReactFlow();
   const meta = NODE_META[type as string] ?? NODE_META.send_text;
@@ -152,7 +180,9 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
           <div className="text-[13px]">⏱ Espera {d.seconds ?? 2} segundos</div>
         )}
         {type === "condition" && (
-          <div className="text-[13px]">Se texto <b>{d.operator ?? "contains"}</b> “{d.value ?? ""}”</div>
+          <div className="text-[13px] bg-muted/40 rounded-md px-3 py-2">
+            {conditionSummary(d)}
+          </div>
         )}
         {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
         {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
@@ -640,26 +670,49 @@ function Inspector({
           </div>
         )}
 
-        {node.type === "condition" && (
-          <>
-            <div className="space-y-1.5">
-              <Label>Operador</Label>
-              <Select value={d.operator ?? "contains"} onValueChange={(v) => onChange({ operator: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contains">Contém</SelectItem>
-                  <SelectItem value="equals">Igual a</SelectItem>
-                  <SelectItem value="starts_with">Começa com</SelectItem>
-                  <SelectItem value="regex">Regex</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Valor</Label>
-              <Input value={d.value ?? ""} onChange={(e) => onChange({ value: e.target.value })} />
-            </div>
-          </>
-        )}
+        {node.type === "condition" && (() => {
+          const opt = conditionOption(d.operator);
+          return (
+            <>
+              <div className="space-y-1.5">
+                <Label>Condição</Label>
+                <Select
+                  value={opt.value}
+                  onValueChange={(v) => {
+                    const next = conditionOption(v);
+                    onChange({ operator: v, value: next.needsValue ? (d.value ?? "") : "" });
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {CONDITION_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {opt.needsValue && (
+                <div className="space-y-1.5">
+                  <Label>Valor</Label>
+                  <Input
+                    type={opt.needsValue === "number" ? "number" : "text"}
+                    value={d.value ?? ""}
+                    onChange={(e) => onChange({ value: e.target.value })}
+                    placeholder={
+                      opt.value === "text_word_count_gte" ? "Ex: 5"
+                      : opt.value === "text_regex" ? "Ex: ^oi"
+                      : opt.value === "button_id_equals" ? "ID do botão"
+                      : "Ex: preço"
+                    }
+                  />
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Saída <b className="text-emerald-500">verdadeiro</b> se a condição bater, senão <b className="text-red-500">falso</b>.
+              </p>
+            </>
+          );
+        })()}
 
         {node.type === "trigger" && (
           <p className="text-xs text-muted-foreground">Configure os gatilhos no painel esquerdo. Conecte a saída deste nó pro primeiro bloco do fluxo.</p>
@@ -678,7 +731,7 @@ function defaultDataFor(type: string, label: string): any {
     case "send_buttons": return { text: "Escolha uma opção:", buttons: [{ id: `btn-${Date.now()}-1`, label: "Opção 1" }] };
     case "wait_message": return { timeoutSeconds: 86400 };
     case "delay": return { seconds: 2 };
-    case "condition": return { operator: "contains", value: "" };
+    case "condition": return { operator: "text_contains", value: "" };
     case "send_document": return { mediaUrl: "", filename: "" };
     default: return { label };
   }

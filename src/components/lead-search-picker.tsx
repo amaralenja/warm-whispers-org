@@ -16,9 +16,15 @@ const QUIZ_SUPABASE_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
 
-const quizSb = createClient(QUIZ_SUPABASE_URL, QUIZ_ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+let _quizSb: ReturnType<typeof createClient> | null = null;
+function getQuizSb() {
+  if (!_quizSb) {
+    _quizSb = createClient(QUIZ_SUPABASE_URL, QUIZ_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return _quizSb;
+}
 
 export type PickedLead = {
   id: string;
@@ -45,7 +51,7 @@ export function LeadSearchPicker({
     setLoading(true);
     try {
       const isEmail = t.includes("@");
-      let q = quizSb
+      let q = getQuizSb()
         .from("leads")
         .select("id,nome,email,whatsapp")
         .order("data_criacao", { ascending: false })
