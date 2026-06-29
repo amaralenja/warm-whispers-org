@@ -466,7 +466,7 @@ function ChatPage() {
               </div>
 
               <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
-                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-[26px] border border-chat-line bg-chat-thread p-2 shadow-[0_18px_44px_color-mix(in_oklab,var(--background)_45%,transparent)]">
+                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
