@@ -245,8 +245,12 @@ function WhatsAppPage() {
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => createMut.mutate({ name, operacaoId: newOp })}
-                  disabled={!name.trim() || !newOp || createMut.isPending}
+                  onClick={() => {
+                    if (!name.trim()) return toast.error("Informe o nome da conexão");
+                    if (!newOp) return toast.error("Selecione uma operação");
+                    createMut.mutate({ name: name.trim(), operacaoId: newOp });
+                  }}
+                  disabled={createMut.isPending}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white"
                 >
                   {createMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
