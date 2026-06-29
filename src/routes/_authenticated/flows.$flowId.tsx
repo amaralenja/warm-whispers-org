@@ -737,6 +737,70 @@ function Inspector({
           );
         })()}
 
+        {node.type === "random" && (() => {
+          const outs: Array<{ id: string; weight: number }> = Array.isArray(d.outputs) ? d.outputs : [];
+          const total = outs.reduce((a, o) => a + Math.max(0, Number(o.weight ?? 0)), 0);
+          function setCount(n: number) {
+            const count = Math.max(2, Math.min(10, n));
+            const equal = Math.floor((100 / count) * 100) / 100;
+            const next: Array<{ id: string; weight: number }> = [];
+            for (let i = 0; i < count; i++) {
+              const prev = outs[i];
+              next.push({
+                id: prev?.id ?? `r-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
+                weight: equal,
+              });
+            }
+            // Ajusta resto pra somar 100
+            const diff = 100 - next.reduce((a, o) => a + o.weight, 0);
+            next[next.length - 1].weight = Math.round((next[next.length - 1].weight + diff) * 100) / 100;
+            onChange({ outputs: next });
+          }
+          function setWeight(i: number, v: number) {
+            const arr = outs.map((o) => ({ ...o }));
+            arr[i].weight = Math.max(0, Math.min(100, Number.isFinite(v) ? v : 0));
+            onChange({ outputs: arr });
+          }
+          function distributeEqually() {
+            setCount(outs.length || 2);
+          }
+          return (
+            <>
+              <div className="space-y-1.5">
+                <Label>Número de saídas (2 a 10)</Label>
+                <Input
+                  type="number" min={2} max={10}
+                  value={outs.length || 2}
+                  onChange={(e) => setCount(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Probabilidades (%)</Label>
+                  <Button type="button" size="sm" variant="ghost" onClick={distributeEqually} className="h-6 text-xs">
+                    Distribuir igualmente
+                  </Button>
+                </div>
+                {outs.map((o, i) => (
+                  <div key={o.id} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16">Saída {i + 1}</span>
+                    <Input
+                      type="number" min={0} max={100} step={0.1}
+                      value={o.weight}
+                      onChange={(e) => setWeight(i, Number(e.target.value))}
+                      className="h-8"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                ))}
+                <p className={`text-[11px] ${Math.abs(total - 100) < 0.5 ? "text-muted-foreground" : "text-amber-500"}`}>
+                  Total: {total.toFixed(1)}% {Math.abs(total - 100) >= 0.5 && "— pesos serão normalizados na execução"}
+                </p>
+              </div>
+            </>
+          );
+        })()}
+
         {node.type === "trigger" && (
           <p className="text-xs text-muted-foreground">Configure os gatilhos no painel esquerdo. Conecte a saída deste nó pro primeiro bloco do fluxo.</p>
         )}
@@ -755,6 +819,11 @@ function defaultDataFor(type: string, label: string): any {
     case "wait_message": return { timeoutSeconds: 86400 };
     case "delay": return { seconds: 2 };
     case "condition": return { operator: "text_contains", value: "" };
+    case "random": {
+      const a = `r-${Date.now()}-a`;
+      const b = `r-${Date.now()}-b`;
+      return { outputs: [{ id: a, weight: 50 }, { id: b, weight: 50 }] };
+    }
     case "send_document": return { mediaUrl: "", filename: "" };
     default: return { label };
   }
