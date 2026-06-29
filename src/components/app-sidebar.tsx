@@ -16,6 +16,8 @@ import {
   ChevronDown,
   MessageCircle,
   MessagesSquare,
+  Workflow,
+
 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +51,9 @@ const mainItems: Item[] = [
   { title: "CRM Leads X1", url: "/crm", icon: Users },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
+  { title: "Fluxos", url: "/flows", icon: Workflow },
 ];
+
 
 
 const highTicketItems: Item[] = [
