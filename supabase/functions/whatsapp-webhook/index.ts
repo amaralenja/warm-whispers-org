@@ -57,6 +57,46 @@ function extractMedia(m: any) {
   };
 }
 
+// Baixa a mídia direto do Meta Graph com o token do canal e devolve bytes + mime.
+async function downloadMetaMedia(token: string, mediaId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  try {
+    // 1) pega URL da mídia
+    const metaRes = await fetch(`https://graph.facebook.com/v23.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!metaRes.ok) {
+      console.warn("[wa-webhook] meta media metadata HTTP", metaRes.status, await metaRes.text().catch(() => ""));
+      return null;
+    }
+    const meta = await metaRes.json();
+    const url = meta?.url as string | undefined;
+    const mime = (meta?.mime_type as string | undefined) ?? "application/octet-stream";
+    if (!url) return null;
+    // 2) baixa os bytes (Meta exige o mesmo Bearer)
+    const fileRes = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!fileRes.ok) {
+      console.warn("[wa-webhook] meta media download HTTP", fileRes.status);
+      return null;
+    }
+    const buf = new Uint8Array(await fileRes.arrayBuffer());
+    return { bytes: buf, mime };
+  } catch (e) {
+    console.warn("[wa-webhook] downloadMetaMedia erro", (e as any)?.message ?? e);
+    return null;
+  }
+}
+
+function extToMime(mime: string) {
+  const m = mime.split(";")[0].trim().toLowerCase();
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+    "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac", "audio/wav": "wav",
+    "video/mp4": "mp4", "video/3gpp": "3gp", "video/quicktime": "mov",
+    "application/pdf": "pdf",
+  };
+  return map[m] ?? (m.split("/")[1] || "bin");
+}
+
 const APP_SOURCE = "lovable-crm";
 const EVOHUB_BASE = "https://api.evohub.ai";
 const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
