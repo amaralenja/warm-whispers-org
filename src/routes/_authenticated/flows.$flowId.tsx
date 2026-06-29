@@ -48,6 +48,7 @@ const NODE_META: Record<string, { label: string; icon: any; color: string; descr
   wait_message:   { label: "Esperar Mensagem", icon: Clock,              color: "#eab308", description: "Pausa até o contato responder" },
   delay:          { label: "Aguardar",         icon: Clock,              color: "#94a3b8", description: "Espera N segundos" },
   condition:      { label: "Condição",         icon: GitBranch,          color: "#f97316", description: "Ramifica se/senão" },
+  random:         { label: "Randomização",     icon: Shuffle,            color: "#8b5cf6", description: "Escolhe uma saída aleatória por probabilidade" },
   end:            { label: "Fim",              icon: StopIcon,           color: "#ef4444", description: "Encerra o fluxo" },
 };
 
