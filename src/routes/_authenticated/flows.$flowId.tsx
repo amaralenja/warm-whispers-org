@@ -670,26 +670,49 @@ function Inspector({
           </div>
         )}
 
-        {node.type === "condition" && (
-          <>
-            <div className="space-y-1.5">
-              <Label>Operador</Label>
-              <Select value={d.operator ?? "contains"} onValueChange={(v) => onChange({ operator: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contains">Contém</SelectItem>
-                  <SelectItem value="equals">Igual a</SelectItem>
-                  <SelectItem value="starts_with">Começa com</SelectItem>
-                  <SelectItem value="regex">Regex</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Valor</Label>
-              <Input value={d.value ?? ""} onChange={(e) => onChange({ value: e.target.value })} />
-            </div>
-          </>
-        )}
+        {node.type === "condition" && (() => {
+          const opt = conditionOption(d.operator);
+          return (
+            <>
+              <div className="space-y-1.5">
+                <Label>Condição</Label>
+                <Select
+                  value={opt.value}
+                  onValueChange={(v) => {
+                    const next = conditionOption(v);
+                    onChange({ operator: v, value: next.needsValue ? (d.value ?? "") : "" });
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {CONDITION_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {opt.needsValue && (
+                <div className="space-y-1.5">
+                  <Label>Valor</Label>
+                  <Input
+                    type={opt.needsValue === "number" ? "number" : "text"}
+                    value={d.value ?? ""}
+                    onChange={(e) => onChange({ value: e.target.value })}
+                    placeholder={
+                      opt.value === "text_word_count_gte" ? "Ex: 5"
+                      : opt.value === "text_regex" ? "Ex: ^oi"
+                      : opt.value === "button_id_equals" ? "ID do botão"
+                      : "Ex: preço"
+                    }
+                  />
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Saída <b className="text-emerald-500">verdadeiro</b> se a condição bater, senão <b className="text-red-500">falso</b>.
+              </p>
+            </>
+          );
+        })()}
 
         {node.type === "trigger" && (
           <p className="text-xs text-muted-foreground">Configure os gatilhos no painel esquerdo. Conecte a saída deste nó pro primeiro bloco do fluxo.</p>
