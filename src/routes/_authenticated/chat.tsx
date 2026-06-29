@@ -540,17 +540,21 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
   const isOut = msg.direction === "out";
+  const body = toText(msg.text_body);
+  const caption = toText(msg.caption);
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[70%] rounded-lg px-3 py-2 shadow-sm ${
-          isOut ? "bg-emerald-500/90 text-white" : "bg-card border border-border"
+        className={`max-w-[min(74%,760px)] overflow-hidden rounded-[24px] border px-4 py-3 shadow-[0_12px_28px_color-mix(in_oklab,var(--background)_32%,transparent)] ${
+          isOut
+            ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
+            : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
         }`}
       >
         <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} outgoing={isOut} />
-        {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
-        {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
-        <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
+        {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
+        {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
+        <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
           <span>{formatTime(msg.created_at)}</span>
           {isOut && <StatusTick status={msg.status} />}
         </div>
@@ -568,28 +572,28 @@ function MediaContent({ msg, mediaState, onLoadMedia, outgoing }: { msg: Msg; me
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
     if (mediaState?.error) {
-      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} />;
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
       return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} />;
     }
     if (mediaState?.loading) {
-      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading />;
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading outgoing={outgoing} />;
     }
     if (msg.msg_type === "document") {
       return (
         <button
           type="button"
           onClick={onLoadMedia}
-          className="flex items-center gap-2 bg-background/30 rounded px-2 py-1.5 text-sm hover:bg-background/50"
+          className="mb-1 flex min-w-64 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-medium transition hover:bg-background/40"
         >
-          <Download className="h-4 w-4" /> {msg.media_filename || "Baixar documento"}
+          <Download className="h-5 w-5" /> {msg.media_filename || "Baixar documento"}
         </button>
       );
     }
-    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} />;
+    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} outgoing={outgoing} />;
   }
-  return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} />;
+  return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} outgoing={outgoing} />;
 }
 
 function MediaPlaceholder({
@@ -598,20 +602,22 @@ function MediaPlaceholder({
   loading,
   error,
   onRetry,
+  outgoing,
 }: {
   type: string;
   filename: string | null;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  outgoing?: boolean;
 }) {
   const icon = type === "image" || type === "sticker"
-    ? <ImageIcon className="h-4 w-4" />
+    ? <ImageIcon className="h-5 w-5" />
     : type === "video"
-      ? <Video className="h-4 w-4" />
+      ? <Video className="h-5 w-5" />
       : type === "audio"
-        ? <Mic className="h-4 w-4" />
-        : <FileText className="h-4 w-4" />;
+        ? <Mic className="h-5 w-5" />
+        : <FileText className="h-5 w-5" />;
   const label = type === "image" ? "Imagem"
     : type === "sticker" ? "Figurinha"
     : type === "video" ? "Vídeo"
@@ -619,20 +625,25 @@ function MediaPlaceholder({
     : filename || "Documento";
 
   return (
-    <div className="mb-1 min-w-[220px] rounded-md border border-border/70 bg-background/40 p-2 text-sm">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="font-medium">{loading ? "Carregando mídia…" : label}</span>
+    <div className={`mb-1 min-w-[280px] rounded-2xl border p-4 text-sm ${outgoing ? "border-chat-accent/25 bg-background/10" : "border-chat-line bg-background/25"}`}>
+      <div className="flex items-center gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-chat-soft text-chat-accent">
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold">{loading ? "Carregando mídia…" : label}</div>
+          {loading && <div className="mt-0.5 text-xs opacity-70">Processando arquivo recebido</div>}
+        </div>
       </div>
       {error && (
-        <p className="mt-1 text-xs text-destructive break-words">
+        <p className="mt-3 break-words rounded-xl bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
           {error.includes("Meta token")
             ? "O EvoHub recebeu a mídia, mas esse canal está sem token Meta ativo. Reabra/reconecte o número na EvoHub."
             : error}
         </p>
       )}
       {!loading && onRetry && (
-        <button type="button" onClick={onRetry} className="mt-2 text-xs underline underline-offset-2">
+        <button type="button" onClick={onRetry} className="mt-3 rounded-full border border-chat-line px-3 py-1.5 text-xs font-semibold transition hover:bg-chat-soft">
           Tentar carregar
         </button>
       )}
@@ -644,27 +655,42 @@ function RenderMedia({
   type, url, mime, filename, outgoing,
 }: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean }) {
   if (type === "image" || type === "sticker") {
-    return <img src={url} alt={filename ?? ""} className={`rounded mb-1 ${type === "sticker" ? "max-w-[120px]" : "max-w-full"}`} />;
+    return (
+      <img
+        src={url}
+        alt={filename ?? (type === "sticker" ? "Figurinha recebida" : "Imagem recebida")}
+        loading="lazy"
+        className={`mb-2 block rounded-2xl border border-chat-line object-contain ${type === "sticker" ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
+      />
+    );
   }
   if (type === "video") {
-    return <video src={url} controls className="rounded mb-1 max-w-full" />;
+    return <video src={url} controls className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
   if (type === "audio") {
     return <WhatsappAudioPlayer url={url} outgoing={outgoing} />;
   }
   if (type === "document") {
     return (
-      <a href={url} download={filename ?? "documento"} className="flex items-center gap-2 underline text-sm">
-        <FileText className="h-4 w-4" /> {filename ?? "Documento"}
+      <a href={url} download={filename ?? "documento"} className="mb-1 flex min-w-72 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-semibold transition hover:bg-background/40">
+        <FileText className="h-5 w-5 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{filename ?? "Documento"}</span>
+        <Download className="h-4 w-4 shrink-0" />
       </a>
     );
   }
   return null;
 }
 
-function FlowDispatcher({ conversation }: { conversation: Conv }) {
-  const listFlowsFn = useServerFn(listFlows);
-  const triggerFn = useServerFn(triggerFlowManually);
+function FlowDispatcher({
+  conversation,
+  listFlowsFn,
+  triggerFn,
+}: {
+  conversation: Conv;
+  listFlowsFn: any;
+  triggerFn: any;
+}) {
   const [open, setOpen] = useState(false);
   const [firing, setFiring] = useState<string | null>(null);
 
@@ -708,12 +734,12 @@ function FlowDispatcher({ conversation }: { conversation: Conv }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Zap className="h-4 w-4 text-emerald-500" />
+        <Button variant="outline" size="sm" className="h-11 rounded-2xl border-chat-line bg-chat-thread px-4 font-semibold hover:bg-chat-soft">
+          <Zap className="mr-2 h-4 w-4 text-chat-accent" />
           Disparar fluxo
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
+      <DropdownMenuContent align="end" className="w-80 rounded-2xl border-chat-line bg-popover p-2">
         {compatible.length === 0 ? (
           <div className="px-3 py-4 text-xs text-muted-foreground text-center">
             Nenhum fluxo ativo compatível com esta operação.
@@ -724,9 +750,9 @@ function FlowDispatcher({ conversation }: { conversation: Conv }) {
               key={f.id}
               disabled={firing === f.id}
               onSelect={(e) => { e.preventDefault(); fire(f.id); }}
-              className="flex items-start gap-2"
+              className="flex items-start gap-3 rounded-xl p-3"
             >
-              <Zap className="h-3.5 w-3.5 mt-0.5 text-emerald-500 shrink-0" />
+              <Zap className="mt-0.5 h-4 w-4 shrink-0 text-chat-accent" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{f.nome}</div>
                 {f.operacao_id && (
