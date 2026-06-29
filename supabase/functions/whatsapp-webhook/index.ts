@@ -140,6 +140,7 @@ function toChannelInfo(c: any, fallbackOperacao?: string | null): ChannelInfo | 
       : (typeof meta.operacao_id === "string" && meta.operacao_id) ? meta.operacao_id
       : fallbackOperacao ?? null,
     display_phone_number: info.displayPhoneNumber ? String(info.displayPhoneNumber) : null,
+    token: c.token ? String(c.token) : null,
   };
 }
 
