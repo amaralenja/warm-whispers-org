@@ -547,7 +547,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[min(74%,760px)] overflow-hidden rounded-[24px] border px-4 py-3 shadow-[0_12px_28px_color-mix(in_oklab,var(--background)_32%,transparent)] ${
+        className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
           isOut
             ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
             : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
