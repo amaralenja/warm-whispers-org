@@ -40,6 +40,7 @@ import {
   downloadIncomingMediaBase64,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
+import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
