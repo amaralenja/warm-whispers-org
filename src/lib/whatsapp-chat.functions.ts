@@ -47,15 +47,73 @@ async function metaProxy(channelToken: string, path: string, init?: RequestInit)
   return body;
 }
 
+async function rawMetaProxy(channelToken: string, path: string, init?: RequestInit) {
+  const res = await fetch(`${EVOHUB_BASE}/meta${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${channelToken}`,
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+  const text = await res.text();
+  let body: any = null;
+  try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+  return { ok: res.ok, status: res.status, body };
+}
+
 async function findChannel(channelId: string) {
   // Loads all channels and finds by id (small N, fine for now)
   const data = await evoApi("/api/v1/channels");
   const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
-  const ch = list.find((c) => c.id === channelId);
+  const fromList = list.find((c) => c.id === channelId);
+  if (!fromList) throw new Error("Canal não encontrado");
+  const ch = await evoApi(`/api/v1/channels/${channelId}`).catch(() => fromList);
   if (!ch) throw new Error("Canal não encontrado");
   const metaConnection = ch?.meta_connection ?? ch?.metadata?.meta_connection ?? null;
   const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id;
   return { token: ch.token as string, phoneNumberId: phoneNumberId as string | undefined, raw: ch };
+}
+
+async function findUsableMetaToken(phoneNumberId: string, preferredToken?: string) {
+  if (preferredToken) {
+    const probe = await rawMetaProxy(preferredToken, `/v23.0/${phoneNumberId}?fields=id`).catch(() => null);
+    if (probe?.ok) return preferredToken;
+  }
+
+  const data = await evoApi("/api/v1/channels");
+  const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
+  for (const row of list) {
+    const detail = await evoApi(`/api/v1/channels/${row.id}`).catch(() => row);
+    const token = detail?.token ? String(detail.token) : "";
+    if (!token || token === preferredToken) continue;
+    const probe = await rawMetaProxy(token, `/v23.0/${phoneNumberId}?fields=id`).catch(() => null);
+    if (probe?.ok) return token;
+  }
+
+  return preferredToken ?? "";
+}
+
+async function metaProxyForChannel(ch: { token: string; phoneNumberId?: string }, path: string, init?: RequestInit) {
+  try {
+    return { body: await metaProxy(ch.token, path, init), token: ch.token };
+  } catch (err: any) {
+    if (!ch.phoneNumberId) throw err;
+    const message = err?.message ? String(err.message) : "";
+    const canRetry =
+      message.includes("Meta token not available") ||
+      message.includes("Unsupported get request") ||
+      message.includes("missing permissions") ||
+      message.includes("OAuth") ||
+      message.includes("401") ||
+      message.includes("400") ||
+      message.includes("500");
+    if (!canRetry) throw err;
+
+    const token = await findUsableMetaToken(ch.phoneNumberId, ch.token);
+    if (!token || token === ch.token) throw err;
+    return { body: await metaProxy(token, path, init), token };
+  }
 }
 
 // --- DB reads ---
@@ -148,7 +206,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };
     }
 
-    const resp = await metaProxy(ch.token, `/v23.0/${ch.phoneNumberId}/messages`, {
+    const { body: resp } = await metaProxyForChannel(ch, `/v23.0/${ch.phoneNumberId}/messages`, {
       method: "POST",
       body: JSON.stringify(body),
     });
@@ -205,7 +263,7 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const ch = await findChannel(data.channelId);
-    const resp = await metaProxy(ch.token, `/v23.0/${data.mediaId}`);
+    const { body: resp } = await metaProxyForChannel(ch, `/v23.0/${data.mediaId}`);
     return { url: resp?.url as string | undefined, mime: resp?.mime_type as string | undefined };
   });
 
@@ -218,11 +276,11 @@ export const downloadIncomingMediaBase64 = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const ch = await findChannel(data.channelId);
-    const meta = await metaProxy(ch.token, `/v23.0/${data.mediaId}`);
+    const { body: meta, token } = await metaProxyForChannel(ch, `/v23.0/${data.mediaId}`);
     const url = meta?.url as string | undefined;
     const mime = (meta?.mime_type as string | undefined) ?? "application/octet-stream";
     if (!url) throw new Error("URL de mídia não encontrada");
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${ch.token}` } });
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(`Download mídia falhou (${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());
     return { base64: buf.toString("base64"), mime };
