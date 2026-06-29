@@ -890,8 +890,67 @@ function Inspector({
         {node.type === "end" && (
           <p className="text-xs text-muted-foreground">Encerra a execução do fluxo neste ponto.</p>
         )}
+        {node.type === "tag_action" && <TagActionInspector d={d} onChange={onChange} />}
       </div>
     </aside>
+  );
+}
+
+function TagActionInspector({ d, onChange }: { d: any; onChange: (patch: any) => void }) {
+  const { data: tags = [], isLoading } = useCrmTags(undefined);
+  const addSet = new Set<string>(d.addTags ?? []);
+  const removeSet = new Set<string>(d.removeTags ?? []);
+  const toggle = (set: Set<string>, id: string) => {
+    const next = new Set(set);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return Array.from(next);
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-muted-foreground">
+        Ações opcionais. Configura uma ou as duas — o bloco aplica ao lead do CRM (matching pelo telefone).
+      </p>
+      {isLoading && <p className="text-xs">Carregando etiquetas…</p>}
+      {!isLoading && tags.length === 0 && (
+        <p className="text-xs text-amber-600">Nenhuma etiqueta criada ainda. Vá no CRM → Etiquetas.</p>
+      )}
+      {tags.length > 0 && (
+        <>
+          <div>
+            <Label className="text-xs text-emerald-600">➕ Adicionar etiquetas</Label>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {tags.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onChange({ addTags: toggle(addSet, t.id) })}
+                  className={`px-2 py-1 rounded-md text-xs border ${addSet.has(t.id) ? "ring-2 ring-emerald-500" : "opacity-60 hover:opacity-100"}`}
+                  style={{ backgroundColor: t.cor, color: "white", borderColor: t.cor }}
+                >
+                  {t.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs text-rose-600">➖ Remover etiquetas</Label>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {tags.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onChange({ removeTags: toggle(removeSet, t.id) })}
+                  className={`px-2 py-1 rounded-md text-xs border ${removeSet.has(t.id) ? "ring-2 ring-rose-500" : "opacity-60 hover:opacity-100"}`}
+                  style={{ backgroundColor: t.cor, color: "white", borderColor: t.cor }}
+                >
+                  {t.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
