@@ -476,7 +476,9 @@ function ChatPage() {
   );
 }
 
-function MessageBubble({ msg, onDownloadMedia }: { msg: Msg; onDownloadMedia: (msg: Msg) => Promise<{ url: string; mime: string }> }) {
+type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
+
+function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
   const isOut = msg.direction === "out";
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
@@ -485,7 +487,7 @@ function MessageBubble({ msg, onDownloadMedia }: { msg: Msg; onDownloadMedia: (m
           isOut ? "bg-emerald-500/90 text-white" : "bg-card border border-border"
         }`}
       >
-        <MediaContent msg={msg} onDownloadMedia={onDownloadMedia} />
+        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} />
         {toText(msg.text_body) && <p className="text-sm whitespace-pre-wrap break-words">{toText(msg.text_body)}</p>}
         {toText(msg.caption) && <p className="text-xs mt-1 opacity-90">{toText(msg.caption)}</p>}
         <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isOut ? "text-white/80" : "text-muted-foreground"}`}>
@@ -497,7 +499,7 @@ function MessageBubble({ msg, onDownloadMedia }: { msg: Msg; onDownloadMedia: (m
   );
 }
 
-function MediaContent({ msg, onDownloadMedia }: { msg: Msg; onDownloadMedia: (msg: Msg) => Promise<{ url: string; mime: string }> }) {
+function MediaContent({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
   if (msg.msg_type === "text") return null;
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
@@ -505,67 +507,29 @@ function MediaContent({ msg, onDownloadMedia }: { msg: Msg; onDownloadMedia: (ms
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
-    return <IncomingMedia msg={msg} onDownloadMedia={onDownloadMedia} />;
+    if (mediaState?.error) {
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} />;
+    }
+    if (mediaState?.url) {
+      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} />;
+    }
+    if (mediaState?.loading) {
+      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading />;
+    }
+    if (msg.msg_type === "document") {
+      return (
+        <button
+          type="button"
+          onClick={onLoadMedia}
+          className="flex items-center gap-2 bg-background/30 rounded px-2 py-1.5 text-sm hover:bg-background/50"
+        >
+          <Download className="h-4 w-4" /> {msg.media_filename || "Baixar documento"}
+        </button>
+      );
+    }
+    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} onRetry={onLoadMedia} />;
   }
   return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} />;
-}
-
-function IncomingMedia({ msg, onDownloadMedia }: { msg: Msg; onDownloadMedia: (msg: Msg) => Promise<{ url: string; mime: string }> }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [mime, setMime] = useState<string | null>(msg.media_mime);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function load() {
-    if (url || loading || !msg.media_id) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await onDownloadMedia(msg);
-      setUrl(res.url);
-      setMime(res.mime);
-    } catch (e: any) {
-      const msgError = e?.message ? String(e.message) : "Não foi possível carregar a mídia";
-      setError(msgError);
-      toast.error("Erro ao baixar mídia: " + msgError);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    // Auto-load images/audio/videos/stickers; documents on click.
-    if (msg.msg_type === "image" || msg.msg_type === "audio" || msg.msg_type === "video" || msg.msg_type === "sticker") {
-      load();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [msg.id]);
-
-  if (error) {
-    return (
-      <MediaPlaceholder
-        type={msg.msg_type}
-        filename={msg.media_filename}
-        error={error}
-        onRetry={load}
-      />
-    );
-  }
-
-  if (!url && !loading && msg.msg_type === "document") {
-    return (
-      <button
-        onClick={load}
-        className="flex items-center gap-2 bg-background/30 rounded px-2 py-1.5 text-sm hover:bg-background/50"
-      >
-        <Download className="h-4 w-4" /> {msg.media_filename || "Baixar documento"}
-      </button>
-    );
-  }
-
-  if (loading) return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading />;
-  if (!url) return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} onRetry={load} />;
-  return <RenderMedia type={msg.msg_type} url={url} mime={mime} filename={msg.media_filename} />;
 }
 
 function MediaPlaceholder({
