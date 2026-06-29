@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { getFlow, saveFlow, saveTriggers, triggerFlowManually } from "@/lib/flow-engine.functions";
+import { listWhatsappChannels } from "@/lib/evohub.functions";
 
 export const Route = createFileRoute("/_authenticated/flows/$flowId")({
   component: FlowEditorPage,
