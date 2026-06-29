@@ -100,13 +100,19 @@ function WhatsAppPage() {
   const createMut = useMutation({
     mutationFn: (vars: { name: string; operacaoId: string }) =>
       createFn({ data: vars }),
-    onSuccess: () => {
-      toast.success("Conexão criada! Compartilhe o link pra ativar.");
+    onSuccess: (ch) => {
+      toast.success("Conexão criada! Abrindo link da EvoHub…");
       setName("");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
+      if (ch?.connectUrl) {
+        window.open(ch.connectUrl, "_blank", "noopener,noreferrer");
+      }
     },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao criar conexão"),
+    onError: (e: any) => {
+      console.error("[whatsapp:create]", e);
+      toast.error(e?.message ?? "Erro ao criar conexão");
+    },
   });
 
   const deleteMut = useMutation({
