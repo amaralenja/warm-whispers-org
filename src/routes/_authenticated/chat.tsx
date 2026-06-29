@@ -263,7 +263,7 @@ function ChatPage() {
     };
   }
 
-  async function loadMedia(msg: Msg) {
+  async function loadMedia(msg: Msg, opts?: { silent?: boolean }) {
     if (!msg.media_id) return;
     const cached = mediaCache[msg.id];
     if (cached?.url || cached?.loading) return;
@@ -273,13 +273,19 @@ function ChatPage() {
       setMediaCache((prev) => ({ ...prev, [msg.id]: { url: res.url, mime: res.mime, loading: false } }));
     } catch (e: any) {
       const error = e?.message ? String(e.message) : "Não foi possível carregar a mídia";
-      setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: false, error } }));
-      toast.error("Erro ao baixar mídia: " + error);
+      // Em mensagens recentes (webhook ainda processando), não mostra erro — só mantém loading silencioso
+      if (opts?.silent) {
+        setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: false } }));
+      } else {
+        setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: false, error } }));
+        toast.error("Erro ao baixar mídia: " + error);
+      }
     }
   }
 
   useEffect(() => {
     const list = (messages as unknown as Msg[]) ?? [];
+    const now = Date.now();
     for (const msg of list) {
       if (
         !msg.media_url &&
@@ -289,11 +295,15 @@ function ChatPage() {
         !mediaCache[msg.id]?.loading &&
         !mediaCache[msg.id]?.error
       ) {
-        loadMedia(msg);
+        // Aguarda 8s pra mensagens novas — webhook ainda pode estar baixando/uploadando
+        const ageMs = now - new Date(msg.created_at as any).getTime();
+        if (ageMs < 8000) continue;
+        loadMedia(msg, { silent: ageMs < 30000 });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
+
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] w-full bg-background overflow-hidden">
@@ -527,7 +537,7 @@ function MediaContent({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?:
         </button>
       );
     }
-    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} onRetry={onLoadMedia} />;
+    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} />;
   }
   return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} />;
 }
