@@ -486,6 +486,7 @@ function CRMPage() {
       />
 
       <ApiKeysDialog open={apiKeysOpen} onClose={() => setApiKeysOpen(false)} />
+      <TagsManagerDialog open={tagsOpen} onOpenChange={setTagsOpen} operacao={workspace?.id ?? "all"} />
     </div>
   );
 }
