@@ -26,6 +26,7 @@ type Vendedor = {
   foto_url: string | null;
   meta: number | null;
   genero: string | null;
+  codigo: string | null;
 };
 
 const BRL = (n: number) =>
@@ -40,18 +41,40 @@ function initials(s: string | null) {
 function VendedoresPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ["vendedores-list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendedores")
-        .select("id, utm, nome, expert, ativo, foto_url, meta, genero")
+        .select("id, utm, nome, expert, ativo, foto_url, meta, genero, codigo")
         .order("nome", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Vendedor[];
     },
   });
+
+  async function regenerateCode(id: number) {
+    const { data: newCode, error: rpcErr } = await supabase.rpc("generate_vendedor_codigo");
+    if (rpcErr || !newCode) {
+      toast.error("Falha ao gerar código");
+      return;
+    }
+    const { error } = await supabase.from("vendedores").update({ codigo: newCode }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Novo código: ${newCode}`);
+    qc.invalidateQueries({ queryKey: ["vendedores-list"] });
+  }
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code);
+    toast.success(`Código ${code} copiado`);
+  }
+
 
   const filtered = useMemo(() => {
     const list = data ?? [];
