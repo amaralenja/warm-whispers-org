@@ -40,6 +40,7 @@ import {
   CheckCircle2,
   XCircle,
   DollarSign,
+  Wallet,
   Eye,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -97,22 +98,34 @@ type Lead = {
   origem: string | null;
 };
 
-const TICKET_TIERS: Record<string, { label: string; cls: string }> = {
-  A: { label: "Até R$ 1k", cls: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
-  B: { label: "R$ 1k–5k", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
-  C: { label: "R$ 5k–10k", cls: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" },
-  D: { label: "R$ 10k–30k", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
-  E: { label: "R$ 30k–50k", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
-  F: { label: "R$ 50k–100k", cls: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
-  G: { label: "R$ 100k+", cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40" },
+const TICKET_TIERS: Record<string, { label: string; cls: string; weight: number }> = {
+  A: { label: "Até R$ 1k",      cls: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",                 weight: 1 },
+  B: { label: "R$ 1k–5k",       cls: "bg-blue-500/15 text-blue-300 border-blue-500/30",                 weight: 2 },
+  C: { label: "R$ 5k–10k",      cls: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",                 weight: 3 },
+  D: { label: "R$ 10k–30k",     cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",       weight: 4 },
+  E: { label: "R$ 30k–50k",     cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",             weight: 5 },
+  F: { label: "R$ 50k–100k",    cls: "bg-orange-500/15 text-orange-300 border-orange-500/30",          weight: 6 },
+  G: { label: "R$ 100k+",       cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40 shadow-[0_0_20px_-5px_rgba(234,179,8,0.6)]", weight: 7 },
 };
 
-function ticketLabel(l: Lead): string {
-  const fat = (l.faturamento ?? "").trim();
-  if (fat) return fat;
+// Caixa = capital disponível que a pessoa declarou ter (não é faturamento desejado)
+function caixaLabel(l: Lead): string {
+  const fromLabel = (l.caixa_label ?? "").trim();
+  if (fromLabel) return fromLabel;
+  const fromJson = ((l.respostas_json as Record<string, unknown> | null)?.caixa ?? "") as string;
+  if (typeof fromJson === "string" && fromJson.trim()) return fromJson.trim();
   const letter = (l.caixa_letra ?? "").toUpperCase();
   return TICKET_TIERS[letter]?.label ?? "—";
 }
+
+function caixaWeight(l: Lead): number {
+  const letter = (l.caixa_letra ?? "").toUpperCase();
+  return TICKET_TIERS[letter]?.weight ?? 0;
+}
+
+// Mantém o nome antigo pra não quebrar referências
+const ticketLabel = caixaLabel;
+
 
 type Period = "today" | "yesterday" | "7d" | "15d" | "30d" | "custom" | "all";
 type ViewMode = "kanban" | "list";
@@ -561,7 +574,7 @@ function QuizPage() {
                   <th className="text-left px-3 py-2">Lead</th>
                   <th className="text-left px-3 py-2">Origem</th>
                   <th className="text-left px-3 py-2">Contato</th>
-                  <th className="text-left px-3 py-2">Ticket</th>
+                  <th className="text-left px-3 py-2">Caixa</th>
                   <th className="text-left px-3 py-2">Score</th>
                   <th className="text-left px-3 py-2">Quando</th>
                   <th className="text-left px-3 py-2">Status</th>
@@ -589,7 +602,8 @@ function QuizPage() {
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${tier?.cls ?? "bg-muted text-muted-foreground border-border"}`}>
-                          <DollarSign className="h-3 w-3" /> {ticketLabel(l)}
+                          <Wallet className="h-3 w-3" /> {caixaLabel(l)}
+                          {caixaWeight(l) >= 4 && <span>🔥</span>}
                         </span>
                       </td>
                       <td className="px-3 py-2">
@@ -734,9 +748,12 @@ function LeadCard({
 
       {ticket !== "—" && (
         <div className={`mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold ${tier?.cls ?? "bg-accent/10 text-accent border-accent/30"}`}>
-          <DollarSign className="h-3 w-3" /> {ticket}
+          <Wallet className="h-3 w-3" />
+          <span className="opacity-70">Caixa:</span> {ticket}
+          {caixaWeight(lead) >= 4 && <span className="ml-1">🔥</span>}
         </div>
       )}
+
 
       <div className="mt-2 space-y-0.5 text-xs">
         {lead.email && (
