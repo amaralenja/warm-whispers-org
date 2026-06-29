@@ -12,7 +12,7 @@ type Ctx = {
   contactWaId: string;
   conversationId: string | null;
   variables: Record<string, any>;
-  lastInput?: { text?: string | null; buttonId?: string | null };
+  lastInput?: { text?: string | null; buttonId?: string | null; messageType?: string | null };
 };
 
 type Node = { id: string; type: string; data: any };
