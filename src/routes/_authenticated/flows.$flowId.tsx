@@ -320,10 +320,21 @@ function Editor({ flowId }: { flowId: string }) {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [name, setName] = useState("");
   const [ativo, setAtivo] = useState(false);
+  const [operacaoId, setOperacaoId] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<any[]>([]);
   const [testOpen, setTestOpen] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testChannel, setTestChannel] = useState("");
+
+  const listChannelsFn = useServerFn(listWhatsappChannels);
+  const { data: allChannels = [] } = useQuery({
+    queryKey: ["wa-channels-all"],
+    queryFn: () => listChannelsFn(),
+  });
+  const channels = useMemo(() => {
+    if (!operacaoId) return allChannels as any[];
+    return (allChannels as any[]).filter((c) => String(c?.metadata?.operacao_id ?? "") === String(operacaoId));
+  }, [allChannels, operacaoId]);
 
   // Hydrate from server
   useEffect(() => {
@@ -331,6 +342,7 @@ function Editor({ flowId }: { flowId: string }) {
     const f = flow as any;
     setName(f.nome ?? "");
     setAtivo(f.ativo ?? false);
+    setOperacaoId(f.operacao_id ?? null);
     setNodes((f.nodes ?? []) as Node[]);
     setEdges((f.edges ?? []) as Edge[]);
     setTriggers(f.wa_flow_triggers ?? []);
