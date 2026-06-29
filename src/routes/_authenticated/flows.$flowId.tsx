@@ -273,7 +273,7 @@ function ScissorsEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, 
 const nodeTypes = {
   trigger: CustomNode, send_text: CustomNode, send_image: CustomNode, send_video: CustomNode,
   send_audio: CustomNode, send_document: CustomNode, send_buttons: CustomNode,
-  wait_message: CustomNode, delay: CustomNode, condition: CustomNode, random: CustomNode, end: CustomNode,
+  wait_message: CustomNode, delay: CustomNode, condition: CustomNode, random: CustomNode, tag_action: CustomNode, end: CustomNode,
 };
 
 const edgeTypes = {
