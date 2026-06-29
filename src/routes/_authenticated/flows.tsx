@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/flows")({
 function FlowsListPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { workspace, operacoes } = useWorkspace();
+  const { workspace, workspaces } = useWorkspace();
   const listFn = useServerFn(listFlows);
   const createFn = useServerFn(createFlow);
   const deleteFlowFn = useServerFn(deleteFlow);
@@ -97,7 +97,7 @@ function FlowsListPage() {
                 <Select value={op} onValueChange={setOp}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {operacoes.map((o) => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
+                    {workspaces.filter((o) => o.id !== "all").map((o) => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

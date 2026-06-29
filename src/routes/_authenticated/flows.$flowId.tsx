@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  ReactFlow, ReactFlowProvider, Background, Controls, MiniBar, MiniMap,
+  ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type Connection, type NodeChange, type EdgeChange,
   type NodeProps, Handle, Position,
