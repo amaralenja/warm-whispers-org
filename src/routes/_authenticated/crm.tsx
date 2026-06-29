@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { TagsManagerDialog } from "@/components/tags-manager-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -161,6 +163,7 @@ async function fetchCrmApiLeads(expert: ExpertApiKey) {
 // ---------- Page ----------
 function CRMPage() {
   const qc = useQueryClient();
+  const fireNewLead = useServerFn(fireNewLeadTrigger);
   const { workspace, workspaces } = useWorkspace();
   const isGeral = workspace?.id === "all";
 
@@ -243,9 +246,15 @@ function CRMPage() {
         .map(({ _syncKey, ...lead }) => lead)
         .filter((lead) => lead.nome?.trim());
 
+      let insertedIds: string[] = [];
       if (toInsert.length > 0) {
-        const { error } = await supabase.from("crm_leads").insert(toInsert as any[]);
+        const { data: ins, error } = await supabase.from("crm_leads").insert(toInsert as any[]).select("id");
         if (error) throw error;
+        insertedIds = (ins ?? []).map((r: any) => r.id);
+      }
+      // Fire "new_lead" triggers (non-blocking)
+      for (const id of insertedIds) {
+        fireNewLead({ data: { lead_id: id } }).catch(() => {});
       }
 
       return {
@@ -295,8 +304,9 @@ function CRMPage() {
         const { error } = await supabase.from("crm_leads").update(lead as any).eq("id", lead.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("crm_leads").insert(lead as any);
+        const { data: ins, error } = await supabase.from("crm_leads").insert(lead as any).select("id").single();
         if (error) throw error;
+        if (ins?.id) fireNewLead({ data: { lead_id: ins.id } }).catch(() => {});
       }
     },
     onSuccess: () => {
