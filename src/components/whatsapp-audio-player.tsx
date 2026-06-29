@@ -31,6 +31,10 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
     setDuration(0);
     setCurrent(0);
     setError(null);
+    if (!url || typeof url !== "string" || url.length === 0) {
+      audioRef.current = null;
+      return;
+    }
     const audio = new Audio();
     audio.preload = "metadata";
     audio.src = url;
