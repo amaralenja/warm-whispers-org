@@ -6,12 +6,13 @@ import { toast } from "sonner";
 import {
   ReactFlow, ReactFlowProvider, Background,
   addEdge, applyNodeChanges, applyEdgeChanges,
+  useReactFlow, getBezierPath, EdgeLabelRenderer, BaseEdge,
   type Node, type Edge, type Connection, type NodeChange, type EdgeChange,
-  type NodeProps, Handle, Position,
+  type NodeProps, type EdgeProps, Handle, Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
-  ArrowLeft, Save, Power, PowerOff, Send, Trash2,
+  ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
   MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X,
 } from "lucide-react";
