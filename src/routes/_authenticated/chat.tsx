@@ -236,10 +236,10 @@ function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-1rem)] bg-background">
+    <div className="flex h-[calc(100vh-3.5rem)] w-full bg-background overflow-hidden">
       {/* Sidebar de conversas */}
-      <aside className="w-[340px] border-r border-border flex flex-col">
-        <div className="p-3 border-b border-border space-y-2">
+      <aside className="w-[320px] xl:w-[360px] border-r border-border flex flex-col min-h-0 shrink-0">
+        <div className="p-3 border-b border-border space-y-2 shrink-0">
           <div className="flex items-center gap-2">
             <MessagesSquare className="h-5 w-5 text-emerald-500" />
             <h2 className="font-semibold">Chat ao Vivo</h2>
@@ -302,7 +302,7 @@ function ChatPage() {
       </aside>
 
       {/* Janela do chat */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {!active ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
@@ -312,7 +312,7 @@ function ChatPage() {
           </div>
         ) : (
           <>
-            <header className="px-4 py-3 border-b border-border flex items-center gap-3">
+            <header className="px-4 py-3 border-b border-border flex items-center gap-3 shrink-0 bg-card">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-emerald-500/15 text-emerald-500 font-semibold">
                   {initials(active.contact_name, active.contact_wa_id)}
@@ -327,7 +327,7 @@ function ChatPage() {
 
             <div
               ref={scrollRef}
-              className="flex-1 overflow-y-auto p-4 space-y-2 bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2230%22%20height=%2230%22%3E%3Crect%20width=%2230%22%20height=%2230%22%20fill=%22%23111%22/%3E%3C/svg%3E')]"
+              className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 bg-muted/20"
             >
               {((messages as unknown as Msg[]) ?? []).map((m, i, arr) => {
                 const prev = arr[i - 1];
@@ -347,7 +347,7 @@ function ChatPage() {
               })}
             </div>
 
-            <footer className="p-3 border-t border-border bg-card">
+            <footer className="p-3 border-t border-border bg-card shrink-0">
               <div className="flex items-end gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
