@@ -51,19 +51,57 @@ const NODE_META: Record<string, { label: string; icon: any; color: string; descr
   end:            { label: "Fim",              icon: StopIcon,           color: "#ef4444", description: "Encerra o fluxo" },
 };
 
-function CustomNode({ data, type, selected }: NodeProps) {
+function CustomNode({ id, data, type, selected }: NodeProps) {
+  const rf = useReactFlow();
   const meta = NODE_META[type as string] ?? NODE_META.send_text;
   const Icon = meta.icon;
   const isTrigger = type === "trigger";
   const isEnd = type === "end";
   const isButtons = type === "send_buttons";
   const isCondition = type === "condition";
+  const d = (data as any) ?? {};
+
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    rf.setNodes((ns) => ns.filter((n) => n.id !== id));
+    rf.setEdges((es) => es.filter((ed) => ed.source !== id && ed.target !== id));
+  }
+  function handleDuplicate(e: React.MouseEvent) {
+    e.stopPropagation();
+    const orig = rf.getNode(id);
+    if (!orig) return;
+    const newId = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    rf.setNodes((ns) => [
+      ...ns,
+      { ...orig, id: newId, position: { x: orig.position.x + 40, y: orig.position.y + 40 }, selected: false } as Node,
+    ]);
+  }
 
   return (
     <div
-      className={`rounded-xl border-2 bg-card shadow-lg min-w-[300px] max-w-[340px] ${selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background" : ""}`}
+      className={`group relative rounded-xl border-2 bg-card shadow-lg min-w-[300px] max-w-[340px] ${selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background" : ""}`}
       style={{ borderColor: meta.color }}
     >
+      {/* Quick actions (hover) */}
+      {!isTrigger && (
+        <div className="absolute -top-3 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+          <button
+            onClick={handleDuplicate}
+            title="Duplicar"
+            className="h-7 w-7 rounded-full bg-card border border-border shadow flex items-center justify-center hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={handleDelete}
+            title="Excluir"
+            className="h-7 w-7 rounded-full bg-card border border-border shadow flex items-center justify-center hover:bg-destructive hover:text-white hover:border-destructive transition"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {!isTrigger && (
         <Handle type="target" position={Position.Top} style={{ background: meta.color, width: 14, height: 14 }} />
       )}
@@ -73,13 +111,56 @@ function CustomNode({ data, type, selected }: NodeProps) {
         </div>
         <span className="text-base font-semibold">{meta.label}</span>
       </div>
-      <div className="px-4 py-3 text-sm text-muted-foreground min-h-[44px] leading-relaxed">
-        {nodePreview(type as string, (data as any) ?? {})}
+
+      {/* Body / preview */}
+      <div className="px-4 py-3 text-sm text-muted-foreground space-y-2">
+        {type === "send_text" && (
+          <div className="rounded-md bg-muted/40 px-3 py-2 text-foreground whitespace-pre-wrap break-words text-[13px] leading-relaxed max-h-32 overflow-hidden">
+            {d.text || <span className="italic text-muted-foreground">(sem texto)</span>}
+          </div>
+        )}
+        {type === "send_image" && (
+          d.mediaUrl
+            ? <img src={d.mediaUrl} alt="" className="rounded-md w-full max-h-40 object-cover border" />
+            : <div className="rounded-md border border-dashed h-24 flex items-center justify-center text-xs italic">sem imagem</div>
+        )}
+        {type === "send_video" && (
+          d.mediaUrl
+            ? <video src={d.mediaUrl} className="rounded-md w-full max-h-40 object-cover border" muted />
+            : <div className="rounded-md border border-dashed h-24 flex items-center justify-center text-xs italic">sem vídeo</div>
+        )}
+        {type === "send_audio" && (
+          d.mediaUrl
+            ? <audio src={d.mediaUrl} controls className="w-full h-8" />
+            : <div className="rounded-md border border-dashed h-12 flex items-center justify-center text-xs italic">sem áudio</div>
+        )}
+        {type === "send_document" && (
+          <div className="rounded-md border bg-muted/40 px-3 py-2 flex items-center gap-2 text-foreground text-[13px]">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate">{d.filename || (d.mediaUrl ? "documento" : "(sem arquivo)")}</span>
+          </div>
+        )}
+        {type === "send_buttons" && (
+          <div className="rounded-md bg-muted/40 px-3 py-2 text-foreground text-[13px] whitespace-pre-wrap break-words">
+            {d.text || <span className="italic text-muted-foreground">(sem texto)</span>}
+          </div>
+        )}
+        {type === "wait_message" && (
+          <div className="text-[13px]">⏳ Aguarda resposta — timeout {d.timeoutSeconds ?? 86400}s</div>
+        )}
+        {type === "delay" && (
+          <div className="text-[13px]">⏱ Espera {d.seconds ?? 2} segundos</div>
+        )}
+        {type === "condition" && (
+          <div className="text-[13px]">Se texto <b>{d.operator ?? "contains"}</b> “{d.value ?? ""}”</div>
+        )}
+        {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
+        {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
       </div>
 
       {/* Outputs */}
       {!isEnd && !isCondition && !isButtons && (
-        <Handle type="source" position={Position.Bottom} id="out" style={{ background: meta.color, width: 10, height: 10 }} />
+        <Handle type="source" position={Position.Bottom} id="out" style={{ background: meta.color, width: 14, height: 14 }} />
       )}
       {isCondition && (
         <>
@@ -93,7 +174,7 @@ function CustomNode({ data, type, selected }: NodeProps) {
       )}
       {isButtons && (
         <div className="px-4 pb-3 space-y-2">
-          {((data as any)?.buttons ?? []).slice(0, 3).map((b: any, i: number) => (
+          {(d.buttons ?? []).slice(0, 3).map((b: any, i: number) => (
             <div key={b.id ?? i} className="relative">
               <div className="text-sm bg-muted rounded-md px-3 py-2 text-center truncate border">{b.label || `Botão ${i + 1}`}</div>
               <Handle
@@ -108,30 +189,35 @@ function CustomNode({ data, type, selected }: NodeProps) {
   );
 }
 
-function nodePreview(type: string, data: any): string {
-  switch (type) {
-    case "trigger": return "Disparado por gatilho";
-    case "send_text": return (data?.text ?? "(sem texto)").slice(0, 60);
-    case "send_image": return data?.mediaUrl ? "📷 mídia anexada" : "(sem mídia)";
-    case "send_video": return data?.mediaUrl ? "🎬 vídeo anexado" : "(sem mídia)";
-    case "send_audio": return data?.mediaUrl ? "🎤 áudio anexado" : "(sem mídia)";
-    case "send_document": return data?.mediaUrl ? `📄 ${data?.filename ?? "documento"}` : "(sem mídia)";
-    case "send_buttons": return (data?.text ?? "(sem texto)").slice(0, 50);
-    case "wait_message": return `Aguarda resposta (timeout ${data?.timeoutSeconds ?? 86400}s)`;
-    case "delay": return `${data?.seconds ?? 2}s`;
-    case "condition": {
-      const op = data?.operator ?? "contains";
-      return `texto ${op} "${data?.value ?? ""}"`;
-    }
-    case "end": return "Fim do fluxo";
-    default: return "";
-  }
+function ScissorsEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd }: EdgeProps) {
+  const rf = useReactFlow();
+  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  return (
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ stroke: "#10b981", strokeWidth: 2, ...style }} />
+      <EdgeLabelRenderer>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); rf.setEdges((es) => es.filter((ed) => ed.id !== id)); }}
+          title="Desconectar"
+          className="nodrag nopan absolute h-7 w-7 rounded-full bg-card border border-border shadow flex items-center justify-center hover:bg-destructive hover:text-white hover:border-destructive transition"
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: "all" }}
+        >
+          <Scissors className="h-3.5 w-3.5" />
+        </button>
+      </EdgeLabelRenderer>
+    </>
+  );
 }
 
 const nodeTypes = {
   trigger: CustomNode, send_text: CustomNode, send_image: CustomNode, send_video: CustomNode,
   send_audio: CustomNode, send_document: CustomNode, send_buttons: CustomNode,
   wait_message: CustomNode, delay: CustomNode, condition: CustomNode, end: CustomNode,
+};
+
+const edgeTypes = {
+  default: ScissorsEdge,
 };
 
 // ============================================================
