@@ -3,8 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
-  User, MoreVertical, KeyRound, RefreshCw,
+  User, MoreVertical, KeyRound, RefreshCw, Tag as TagIcon,
 } from "lucide-react";
+import { TagsManagerDialog } from "@/components/tags-manager-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
@@ -169,6 +170,7 @@ function CRMPage() {
   const [editing, setEditing] = useState<Lead | null>(null);
   const [creating, setCreating] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
   const operacoes = useMemo(
     () => workspaces.filter((w) => w.id !== "all").map((w) => w.nome),
@@ -384,6 +386,9 @@ function CRMPage() {
           <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
             <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setTagsOpen(true)}>
+            <TagIcon className="mr-1.5 h-4 w-4" /> Etiquetas
+          </Button>
           <Button variant="outline" size="sm" onClick={exportCSV}>
             <Download className="mr-1.5 h-4 w-4" /> Exportar
           </Button>
@@ -481,6 +486,7 @@ function CRMPage() {
       />
 
       <ApiKeysDialog open={apiKeysOpen} onClose={() => setApiKeysOpen(false)} />
+      <TagsManagerDialog open={tagsOpen} onOpenChange={setTagsOpen} operacao={workspace?.id ?? "all"} />
     </div>
   );
 }

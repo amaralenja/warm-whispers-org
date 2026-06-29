@@ -14,9 +14,10 @@ import "@xyflow/react/dist/style.css";
 import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
-  MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle,
+  MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle, Tag as TagIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCrmTags, type CrmTag } from "@/components/tags-manager-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ const NODE_META: Record<string, { label: string; icon: any; color: string; descr
   delay:          { label: "Aguardar",         icon: Clock,              color: "#94a3b8", description: "Espera N segundos" },
   condition:      { label: "Condição",         icon: GitBranch,          color: "#f97316", description: "Ramifica se/senão" },
   random:         { label: "Randomização",     icon: Shuffle,            color: "#8b5cf6", description: "Escolhe uma saída aleatória por probabilidade" },
+  tag_action:     { label: "Etiquetas",        icon: TagIcon,            color: "#10b981", description: "Adicionar ou remover etiquetas do lead" },
   end:            { label: "Fim",              icon: StopIcon,           color: "#ef4444", description: "Encerra o fluxo" },
 };
 
@@ -197,6 +199,13 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
             🎲 {(d.outputs ?? []).length || 2} saídas aleatórias
           </div>
         )}
+        {type === "tag_action" && (
+          <div className="text-[13px] bg-emerald-500/10 rounded-md px-3 py-2 space-y-0.5">
+            {(d.addTags ?? []).length > 0 && <div>➕ Adicionar {(d.addTags ?? []).length} etiqueta(s)</div>}
+            {(d.removeTags ?? []).length > 0 && <div>➖ Remover {(d.removeTags ?? []).length} etiqueta(s)</div>}
+            {(d.addTags ?? []).length === 0 && (d.removeTags ?? []).length === 0 && <div className="italic text-muted-foreground">Nenhuma etiqueta configurada</div>}
+          </div>
+        )}
         {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
         {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
       </div>
@@ -272,7 +281,7 @@ function ScissorsEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, 
 const nodeTypes = {
   trigger: CustomNode, send_text: CustomNode, send_image: CustomNode, send_video: CustomNode,
   send_audio: CustomNode, send_document: CustomNode, send_buttons: CustomNode,
-  wait_message: CustomNode, delay: CustomNode, condition: CustomNode, random: CustomNode, end: CustomNode,
+  wait_message: CustomNode, delay: CustomNode, condition: CustomNode, random: CustomNode, tag_action: CustomNode, end: CustomNode,
 };
 
 const edgeTypes = {
@@ -508,6 +517,7 @@ function Palette({
     { label: "Conteúdo", types: ["send_text", "send_image", "send_video", "send_audio", "send_document"] },
     { label: "Interativo", types: ["send_buttons"] },
     { label: "Espera", types: ["wait_message", "delay"] },
+    { label: "CRM", types: ["tag_action"] },
     { label: "Lógica", types: ["condition", "random", "end"] },
   ];
 
@@ -881,8 +891,67 @@ function Inspector({
         {node.type === "end" && (
           <p className="text-xs text-muted-foreground">Encerra a execução do fluxo neste ponto.</p>
         )}
+        {node.type === "tag_action" && <TagActionInspector d={d} onChange={onChange} />}
       </div>
     </aside>
+  );
+}
+
+function TagActionInspector({ d, onChange }: { d: any; onChange: (patch: any) => void }) {
+  const { data: tags = [], isLoading } = useCrmTags(undefined);
+  const addSet = new Set<string>(d.addTags ?? []);
+  const removeSet = new Set<string>(d.removeTags ?? []);
+  const toggle = (set: Set<string>, id: string) => {
+    const next = new Set(set);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return Array.from(next);
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-muted-foreground">
+        Ações opcionais. Configura uma ou as duas — o bloco aplica ao lead do CRM (matching pelo telefone).
+      </p>
+      {isLoading && <p className="text-xs">Carregando etiquetas…</p>}
+      {!isLoading && tags.length === 0 && (
+        <p className="text-xs text-amber-600">Nenhuma etiqueta criada ainda. Vá no CRM → Etiquetas.</p>
+      )}
+      {tags.length > 0 && (
+        <>
+          <div>
+            <Label className="text-xs text-emerald-600">➕ Adicionar etiquetas</Label>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {tags.map((t: CrmTag) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onChange({ addTags: toggle(addSet, t.id) })}
+                  className={`px-2 py-1 rounded-md text-xs border ${addSet.has(t.id) ? "ring-2 ring-emerald-500" : "opacity-60 hover:opacity-100"}`}
+                  style={{ backgroundColor: t.cor, color: "white", borderColor: t.cor }}
+                >
+                  {t.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs text-rose-600">➖ Remover etiquetas</Label>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {tags.map((t: CrmTag) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onChange({ removeTags: toggle(removeSet, t.id) })}
+                  className={`px-2 py-1 rounded-md text-xs border ${removeSet.has(t.id) ? "ring-2 ring-rose-500" : "opacity-60 hover:opacity-100"}`}
+                  style={{ backgroundColor: t.cor, color: "white", borderColor: t.cor }}
+                >
+                  {t.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -898,6 +967,7 @@ function defaultDataFor(type: string, label: string): any {
       const b = `r-${Date.now()}-b`;
       return { outputs: [{ id: a, weight: 50 }, { id: b, weight: 50 }] };
     }
+    case "tag_action": return { addTags: [], removeTags: [] };
     case "send_document": return { mediaUrl: "", filename: "" };
     default: return { label };
   }
