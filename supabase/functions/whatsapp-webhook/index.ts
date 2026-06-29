@@ -54,6 +54,7 @@ function extractMedia(m: any) {
 
 const APP_SOURCE = "lovable-crm";
 const EVOHUB_BASE = "https://api.evohub.ai";
+const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
 
 type ChannelInfo = { id: string; phone_number_id: string; operacao_id: string | null };
 
@@ -76,6 +77,19 @@ function normalizeMetadata(metadata: any): Record<string, any> {
 function getMetaConnection(c: any) {
   const meta = normalizeMetadata(c?.metadata);
   return c?.meta_connection ?? meta?.meta_connection ?? null;
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function shouldAutoImport(c: any) {
+  const name = normalizeText(String(c?.name ?? ""));
+  return AUTO_IMPORT_WHATSAPP_NAMES.some((allowed) => name === normalizeText(allowed));
 }
 
 async function getConnectedChannels(): Promise<ChannelInfo[]> {
@@ -102,12 +116,12 @@ async function getConnectedChannels(): Promise<ChannelInfo[]> {
         const meta = normalizeMetadata(c?.metadata);
         const metaConnection = getMetaConnection(c);
         const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id;
-        const isMotion = meta?.app_source === APP_SOURCE || meta?.appSource === APP_SOURCE;
+        const isMotion = meta?.app_source === APP_SOURCE || meta?.appSource === APP_SOURCE || shouldAutoImport(c);
         if (!isMotion || !phoneNumberId) return null;
         return {
           id: String(c.id),
           phone_number_id: String(phoneNumberId),
-          operacao_id: typeof meta.operacao_id === "string" ? meta.operacao_id : null,
+          operacao_id: typeof meta.operacao_id === "string" ? meta.operacao_id : shouldAutoImport(c) ? "Caio" : null,
         };
       })
       .filter(Boolean) as ChannelInfo[];
