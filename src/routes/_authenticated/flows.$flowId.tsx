@@ -51,6 +51,34 @@ const NODE_META: Record<string, { label: string; icon: any; color: string; descr
   end:            { label: "Fim",              icon: StopIcon,           color: "#ef4444", description: "Encerra o fluxo" },
 };
 
+const CONDITION_OPTIONS: { value: string; label: string; needsValue?: "text" | "number" }[] = [
+  { value: "text_contains", label: "Texto contém", needsValue: "text" },
+  { value: "text_equals", label: "Texto é igual a", needsValue: "text" },
+  { value: "text_starts_with", label: "Texto começa com", needsValue: "text" },
+  { value: "text_regex", label: "Texto bate com Regex", needsValue: "text" },
+  { value: "text_word_count_gte", label: "Tem ao menos X palavras", needsValue: "number" },
+  { value: "is_text", label: "Lead mandou texto" },
+  { value: "is_audio", label: "Lead mandou áudio" },
+  { value: "is_image", label: "Lead mandou imagem" },
+  { value: "is_video", label: "Lead mandou vídeo" },
+  { value: "is_document", label: "Lead mandou documento" },
+  { value: "is_sticker", label: "Lead mandou figurinha" },
+  { value: "is_location", label: "Lead mandou localização" },
+  { value: "is_contact", label: "Lead mandou contato" },
+  { value: "is_button_reply", label: "Lead clicou em algum botão" },
+  { value: "button_id_equals", label: "Lead clicou no botão ID =", needsValue: "text" },
+];
+
+function conditionOption(op?: string) {
+  return CONDITION_OPTIONS.find((o) => o.value === op) ?? CONDITION_OPTIONS[0];
+}
+
+function conditionSummary(d: any) {
+  const opt = conditionOption(d?.operator);
+  if (opt.needsValue) return `${opt.label} "${d?.value ?? ""}"`;
+  return opt.label;
+}
+
 function CustomNode({ id, data, type, selected }: NodeProps) {
   const rf = useReactFlow();
   const meta = NODE_META[type as string] ?? NODE_META.send_text;
