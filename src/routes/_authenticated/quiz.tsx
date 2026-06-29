@@ -746,9 +746,12 @@ function LeadCard({
 
       {ticket !== "—" && (
         <div className={`mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold ${tier?.cls ?? "bg-accent/10 text-accent border-accent/30"}`}>
-          <DollarSign className="h-3 w-3" /> {ticket}
+          <Wallet className="h-3 w-3" />
+          <span className="opacity-70">Caixa:</span> {ticket}
+          {caixaWeight(lead) >= 4 && <span className="ml-1">🔥</span>}
         </div>
       )}
+
 
       <div className="mt-2 space-y-0.5 text-xs">
         {lead.email && (
