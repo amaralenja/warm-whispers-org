@@ -967,6 +967,7 @@ function defaultDataFor(type: string, label: string): any {
       const b = `r-${Date.now()}-b`;
       return { outputs: [{ id: a, weight: 50 }, { id: b, weight: 50 }] };
     }
+    case "tag_action": return { addTags: [], removeTags: [] };
     case "send_document": return { mediaUrl: "", filename: "" };
     default: return { label };
   }
