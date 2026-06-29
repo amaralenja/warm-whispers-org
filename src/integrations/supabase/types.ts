@@ -925,6 +925,7 @@ export type Database = {
       vendedores: {
         Row: {
           ativo: boolean | null
+          codigo: string | null
           created_at: string | null
           expert: string
           foto_url: string | null
@@ -936,6 +937,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
+          codigo?: string | null
           created_at?: string | null
           expert: string
           foto_url?: string | null
@@ -947,6 +949,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
+          codigo?: string | null
           created_at?: string | null
           expert?: string
           foto_url?: string | null
@@ -1307,12 +1310,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_vendedor_codigo: { Args: never; Returns: string }
       get_hall_of_fame_mes: { Args: never; Returns: Json }
       get_metas_coletivas_mes: { Args: never; Returns: Json }
       get_ranking_tv_stats: {
         Args: { _from?: string; _to?: string }
         Returns: Json
       }
+      login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

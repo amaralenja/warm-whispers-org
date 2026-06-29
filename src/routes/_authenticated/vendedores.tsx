@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Briefcase, Search, Target, Trophy } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Briefcase, Copy, KeyRound, RefreshCw, Search, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/vendedores")({
   component: VendedoresPage,
@@ -24,6 +26,7 @@ type Vendedor = {
   foto_url: string | null;
   meta: number | null;
   genero: string | null;
+  codigo: string | null;
 };
 
 const BRL = (n: number) =>
@@ -38,18 +41,40 @@ function initials(s: string | null) {
 function VendedoresPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ["vendedores-list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendedores")
-        .select("id, utm, nome, expert, ativo, foto_url, meta, genero")
+        .select("id, utm, nome, expert, ativo, foto_url, meta, genero, codigo")
         .order("nome", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Vendedor[];
     },
   });
+
+  async function regenerateCode(id: number) {
+    const { data: newCode, error: rpcErr } = await supabase.rpc("generate_vendedor_codigo");
+    if (rpcErr || !newCode) {
+      toast.error("Falha ao gerar código");
+      return;
+    }
+    const { error } = await supabase.from("vendedores").update({ codigo: newCode }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Novo código: ${newCode}`);
+    qc.invalidateQueries({ queryKey: ["vendedores-list"] });
+  }
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code);
+    toast.success(`Código ${code} copiado`);
+  }
+
 
   const filtered = useMemo(() => {
     const list = data ?? [];
@@ -177,15 +202,44 @@ function VendedoresPage() {
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-3 text-xs">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Target className="h-3.5 w-3.5" />
-                  Meta
+              <div className="mt-3 space-y-2 border-t border-border/40 pt-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Target className="h-3.5 w-3.5" />
+                    Meta
+                  </div>
+                  <div className="font-display font-semibold tabular-nums text-emerald-400">
+                    {BRL(Number(v.meta ?? 0))}
+                  </div>
                 </div>
-                <div className="font-display font-semibold tabular-nums text-emerald-400">
-                  {BRL(Number(v.meta ?? 0))}
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="font-mono text-sm font-bold tracking-widest text-foreground">
+                      {v.codigo ?? "——————"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {v.codigo && (
+                      <button
+                        onClick={() => copyCode(v.codigo!)}
+                        title="Copiar código"
+                        className="rounded p-1 text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => regenerateCode(v.id)}
+                      title="Gerar novo código"
+                      className="rounded p-1 text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
+
             </div>
           ))}
         </div>
