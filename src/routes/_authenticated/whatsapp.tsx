@@ -101,6 +101,8 @@ function WhatsAppPage() {
     refetchInterval: 15000,
   });
 
+  const [quotaError, setQuotaError] = useState(false);
+
   const createMut = useMutation({
     mutationFn: (vars: { name: string; operacaoId: string }) => createFn({ data: vars }),
     onSuccess: (ch) => {
@@ -108,10 +110,17 @@ function WhatsAppPage() {
       setName("");
       setOpen(false);
       setJustCreated(ch);
+      setQuotaError(false);
       qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
     },
     onError: (e: any) => {
       console.error("[whatsapp:create]", e);
+      if (e?.message === "EVOHUB_QUOTA_EXCEEDED") {
+        setQuotaError(true);
+        setOpen(false);
+        toast.error("Limite de conexões da EvoHub atingido");
+        return;
+      }
       toast.error(e?.message ?? "Erro ao criar conexão");
     },
   });
@@ -296,6 +305,38 @@ function WhatsAppPage() {
             </div>
           </div>
         </div>
+
+        {quotaError && (
+          <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-background p-5 shadow-lg shadow-amber-500/10 animate-in fade-in slide-in-from-top-2">
+            <button
+              onClick={() => setQuotaError(false)}
+              className="absolute top-3 right-3 h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-start gap-3 pr-8">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/20 ring-2 ring-amber-500/40 flex items-center justify-center shrink-0">
+                <XCircle className="h-5 w-5 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground">Limite EvoHub excedido</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Sua conta EvoHub atingiu o limite de conexões WhatsApp do plano atual. Pra criar uma nova, libere um slot removendo uma conexão existente, ou faça upgrade do plano no painel da EvoHub.
+                </p>
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open("https://app.evohub.ai", "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir painel EvoHub
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Just-created highlight card */}
         {justCreated && (

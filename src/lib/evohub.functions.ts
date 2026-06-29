@@ -22,6 +22,10 @@ async function evoFetch(path: string, init?: RequestInit) {
   let body: any = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
   if (!res.ok) {
+    const code = body?.code as string | undefined;
+    if (code === "QUOTA_EXCEEDED") {
+      throw new Error("EVOHUB_QUOTA_EXCEEDED");
+    }
     const msg = (body && (body.message || body.error)) || `EvoHub HTTP ${res.status}`;
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
