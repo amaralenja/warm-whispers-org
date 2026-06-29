@@ -82,22 +82,22 @@ function CustomNode({ data, type, selected }: NodeProps) {
       )}
       {isCondition && (
         <>
-          <Handle type="source" position={Position.Bottom} id="true" style={{ left: "30%", background: "#10b981", width: 10, height: 10 }} />
-          <Handle type="source" position={Position.Bottom} id="false" style={{ left: "70%", background: "#ef4444", width: 10, height: 10 }} />
-          <div className="flex justify-between px-3 pb-1 text-[10px]">
+          <Handle type="source" position={Position.Bottom} id="true" style={{ left: "30%", background: "#10b981", width: 14, height: 14 }} />
+          <Handle type="source" position={Position.Bottom} id="false" style={{ left: "70%", background: "#ef4444", width: 14, height: 14 }} />
+          <div className="flex justify-between px-4 pb-2 text-xs font-medium">
             <span className="text-emerald-500">verdadeiro</span>
             <span className="text-red-500">falso</span>
           </div>
         </>
       )}
       {isButtons && (
-        <div className="px-3 pb-2 space-y-1">
+        <div className="px-4 pb-3 space-y-2">
           {((data as any)?.buttons ?? []).slice(0, 3).map((b: any, i: number) => (
             <div key={b.id ?? i} className="relative">
-              <div className="text-[11px] bg-muted rounded px-2 py-1 text-center truncate border">{b.label || `Botão ${i + 1}`}</div>
+              <div className="text-sm bg-muted rounded-md px-3 py-2 text-center truncate border">{b.label || `Botão ${i + 1}`}</div>
               <Handle
                 type="source" position={Position.Right} id={b.id}
-                style={{ top: "50%", background: meta.color, width: 8, height: 8 }}
+                style={{ top: "50%", background: meta.color, width: 12, height: 12 }}
               />
             </div>
           ))}
