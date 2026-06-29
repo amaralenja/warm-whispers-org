@@ -176,7 +176,10 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
           </div>
         )}
         {type === "wait_message" && (
-          <div className="text-[13px]">⏳ Aguarda resposta — timeout {d.timeoutSeconds ?? 86400}s</div>
+          <div className="text-[13px]">
+            ⏳ {d.infinite ? "Aguarda indefinidamente" : `Timeout ${d.timeoutSeconds ?? 86400}s`}
+            {d.remarketing?.enabled && <div className="text-[11px] text-yellow-700 mt-0.5">↪ Remarketing em {d.remarketing.afterSeconds}s</div>}
+          </div>
         )}
         {type === "delay" && (
           <div className="text-[13px]">⏱ Espera {d.seconds ?? 2} segundos</div>
