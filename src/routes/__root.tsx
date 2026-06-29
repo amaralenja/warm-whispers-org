@@ -4,10 +4,9 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -109,14 +108,64 @@ function RootShell(props: { children?: ReactNode } | null = null) {
   return (
     <html lang="pt-BR">
       <head>
-        <HeadContent />
+        <StaticHeadContent />
       </head>
       <body>
         {children}
-        <Scripts />
+        <ShellBoundary fallback={null}>
+          <Scripts />
+        </ShellBoundary>
       </body>
     </html>
   );
+}
+
+function StaticHeadContent() {
+  return (
+    <>
+      <meta charSet="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>MULTIUM</title>
+      <meta name="description" content="Plataforma MULTIUM" />
+      <meta property="og:title" content="MULTIUM" />
+      <meta name="twitter:title" content="MULTIUM" />
+      <meta property="og:description" content="Plataforma MULTIUM" />
+      <meta name="twitter:description" content="Plataforma MULTIUM" />
+      <meta
+        property="og:image"
+        content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6b6ea40e-600d-4694-af0d-a7853a298c8e/id-preview-d79c57d6--2e1a29ec-fac0-4ff7-b857-84de13f3b474.lovable.app-1782259073782.png"
+      />
+      <meta
+        name="twitter:image"
+        content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6b6ea40e-600d-4694-af0d-a7853a298c8e/id-preview-d79c57d6--2e1a29ec-fac0-4ff7-b857-84de13f3b474.lovable.app-1782259073782.png"
+      />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta property="og:type" content="website" />
+      <link rel="stylesheet" href={appCss} />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      />
+    </>
+  );
+}
+
+class ShellBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    reportLovableError(error, { boundary: "root_shell" });
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
 }
 
 const rootQueryClient = new QueryClient();

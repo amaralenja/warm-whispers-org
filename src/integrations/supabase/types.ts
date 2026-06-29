@@ -1020,6 +1020,63 @@ export type Database = {
           },
         ]
       }
+      wa_channels: {
+        Row: {
+          app_source: string
+          connect_url: string | null
+          created_at: string | null
+          display_phone_number: string | null
+          id: string
+          metadata: Json
+          name: string
+          operacao_id: string | null
+          phone_number_id: string | null
+          quality_rating: string | null
+          status: string | null
+          synced_at: string
+          token: string | null
+          type: string
+          updated_at: string
+          verified_name: string | null
+        }
+        Insert: {
+          app_source?: string
+          connect_url?: string | null
+          created_at?: string | null
+          display_phone_number?: string | null
+          id: string
+          metadata?: Json
+          name?: string
+          operacao_id?: string | null
+          phone_number_id?: string | null
+          quality_rating?: string | null
+          status?: string | null
+          synced_at?: string
+          token?: string | null
+          type?: string
+          updated_at?: string
+          verified_name?: string | null
+        }
+        Update: {
+          app_source?: string
+          connect_url?: string | null
+          created_at?: string | null
+          display_phone_number?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          operacao_id?: string | null
+          phone_number_id?: string | null
+          quality_rating?: string | null
+          status?: string | null
+          synced_at?: string
+          token?: string | null
+          type?: string
+          updated_at?: string
+          verified_name?: string | null
+        }
+        Relationships: []
+      }
       wa_conversations: {
         Row: {
           channel_id: string

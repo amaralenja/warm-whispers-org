@@ -128,7 +128,8 @@ function ChatPage() {
   const { data: convs = [] } = useQuery({
     queryKey: ["wa-conversations", opFilter ?? "all"],
     queryFn: () => listConvFn({ data: { operacaoId: opFilter } }),
-    refetchInterval: 20000,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   });
 
   // Realtime: refresh conv list when new conversation/message lands
@@ -165,6 +166,8 @@ function ChatPage() {
     queryKey: ["wa-messages", activeId],
     queryFn: () => activeId ? listMsgFn({ data: { conversationId: activeId } }) : Promise.resolve([]),
     enabled: !!activeId,
+    refetchInterval: activeId ? 3000 : false,
+    refetchOnWindowFocus: true,
   });
 
   // Auto-scroll to bottom when messages change
