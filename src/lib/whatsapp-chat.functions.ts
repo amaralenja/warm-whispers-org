@@ -53,7 +53,8 @@ async function findChannel(channelId: string) {
   const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
   const ch = list.find((c) => c.id === channelId);
   if (!ch) throw new Error("Canal não encontrado");
-  const phoneNumberId = ch?.metadata?.meta_connection?.phone_number_id;
+  const metaConnection = ch?.meta_connection ?? ch?.metadata?.meta_connection ?? null;
+  const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id;
   return { token: ch.token as string, phoneNumberId: phoneNumberId as string | undefined, raw: ch };
 }
 
