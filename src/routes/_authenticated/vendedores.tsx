@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Briefcase, Search, Target, Trophy } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Briefcase, Copy, KeyRound, RefreshCw, Search, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/vendedores")({
   component: VendedoresPage,
