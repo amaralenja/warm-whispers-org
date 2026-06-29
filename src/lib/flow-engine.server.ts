@@ -255,17 +255,38 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
     }
 
     case "condition": {
-      const op = String(node.data?.operator ?? "contains");
+      const op = String(node.data?.operator ?? "text_contains");
+      const rawText = ctx.lastInput?.text ?? "";
+      const input = rawText.toLowerCase();
       const target = String(node.data?.value ?? "").toLowerCase();
-      const input = (ctx.lastInput?.text ?? "").toLowerCase();
+      const msgType = String(ctx.lastInput?.messageType ?? "").toLowerCase();
       let matched = false;
-      if (op === "contains") matched = input.includes(target);
-      else if (op === "equals") matched = input === target;
-      else if (op === "starts_with") matched = input.startsWith(target);
-      else if (op === "regex") {
-        try { matched = new RegExp(node.data?.value ?? "", "i").test(ctx.lastInput?.text ?? ""); } catch { matched = false; }
+
+      // Text-based
+      if (op === "text_contains" || op === "contains") matched = !!target && input.includes(target);
+      else if (op === "text_equals" || op === "equals") matched = input === target;
+      else if (op === "text_starts_with" || op === "starts_with") matched = input.startsWith(target);
+      else if (op === "text_regex" || op === "regex") {
+        try { matched = new RegExp(node.data?.value ?? "", "i").test(rawText); } catch { matched = false; }
       }
-      return { handle: matched ? "true" : "false", log: { matched } };
+      else if (op === "text_word_count_gte") {
+        const n = Number(node.data?.value ?? 0);
+        const words = rawText.trim().split(/\s+/).filter(Boolean).length;
+        matched = words >= n;
+      }
+      // Media-based (no value needed)
+      else if (op === "is_audio") matched = msgType === "audio" || msgType === "voice";
+      else if (op === "is_image") matched = msgType === "image";
+      else if (op === "is_video") matched = msgType === "video";
+      else if (op === "is_document") matched = msgType === "document";
+      else if (op === "is_sticker") matched = msgType === "sticker";
+      else if (op === "is_location") matched = msgType === "location";
+      else if (op === "is_contact") matched = msgType === "contacts" || msgType === "contact";
+      else if (op === "is_text") matched = msgType === "text";
+      else if (op === "is_button_reply") matched = !!ctx.lastInput?.buttonId;
+      else if (op === "button_id_equals") matched = String(ctx.lastInput?.buttonId ?? "") === String(node.data?.value ?? "");
+
+      return { handle: matched ? "true" : "false", log: { matched, op, msgType } };
     }
 
     case "end":
