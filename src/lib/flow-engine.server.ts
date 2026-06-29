@@ -405,12 +405,13 @@ export async function dispatchIncomingForFlows(args: {
   contactWaId: string;
   text: string | null;
   buttonId: string | null;
+  messageType?: string | null;
   isFirstMessage: boolean;
 }) {
   // 1. Advance a waiting run if any
   const advanced = await advanceWaitingRun({
     conversationId: args.conversationId,
-    input: { text: args.text, buttonId: args.buttonId },
+    input: { text: args.text, buttonId: args.buttonId, messageType: args.messageType ?? null },
   });
   if (advanced) return advanced;
 
