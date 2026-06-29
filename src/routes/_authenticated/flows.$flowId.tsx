@@ -14,7 +14,7 @@ import "@xyflow/react/dist/style.css";
 import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
-  MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X,
+  MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,7 @@ const NODE_META: Record<string, { label: string; icon: any; color: string; descr
   wait_message:   { label: "Esperar Mensagem", icon: Clock,              color: "#eab308", description: "Pausa até o contato responder" },
   delay:          { label: "Aguardar",         icon: Clock,              color: "#94a3b8", description: "Espera N segundos" },
   condition:      { label: "Condição",         icon: GitBranch,          color: "#f97316", description: "Ramifica se/senão" },
+  random:         { label: "Randomização",     icon: Shuffle,            color: "#8b5cf6", description: "Escolhe uma saída aleatória por probabilidade" },
   end:            { label: "Fim",              icon: StopIcon,           color: "#ef4444", description: "Encerra o fluxo" },
 };
 
@@ -87,6 +88,7 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
   const isEnd = type === "end";
   const isButtons = type === "send_buttons";
   const isCondition = type === "condition";
+  const isRandom = type === "random";
   const d = (data as any) ?? {};
 
   function handleDelete(e: React.MouseEvent) {
@@ -184,12 +186,17 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
             {conditionSummary(d)}
           </div>
         )}
+        {type === "random" && (
+          <div className="text-[13px] bg-muted/40 rounded-md px-3 py-2">
+            🎲 {(d.outputs ?? []).length || 2} saídas aleatórias
+          </div>
+        )}
         {type === "trigger" && <div className="text-[13px] italic">Disparado por gatilho</div>}
         {type === "end" && <div className="text-[13px] italic">Fim do fluxo</div>}
       </div>
 
       {/* Outputs */}
-      {!isEnd && !isCondition && !isButtons && (
+      {!isEnd && !isCondition && !isButtons && !isRandom && (
         <Handle type="source" position={Position.Bottom} id="out" style={{ background: meta.color, width: 14, height: 14 }} />
       )}
       {isCondition && (
@@ -209,6 +216,22 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
               <div className="text-sm bg-muted rounded-md px-3 py-2 text-center truncate border">{b.label || `Botão ${i + 1}`}</div>
               <Handle
                 type="source" position={Position.Right} id={b.id}
+                style={{ top: "50%", background: meta.color, width: 12, height: 12 }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      {isRandom && (
+        <div className="px-4 pb-3 space-y-2">
+          {(d.outputs ?? []).map((o: any, i: number) => (
+            <div key={o.id ?? i} className="relative">
+              <div className="text-sm bg-muted rounded-md px-3 py-2 flex items-center justify-between border">
+                <span className="truncate">Saída {i + 1}</span>
+                <span className="text-xs font-semibold text-violet-500">{Number(o.weight ?? 0).toFixed(0)}%</span>
+              </div>
+              <Handle
+                type="source" position={Position.Right} id={o.id}
                 style={{ top: "50%", background: meta.color, width: 12, height: 12 }}
               />
             </div>
@@ -243,7 +266,7 @@ function ScissorsEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, 
 const nodeTypes = {
   trigger: CustomNode, send_text: CustomNode, send_image: CustomNode, send_video: CustomNode,
   send_audio: CustomNode, send_document: CustomNode, send_buttons: CustomNode,
-  wait_message: CustomNode, delay: CustomNode, condition: CustomNode, end: CustomNode,
+  wait_message: CustomNode, delay: CustomNode, condition: CustomNode, random: CustomNode, end: CustomNode,
 };
 
 const edgeTypes = {
@@ -479,7 +502,7 @@ function Palette({
     { label: "Conteúdo", types: ["send_text", "send_image", "send_video", "send_audio", "send_document"] },
     { label: "Interativo", types: ["send_buttons"] },
     { label: "Espera", types: ["wait_message", "delay"] },
-    { label: "Lógica", types: ["condition", "end"] },
+    { label: "Lógica", types: ["condition", "random", "end"] },
   ];
 
   return (
@@ -714,6 +737,70 @@ function Inspector({
           );
         })()}
 
+        {node.type === "random" && (() => {
+          const outs: Array<{ id: string; weight: number }> = Array.isArray(d.outputs) ? d.outputs : [];
+          const total = outs.reduce((a, o) => a + Math.max(0, Number(o.weight ?? 0)), 0);
+          function setCount(n: number) {
+            const count = Math.max(2, Math.min(10, n));
+            const equal = Math.floor((100 / count) * 100) / 100;
+            const next: Array<{ id: string; weight: number }> = [];
+            for (let i = 0; i < count; i++) {
+              const prev = outs[i];
+              next.push({
+                id: prev?.id ?? `r-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
+                weight: equal,
+              });
+            }
+            // Ajusta resto pra somar 100
+            const diff = 100 - next.reduce((a, o) => a + o.weight, 0);
+            next[next.length - 1].weight = Math.round((next[next.length - 1].weight + diff) * 100) / 100;
+            onChange({ outputs: next });
+          }
+          function setWeight(i: number, v: number) {
+            const arr = outs.map((o) => ({ ...o }));
+            arr[i].weight = Math.max(0, Math.min(100, Number.isFinite(v) ? v : 0));
+            onChange({ outputs: arr });
+          }
+          function distributeEqually() {
+            setCount(outs.length || 2);
+          }
+          return (
+            <>
+              <div className="space-y-1.5">
+                <Label>Número de saídas (2 a 10)</Label>
+                <Input
+                  type="number" min={2} max={10}
+                  value={outs.length || 2}
+                  onChange={(e) => setCount(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Probabilidades (%)</Label>
+                  <Button type="button" size="sm" variant="ghost" onClick={distributeEqually} className="h-6 text-xs">
+                    Distribuir igualmente
+                  </Button>
+                </div>
+                {outs.map((o, i) => (
+                  <div key={o.id} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16">Saída {i + 1}</span>
+                    <Input
+                      type="number" min={0} max={100} step={0.1}
+                      value={o.weight}
+                      onChange={(e) => setWeight(i, Number(e.target.value))}
+                      className="h-8"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                ))}
+                <p className={`text-[11px] ${Math.abs(total - 100) < 0.5 ? "text-muted-foreground" : "text-amber-500"}`}>
+                  Total: {total.toFixed(1)}% {Math.abs(total - 100) >= 0.5 && "— pesos serão normalizados na execução"}
+                </p>
+              </div>
+            </>
+          );
+        })()}
+
         {node.type === "trigger" && (
           <p className="text-xs text-muted-foreground">Configure os gatilhos no painel esquerdo. Conecte a saída deste nó pro primeiro bloco do fluxo.</p>
         )}
@@ -732,6 +819,11 @@ function defaultDataFor(type: string, label: string): any {
     case "wait_message": return { timeoutSeconds: 86400 };
     case "delay": return { seconds: 2 };
     case "condition": return { operator: "text_contains", value: "" };
+    case "random": {
+      const a = `r-${Date.now()}-a`;
+      const b = `r-${Date.now()}-b`;
+      return { outputs: [{ id: a, weight: 50 }, { id: b, weight: 50 }] };
+    }
     case "send_document": return { mediaUrl: "", filename: "" };
     default: return { label };
   }
