@@ -13,6 +13,7 @@ import { Route as RankingTvRouteImport } from './routes/ranking-tv'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
@@ -40,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/whatsapp': typeof AuthenticatedWhatsappRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/whatsapp': typeof AuthenticatedWhatsappRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/ranking'
     | '/relatorios'
+    | '/whatsapp'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/ranking'
     | '/relatorios'
+    | '/whatsapp'
   id:
     | '__root__'
     | '/'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
+    | '/_authenticated/whatsapp'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -202,6 +214,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/whatsapp': {
+      id: '/_authenticated/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/relatorios': {
       id: '/_authenticated/relatorios'
@@ -271,6 +290,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
+  AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -282,6 +302,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
+  AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

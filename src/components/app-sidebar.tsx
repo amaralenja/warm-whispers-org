@@ -14,6 +14,7 @@ import {
   LogOut,
   Crown,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -44,6 +45,7 @@ const mainItems: Item[] = [
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
   { title: "CRM Leads X1", url: "/crm", icon: Users },
+  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
 ];
 
 const highTicketItems: Item[] = [
