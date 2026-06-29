@@ -348,7 +348,7 @@ export async function runFlowAdmin(args: {
 
 export async function advanceWaitingRun(args: {
   conversationId: string;
-  input: { text?: string | null; buttonId?: string | null };
+  input: { text?: string | null; buttonId?: string | null; messageType?: string | null };
 }) {
   // Find a waiting run for this conversation
   const { data: run } = await supabaseAdmin
