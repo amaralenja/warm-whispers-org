@@ -130,13 +130,26 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
 
 
                 const media = extractMedia(m);
+                // Detect button reply (interactive)
+                const interactive = (m as any).interactive;
+                const buttonId =
+                  interactive?.button_reply?.id ??
+                  interactive?.list_reply?.id ??
+                  (m as any).button?.payload ??
+                  null;
+                const buttonText =
+                  interactive?.button_reply?.title ??
+                  interactive?.list_reply?.title ??
+                  (m as any).button?.text ??
+                  null;
+
                 const insertPayload: any = {
                   conversation_id: (conv as any).id,
                   channel_id: channelId,
                   wa_message_id: m.id,
                   direction: "in",
                   msg_type: m.type,
-                  text_body: m.text?.body ?? null,
+                  text_body: m.text?.body ?? buttonText ?? null,
                   media_id: media?.id ?? null,
                   media_mime: media?.mime ?? null,
                   media_filename: media?.filename ?? null,
@@ -152,7 +165,30 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   .from("wa_messages" as any)
                   .upsert(insertPayload, { onConflict: "channel_id,wa_message_id" });
                 if (msgErr) console.error("[wa-webhook] insert msg error", msgErr);
+
+                // Dispatch to flow engine (fire and continue; await so errors are logged)
+                try {
+                  const { count: priorCount } = await supabaseAdmin
+                    .from("wa_messages" as any)
+                    .select("id", { count: "exact", head: true })
+                    .eq("conversation_id", (conv as any).id)
+                    .eq("direction", "in");
+                  const isFirstMessage = (priorCount ?? 0) <= 1;
+
+                  const { dispatchIncomingForFlows } = await import("@/lib/flow-engine.server");
+                  await dispatchIncomingForFlows({
+                    conversationId: (conv as any).id,
+                    channelId,
+                    contactWaId: m.from,
+                    text: m.text?.body ?? buttonText ?? null,
+                    buttonId,
+                    isFirstMessage,
+                  });
+                } catch (e) {
+                  console.error("[wa-webhook] flow dispatch error", e);
+                }
               }
+
 
               // Status updates (sent/delivered/read/failed)
               const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : [];
