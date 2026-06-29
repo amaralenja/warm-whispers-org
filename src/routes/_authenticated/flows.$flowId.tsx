@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
+  ReactFlow, ReactFlowProvider, Background,
   addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type Connection, type NodeChange, type EdgeChange,
   type NodeProps, Handle, Position,
@@ -310,8 +310,6 @@ function Editor({ flowId }: { flowId: string }) {
             fitView
           >
             <Background gap={16} color="#374151" />
-            <Controls />
-            <MiniMap pannable zoomable maskColor="rgba(0,0,0,0.7)" />
           </ReactFlow>
         </div>
 
