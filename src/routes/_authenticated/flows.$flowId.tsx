@@ -394,6 +394,7 @@ function Editor({ flowId }: { flowId: string }) {
             onNodeClick={onNodeClick}
             onPaneClick={() => setSelectedNode(null)}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
           >
             <Background gap={16} color="#374151" />
