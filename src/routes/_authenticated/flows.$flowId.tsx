@@ -181,9 +181,12 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
             {d.remarketing?.enabled && <div className="text-[11px] text-yellow-700 mt-0.5">↪ Remarketing em {d.remarketing.afterSeconds}s</div>}
           </div>
         )}
-        {type === "delay" && (
-          <div className="text-[13px]">⏱ Espera {d.seconds ?? 2} segundos</div>
-        )}
+        {type === "delay" && (() => {
+          const t = Number(d.seconds ?? 2);
+          const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+          const parts = [h && `${h}h`, m && `${m}m`, s && `${s}s`].filter(Boolean).join(" ") || "0s";
+          return <div className="text-[13px]">⏱ Espera {parts}</div>;
+        })()}
         {type === "condition" && (
           <div className="text-[13px] bg-muted/40 rounded-md px-3 py-2">
             {conditionSummary(d)}
