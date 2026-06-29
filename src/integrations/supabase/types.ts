@@ -328,6 +328,33 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_tags: {
+        Row: {
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+          operacao: string
+          updated_at: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome: string
+          operacao?: string
+          updated_at?: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          operacao?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documentacao: {
         Row: {
           conteudo: string | null
