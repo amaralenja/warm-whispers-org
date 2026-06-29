@@ -602,7 +602,8 @@ function QuizPage() {
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${tier?.cls ?? "bg-muted text-muted-foreground border-border"}`}>
-                          <DollarSign className="h-3 w-3" /> {ticketLabel(l)}
+                          <Wallet className="h-3 w-3" /> {caixaLabel(l)}
+                          {caixaWeight(l) >= 4 && <span>🔥</span>}
                         </span>
                       </td>
                       <td className="px-3 py-2">
