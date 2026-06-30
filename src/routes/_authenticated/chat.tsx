@@ -45,6 +45,7 @@ import {
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
+import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 
 function ChatRoute() {
