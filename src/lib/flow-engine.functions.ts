@@ -154,6 +154,7 @@ export const saveFlow = createServerFn({ method: "POST" })
     id: string;
     nome?: string;
     operacao_id?: string | null;
+    folder?: string | null;
     ativo?: boolean;
     entry_node_id?: string | null;
     nodes?: FlowNode[];
@@ -161,9 +162,10 @@ export const saveFlow = createServerFn({ method: "POST" })
   }) => d)
   .handler(async ({ context, data }) => {
     const patch: any = {};
-    for (const k of ["nome", "operacao_id", "ativo", "entry_node_id", "nodes", "edges"]) {
+    for (const k of ["nome", "operacao_id", "folder", "ativo", "entry_node_id", "nodes", "edges"]) {
       if ((data as any)[k] !== undefined) patch[k] = (data as any)[k];
     }
+    if (typeof patch.folder === "string") patch.folder = patch.folder.trim() || null;
     if (typeof patch.nome === "string" && patch.nome.trim()) {
       const novoNome = patch.nome.trim();
       const { data: dup } = await context.supabase
