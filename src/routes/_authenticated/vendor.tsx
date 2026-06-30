@@ -165,29 +165,32 @@ function VendorPortal() {
         </div>
 
         {/* Meta */}
-        {stats && stats.meta > 0 && (
+        {metaDiaria > 0 && (
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-400"><Target className="h-4 w-4" /></div>
-                <h3 className="text-sm font-semibold uppercase tracking-wider">Meta do mês</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wider">{labelMeta}</h3>
               </div>
               <div className="text-right">
-                <div className="font-display text-2xl font-bold tabular-nums">{stats.metaPct.toFixed(0)}%</div>
+                <div className="font-display text-2xl font-bold tabular-nums">{metaPct.toFixed(0)}%</div>
                 <div className="text-[0.65rem] text-muted-foreground">
-                  {BRL(stats.faturamento)} / {BRL(stats.meta)}
+                  {BRL(stats?.faturamento ?? 0)} / {BRL(metaPeriodo)}
+                </div>
+                <div className="text-[0.6rem] text-muted-foreground">
+                  {BRL(metaDiaria)}/dia × {diasPeriodo} {diasPeriodo === 1 ? "dia" : "dias"}
                 </div>
               </div>
             </div>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-secondary/40">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all"
-                style={{ width: `${Math.min(100, stats.metaPct)}%` }}
+                style={{ width: `${metaPct}%` }}
               />
             </div>
             <div className="mt-2 text-xs text-muted-foreground">
-              {stats.faltaMeta > 0
-                ? <>Faltam <span className="font-semibold text-emerald-400">{BRL(stats.faltaMeta)}</span> pra bater a meta. Bora!</>
+              {faltaPeriodo > 0
+                ? <>Faltam <span className="font-semibold text-emerald-400">{BRL(faltaPeriodo)}</span> pra bater a meta. Bora!</>
                 : <span className="font-semibold text-emerald-400">Meta batida! 🎉</span>}
             </div>
           </div>
