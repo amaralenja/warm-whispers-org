@@ -290,18 +290,20 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     if (!data.name) throw new Error("Nome obrigatório");
-    if (!data.operacaoId) throw new Error("Operação obrigatória");
+    if (data.kind === "chat" && !data.operacaoId) throw new Error("Operação obrigatória");
+    const opId = data.kind === "notification" ? "__notificador__" : data.operacaoId;
     const ch = await evoFetch("/api/v1/channels", {
       method: "POST",
       body: JSON.stringify({
         name: data.name,
         type: "whatsapp",
-        metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE, kind: data.kind },
+        metadata: { operacao_id: opId, app_source: APP_SOURCE, kind: data.kind },
       }),
     });
-    await upsertLocalChannel(context.supabase, { ...ch, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, data.operacaoId);
+    await upsertLocalChannel(context.supabase, { ...ch, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, opId);
     return withConnectUrl({ ...ch, kind: data.kind });
   });
+
 
 
 

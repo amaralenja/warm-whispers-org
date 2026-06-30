@@ -244,7 +244,9 @@ function WhatsAppPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Nova conexão WhatsApp</DialogTitle>
+                    <DialogTitle>
+                      Nova conexão {tab === "notification" ? "(Notificador)" : "WhatsApp"}
+                    </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-2">
                     <div className="space-y-2">
@@ -253,32 +255,42 @@ function WhatsAppPage() {
                         id="ch-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Ex.: Atendimento Principal"
+                        placeholder={tab === "notification" ? "Ex.: Notificador Calls" : "Ex.: Atendimento Principal"}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Operação</Label>
-                      <Select value={newOp} onValueChange={setNewOp}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a operação" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {operacoes.map((op) => (
-                            <SelectItem key={op.id} value={op.id}>
-                              {op.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {tab === "notification" ? (
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+                        Este número será marcado como <strong>Notificador</strong> e não fica vinculado a nenhuma operação — usado só para disparos automáticos (lembretes de call, templates, etc).
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Operação</Label>
+                        <Select value={newOp} onValueChange={setNewOp}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a operação" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {operacoes.map((op) => (
+                              <SelectItem key={op.id} value={op.id}>
+                                {op.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                     <Button
                       onClick={() => {
                         if (!name.trim()) return toast.error("Informe o nome da conexão");
-                        if (!newOp) return toast.error("Selecione uma operação");
-                        createMut.mutate({ name: name.trim(), operacaoId: newOp, kind: tab });
+                        if (tab === "chat" && !newOp) return toast.error("Selecione uma operação");
+                        createMut.mutate({
+                          name: name.trim(),
+                          operacaoId: tab === "notification" ? "" : newOp,
+                          kind: tab,
+                        });
                       }}
                       disabled={createMut.isPending}
                       className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
@@ -288,6 +300,7 @@ function WhatsAppPage() {
                     </Button>
                   </DialogFooter>
                 </DialogContent>
+
               </Dialog>
             </div>
           </div>
