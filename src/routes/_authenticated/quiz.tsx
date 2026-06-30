@@ -975,17 +975,24 @@ function IgRow({ username }: { username: string }) {
       <div className="mt-1 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-1.5">
         {profile.profile_pic_url ? (
           <img
-            src={profile.profile_pic_url}
+            src={`/api/public/ig-image?u=${encodeURIComponent(profile.profile_pic_url)}`}
             alt={profile.username}
-            referrerPolicy="no-referrer"
-            className="h-9 w-9 rounded-full object-cover border border-emerald-500/50"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            className="h-9 w-9 rounded-full object-cover border border-emerald-500/50 bg-pink-500/10"
+            onError={(e) => {
+              const el = e.currentTarget as HTMLImageElement;
+              el.onerror = null;
+              el.replaceWith(Object.assign(document.createElement("div"), {
+                className: "h-9 w-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-emerald-500/50",
+                textContent: (profile.username?.[0] || "?").toUpperCase(),
+              }));
+            }}
           />
         ) : (
-          <div className="h-9 w-9 rounded-full bg-pink-500/20 flex items-center justify-center">
-            <Instagram className="h-4 w-4 text-pink-400" />
+          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-emerald-500/50">
+            {(profile.username?.[0] || "?").toUpperCase()}
           </div>
         )}
+
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
             <a
