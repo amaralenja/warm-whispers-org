@@ -3,7 +3,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const EVOHUB_BASE = "https://app.evohub.evolutionfoundation.com.br";
+const EVOHUB_BASE = "https://api.evohub.ai";
 
 type Ctx = {
   runId: string;
@@ -42,7 +42,7 @@ async function fetchChannelToken(channelId: string): Promise<{ token: string; ph
 
 async function sendWA(channelId: string, to: string, body: any) {
   const { token, phoneNumberId } = await fetchChannelToken(channelId);
-  const res = await fetch(`${EVOHUB_BASE}/meta/v23.0/${phoneNumberId}/messages`, {
+  const res = await fetch(`${EVOHUB_BASE}/meta/${phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to, ...body }),
