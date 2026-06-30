@@ -1,0 +1,1 @@
+ALTER TABLE public.instagram_leads ADD COLUMN IF NOT EXISTS verification_status text NOT NULL DEFAULT 'real';

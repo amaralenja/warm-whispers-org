@@ -701,6 +701,7 @@ export type Database = {
           raw: Json | null
           updated_at: string
           username: string
+          verification_status: string
         }
         Insert: {
           biography?: string | null
@@ -717,6 +718,7 @@ export type Database = {
           raw?: Json | null
           updated_at?: string
           username: string
+          verification_status?: string
         }
         Update: {
           biography?: string | null
@@ -733,6 +735,7 @@ export type Database = {
           raw?: Json | null
           updated_at?: string
           username?: string
+          verification_status?: string
         }
         Relationships: []
       }
