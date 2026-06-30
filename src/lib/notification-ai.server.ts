@@ -234,6 +234,55 @@ export async function transcribeWaAudio(mediaId: string, phoneNumberId: string):
   return String(j?.text || "").trim();
 }
 
+// ---- Image understanding (vision) ----
+export async function describeWaImage(
+  mediaId: string,
+  phoneNumberId: string,
+  caption?: string,
+): Promise<string> {
+  const metaRes = await evoMeta(`${phoneNumberId}/${mediaId}`);
+  const info = await metaRes.json();
+  const url = info?.url;
+  if (!url) throw new Error("media url não retornada");
+  const dl = await fetch(url, {
+    headers: { Authorization: `Bearer ${process.env.EVOHUB_API_KEY}` },
+  });
+  if (!dl.ok) throw new Error(`download image ${dl.status}`);
+  const buf = await dl.arrayBuffer();
+  const mime = info?.mime_type || "image/jpeg";
+  const b64 = Buffer.from(buf).toString("base64");
+  const dataUrl = `data:${mime};base64,${b64}`;
+
+  const vr = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getOpenAIKey()}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                "Descreva o conteúdo desta imagem em 1-2 frases curtas, em português BR. Se tiver texto legível na imagem, inclua. Se for print de agenda/calendário, extraia datas e horários.",
+            },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!vr.ok) throw new Error(`vision ${vr.status}: ${(await vr.text()).slice(0, 200)}`);
+  const j: any = await vr.json();
+  const desc = String(j?.choices?.[0]?.message?.content || "").trim();
+  return caption ? `[Imagem enviada — ${desc}] Legenda: ${caption}` : `[Imagem enviada — ${desc}]`;
+}
+
 // ---- Calendar reschedule ----
 async function rescheduleCalendarEvent(eventId: string, startISO: string, durationMin: number) {
   const { gcal } = await import("@/lib/google-calendar.functions");
