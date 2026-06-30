@@ -54,7 +54,7 @@ const mainItems: Item[] = [
   { title: "SOPs", url: "/sops", icon: BookOpenText },
 ];
 
-const highTicketItems_unused_placeholder: Item[] = [];
+
 
 const operacaoX1Items: Item[] = [
   { title: "CRM Leads X1", url: "/crm", icon: Users },
