@@ -287,11 +287,22 @@ export async function describeWaImage(
 async function rescheduleCalendarEvent(eventId: string, startISO: string, durationMin: number) {
   const { gcal } = await import("@/lib/google-calendar.functions");
   const endISO = new Date(new Date(startISO).getTime() + durationMin * 60_000).toISOString();
+  // Preserve title but ensure the 🔄 prefix is set
+  let summary: string | undefined;
+  try {
+    const ev: any = await gcal(`/events/${encodeURIComponent(eventId)}`);
+    const base = String(ev?.summary || "").replace(/^([✅❌🔄])\s+/, "");
+    summary = `🔄 ${base}`;
+  } catch {}
   return gcal(`/events/${encodeURIComponent(eventId)}`, {
     method: "PATCH",
     body: JSON.stringify({
+      ...(summary ? { summary } : {}),
       start: { dateTime: startISO, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endISO, timeZone: "America/Sao_Paulo" },
+      extendedProperties: {
+        private: { attendance_status: "remarcada", rescheduled_at: new Date().toISOString() },
+      },
     }),
   });
 }
