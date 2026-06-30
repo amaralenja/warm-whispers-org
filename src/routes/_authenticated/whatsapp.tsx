@@ -331,6 +331,30 @@ function WhatsAppPage() {
           />
         )}
 
+        {/* Tabs: Atendimento vs Notificações */}
+        <div className="flex items-center gap-2 border-b border-border">
+          {([
+            { id: "chat" as const, label: "Atendimento" },
+            { id: "notification" as const, label: "Notificações" },
+          ]).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                tab === t.id
+                  ? "border-emerald-500 text-emerald-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "notification" && <TemplatesPanel />}
+
+
+
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             {(error as Error)?.message ?? "Erro ao carregar conexões"}
