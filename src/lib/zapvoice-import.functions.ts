@@ -97,10 +97,16 @@ function zvTypeToNodeType(t: string): "send_text" | "send_image" | "send_video" 
 
 export const importZapVoiceBackup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { backup: any; operacao_id?: string | null; replace?: boolean }) => ({
+  .inputValidator((d: {
+    backup: any;
+    operacao_id?: string | null;
+    replace?: boolean;
+    funnelIds?: string[] | null;
+  }) => ({
     backup: d?.backup,
     operacao_id: d?.operacao_id ?? null,
     replace: !!d?.replace,
+    funnelIds: Array.isArray(d?.funnelIds) ? d.funnelIds.map(String) : null,
   }))
   .handler(async ({ context, data }) => {
     const b = data.backup;
@@ -116,13 +122,21 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
     const summary: Summary = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
     // Substituir: apaga só os fluxos importados deste usuário com prefixo [ZV]
-    if (data.replace) {
+    // (apenas no primeiro chunk — se funnelIds vier, NÃO apaga pra não destruir os já criados)
+    if (data.replace && !data.funnelIds) {
       await db
         .from("wa_flows")
         .delete()
         .eq("created_by", context.userId)
         .ilike("nome", "[ZV]%");
     }
+
+    // Filtra funis a processar (chunking)
+    const allFunnels = b.funnels as ZvFunnel[];
+    const funnelsToProcess = data.funnelIds
+      ? allFunnels.filter((f) => data.funnelIds!.includes(String(f.id)))
+      : allFunnels;
+    (b as any).funnels = funnelsToProcess;
 
     const messagesById = mapBy<ZvItem>(b.messages);
     const audiosById = mapBy<ZvItem>(b.audios);
