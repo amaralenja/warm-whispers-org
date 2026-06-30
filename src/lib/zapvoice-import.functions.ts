@@ -111,8 +111,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       if (!Array.isArray((b as any)[k])) throw new Error(`Backup inválido: '${k}' precisa ser array.`);
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = context.supabase as any;
 
     const summary: Summary = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
