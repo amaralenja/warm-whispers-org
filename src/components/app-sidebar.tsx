@@ -245,10 +245,12 @@ export function AppSidebar() {
                   </SidebarMenuSub>
                 )}
               </SidebarMenuItem>
+              )}
 
 
 
               {/* High Ticket — colapsável */}
+              {showHTGroup && (
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="High Ticket"
