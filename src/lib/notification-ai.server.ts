@@ -152,6 +152,14 @@ const TOOLS = [
       },
     },
   },
+  { type: "function" as const, function: { name: "get_dashboard_snapshot", description: "Snapshot geral de hoje/mês: vendas, top vendedor, financeiro, leads, calls, ads, quiz. Use quando pedirem 'relatório', 'como tá hoje', 'me dá um overview'.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_sales_today", description: "Ranking de vendas de hoje por vendedor.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_leads_summary", description: "Quantos leads no CRM hoje e por operação/expert.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_my_tasks", description: "Tarefas pendentes (hoje + atrasadas) da pessoa que está conversando.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_calls_summary", description: "Calls hoje, amanhã, semana, ontem, mês — geral.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_ads_summary", description: "Gasto e métricas de Meta Ads no mês atual.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_quiz_summary", description: "Funil do quiz HighTicket: total, completos hoje, qualificados por faixa.", parameters: { type: "object", properties: {} } } },
+  { type: "function" as const, function: { name: "get_financial_summary", description: "Resumo financeiro do mês: receitas, despesas, saldo, próximos vencimentos.", parameters: { type: "object", properties: {} } } },
   {
     type: "function" as const,
     function: {
