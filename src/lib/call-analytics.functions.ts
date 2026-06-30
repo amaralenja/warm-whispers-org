@@ -275,3 +275,26 @@ export const removeTemplateRecipient = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Lista vendedores + team_members que têm telefone, normalizando o 9 */
+export const listRecipientCandidates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [vRes, tRes] = await Promise.all([
+      context.supabase.from("vendedores").select("id, nome, telefone, foto_url").eq("ativo", true),
+      context.supabase.from("team_members").select("id, nome, telefone, foto_url, funcao").eq("ativo", true),
+    ]);
+    const out: Array<{ id: string; nome: string; telefone: string; origem: "vendedor" | "equipe"; subtitulo?: string; foto_url?: string | null }> = [];
+    for (const v of vRes.data ?? []) {
+      const tel = normalizeBrPhone((v as any).telefone ?? "");
+      if (!tel) continue;
+      out.push({ id: `v:${(v as any).id}`, nome: (v as any).nome, telefone: tel, origem: "vendedor", foto_url: (v as any).foto_url });
+    }
+    for (const t of tRes.data ?? []) {
+      const tel = normalizeBrPhone((t as any).telefone ?? "");
+      if (!tel) continue;
+      out.push({ id: `t:${(t as any).id}`, nome: (t as any).nome, telefone: tel, origem: "equipe", subtitulo: (t as any).funcao, foto_url: (t as any).foto_url });
+    }
+    return out.sort((a, b) => a.nome.localeCompare(b.nome));
+  });
+
+
