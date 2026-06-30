@@ -42,8 +42,14 @@ import {
   DollarSign,
   Wallet,
   Eye,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
+import { useServerFn } from "@tanstack/react-start";
+import { fetchInstagramProfile } from "@/lib/instagram.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/quiz")({
   component: QuizPage,
