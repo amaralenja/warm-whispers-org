@@ -940,7 +940,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
   );
 }
 
-// ----- Verificação de Instagram (Bright Data) -----
+// ----- Verificação de Instagram (Bright Data + cache em banco) -----
 type IgStatus = "unknown" | "checking" | "real" | "fake";
 type IgProfile = {
   username: string;
@@ -953,16 +953,13 @@ type IgProfile = {
   profile_pic_url?: string | null;
   profile_url?: string | null;
 };
-type IgCacheEntry = { status: "real" | "fake"; profile?: IgProfile };
-const IG_CACHE_KEY = "quiz_ig_verify_v3";
 
-function loadIgCache(): Record<string, IgCacheEntry> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(IG_CACHE_KEY) || "{}"); } catch { return {}; }
-}
-function saveIgCache(c: Record<string, IgCacheEntry>) {
-  localStorage.setItem(IG_CACHE_KEY, JSON.stringify(c));
-}
+// Contexto: mapa compartilhado de @username -> row do banco
+type IgDbRow = { username: string; verification_status?: string | null } & Partial<IgProfile>;
+const IgDbContext = createContext<{
+  map: Map<string, IgDbRow>;
+  setLocal: (key: string, row: IgDbRow) => void;
+}>({ map: new Map(), setLocal: () => {} });
 
 function fmtIg(n?: number) {
   if (!n) return "0";
