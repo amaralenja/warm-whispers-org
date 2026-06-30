@@ -317,6 +317,12 @@ export async function continueNotificationSession(opts: {
   const { db, channelId, contactWa, userText } = opts;
   if (!userText.trim()) return;
 
+  // Allowlist: só responde vendedores e team_members
+  if (!(await isAllowedContact(db, contactWa))) {
+    console.log("[notif-ai] contato fora da allowlist, ignorando", contactWa);
+    return;
+  }
+
   const { data: sessRow } = await db
     .from("wa_ai_sessions")
     .select("*")
