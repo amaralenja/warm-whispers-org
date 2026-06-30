@@ -770,6 +770,11 @@ function ChatPage() {
                     />
                   )}
                 </div>
+                <FlowInlineBar
+                  conversation={active}
+                  listFlowsFn={listFlowsFn}
+                  triggerFn={triggerFlowFn}
+                />
               </footer>
             </>
           )}
