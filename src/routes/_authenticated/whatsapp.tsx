@@ -149,9 +149,12 @@ function WhatsAppPage() {
   });
 
   const allChannels = (data ?? []) as EvoChannel[];
-  const scoped = isGeral
-    ? allChannels
-    : allChannels.filter((c) => c.operacaoId === workspace.id);
+  // Notification channels are global (operacao = __notificador__) — never filter by workspace.
+  const scoped = allChannels.filter((c) => {
+    const kind = c.kind ?? "chat";
+    if (kind === "notification") return true;
+    return isGeral || c.operacaoId === workspace.id;
+  });
   const channels = scoped.filter((c) => (c.kind ?? "chat") === tab);
 
 
