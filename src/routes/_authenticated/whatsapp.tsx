@@ -653,6 +653,7 @@ function TemplatesPanel() {
       if (error) throw error;
       return (data ?? []) as any[];
     },
+    refetchInterval: 15000,
   });
 
   const [editing, setEditing] = useState<any | null>(null);
@@ -664,6 +665,7 @@ function TemplatesPanel() {
   const [approvalOpen, setApprovalOpen] = useState<any | null>(null);
   const [approvalChannelId, setApprovalChannelId] = useState<string>("");
   const [approvalSending, setApprovalSending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const { data: notifChannels = [] } = useQuery({
     queryKey: ["wa_notification_channels"],
@@ -691,6 +693,23 @@ function TemplatesPanel() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
   });
 
+  const statusBadge = (s: string | null | undefined) => {
+    const v = String(s ?? "").toUpperCase();
+    if (v === "APPROVED") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/40";
+    if (v === "REJECTED" || v === "DISABLED") return "bg-red-500/15 text-red-300 border-red-500/40";
+    if (v === "PENDING" || v === "IN_REVIEW" || v === "IN_APPEAL") return "bg-amber-500/15 text-amber-300 border-amber-500/40";
+    return "bg-muted/40 text-muted-foreground border-border";
+  };
+  const statusLabel = (s: string | null | undefined) => {
+    const v = String(s ?? "").toUpperCase();
+    if (!v) return "Não enviado";
+    if (v === "APPROVED") return "Aprovado";
+    if (v === "REJECTED") return "Rejeitado";
+    if (v === "PENDING" || v === "IN_REVIEW") return "Em análise";
+    if (v === "IN_APPEAL") return "Em recurso";
+    if (v === "DISABLED") return "Desativado";
+    return v;
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 space-y-4">
@@ -699,7 +718,29 @@ function TemplatesPanel() {
           <h3 className="text-base font-semibold text-foreground">Templates de notificação</h3>
           <p className="text-xs text-muted-foreground">Mensagens pré-aprovadas usadas pelos gatilhos automáticos.</p>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={syncing}
+          onClick={async () => {
+            setSyncing(true);
+            try {
+              const { syncMetaTemplates } = await import("@/lib/wa-templates.functions");
+              const res = await syncMetaTemplates();
+              toast.success(`Sincronizado · ${res.updated}/${res.total}`);
+              qc.invalidateQueries({ queryKey: ["wa_templates"] });
+            } catch (e: any) {
+              toast.error(e?.message ?? "Falha ao sincronizar");
+            } finally {
+              setSyncing(false);
+            }
+          }}
+        >
+          {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+          Atualizar status
+        </Button>
       </div>
+
       {isLoading ? (
         <div className="text-sm text-muted-foreground"><Loader2 className="h-4 w-4 inline animate-spin mr-2" /> Carregando…</div>
       ) : templates.length === 0 ? (
