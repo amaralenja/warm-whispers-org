@@ -78,11 +78,12 @@ async function rawMetaProxy(channelToken: string, path: string, init?: RequestIn
 
 async function findChannel(channelId: string, supabase?: any) {
   if (supabase) {
-    const { data: local } = await supabase
+    const { data: localRow } = await supabase
       .from("wa_channels" as any)
       .select("id,token,phone_number_id,metadata,status,name")
       .eq("id", channelId)
       .maybeSingle();
+    const local = localRow as any;
     const localToken = local?.token ? String(local.token) : "";
     const localPhoneNumberId = local?.phone_number_id
       ? String(local.phone_number_id)
