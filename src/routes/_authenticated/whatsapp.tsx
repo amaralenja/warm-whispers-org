@@ -54,8 +54,10 @@ import {
   listRecipientCandidates,
   listTemplateRecipients,
   removeTemplateRecipient,
+  retryNotificationDispatch,
   sendCallAnalytics,
 } from "@/lib/call-analytics.functions";
+
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   component: WhatsAppPage,
@@ -1102,6 +1104,8 @@ function TemplatesPanel() {
 
 function DispatchLogsPanel() {
   const listLogsFn = useServerFn(listNotificationDispatchLogs);
+  const retryFn = useServerFn(retryNotificationDispatch);
+  const qc = useQueryClient();
   const { data: logs = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ["wa_notification_dispatch_logs"],
     queryFn: async () => {
@@ -1109,6 +1113,17 @@ function DispatchLogsPanel() {
     },
     refetchInterval: 10000,
   });
+
+  const retryMut = useMutation({
+    mutationFn: async (logId: string) => retryFn({ data: { logId } }),
+    onSuccess: () => {
+      toast.success("Disparo reenviado");
+      qc.invalidateQueries({ queryKey: ["wa_notification_dispatch_logs"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao reenviar"),
+  });
+
+
 
   const fmt = (iso: string | null | undefined) => {
     if (!iso) return "—";
@@ -1183,8 +1198,26 @@ function DispatchLogsPanel() {
                       )}
                     </td>
                     <td className="px-3 py-3 max-w-[260px]">
-                      <div className="truncate font-mono text-xs text-muted-foreground" title={log.waMessageId || ""}>{log.waMessageId || "—"}</div>
+                      <div className="flex items-start gap-2">
+                        <div className="truncate font-mono text-xs text-muted-foreground flex-1" title={log.waMessageId || ""}>{log.waMessageId || "—"}</div>
+                        {(String(log.status ?? "").toLowerCase() === "failed" || String(log.status ?? "").toLowerCase() === "undelivered") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-[11px]"
+                            disabled={retryMut.isPending && retryMut.variables === log.id}
+                            onClick={() => retryMut.mutate(log.id)}
+                          >
+                            {retryMut.isPending && retryMut.variables === log.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <><RotateCw className="h-3 w-3 mr-1" /> Reenviar</>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </td>
+
                   </tr>
                 );
               })}
