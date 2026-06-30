@@ -244,11 +244,15 @@ function FlowsListPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Pasta (opcional)</Label>
+                  <Input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="Ex.: Onboarding, Recuperação..." />
+                </div>
               </div>
               <DialogFooter>
                 <Button
                   disabled={!name.trim() || createMut.isPending}
-                  onClick={() => createMut.mutate({ nome: name.trim(), operacao_id: op || null })}
+                  onClick={() => createMut.mutate({ nome: name.trim(), operacao_id: op || null, folder: folder.trim() || null })}
                 >Criar</Button>
               </DialogFooter>
             </DialogContent>
