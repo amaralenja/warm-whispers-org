@@ -188,7 +188,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     const parts = buttonId.split(":");
                     const reminderId = parts[1];
                     const action = (parts[2] ?? "").toLowerCase();
-                    if (reminderId && (action === "showup" || action === "noshow")) {
+                    if (reminderId && (action === "showup" || action === "noshow" || action === "remarcada")) {
                       const { data: rem } = await supabaseAdmin
                         .from("wa_call_reminders" as any)
                         .select("*")
