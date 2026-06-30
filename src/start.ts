@@ -18,10 +18,10 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+// Auth é anexada via serverFns.fetch (fetchWithSupabaseAuth) — NÃO usar
+// functionMiddleware com attachSupabaseAuth: quebra com "undefined.map"
+// durante HMR ao renderizar componentes que chamam useServerFn().
 export const startInstance = createStart(() => ({
-  // Auth é anexada via serverFns.fetch (fetchWithSupabaseAuth) — NÃO usar
-  // functionMiddleware com attachSupabaseAuth: quebra com "undefined.map"
-  // durante HMR ao renderizar componentes que chamam useServerFn().
   requestMiddleware: [errorMiddleware],
   serverFns: {
     fetch: fetchWithSupabaseAuth,

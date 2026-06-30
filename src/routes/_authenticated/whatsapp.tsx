@@ -17,6 +17,7 @@ import {
   Activity,
   X,
   QrCode,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ import {
   setChannelOperacao,
   deleteWhatsappChannel,
   regenerateWhatsappToken,
+  renameWhatsappChannel,
   getWhatsappQuality,
   type EvoChannel,
 } from "@/lib/evohub.functions";
@@ -80,6 +82,7 @@ function WhatsAppPage() {
   const deleteFn = useServerFn(deleteWhatsappChannel);
   const regenFn = useServerFn(regenerateWhatsappToken);
   const setOpFn = useServerFn(setChannelOperacao);
+  const renameFn = useServerFn(renameWhatsappChannel);
   const registerWebhookFn = useServerFn(registerWhatsappWebhook);
 
   const isGeral = workspace.id === "all";
@@ -157,6 +160,15 @@ function WhatsAppPage() {
       qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar operação"),
+  });
+
+  const renameMut = useMutation({
+    mutationFn: (vars: { id: string; name: string }) => renameFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("Nome atualizado");
+      qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao renomear"),
   });
 
   const allChannels = (data ?? []) as EvoChannel[];
@@ -429,7 +441,10 @@ function WhatsAppPage() {
                     if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
                   }}
                   deletePending={deleteMut.isPending}
+                  onRename={(newName) => renameMut.mutate({ id: ch.id, name: newName })}
+                  renamePending={renameMut.isPending}
                 />
+
               ))}
             </div>
           )
@@ -493,7 +508,7 @@ function Banner({
 }
 
 function ChannelCard({
-  ch, opLabel, operacoes, onChangeOp, onRegen, regenPending, onDelete, deletePending,
+  ch, opLabel, operacoes, onChangeOp, onRegen, regenPending, onDelete, deletePending, onRename, renamePending,
 }: {
   ch: EvoChannel;
   opLabel: string;
@@ -503,6 +518,8 @@ function ChannelCard({
   regenPending: boolean;
   onDelete: () => void;
   deletePending: boolean;
+  onRename: (newName: string) => void;
+  renamePending: boolean;
 }) {
   const qualityFn = useServerFn(getWhatsappQuality);
   const status = (ch.status || "").toLowerCase();
@@ -550,7 +567,21 @@ function ChannelCard({
           </span>
         </div>
 
-        <h3 className="mt-4 text-lg font-bold text-foreground truncate">{ch.name}</h3>
+        <div className="mt-4 flex items-center gap-1.5">
+          <h3 className="text-lg font-bold text-foreground truncate flex-1">{ch.name}</h3>
+          <button
+            type="button"
+            title="Renomear instância"
+            disabled={renamePending}
+            onClick={() => {
+              const next = window.prompt("Novo nome da instância:", ch.name);
+              if (next && next.trim() && next.trim() !== ch.name) onRename(next.trim());
+            }}
+            className="h-7 w-7 shrink-0 grid place-content-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
+          >
+            {renamePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+          </button>
+        </div>
         <p className="text-sm text-muted-foreground">WhatsApp Business</p>
       </div>
 

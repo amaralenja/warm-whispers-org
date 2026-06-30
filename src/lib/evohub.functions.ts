@@ -361,6 +361,35 @@ export const deleteWhatsappChannel = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+
+export const renameWhatsappChannel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; name: string }) => ({
+    id: String(d?.id ?? ""),
+    name: String(d?.name ?? "").trim(),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.id) throw new Error("ID obrigatório");
+    if (!data.name) throw new Error("Nome obrigatório");
+    const updated = await evoFetch(`/api/v1/channels/${data.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name: data.name }),
+    }).catch(async () => {
+      // fallback: tentar PATCH se a EvoHub usar outro verbo
+      return evoFetch(`/api/v1/channels/${data.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: data.name }),
+      });
+    });
+    await context.supabase
+      .from("wa_channels" as any)
+      .update({ name: data.name, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    return withConnectUrl({ ...(updated ?? {}), id: data.id, name: data.name });
+  });
+
+
 export const regenerateWhatsappToken = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
