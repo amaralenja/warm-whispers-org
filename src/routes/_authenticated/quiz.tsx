@@ -599,7 +599,7 @@ function QuizPage() {
           </CardContent>
         </Card>
       ) : view === "kanban" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+        <DragScroll className="flex gap-4 overflow-x-auto scrollbar-fancy pb-3 -mx-2 px-2 cursor-grab active:cursor-grabbing select-none">
           {ORIGIN_ORDER.map((key) => {
             const items = grouped[key] ?? [];
             if (items.length === 0) return null;
@@ -607,7 +607,7 @@ function QuizPage() {
             const origin = classifyLead(sample);
             const Icon = origin.icon;
             return (
-              <div key={key} className={`flex flex-col rounded-2xl border ${origin.border} ${origin.bg} max-h-[82vh]`}>
+              <div key={key} className={`shrink-0 w-[360px] flex flex-col rounded-2xl border ${origin.border} ${origin.bg} max-h-[82vh]`}>
                 <div className={`flex items-center justify-between px-4 py-3 border-b ${origin.border}`}>
                   <div className={`flex items-center gap-2 text-sm font-semibold ${origin.text}`}>
                     <Icon className="h-4 w-4" /> {origin.label}
@@ -623,7 +623,7 @@ function QuizPage() {
             );
           })}
           {grouped.fakes.length > 0 && reality !== "real" && (
-            <div className="flex flex-col rounded-2xl border border-rose-500/30 bg-rose-500/5 max-h-[82vh]">
+            <div className="shrink-0 w-[360px] flex flex-col rounded-2xl border border-rose-500/30 bg-rose-500/5 max-h-[82vh]">
               <div className="flex items-center justify-between px-4 py-3 border-b border-rose-500/30">
                 <div className="flex items-center gap-2 text-sm font-semibold text-rose-300">
                   <XCircle className="h-4 w-4" /> Fakes
@@ -637,9 +637,9 @@ function QuizPage() {
               </div>
             </div>
           )}
-
-        </div>
+        </DragScroll>
       ) : (
+
         <Card>
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-sm">
