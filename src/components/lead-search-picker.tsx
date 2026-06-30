@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -76,49 +75,49 @@ export function LeadSearchPicker({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <UserPlus className="h-4 w-4 mr-1" /> {triggerLabel}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Buscar lead no Quiz</DialogTitle>
-        </DialogHeader>
-        <div className="flex gap-2">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doSearch()}
-            placeholder="Nome, e-mail ou WhatsApp..."
-            autoFocus
-          />
-          <Button type="button" onClick={doSearch} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          </Button>
-        </div>
-        <div className="max-h-[400px] overflow-y-auto space-y-1 mt-2">
-          {results.length === 0 && !loading && (
-            <p className="text-xs text-muted-foreground text-center py-6">
-              Digite e busque para encontrar leads.
-            </p>
-          )}
-          {results.map((l) => (
-            <button
-              type="button"
-              key={l.id}
-              onClick={() => pick(l)}
-              className="w-full text-left p-2 rounded-md border border-border hover:bg-accent/10 hover:border-accent transition"
-            >
-              <div className="font-medium text-sm">{l.nome || "(sem nome)"}</div>
-              <div className="text-xs text-muted-foreground">
-                {l.email || "—"} {l.whatsapp ? `• ${l.whatsapp}` : ""}
-              </div>
-            </button>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <UserPlus className="h-4 w-4 mr-1" /> {triggerLabel}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Buscar lead no Quiz</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && doSearch()}
+              placeholder="Nome, e-mail ou WhatsApp..."
+              autoFocus
+            />
+            <Button type="button" onClick={doSearch} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            </Button>
+          </div>
+          <div className="max-h-[400px] overflow-y-auto space-y-1 mt-2">
+            {results.length === 0 && !loading ? (
+              <p className="text-xs text-muted-foreground text-center py-6">
+                Digite e busque para encontrar leads.
+              </p>
+            ) : null}
+            {results.map((l) => (
+              <button
+                type="button"
+                key={l.id}
+                onClick={() => pick(l)}
+                className="w-full text-left p-2 rounded-md border border-border hover:bg-accent/10 hover:border-accent transition"
+              >
+                <div className="font-medium text-sm">{l.nome || "(sem nome)"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {l.email || "—"} {l.whatsapp ? `• ${l.whatsapp}` : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
