@@ -2,7 +2,6 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 import { fetchWithSupabaseAuth } from "@/integrations/supabase/auth-attacher";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -20,13 +19,11 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 // Auth é anexada via serverFns.fetch (fetchWithSupabaseAuth) — NÃO usar
-// functionMiddleware com attachSupabaseAuth: quebra com "undefined.map"
-// durante HMR ao renderizar componentes que chamam useServerFn().
+// functionMiddleware com attachSupabaseAuth: o módulo não exporta mais essa fn
+// e o React quebra com "undefined.map" durante HMR.
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
   requestMiddleware: [errorMiddleware],
   serverFns: {
     fetch: fetchWithSupabaseAuth,
   },
 }));
-
