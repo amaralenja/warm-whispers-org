@@ -1033,9 +1033,10 @@ async function igDrain() {
 }
 
 function IgRow({ username }: { username: string }) {
-  const key = username.toLowerCase();
+  const key = (username || "").toLowerCase().trim().replace(/^@/, "").replace(/\/+$/, "");
+  const isValidHandle = /^[a-z0-9._]+$/i.test(key);
   const { map, setLocal } = useContext(IgDbContext);
-  const dbRow = map.get(key);
+  const dbRow = isValidHandle ? map.get(key) : undefined;
 
   function rowToProfile(r: IgDbRow | undefined): IgProfile | null {
     if (!r) return null;
