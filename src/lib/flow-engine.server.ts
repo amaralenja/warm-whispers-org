@@ -159,15 +159,32 @@ async function sendWA(channelId: string, to: string, body: any, db: any) {
   return { waMsgId: attempt.json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
 }
 
+// Monotonic counter so consecutive flow inserts always have strictly increasing created_at,
+// even when the engine fires fast back-to-back messages.
+let __flowMsgSeq = 0;
+let __flowMsgLastMs = 0;
+function nextFlowCreatedAt(): string {
+  const now = Date.now();
+  if (now <= __flowMsgLastMs) {
+    __flowMsgSeq += 1;
+  } else {
+    __flowMsgLastMs = now;
+    __flowMsgSeq = 0;
+  }
+  // Add seq ms to ensure strict ordering across rapid inserts.
+  return new Date(__flowMsgLastMs + __flowMsgSeq).toISOString();
+}
+
 async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
   if (!ctx.conversationId) return;
+  const createdAt = nextFlowCreatedAt();
   await ctx.db.from("wa_messages" as any).insert({
     conversation_id: ctx.conversationId,
     channel_id: ctx.channelId,
     wa_message_id: waMsgId,
     direction: "out",
     msg_type: type,
-    text_body: body?.text?.body ?? null,
+    text_body: body?.text?.body ?? body?.interactive?.body?.text ?? null,
     media_url: body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null,
     media_filename: body?.document?.filename ?? null,
     caption: body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null,
@@ -175,13 +192,15 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     to_wa_id: toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId),
     status: "sent",
     raw: body,
+    created_at: createdAt,
   });
   await ctx.db.from("wa_conversations" as any).update({
-    last_message_at: new Date().toISOString(),
+    last_message_at: createdAt,
     last_message_preview: type === "text" ? (body?.text?.body ?? "").slice(0, 120) : `[${type}]`,
     last_message_direction: "out",
   }).eq("id", ctx.conversationId);
 }
+
 
 async function logExecution(db: any, runId: string, node: Node, status: string, output?: any, error?: string, started?: number) {
   await db.from("wa_flow_executions" as any).insert({
