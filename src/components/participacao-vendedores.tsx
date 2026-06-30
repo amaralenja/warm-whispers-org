@@ -36,16 +36,17 @@ function asStr(v: unknown) {
 }
 
 export function ParticipacaoVendedores({
-  vendedores,
+  vendedores: vendedoresProp,
   loading,
 }: {
-  vendedores: VendedorStat[];
+  vendedores?: VendedorStat[] | null;
   loading?: boolean;
 }) {
+  const vendedores: VendedorStat[] = Array.isArray(vendedoresProp) ? vendedoresProp : [];
   const [hover, setHover] = useState<number | null>(null);
 
   const total = useMemo(
-    () => vendedores.reduce((acc, v) => acc + v.faturamento, 0),
+    () => vendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0),
     [vendedores],
   );
 
