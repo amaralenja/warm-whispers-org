@@ -85,19 +85,55 @@ async function fetchChannelToken(channelId: string, db: any): Promise<{ token: s
   return { token: ch.token, phoneNumberId };
 }
 
-async function sendWA(channelId: string, to: string, body: any, db: any) {
-  const { token, phoneNumberId } = await fetchChannelToken(channelId, db);
-  const toNormalized = normalizeBrWhatsappNumber(to);
+async function postMetaMessage(token: string, phoneNumberId: string, payload: any) {
   const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta/${phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", to: toNormalized, ...body }),
+    body: JSON.stringify(payload),
   });
   const text = await res.text();
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = text; }
-  if (!res.ok) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
-  return { waMsgId: json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
+  return { ok: res.ok, status: res.status, json };
+}
+
+async function findUsableMetaToken(phoneNumberId: string, preferredToken: string): Promise<string> {
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}/api/v1/channels`, {
+    headers: { Authorization: `Bearer ${process.env.EVOHUB_API_KEY}` },
+  }).catch(() => null);
+  if (!res || !res.ok) return preferredToken;
+  const body = await res.json().catch(() => null);
+  const list: any[] = Array.isArray(body) ? body : body?.data ?? body?.channels ?? [];
+  for (const row of list) {
+    const token = row?.token ? String(row.token) : "";
+    if (!token || token === preferredToken) continue;
+    const probe = await fetchWithTimeout(`${EVOHUB_BASE}/meta/${phoneNumberId}?fields=id`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => null);
+    if (probe?.ok) return token;
+  }
+  return preferredToken;
+}
+
+async function sendWA(channelId: string, to: string, body: any, db: any) {
+  const { token, phoneNumberId } = await fetchChannelToken(channelId, db);
+  const toNormalized = normalizeBrWhatsappNumber(to);
+  const payload = { messaging_product: "whatsapp", to: toNormalized, ...body };
+
+  let attempt = await postMetaMessage(token, phoneNumberId, payload);
+  if (!attempt.ok) {
+    const msg = attempt.json?.error?.message ?? attempt.json?.message ?? `HTTP ${attempt.status}`;
+    const msgStr = typeof msg === "string" ? msg : JSON.stringify(msg);
+    const canRetry = /INTERNAL|Meta token|Unsupported|OAuth|missing permissions|\b(400|401|500)\b/i.test(msgStr);
+    if (canRetry) {
+      const altToken = await findUsableMetaToken(phoneNumberId, token);
+      if (altToken && altToken !== token) {
+        attempt = await postMetaMessage(altToken, phoneNumberId, payload);
+      }
+    }
+    if (!attempt.ok) throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return { waMsgId: attempt.json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
 }
 
 async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
