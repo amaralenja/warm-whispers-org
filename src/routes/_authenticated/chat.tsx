@@ -296,8 +296,10 @@ function ChatPage() {
     }).catch(() => undefined);
   }
 
-  async function handleFileUpload(file: File) {
+  async function handleFileUpload(file: File, opts?: { type?: typeof pendingType; caption?: string }) {
     if (!active) return;
+    const type = opts?.type ?? pendingType;
+    const caption = opts?.caption ?? "";
     toast.loading("Enviando mídia…", { id: "wa-media-upload" });
     const ext = file.name.split(".").pop() || "bin";
     const path = `${active.channel_id}/${active.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -320,12 +322,36 @@ function ChatPage() {
       channelId: active.channel_id,
       conversationId: active.id,
       to: active.contact_wa_id,
-      type: pendingType,
+      type,
       mediaUrl: signed.data.signedUrl,
       filename: file.name,
-      caption: draft.trim() || undefined,
+      caption: caption.trim() || undefined,
     });
     toast.dismiss("wa-media-upload");
+  }
+
+  function openPreviewOrSend(file: File) {
+    if (pendingType === "audio") {
+      handleFileUpload(file);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview({ file, url, type: pendingType });
+    setPreviewCaption("");
+  }
+
+  function confirmPreviewSend() {
+    if (!preview) return;
+    handleFileUpload(preview.file, { type: preview.type, caption: previewCaption });
+    URL.revokeObjectURL(preview.url);
+    setPreview(null);
+    setPreviewCaption("");
+  }
+
+  function cancelPreview() {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+    setPreviewCaption("");
   }
 
   async function downloadMedia(msg: Msg) {
