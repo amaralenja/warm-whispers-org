@@ -31,6 +31,7 @@ import { Route as AuthenticatedFlowsIndexRouteImport } from './routes/_authentic
 import { Route as ApiPublicIgImageRouteImport } from './routes/api/public/ig-image'
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
+import { Route as ApiPublicNotificationAiReplyRouteImport } from './routes/api/public/notification-ai/reply'
 import { Route as ApiPublicNotificationAiContinueRouteImport } from './routes/api/public/notification-ai/continue'
 import { Route as ApiPublicHooksTaskDueCheckRouteImport } from './routes/api/public/hooks/task-due-check'
 import { Route as ApiPublicHooksSendCallAnalyticsRouteImport } from './routes/api/public/hooks/send-call-analytics'
@@ -148,6 +149,12 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicNotificationAiReplyRoute =
+  ApiPublicNotificationAiReplyRouteImport.update({
+    id: '/api/public/notification-ai/reply',
+    path: '/api/public/notification-ai/reply',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicNotificationAiContinueRoute =
   ApiPublicNotificationAiContinueRouteImport.update({
     id: '/api/public/notification-ai/continue',
@@ -204,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
+  '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -232,6 +240,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
+  '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
@@ -262,6 +271,7 @@ export interface FileRoutesById {
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
+  '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
     | '/api/public/notification-ai/continue'
+    | '/api/public/notification-ai/reply'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
     | '/api/public/notification-ai/continue'
+    | '/api/public/notification-ai/reply'
     | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
     | '/api/public/notification-ai/continue'
+    | '/api/public/notification-ai/reply'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -363,6 +376,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSendCallAnalyticsRoute: typeof ApiPublicHooksSendCallAnalyticsRoute
   ApiPublicHooksTaskDueCheckRoute: typeof ApiPublicHooksTaskDueCheckRoute
   ApiPublicNotificationAiContinueRoute: typeof ApiPublicNotificationAiContinueRoute
+  ApiPublicNotificationAiReplyRoute: typeof ApiPublicNotificationAiReplyRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
@@ -522,6 +536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/notification-ai/reply': {
+      id: '/api/public/notification-ai/reply'
+      path: '/api/public/notification-ai/reply'
+      fullPath: '/api/public/notification-ai/reply'
+      preLoaderRoute: typeof ApiPublicNotificationAiReplyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/notification-ai/continue': {
       id: '/api/public/notification-ai/continue'
       path: '/api/public/notification-ai/continue'
@@ -612,6 +633,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSendCallAnalyticsRoute: ApiPublicHooksSendCallAnalyticsRoute,
   ApiPublicHooksTaskDueCheckRoute: ApiPublicHooksTaskDueCheckRoute,
   ApiPublicNotificationAiContinueRoute: ApiPublicNotificationAiContinueRoute,
+  ApiPublicNotificationAiReplyRoute: ApiPublicNotificationAiReplyRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
