@@ -340,12 +340,7 @@ export function VendorPermissionsDialog({
               </div>
             </section>
 
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+
           </div>
         )}
 
