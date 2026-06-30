@@ -36,18 +36,18 @@ function asStr(v: unknown) {
 }
 
 export function ParticipacaoVendedores({
-  vendedores,
+  vendedores: vendedoresProp,
   loading,
 }: {
   vendedores?: VendedorStat[] | null;
   loading?: boolean;
 }) {
-  const safeVendedores: VendedorStat[] = Array.isArray(vendedores) ? vendedores : [];
+  const vendedores: VendedorStat[] = Array.isArray(vendedoresProp) ? vendedoresProp : [];
   const [hover, setHover] = useState<number | null>(null);
 
   const total = useMemo(
-    () => safeVendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0),
-    [safeVendedores],
+    () => vendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0),
+    [vendedores],
   );
 
   // Donut: top 6, agrupa o resto como "Outros"
