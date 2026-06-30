@@ -1326,6 +1326,7 @@ export type Database = {
           created_at: string | null
           display_phone_number: string | null
           id: string
+          kind: string
           metadata: Json
           name: string
           operacao_id: string | null
@@ -1344,6 +1345,7 @@ export type Database = {
           created_at?: string | null
           display_phone_number?: string | null
           id: string
+          kind?: string
           metadata?: Json
           name?: string
           operacao_id?: string | null
@@ -1362,6 +1364,7 @@ export type Database = {
           created_at?: string | null
           display_phone_number?: string | null
           id?: string
+          kind?: string
           metadata?: Json
           name?: string
           operacao_id?: string | null
@@ -1690,6 +1693,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wa_templates: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          conteudo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          slug: string
+          updated_at: string
+          vars: string[]
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string
+          conteudo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          slug: string
+          updated_at?: string
+          vars?: string[]
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          conteudo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          slug?: string
+          updated_at?: string
+          vars?: string[]
+        }
+        Relationships: []
       }
     }
     Views: {
