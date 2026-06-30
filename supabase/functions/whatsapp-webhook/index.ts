@@ -591,11 +591,61 @@ async function describeImageWithOpenAI(bytes: Uint8Array, mime: string, caption?
   return String(json.choices?.[0]?.message?.content || caption || "imagem recebida").trim();
 }
 
+const AI_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "create_task",
+      description: "Cria uma tarefa no quadro de tarefas (Kanban) da Multum. Use quando o usuário pedir pra anotar/criar/adicionar uma tarefa, lembrete ou to-do.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: { type: "string", description: "Título curto da tarefa" },
+          descricao: { type: "string", description: "Detalhes opcionais" },
+          prioridade: { type: "string", enum: ["baixa", "media", "alta", "urgente"], description: "Prioridade, default media" },
+          prazo: { type: "string", description: "Prazo ISO 8601 (ex: 2026-07-01T15:00:00-03:00) — opcional" },
+          assignee_nome: { type: "string", description: "Nome do responsável (opcional). Ex: 'Amaral'" },
+        },
+        required: ["titulo"],
+      },
+    },
+  },
+];
+
+async function executeAiTool(supabase: any, name: string, args: any, contactWa: string): Promise<string> {
+  try {
+    if (name === "create_task") {
+      const { data: col } = await supabase.from("task_columns").select("id,board_id,ordem").order("ordem", { ascending: true }).limit(1).maybeSingle();
+      if (!col) return JSON.stringify({ ok: false, error: "Nenhum board/coluna padrão encontrado" });
+      let assignee_ids: string[] = [];
+      if (args.assignee_nome) {
+        const { data: tm } = await supabase.from("team_members").select("id,nome").ilike("nome", `%${args.assignee_nome}%`).limit(1).maybeSingle();
+        if (tm?.id) assignee_ids = [tm.id];
+      }
+      const row = {
+        board_id: col.board_id,
+        column_id: col.id,
+        titulo: String(args.titulo).slice(0, 200),
+        descricao: args.descricao ?? null,
+        prioridade: args.prioridade ?? "media",
+        prazo: args.prazo ?? null,
+        assignee_ids,
+      };
+      const { data, error } = await supabase.from("tasks").insert(row).select("id,titulo").maybeSingle();
+      if (error) return JSON.stringify({ ok: false, error: error.message });
+      return JSON.stringify({ ok: true, id: data?.id, titulo: data?.titulo, assignee: args.assignee_nome ?? null, prazo: args.prazo ?? null });
+    }
+    return JSON.stringify({ ok: false, error: `tool desconhecida: ${name}` });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: (e as any)?.message ?? String(e) });
+  }
+}
+
 async function composeAiReply(supabase: any, contactWa: string, userText: string): Promise<string> {
   const clean = userText.trim();
   const norm = normalizeText(clean);
   if (/^(opa|oi|ol[áa]|bom dia|boa tarde|boa noite|e ai|e aí|\.)\W*$/.test(norm)) {
-    return "Opa, tudo bem? Como posso te ajudar hoje? Pode pedir relatório, vendas, leads, tarefas, calls, financeiro, quiz ou Ads.";
+    return "Opa, tudo bem? Como posso te ajudar hoje? Pode pedir relatório, vendas, leads, tarefas, calls, financeiro, quiz ou Ads. Posso também criar tarefas pra você.";
   }
   const snapshot = await getAiSnapshot(supabase, contactWa, clean);
   const key = Deno.env.get("OPENAI_API_KEY");
@@ -606,25 +656,37 @@ async function composeAiReply(supabase: any, contactWa: string, userText: string
     });
     if (appReply) return appReply;
     if (snapshot) return `Fechou, chefe. Segue o que achei:\n\n${snapshot}`;
-    return "Fechou, chefe. Recebi sua mensagem, mas a chave da OpenAI não está disponível no webhook agora. Me pede um relatório que eu te retorno com os dados do sistema.";
+    return "Fechou, chefe. Recebi sua mensagem, mas a chave da OpenAI não está disponível no webhook agora.";
   }
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.35,
-        messages: [
-          { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e útil, com linguagem informal profissional. Nunca invente número: use só o contexto real quando houver. Se pedirem uma ação que ainda exige confirmação, peça os dados faltantes." },
-          ...(snapshot ? [{ role: "system", content: snapshot }] : []),
-          { role: "user", content: clean },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`OpenAI chat HTTP ${res.status}: ${await res.text()}`);
-    const json = await res.json();
-    return String(json.choices?.[0]?.message?.content || "Fechou, chefe. Como posso te ajudar?").trim();
+    const messages: any[] = [
+      { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e informal profissional. Nunca invente número: use só contexto real. Quando o usuário pedir pra criar/anotar/adicionar uma tarefa, USE A TOOL create_task — não apenas diga que vai anotar. Confirme depois de executar." },
+      ...(snapshot ? [{ role: "system", content: snapshot }] : []),
+      { role: "user", content: clean },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-4o-mini", temperature: 0.35, tools: AI_TOOLS, messages }),
+      });
+      if (!res.ok) throw new Error(`OpenAI chat HTTP ${res.status}: ${await res.text()}`);
+      const json = await res.json();
+      const msg = json.choices?.[0]?.message;
+      const toolCalls = msg?.tool_calls;
+      if (toolCalls && toolCalls.length) {
+        messages.push(msg);
+        for (const tc of toolCalls) {
+          let args: any = {};
+          try { args = JSON.parse(tc.function?.arguments || "{}"); } catch {}
+          const result = await executeAiTool(supabase, tc.function?.name, args, contactWa);
+          messages.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
+        continue;
+      }
+      return String(msg?.content || "Fechou, chefe. Como posso te ajudar?").trim();
+    }
+    return "Fechou, chefe. Executei o que pediu.";
   } catch (e) {
     const appReply = await composeAiReplyViaApp(clean, snapshot).catch(() => "");
     if (appReply) return appReply;
