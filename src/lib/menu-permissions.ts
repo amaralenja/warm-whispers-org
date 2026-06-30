@@ -35,15 +35,22 @@ export const MENU_TREE: MenuNode[] = [
 
 export type Permissoes = Record<string, boolean | Record<string, boolean>>;
 
+/** Admin (sem permissoes setadas) enxerga tudo via canSee. Esta é a baseline para NOVOS vendedores. */
 export function defaultPermissoes(): Permissoes {
   const p: Permissoes = {};
   for (const n of MENU_TREE) {
     if ("children" in n) {
       const sub: Record<string, boolean> = {};
-      for (const c of n.children) sub[c.key] = true;
+      // Por padrão tudo desligado…
+      for (const c of n.children) sub[c.key] = false;
+      // …menos os essenciais de Operação X1: CRM e WhatsApp.
+      if (n.key === "operacao-x1") {
+        sub["crm"] = true;
+        sub["whatsapp"] = true;
+      }
       p[n.key] = sub;
     } else {
-      p[n.key] = true;
+      p[n.key] = false;
     }
   }
   return p;
