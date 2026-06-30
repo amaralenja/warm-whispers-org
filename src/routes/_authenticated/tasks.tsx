@@ -120,9 +120,22 @@ function normalizeChecklist(raw: unknown): ChecklistGroup[] {
 
 function normalizeLabels(raw: unknown): { texto: string; cor: string }[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((l: any) =>
-    typeof l === "string" ? { texto: l, cor: "#64748b" } : { texto: l.texto, cor: l.cor ?? "#64748b" },
-  );
+  return raw
+    .map((l: any) => {
+      if (typeof l === "string") {
+        try {
+          const parsed = JSON.parse(l);
+          if (parsed && typeof parsed === "object") {
+            return { texto: String(parsed.texto ?? parsed.label ?? ""), cor: String(parsed.cor ?? "#64748b") };
+          }
+        } catch {
+          // label antiga em texto puro
+        }
+        return { texto: l, cor: "#64748b" };
+      }
+      return { texto: String(l?.texto ?? ""), cor: String(l?.cor ?? "#64748b") };
+    })
+    .filter((l) => l.texto.trim().length > 0);
 }
 
 
@@ -680,7 +693,7 @@ function TaskDialog({
       prioridade,
       prazo: prazo ? prazo.toISOString() : null,
       assignee_ids: assignees,
-      labels,
+      labels: labels.map((l) => JSON.stringify({ texto: l.texto, cor: l.cor })),
       checklist: checklists,
       column_id: columnId,
     };
