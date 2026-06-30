@@ -216,6 +216,27 @@ function ChatPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
+  const { data: channels = [] } = useQuery({
+    queryKey: ["wa-channels-display"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("wa_channels" as any)
+        .select("id,name,display_phone_number,verified_name");
+      return (data ?? []) as unknown as Array<{ id: string; name: string | null; display_phone_number: string | null; verified_name: string | null }>;
+    },
+    staleTime: 60_000,
+  });
+  const channelById = useMemo(() => {
+    const m = new Map<string, { label: string; phone: string }>();
+    for (const c of channels) {
+      const phone = c.display_phone_number ? `+${String(c.display_phone_number).replace(/\D/g, "")}` : "";
+      const label = c.verified_name || c.name || phone || c.id;
+      m.set(c.id, { label, phone });
+    }
+    return m;
+  }, [channels]);
+
   // Realtime: refresh conv list when new conversation/message lands
   useEffect(() => {
     const ch = supabase
@@ -592,6 +613,17 @@ function ChatPage() {
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
+                    {(() => {
+                      const ch = channelById.get(active.channel_id);
+                      if (!ch) return null;
+                      return (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          <span className="opacity-70">Atendido por:</span>{" "}
+                          <span className="font-medium text-foreground">{ch.label}</span>
+                          {ch.phone && ch.phone !== ch.label ? <span className="ml-1 opacity-70">({ch.phone})</span> : null}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
                 <FlowDispatcher
