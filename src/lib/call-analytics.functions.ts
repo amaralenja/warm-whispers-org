@@ -228,9 +228,8 @@ export async function runCallAnalyticsCron(dateStr?: string) {
 export const listTemplateRecipients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { templateId: string }) => d)
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows, error } = await supabaseAdmin
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
       .from("wa_template_recipients" as any)
       .select("*")
       .eq("template_id", data.templateId)
@@ -242,11 +241,10 @@ export const listTemplateRecipients = createServerFn({ method: "POST" })
 export const addTemplateRecipient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { templateId: string; telefone: string; nome?: string }) => d)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const phone = normalizeBrPhone(data.telefone);
     if (!phone) throw new Error("Telefone inválido");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await context.supabase
       .from("wa_template_recipients" as any)
       .insert({ template_id: data.templateId, telefone: phone, nome: data.nome ?? null, ativo: true })
       .select("*")
@@ -258,12 +256,12 @@ export const addTemplateRecipient = createServerFn({ method: "POST" })
 export const removeTemplateRecipient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
       .from("wa_template_recipients" as any)
       .delete()
       .eq("id", data.id);
     if (error) throw error;
     return { ok: true };
   });
+
