@@ -340,7 +340,216 @@ async function rescheduleCalendarEvent(eventId: string, startISO: string, durati
   });
 }
 
+// ---- Identify contact (vendedor ou team) ----
+async function identifyContact(db: AnyDb, contactWa: string): Promise<{ tipo: "vendedor" | "team"; id: string; nome: string; utm?: string } | null> {
+  const variants = brPhoneVariants(contactWa);
+  const [{ data: vend }, { data: team }] = await Promise.all([
+    db.from("vendedores").select("id,nome,utm,telefone").not("telefone", "is", null),
+    db.from("team_members").select("id,nome,telefone").not("telefone", "is", null),
+  ]);
+  for (const v of (vend ?? []) as any[]) {
+    const vs = brPhoneVariants(v.telefone);
+    if (vs.some((x) => variants.includes(x))) return { tipo: "vendedor", id: String(v.id), nome: v.nome, utm: v.utm };
+  }
+  for (const t of (team ?? []) as any[]) {
+    const ts = brPhoneVariants(t.telefone);
+    if (ts.some((x) => variants.includes(x))) return { tipo: "team", id: String(t.id), nome: t.nome };
+  }
+  return null;
+}
+
+function brlFmt(n: number) {
+  return Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+
+async function gcalRange(timeMin: string, timeMax: string) {
+  const { gcal } = await import("@/lib/google-calendar.functions");
+  const params = new URLSearchParams({ timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "250" });
+  const r: any = await gcal(`/events?${params.toString()}`);
+  return (r?.items ?? []) as any[];
+}
+
+function brtRange(fromDate: Date, toDate: Date) {
+  return { timeMin: fromDate.toISOString(), timeMax: toDate.toISOString() };
+}
+
+function startOfTodayBRT(): Date {
+  const now = new Date();
+  const s = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  s.setHours(0, 0, 0, 0);
+  // convert back to UTC ms by reapplying offset
+  const diff = s.getTime() - now.getTime() + (now.getTimezoneOffset() - s.getTimezoneOffset()) * 60000;
+  return new Date(now.getTime() + diff);
+}
+
+// ---- Report builders ----
+async function reportSalesToday(db: AnyDb) {
+  const { data } = await db.rpc("get_ranking_tv_stats");
+  const ranking = (data?.ranking ?? []).filter((r: any) => r.vendas > 0).slice(0, 5);
+  return {
+    total_faturamento: brlFmt(data?.totalFaturamento || 0),
+    total_vendas: data?.totalVendas || 0,
+    ticket_medio: brlFmt(data?.ticketMedioGeral || 0),
+    top_vendedores: ranking.map((r: any) => ({
+      nome: r.nome, utm: r.utm, faturamento: brlFmt(r.faturamento), vendas: r.vendas, meta_pct: Math.round(r.metaPct),
+    })),
+  };
+}
+
+async function reportLeads(db: AnyDb) {
+  const todayISO = startOfTodayBRT().toISOString();
+  const { count: totalHoje } = await db.from("crm_leads").select("id", { count: "exact", head: true }).gte("created_at", todayISO);
+  const { data: byExpert } = await db.from("crm_leads").select("expert").gte("created_at", todayISO);
+  const counts: Record<string, number> = {};
+  for (const r of (byExpert ?? []) as any[]) counts[r.expert || "—"] = (counts[r.expert || "—"] || 0) + 1;
+  return { leads_hoje: totalHoje ?? 0, por_operacao: counts };
+}
+
+async function reportMyTasks(db: AnyDb, me: { id: string } | null) {
+  if (!me) return { erro: "não identifiquei seu cadastro" };
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const { data } = await db
+    .from("tasks").select("titulo,prazo,prioridade,concluida,assignee_ids")
+    .contains("assignee_ids", [me.id])
+    .eq("concluida", false)
+    .order("prazo", { ascending: true })
+    .limit(20);
+  const items = (data ?? []) as any[];
+  const atrasadas = items.filter((t) => t.prazo && new Date(t.prazo) < new Date());
+  const hoje = items.filter((t) => t.prazo && new Date(t.prazo) <= todayEnd && new Date(t.prazo) >= new Date());
+  return {
+    pendentes_total: items.length,
+    atrasadas: atrasadas.map((t) => ({ titulo: t.titulo, prazo: t.prazo, prioridade: t.prioridade })),
+    hoje: hoje.map((t) => ({ titulo: t.titulo, prazo: t.prazo, prioridade: t.prioridade })),
+  };
+}
+
+async function reportCalls() {
+  const now = new Date();
+  const startHoje = startOfTodayBRT();
+  const endHoje = new Date(startHoje.getTime() + 86400_000);
+  const endAmanha = new Date(startHoje.getTime() + 2 * 86400_000);
+  const startOntem = new Date(startHoje.getTime() - 86400_000);
+  const endSemana = new Date(startHoje.getTime() + 7 * 86400_000);
+  const startMes = new Date(now.getFullYear(), now.getMonth(), 1);
+  try {
+    const [hoje, amanha, semana, ontem, mes] = await Promise.all([
+      gcalRange(startHoje.toISOString(), endHoje.toISOString()),
+      gcalRange(endHoje.toISOString(), endAmanha.toISOString()),
+      gcalRange(startHoje.toISOString(), endSemana.toISOString()),
+      gcalRange(startOntem.toISOString(), startHoje.toISOString()),
+      gcalRange(startMes.toISOString(), now.toISOString()),
+    ]);
+    const tally = (items: any[]) => {
+      let show = 0, no = 0, rem = 0;
+      for (const e of items) {
+        const s = String(e.summary || "");
+        if (s.startsWith("✅")) show++;
+        else if (s.startsWith("❌")) no++;
+        else if (s.startsWith("🔄")) rem++;
+      }
+      return { total: items.length, showup: show, noshow: no, remarcada: rem };
+    };
+    return {
+      hoje: tally(hoje),
+      amanha: tally(amanha),
+      proxima_semana: tally(semana),
+      ontem: tally(ontem),
+      mes_ate_agora: tally(mes),
+    };
+  } catch (e: any) {
+    return { erro: `calendário: ${e?.message || e}` };
+  }
+}
+
+async function reportAdsMonth() {
+  try {
+    const accountId = process.env.META_ADS_ACCOUNT_ID;
+    const token = process.env.META_ADS_SYSTEM_USER_TOKEN;
+    if (!accountId || !token) return { erro: "Meta Ads não configurado" };
+    const since = new Date(); since.setDate(1); const sinceStr = since.toISOString().slice(0, 10);
+    const untilStr = new Date().toISOString().slice(0, 10);
+    const url = `https://graph.facebook.com/v20.0/act_${accountId}/insights?fields=spend,impressions,clicks,ctr,cpm,actions&time_range=${encodeURIComponent(JSON.stringify({ since: sinceStr, until: untilStr }))}&access_token=${token}`;
+    const r = await fetch(url);
+    const j: any = await r.json();
+    const row = j?.data?.[0];
+    if (!row) return { erro: "sem dados de insights", raw: j?.error?.message };
+    const purchases = (row.actions || []).find((a: any) => a.action_type === "purchase")?.value;
+    return {
+      gasto: brlFmt(Number(row.spend || 0)),
+      impressoes: Number(row.impressions || 0),
+      cliques: Number(row.clicks || 0),
+      ctr: row.ctr ? `${Number(row.ctr).toFixed(2)}%` : "—",
+      cpm: row.cpm ? brlFmt(Number(row.cpm)) : "—",
+      conversoes: purchases ? Number(purchases) : 0,
+      periodo: `${sinceStr} → ${untilStr}`,
+    };
+  } catch (e: any) {
+    return { erro: e?.message || String(e) };
+  }
+}
+
+async function reportQuiz(db: AnyDb) {
+  const todayISO = startOfTodayBRT().toISOString();
+  const [{ count: total }, { count: hoje }] = await Promise.all([
+    db.from("ht_leads").select("id", { count: "exact", head: true }),
+    db.from("ht_leads").select("id", { count: "exact", head: true }).gte("created_at", todayISO),
+  ]);
+  // tenta achar faixa de faturamento em metadata
+  const { data: rows } = await db.from("ht_leads").select("dados,created_at").gte("created_at", todayISO).limit(500);
+  const faixas: Record<string, number> = {};
+  for (const r of (rows ?? []) as any[]) {
+    const f = r?.dados?.faturamento || r?.dados?.faixa || "não informado";
+    faixas[f] = (faixas[f] || 0) + 1;
+  }
+  return { total_quiz: total ?? 0, completos_hoje: hoje ?? 0, faixas_hoje: faixas };
+}
+
+async function reportFinancial(db: AnyDb) {
+  const now = new Date();
+  const ini = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const { data } = await db
+    .from("financeiro").select("tipo,valor,status,data_vencimento,descricao")
+    .gte("data_ref", ini)
+    .limit(500);
+  const rows = (data ?? []) as any[];
+  let receitas = 0, despesas = 0, aReceber = 0, aPagar = 0;
+  for (const r of rows) {
+    const v = Number(r.valor || 0);
+    if (r.tipo === "receita") { receitas += v; if (r.status !== "pago") aReceber += v; }
+    else { despesas += v; if (r.status !== "pago") aPagar += v; }
+  }
+  const proximos = rows
+    .filter((r) => r.status !== "pago" && r.data_vencimento)
+    .sort((a, b) => String(a.data_vencimento).localeCompare(String(b.data_vencimento)))
+    .slice(0, 5)
+    .map((r) => ({ desc: r.descricao, vence: r.data_vencimento, valor: brlFmt(r.valor), tipo: r.tipo }));
+  return {
+    receitas_mes: brlFmt(receitas), despesas_mes: brlFmt(despesas),
+    saldo_mes: brlFmt(receitas - despesas),
+    a_receber: brlFmt(aReceber), a_pagar: brlFmt(aPagar),
+    proximos_vencimentos: proximos,
+  };
+}
+
+async function snapshot(db: AnyDb, me: { id: string } | null) {
+  const [vendas, leads, calls, ads, quiz, fin, tasks] = await Promise.allSettled([
+    reportSalesToday(db), reportLeads(db), reportCalls(), reportAdsMonth(), reportQuiz(db), reportFinancial(db), reportMyTasks(db, me),
+  ]);
+  const pick = (p: any) => p.status === "fulfilled" ? p.value : { erro: String(p.reason?.message || p.reason) };
+  return {
+    vendas_hoje: pick(vendas),
+    leads: pick(leads),
+    calls: pick(calls),
+    ads_mes: pick(ads),
+    quiz: pick(quiz),
+    financeiro_mes: pick(fin),
+    minhas_tarefas: pick(tasks),
+  };
+}
+
 // ---- Main entry points ----
+
 
 export async function startNotificationSession(opts: {
   db: AnyDb;
