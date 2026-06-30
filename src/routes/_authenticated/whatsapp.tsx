@@ -1115,11 +1115,11 @@ function TemplatesPanel() {
 }
 
 function DispatchLogsPanel() {
+  const listLogsFn = useServerFn(listNotificationDispatchLogs);
   const { data: logs = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ["wa_notification_dispatch_logs"],
     queryFn: async () => {
-      const { listNotificationDispatchLogs } = await import("@/lib/call-analytics.functions");
-      return await listNotificationDispatchLogs({ data: { limit: 120 } });
+      return await listLogsFn({ data: { limit: 120 } });
     },
     refetchInterval: 10000,
   });
