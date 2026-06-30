@@ -230,14 +230,37 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
             let nodeData: any = {};
 
             if (s.type === "message") {
-              const msg = messagesById.get(s.itemId) ?? objectsById.get(s.itemId);
-              const text =
-                (msg as any)?.text ??
-                (msg as any)?.content ??
-                (msg as any)?.message ??
-                (msg as any)?.body ??
-                "";
-              nodeData = { text: String(text || "(sem texto)") };
+              const msgObj = messagesById.get(s.itemId);
+              const objMatch = objectsById.get(s.itemId)
+                ?? b.objectsList?.find((o: any) => o?.itemId === s.itemId);
+
+              const extractText = (o: any): string | null => {
+                if (!o) return null;
+                for (const k of ["text", "content", "message", "body", "value"]) {
+                  const v = o?.[k];
+                  if (typeof v === "string" && v.trim()) return v;
+                }
+                const d = o?.data;
+                if (typeof d === "string" && d.trim() && !d.startsWith("data:")) return d;
+                return null;
+              };
+
+              const text = extractText(msgObj) ?? extractText(objMatch);
+
+              if (text) {
+                nodeData = { text: String(text) };
+              } else {
+                nodeData = {
+                  text: "ERRO: conteúdo não encontrado",
+                  _debug: {
+                    original_item_id: s.itemId,
+                    original_sequence_id: s.id,
+                    original_message_object: msgObj ?? null,
+                    original_object_list_match: objMatch ?? null,
+                  },
+                };
+                summary.errors.push({ funnel: f.name, item: s.itemId, message: "texto não encontrado em messages/objectsList" });
+              }
             } else {
               const kind = s.type === "audio" ? "audio" : s.type === "document" ? "document" : "media";
               const up = await uploadMedia(s.itemId, kind);
