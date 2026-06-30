@@ -426,9 +426,9 @@ function FlowsListPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setZvOpen(false)}>Fechar</Button>
-            <Button disabled={!zvFile || zvMut.isPending} onClick={runZvImport}>
-              {zvMut.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando…</>
+            <Button disabled={!zvFile || !!zvProgress} onClick={runZvImport}>
+              {zvProgress
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando {zvProgress}…</>
                 : <><Upload className="h-4 w-4 mr-2" /> Importar</>}
             </Button>
           </DialogFooter>
