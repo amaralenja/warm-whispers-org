@@ -4,6 +4,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const EVOHUB_BASE = "https://api.evohub.ai";
+const API_TIMEOUT_MS = 15_000;
 
 type Ctx = {
   runId: string;
@@ -18,6 +19,30 @@ type Ctx = {
 type Node = { id: string; type: string; data: any };
 type Edge = { id: string; source: string; target: string; sourceHandle?: string | null };
 
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: init?.signal ?? controller.signal });
+  } catch (err: any) {
+    if (err?.name === "AbortError") throw new Error("EvoHub demorou demais para responder");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeBrWhatsappNumber(raw: string): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits.startsWith("55")) return digits;
+  if (digits.length === 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    if (rest.length === 8 && !rest.startsWith("9")) return `55${ddd}9${rest}`;
+  }
+  return digits;
+}
+
 function interpolate(tpl: string, ctx: Ctx): string {
   if (!tpl) return tpl;
   return tpl
@@ -27,7 +52,23 @@ function interpolate(tpl: string, ctx: Ctx): string {
 }
 
 async function fetchChannelToken(channelId: string): Promise<{ token: string; phoneNumberId: string }> {
-  const res = await fetch(`${EVOHUB_BASE}/api/v1/channels`, {
+  const { data: localRow } = await supabaseAdmin
+    .from("wa_channels" as any)
+    .select("id,token,phone_number_id,metadata")
+    .eq("id", channelId)
+    .maybeSingle();
+  const local = localRow as any;
+  const localToken = local?.token ? String(local.token) : "";
+  const localPhoneNumberId = local?.phone_number_id
+    ? String(local.phone_number_id)
+    : local?.metadata?.meta_connection?.phone_number_id
+      ? String(local.metadata.meta_connection.phone_number_id)
+      : "";
+  if (localToken && localPhoneNumberId) {
+    return { token: localToken, phoneNumberId: localPhoneNumberId };
+  }
+
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}/api/v1/channels`, {
     headers: { Authorization: `Bearer ${process.env.EVOHUB_API_KEY}` },
   });
   if (!res.ok) throw new Error(`EvoHub HTTP ${res.status}`);
@@ -35,26 +76,27 @@ async function fetchChannelToken(channelId: string): Promise<{ token: string; ph
   const list: any[] = Array.isArray(body) ? body : body?.data ?? body?.channels ?? [];
   const ch = list.find((c) => c.id === channelId);
   if (!ch) throw new Error(`Canal ${channelId} não encontrado no EvoHub`);
-  const phoneNumberId = ch?.metadata?.meta_connection?.phone_number_id;
+  const phoneNumberId = ch?.metadata?.meta_connection?.phone_number_id ?? ch?.meta_connection?.phone_number_id ?? ch?.phone_number_id;
   if (!phoneNumberId) throw new Error("Canal sem phone_number_id");
   return { token: ch.token, phoneNumberId };
 }
 
 async function sendWA(channelId: string, to: string, body: any) {
   const { token, phoneNumberId } = await fetchChannelToken(channelId);
-  const res = await fetch(`${EVOHUB_BASE}/meta/${phoneNumberId}/messages`, {
+  const toNormalized = normalizeBrWhatsappNumber(to);
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta/${phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", to, ...body }),
+    body: JSON.stringify({ messaging_product: "whatsapp", to: toNormalized, ...body }),
   });
   const text = await res.text();
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = text; }
   if (!res.ok) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
-  return { waMsgId: json?.messages?.[0]?.id ?? null, phoneNumberId };
+  return { waMsgId: json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
 }
 
-async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string) {
+async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
   if (!ctx.conversationId) return;
   await supabaseAdmin.from("wa_messages" as any).insert({
     conversation_id: ctx.conversationId,
@@ -67,7 +109,7 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     media_filename: body?.document?.filename ?? null,
     caption: body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null,
     from_wa_id: phoneNumberId,
-    to_wa_id: ctx.contactWaId,
+    to_wa_id: toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId),
     status: "sent",
     raw: body,
   });
@@ -179,8 +221,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
       if (!text) return {};
       const body = { type: "text", text: { body: text } };
-      const { waMsgId, phoneNumberId } = await sendWA(ctx.channelId, ctx.contactWaId, body);
-      await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId);
+      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body);
+      await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized);
       return { log: { text } };
     }
 
@@ -211,8 +253,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (mediaType === "document" && filename) inner.filename = filename;
       }
       const body: any = { type: mediaType, [mediaType]: inner };
-      const { waMsgId, phoneNumberId } = await sendWA(ctx.channelId, ctx.contactWaId, body);
-      await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId);
+      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body);
+      await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
       return { log: { url: finalUrl } };
     }
 
@@ -233,8 +275,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
           },
         },
       };
-      const { waMsgId, phoneNumberId } = await sendWA(ctx.channelId, ctx.contactWaId, body);
-      await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId);
+      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body);
+      await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
       // After sending, automatically pause to wait for button reply.
       const ttl = Number(node.data?.timeoutSeconds ?? 86400);
       return {

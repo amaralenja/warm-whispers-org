@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const EVOHUB_BASE = "https://api.evohub.ai";
+const API_TIMEOUT_MS = 15_000;
 
 function getEvoKey() {
   const k = process.env.EVOHUB_API_KEY;
@@ -9,8 +10,21 @@ function getEvoKey() {
   return k;
 }
 
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: init?.signal ?? controller.signal });
+  } catch (err: any) {
+    if (err?.name === "AbortError") throw new Error("EvoHub demorou demais para responder");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function evoApi(path: string, init?: RequestInit) {
-  const res = await fetch(`${EVOHUB_BASE}${path}`, {
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${getEvoKey()}`,
@@ -29,7 +43,7 @@ async function evoApi(path: string, init?: RequestInit) {
 }
 
 async function metaProxy(channelToken: string, path: string, init?: RequestInit) {
-  const res = await fetch(`${EVOHUB_BASE}/meta${path}`, {
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${channelToken}`,
@@ -48,7 +62,7 @@ async function metaProxy(channelToken: string, path: string, init?: RequestInit)
 }
 
 async function rawMetaProxy(channelToken: string, path: string, init?: RequestInit) {
-  const res = await fetch(`${EVOHUB_BASE}/meta${path}`, {
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${channelToken}`,
@@ -62,8 +76,26 @@ async function rawMetaProxy(channelToken: string, path: string, init?: RequestIn
   return { ok: res.ok, status: res.status, body };
 }
 
-async function findChannel(channelId: string) {
-  // Loads all channels and finds by id (small N, fine for now)
+async function findChannel(channelId: string, supabase?: any) {
+  if (supabase) {
+    const { data: localRow } = await supabase
+      .from("wa_channels" as any)
+      .select("id,token,phone_number_id,metadata,status,name")
+      .eq("id", channelId)
+      .maybeSingle();
+    const local = localRow as any;
+    const localToken = local?.token ? String(local.token) : "";
+    const localPhoneNumberId = local?.phone_number_id
+      ? String(local.phone_number_id)
+      : local?.metadata?.meta_connection?.phone_number_id
+        ? String(local.metadata.meta_connection.phone_number_id)
+        : undefined;
+    if (localToken && localPhoneNumberId) {
+      return { token: localToken, phoneNumberId: localPhoneNumberId, raw: local };
+    }
+  }
+
+  // Fallback EvoHub: carrega o canal remoto quando a tabela local ainda não tem token/phone_number_id.
   const data = await evoApi("/api/v1/channels");
   const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
   const fromList = list.find((c) => c.id === channelId);
@@ -71,7 +103,7 @@ async function findChannel(channelId: string) {
   const ch = await evoApi(`/api/v1/channels/${channelId}`).catch(() => fromList);
   if (!ch) throw new Error("Canal não encontrado");
   const metaConnection = ch?.meta_connection ?? ch?.metadata?.meta_connection ?? null;
-  const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id;
+  const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id ?? ch?.phone_number_id;
   return { token: ch.token as string, phoneNumberId: phoneNumberId as string | undefined, raw: ch };
 }
 
@@ -204,7 +236,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     caption: d?.caption ?? "",
   }))
   .handler(async ({ context, data }) => {
-    const ch = await findChannel(data.channelId);
+    const ch = await findChannel(data.channelId, context.supabase);
     if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id (não conectado ainda)");
 
     const toNormalized = normalizeBrWhatsappNumber(data.to);
@@ -236,17 +268,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };
     }
 
-    const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-
-    const waMsgId = resp?.messages?.[0]?.id ?? null;
-
-    const { error } = await context.supabase.from("wa_messages" as any).insert({
+    const { data: inserted, error } = await context.supabase.from("wa_messages" as any).insert({
       conversation_id: data.conversationId,
       channel_id: data.channelId,
-      wa_message_id: waMsgId,
+      wa_message_id: null,
       direction: "out",
       msg_type: data.type,
       text_body: data.type === "text" ? data.text : null,
@@ -255,10 +280,11 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       caption: data.caption || null,
       from_wa_id: ch.phoneNumberId,
       to_wa_id: toNormalized,
-      status: "sent",
+      status: "pending",
       sent_by: context.userId,
-    });
-    if (error) console.error("insert outgoing msg", error);
+      raw: { pending: true, request: body },
+    }).select("id").single();
+    if (error) throw new Error(`Falha ao salvar mensagem: ${error.message}`);
 
     await context.supabase
       .from("wa_conversations" as any)
@@ -269,7 +295,27 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       })
       .eq("id", data.conversationId);
 
-    return { ok: true, waMsgId };
+    try {
+      const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      const waMsgId = resp?.messages?.[0]?.id ?? null;
+      await context.supabase
+        .from("wa_messages" as any)
+        .update({ wa_message_id: waMsgId, status: "sent", raw: { request: body, response: resp } })
+        .eq("id", (inserted as any).id);
+
+      return { ok: true, waMsgId, messageId: (inserted as any).id };
+    } catch (e: any) {
+      const errorMessage = e?.message ? String(e.message) : "Falha ao enviar no WhatsApp";
+      await context.supabase
+        .from("wa_messages" as any)
+        .update({ status: "failed", raw: { request: body, error: errorMessage } })
+        .eq("id", (inserted as any).id);
+      throw new Error(errorMessage);
+    }
   });
 
 function previewForOut(d: SendInput): string {

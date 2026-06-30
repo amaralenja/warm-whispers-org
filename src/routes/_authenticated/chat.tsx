@@ -88,6 +88,17 @@ type Msg = {
   created_at: string;
 };
 
+type SendVars = {
+  channelId: string;
+  conversationId: string;
+  to: string;
+  type: "text" | "image" | "audio" | "video" | "document" | "sticker";
+  text?: string;
+  mediaUrl?: string;
+  filename?: string;
+  caption?: string;
+};
+
 function initials(name: string | null | undefined, fallback: string) {
   const n = (name || fallback || "?").trim();
   return n
@@ -128,6 +139,8 @@ function formatDateLabel(iso: string) {
 }
 
 function StatusTick({ status }: { status: string | null }) {
+  if (status === "failed") return <span className="text-[10px] font-bold text-destructive">erro</span>;
+  if (status === "pending") return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
   if (status === "read") return <CheckCheck className="h-3.5 w-3.5 text-chat-accent" />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-muted-foreground" />;
@@ -151,6 +164,7 @@ function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingType, setPendingType] = useState<"image" | "video" | "document" | "audio">("image");
   const [mediaCache, setMediaCache] = useState<Record<string, { url?: string; mime?: string; loading?: boolean; error?: string }>>({});
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
@@ -217,24 +231,66 @@ function ChatPage() {
   }, [activeId, unreadForActive]);
 
   const sendMut = useMutation({
-    mutationFn: (vars: Parameters<typeof sendFn>[0]["data"]) => sendFn({ data: vars }),
+    mutationFn: (vars: SendVars) => sendFn({ data: vars }),
+    onMutate: async (vars) => {
+      setSendError(null);
+      await qc.cancelQueries({ queryKey: ["wa-messages", vars.conversationId] });
+      const optimisticId = `optimistic-${Date.now()}`;
+      const optimistic: Msg = {
+        id: optimisticId,
+        conversation_id: vars.conversationId,
+        channel_id: vars.channelId,
+        wa_message_id: null,
+        direction: "out",
+        msg_type: vars.type,
+        text_body: vars.type === "text" ? vars.text ?? "" : null,
+        media_id: null,
+        media_url: vars.type !== "text" ? vars.mediaUrl ?? null : null,
+        media_mime: null,
+        media_filename: vars.filename ?? null,
+        caption: vars.caption ?? null,
+        status: "pending",
+        raw: { optimistic: true },
+        created_at: new Date().toISOString(),
+      };
+      qc.setQueryData(["wa-messages", vars.conversationId], (old: Msg[] | undefined) => [
+        ...((old as Msg[]) ?? []),
+        optimistic,
+      ]);
+      return { optimisticId, conversationId: vars.conversationId };
+    },
     onSuccess: () => {
       setDraft("");
       qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao enviar"),
+    onError: (e: any, _vars, ctx) => {
+      const msg = e?.message ?? "Erro ao enviar";
+      setSendError(msg);
+      toast.error(msg);
+      if (ctx?.conversationId && ctx.optimisticId) {
+        qc.setQueryData(["wa-messages", ctx.conversationId], (old: Msg[] | undefined) =>
+          ((old as Msg[]) ?? []).map((m) =>
+            m.id === ctx.optimisticId ? { ...m, status: "failed", raw: { error: msg } } : m,
+          ),
+        );
+      }
+      qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+    },
   });
 
   async function handleSendText() {
     if (!active || !draft.trim()) return;
-    sendMut.mutate({
+    const text = draft.trim();
+    setDraft("");
+    await sendMut.mutateAsync({
       channelId: active.channel_id,
       conversationId: active.id,
       to: active.contact_wa_id,
       type: "text",
-      text: draft.trim(),
-    });
+      text,
+    }).catch(() => undefined);
   }
 
   async function handleFileUpload(file: File) {
@@ -526,6 +582,11 @@ function ChatPage() {
                     rows={1}
                     className="max-h-36 min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-3 text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
                   />
+                  {sendError && (
+                    <div className="max-w-72 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+                      {sendError}
+                    </div>
+                  )}
                   <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
                     <Smile className="h-5 w-5" />
                   </Button>
