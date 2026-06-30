@@ -17,6 +17,7 @@ function formatTime(s: number) {
 }
 
 export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps) {
+  const safeUrl = typeof url === "string" ? url : "";
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,13 +32,13 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
     setDuration(0);
     setCurrent(0);
     setError(null);
-    if (!url || typeof url !== "string" || url.length === 0) {
+    if (!safeUrl || safeUrl.length === 0) {
       audioRef.current = null;
       return;
     }
     const audio = new Audio();
     audio.preload = "metadata";
-    audio.src = url;
+    audio.src = safeUrl;
     audioRef.current = audio;
 
     const onLoaded = () => setDuration(audio.duration || 0);
@@ -73,7 +74,7 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
       audio.removeEventListener("playing", onPlaying);
       audioRef.current = null;
     };
-  }, [url]);
+  }, [safeUrl]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed;

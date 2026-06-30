@@ -45,6 +45,7 @@ import {
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
+import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 
 function ChatRoute() {
@@ -674,14 +675,21 @@ function ChatPage() {
                   <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
                     <Smile className="h-5 w-5" />
                   </Button>
-                  <Button
-                    size="icon"
-                    className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
-                    onClick={handleSendText}
-                    disabled={!draft.trim() || sendMut.isPending}
-                  >
-                    {sendMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                  </Button>
+                  {draft.trim() ? (
+                    <Button
+                      size="icon"
+                      className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
+                      onClick={handleSendText}
+                      disabled={sendMut.isPending}
+                    >
+                      {sendMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                    </Button>
+                  ) : (
+                    <WhatsappRecorder
+                      disabled={sendMut.isPending}
+                      onSend={(file: File) => handleFileUpload(file, { type: "audio" })}
+                    />
+                  )}
                 </div>
               </footer>
             </>
