@@ -268,8 +268,6 @@ export const syncMetaTemplates = createServerFn({ method: "POST" })
         .update({
           meta_status: match.status ?? null,
           meta_category: match.category ?? null,
-          meta_rejected_reason: match.rejected_reason ?? null,
-          meta_synced_at: new Date().toISOString(),
         })
         .eq("id", row.id);
       updated += 1;
