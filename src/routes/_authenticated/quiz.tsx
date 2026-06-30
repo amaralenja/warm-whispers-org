@@ -116,10 +116,12 @@ const TICKET_TIERS: Record<string, { label: string; cls: string; weight: number 
 
 // Caixa = capital disponível que a pessoa declarou ter (não é faturamento desejado)
 function caixaLabel(l: Lead): string {
-  const fromLabel = (l.caixa_label ?? "").trim();
+  const raw = l.caixa_label;
+  const fromLabel = typeof raw === "string" ? raw.trim() : "";
   if (fromLabel) return fromLabel;
-  const fromJson = ((l.respostas_json as Record<string, unknown> | null)?.caixa ?? "") as string;
-  if (typeof fromJson === "string" && fromJson.trim()) return fromJson.trim();
+  const j = (l.respostas_json as Record<string, unknown> | null)?.caixa;
+  if (typeof j === "string" && j.trim()) return j.trim();
+  if (typeof j === "number") return String(j);
   const letter = (l.caixa_letra ?? "").toUpperCase();
   return TICKET_TIERS[letter]?.label ?? "—";
 }
@@ -131,6 +133,7 @@ function caixaWeight(l: Lead): number {
 
 // Mantém o nome antigo pra não quebrar referências
 const ticketLabel = caixaLabel;
+
 
 
 type Period = "today" | "yesterday" | "7d" | "15d" | "30d" | "custom" | "all";
