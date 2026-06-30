@@ -129,6 +129,30 @@ function FlowsListPage() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao importar"),
   });
 
+  const zvMut = useMutation({
+    mutationFn: async (v: { backup: any; operacao_id: string | null; replace: boolean }) =>
+      importZvFn({ data: v }),
+    onSuccess: (r: any) => {
+      setZvSummary(r);
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+      toast.success(`Importado: ${r.funnels} funis · ${r.steps} etapas · ${r.uploads} arquivos`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao importar ZapVoice"),
+  });
+
+  async function runZvImport() {
+    if (!zvFile) return toast.error("Selecione o arquivo .json");
+    let parsed: any;
+    try {
+      parsed = JSON.parse(await zvFile.text());
+    } catch (e: any) {
+      return toast.error("JSON inválido: " + (e?.message ?? e));
+    }
+    if (!Array.isArray(parsed?.funnels)) return toast.error("JSON sem 'funnels[]'");
+    setZvSummary(null);
+    zvMut.mutate({ backup: parsed, operacao_id: zvOp || null, replace: zvReplace });
+  }
+
   const filtered = (flows as any[]).filter((f) =>
     workspace.id === "all" ? true : f.operacao_id === workspace.id
   );
