@@ -254,7 +254,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       media_filename: data.filename || null,
       caption: data.caption || null,
       from_wa_id: ch.phoneNumberId,
-      to_wa_id: data.to,
+      to_wa_id: toNormalized,
       status: "sent",
       sent_by: context.userId,
     });
