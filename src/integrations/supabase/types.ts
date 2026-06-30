@@ -1766,6 +1766,11 @@ export type Database = {
           created_at: string
           descricao: string | null
           id: string
+          meta_category: string | null
+          meta_channel_id: string | null
+          meta_status: string | null
+          meta_submitted_at: string | null
+          meta_template_id: string | null
           nome: string
           slug: string
           updated_at: string
@@ -1779,6 +1784,11 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           id?: string
+          meta_category?: string | null
+          meta_channel_id?: string | null
+          meta_status?: string | null
+          meta_submitted_at?: string | null
+          meta_template_id?: string | null
           nome: string
           slug: string
           updated_at?: string
@@ -1792,6 +1802,11 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           id?: string
+          meta_category?: string | null
+          meta_channel_id?: string | null
+          meta_status?: string | null
+          meta_submitted_at?: string | null
+          meta_template_id?: string | null
           nome?: string
           slug?: string
           updated_at?: string

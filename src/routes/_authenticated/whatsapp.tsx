@@ -658,6 +658,18 @@ function TemplatesPanel() {
   const [testOpen, setTestOpen] = useState<any | null>(null);
   const [testForm, setTestForm] = useState({ to: "", nome: "", hora: "", convidados: "" });
   const [testSending, setTestSending] = useState(false);
+  const [approvalOpen, setApprovalOpen] = useState<any | null>(null);
+  const [approvalChannelId, setApprovalChannelId] = useState<string>("");
+  const [approvalSending, setApprovalSending] = useState(false);
+
+  const { data: notifChannels = [] } = useQuery({
+    queryKey: ["wa_notification_channels"],
+    queryFn: async () => {
+      const { listNotificationChannels } = await import("@/lib/wa-templates.functions");
+      return await listNotificationChannels();
+    },
+    enabled: !!approvalOpen,
+  });
 
   const saveMut = useMutation({
     mutationFn: async (vars: { id: string; conteudo: string; buttons: Array<{ id: string; label: string }> }) => {
@@ -708,6 +720,7 @@ function TemplatesPanel() {
                   {t.slug === "lembrete_call" && (
                     <Button size="sm" variant="outline" onClick={() => { setTestOpen(t); setTestForm({ to: "", nome: "", hora: "", convidados: "" }); }}>Testar envio</Button>
                   )}
+                  <Button size="sm" variant="outline" className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" onClick={() => { setApprovalOpen(t); setApprovalChannelId(""); }}>Enviar p/ Meta</Button>
                   <Button size="sm" variant="outline" onClick={() => { setEditing(t); setConteudo(t.conteudo); setButtonsDraft(Array.isArray(t.buttons) ? t.buttons : []); }}>Editar</Button>
                 </div>
               </div>
@@ -812,6 +825,65 @@ function TemplatesPanel() {
               }}
             >
               {testSending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Enviar agora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!approvalOpen} onOpenChange={(v) => !v && setApprovalOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar template para aprovação da Meta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Será enviado como <strong className="text-emerald-400">UTILIDADE</strong> (maior taxa de aprovação). Se a Meta exigir outra categoria, tentamos como Marketing automaticamente.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Número conectado (WABA)</Label>
+              <Select value={approvalChannelId} onValueChange={setApprovalChannelId}>
+                <SelectTrigger><SelectValue placeholder="Selecione um número notificador" /></SelectTrigger>
+                <SelectContent>
+                  {notifChannels.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum número notificador conectado.</div>
+                  )}
+                  {notifChannels.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id} disabled={!c.hasWaba}>
+                      {c.name} {c.displayPhone ? `· ${c.displayPhone}` : ""} {!c.hasWaba ? "· (sem WABA)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">Só números com Meta Business Account conectado podem receber templates.</p>
+            </div>
+            {approvalOpen && (
+              <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="text-[11px] text-muted-foreground mb-1">Prévia do conteúdo</div>
+                <pre className="whitespace-pre-wrap text-xs text-foreground/90">{approvalOpen.conteudo}</pre>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApprovalOpen(null)}>Cancelar</Button>
+            <Button
+              className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
+              disabled={approvalSending || !approvalChannelId}
+              onClick={async () => {
+                setApprovalSending(true);
+                try {
+                  const { submitWhatsappTemplate } = await import("@/lib/wa-templates.functions");
+                  const res = await submitWhatsappTemplate({ data: { templateId: approvalOpen.id, channelId: approvalChannelId, language: "pt_BR" } });
+                  toast.success(`Enviado como ${res.category} · status ${res.status}`);
+                  qc.invalidateQueries({ queryKey: ["wa_templates"] });
+                  setApprovalOpen(null);
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Falha ao enviar para a Meta");
+                } finally {
+                  setApprovalSending(false);
+                }
+              }}
+            >
+              {approvalSending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Enviar para aprovação
             </Button>
           </DialogFooter>
         </DialogContent>
