@@ -46,6 +46,8 @@ import {
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 
 function ChatRoute() {
