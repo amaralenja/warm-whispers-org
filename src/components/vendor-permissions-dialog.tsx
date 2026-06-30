@@ -53,23 +53,37 @@ export function VendorPermissionsDialog({
     (async () => {
       setLoading(true);
       try {
-        const [vendRes, chanRes] = await Promise.all([
+        const [vendRes, chanRes, poolRes] = await Promise.all([
           supabase
             .from("vendedores")
-            .select("permissoes, wa_channel_ids")
+            .select("permissoes, wa_channel_ids, lead_weight")
             .eq("id", vendorId)
             .maybeSingle(),
           supabase
             .from("wa_channels" as any)
             .select("id, name, display_phone_number, verified_name, operacao_id")
             .order("name", { ascending: true }),
+          supabase
+            .from("vendedores")
+            .select("id, nome, lead_weight, wa_channel_ids, ativo")
+            .eq("ativo", true),
         ]);
         if (cancelled) return;
         const v = vendRes.data as any;
         const merged = { ...defaultPermissoes(), ...((v?.permissoes as Permissoes) ?? {}) };
         setPermissoes(merged);
         setChannelIds(Array.isArray(v?.wa_channel_ids) ? v.wa_channel_ids : []);
+        setLeadWeight(Number(v?.lead_weight ?? 1));
         setChannels(((chanRes.data as any) ?? []) as Channel[]);
+        setPool(
+          (((poolRes.data as any) ?? []) as any[]).map((p) => ({
+            id: p.id,
+            nome: p.nome,
+            lead_weight: Number(p.lead_weight ?? 1),
+            wa_channel_ids: Array.isArray(p.wa_channel_ids) ? p.wa_channel_ids : [],
+          })),
+        );
+
       } catch (e: any) {
         toast.error(e?.message ?? "Falha ao carregar");
       } finally {
