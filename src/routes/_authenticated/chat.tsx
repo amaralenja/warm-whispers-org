@@ -33,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
@@ -165,6 +166,8 @@ function ChatPage() {
   const [pendingType, setPendingType] = useState<"image" | "video" | "document" | "audio">("image");
   const [mediaCache, setMediaCache] = useState<Record<string, { url?: string; mime?: string; loading?: boolean; error?: string }>>({});
   const [sendError, setSendError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ file: File; url: string; type: "image" | "video" | "document" } | null>(null);
+  const [previewCaption, setPreviewCaption] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
@@ -293,8 +296,10 @@ function ChatPage() {
     }).catch(() => undefined);
   }
 
-  async function handleFileUpload(file: File) {
+  async function handleFileUpload(file: File, opts?: { type?: typeof pendingType; caption?: string }) {
     if (!active) return;
+    const type = opts?.type ?? pendingType;
+    const caption = opts?.caption ?? "";
     toast.loading("Enviando mídia…", { id: "wa-media-upload" });
     const ext = file.name.split(".").pop() || "bin";
     const path = `${active.channel_id}/${active.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -317,12 +322,36 @@ function ChatPage() {
       channelId: active.channel_id,
       conversationId: active.id,
       to: active.contact_wa_id,
-      type: pendingType,
+      type,
       mediaUrl: signed.data.signedUrl,
       filename: file.name,
-      caption: draft.trim() || undefined,
+      caption: caption.trim() || undefined,
     });
     toast.dismiss("wa-media-upload");
+  }
+
+  function openPreviewOrSend(file: File) {
+    if (pendingType === "audio") {
+      handleFileUpload(file);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview({ file, url, type: pendingType });
+    setPreviewCaption("");
+  }
+
+  function confirmPreviewSend() {
+    if (!preview) return;
+    handleFileUpload(preview.file, { type: preview.type, caption: previewCaption });
+    URL.revokeObjectURL(preview.url);
+    setPreview(null);
+    setPreviewCaption("");
+  }
+
+  function cancelPreview() {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+    setPreviewCaption("");
   }
 
   async function downloadMedia(msg: Msg) {
@@ -565,7 +594,7 @@ function ChatPage() {
                     }
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) handleFileUpload(f);
+                      if (f) openPreviewOrSend(f);
                       e.target.value = "";
                     }}
                   />
@@ -604,6 +633,58 @@ function ChatPage() {
           )}
         </main>
       </div>
+
+      <Dialog open={!!preview} onOpenChange={(o) => { if (!o) cancelPreview(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {preview?.type === "image" ? "Enviar imagem" : preview?.type === "video" ? "Enviar vídeo" : "Enviar documento"}
+            </DialogTitle>
+          </DialogHeader>
+          {preview && (
+            <div className="space-y-3">
+              <div className="flex max-h-[50vh] items-center justify-center overflow-hidden rounded-xl bg-muted/40">
+                {preview.type === "image" ? (
+                  <img src={preview.url} alt="preview" className="max-h-[50vh] w-auto object-contain" />
+                ) : preview.type === "video" ? (
+                  <video src={preview.url} controls className="max-h-[50vh] w-full" />
+                ) : (
+                  <div className="flex w-full items-center gap-3 p-4">
+                    <FileText className="h-10 w-10 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{preview.file.name}</p>
+                      <p className="text-xs text-muted-foreground">{(preview.file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {preview.type !== "document" || true ? (
+                <Textarea
+                  value={previewCaption}
+                  onChange={(e) => setPreviewCaption(e.target.value)}
+                  placeholder="Adicionar legenda (opcional)"
+                  rows={2}
+                  className="resize-none"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      confirmPreviewSend();
+                    }
+                  }}
+                />
+              ) : null}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={cancelPreview}>Cancelar</Button>
+            <Button onClick={confirmPreviewSend} disabled={sendMut.isPending}>
+              {sendMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Enviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
