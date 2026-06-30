@@ -906,19 +906,40 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
 
 // ----- Verificação de Instagram (Bright Data) -----
 type IgStatus = "unknown" | "checking" | "real" | "fake";
-const IG_CACHE_KEY = "quiz_ig_verify_v1";
+type IgProfile = {
+  username: string;
+  full_name?: string | null;
+  biography?: string | null;
+  followers?: number;
+  following?: number;
+  posts_count?: number;
+  is_verified?: boolean;
+  profile_pic_url?: string | null;
+  profile_url?: string | null;
+};
+type IgCacheEntry = { status: "real" | "fake"; profile?: IgProfile };
+const IG_CACHE_KEY = "quiz_ig_verify_v2";
 
-function loadIgCache(): Record<string, "real" | "fake"> {
+function loadIgCache(): Record<string, IgCacheEntry> {
   if (typeof window === "undefined") return {};
   try { return JSON.parse(localStorage.getItem(IG_CACHE_KEY) || "{}"); } catch { return {}; }
 }
-function saveIgCache(c: Record<string, "real" | "fake">) {
+function saveIgCache(c: Record<string, IgCacheEntry>) {
   localStorage.setItem(IG_CACHE_KEY, JSON.stringify(c));
+}
+
+function fmtIg(n?: number) {
+  if (!n) return "0";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
 }
 
 function IgRow({ username }: { username: string }) {
   const key = username.toLowerCase();
-  const [status, setStatus] = useState<IgStatus>(() => loadIgCache()[key] ?? "unknown");
+  const initial = loadIgCache()[key];
+  const [status, setStatus] = useState<IgStatus>(initial?.status ?? "unknown");
+  const [profile, setProfile] = useState<IgProfile | null>(initial?.profile ?? null);
   const fetchFn = useServerFn(fetchInstagramProfile);
 
   async function verify(e: React.MouseEvent) {
@@ -926,20 +947,69 @@ function IgRow({ username }: { username: string }) {
     if (status === "checking") return;
     setStatus("checking");
     try {
-      await fetchFn({ data: { input: username } });
-      const c = loadIgCache(); c[key] = "real"; saveIgCache(c);
+      const p: any = await fetchFn({ data: { input: username } });
+      const prof: IgProfile = {
+        username: p?.username ?? username,
+        full_name: p?.full_name ?? null,
+        biography: p?.biography ?? null,
+        followers: Number(p?.followers) || 0,
+        following: Number(p?.following) || 0,
+        posts_count: Number(p?.posts_count) || 0,
+        is_verified: !!p?.is_verified,
+        profile_pic_url: p?.profile_pic_url ?? null,
+        profile_url: p?.profile_url ?? `https://instagram.com/${username}`,
+      };
+      const c = loadIgCache(); c[key] = { status: "real", profile: prof }; saveIgCache(c);
+      setProfile(prof);
       setStatus("real");
       toast.success(`@${username} verificado ✓`);
     } catch (err: any) {
-      const c = loadIgCache(); c[key] = "fake"; saveIgCache(c);
+      const c = loadIgCache(); c[key] = { status: "fake" }; saveIgCache(c);
       setStatus("fake");
       toast.error(`@${username} não encontrado`);
     }
   }
 
+  if (status === "real" && profile) {
+    return (
+      <div className="mt-1 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-1.5">
+        {profile.profile_pic_url ? (
+          <img
+            src={profile.profile_pic_url}
+            alt={profile.username}
+            referrerPolicy="no-referrer"
+            className="h-9 w-9 rounded-full object-cover border border-emerald-500/50"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="h-9 w-9 rounded-full bg-pink-500/20 flex items-center justify-center">
+            <Instagram className="h-4 w-4 text-pink-400" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            <a
+              href={profile.profile_url || `https://instagram.com/${username}`}
+              target="_blank" rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="truncate text-xs font-semibold text-emerald-300 hover:underline"
+            >
+              @{profile.username}
+            </a>
+            {profile.is_verified && <ShieldCheck className="h-3 w-3 text-blue-400" />}
+          </div>
+          <div className="flex gap-2 text-[10px] text-muted-foreground">
+            <span><b className="text-foreground">{fmtIg(profile.followers)}</b> seg</span>
+            <span><b className="text-foreground">{fmtIg(profile.following)}</b> seguindo</span>
+            <span><b className="text-foreground">{fmtIg(profile.posts_count)}</b> posts</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const color =
-    status === "real" ? "text-emerald-400"
-    : status === "fake" ? "text-rose-400 line-through"
+    status === "fake" ? "text-rose-400 line-through"
     : "text-pink-400";
 
   return (
@@ -951,10 +1021,7 @@ function IgRow({ username }: { username: string }) {
           <ShieldAlert className="h-2.5 w-2.5 mr-0.5" /> fake
         </Badge>
       )}
-      {status === "real" && (
-        <ShieldCheck className="h-3 w-3 text-emerald-400" />
-      )}
-      {status !== "real" && status !== "fake" && (
+      {status !== "fake" && (
         <button
           type="button"
           onClick={verify}
@@ -967,3 +1034,4 @@ function IgRow({ username }: { username: string }) {
     </div>
   );
 }
+
