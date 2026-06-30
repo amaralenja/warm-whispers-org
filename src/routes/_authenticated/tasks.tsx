@@ -68,11 +68,13 @@ type Member = {
   id: string;
   nome: string;
   email: string | null;
+  telefone: string | null;
   funcao: string | null;
   foto_url: string | null;
   cor: string;
   ativo: boolean;
 };
+
 
 const PRIO_COLORS: Record<string, string> = {
   baixa: "bg-slate-500/20 text-slate-300 border-slate-500/40",
