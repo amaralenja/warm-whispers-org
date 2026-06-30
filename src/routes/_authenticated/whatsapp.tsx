@@ -654,11 +654,18 @@ function TemplatesPanel() {
 
   const [editing, setEditing] = useState<any | null>(null);
   const [conteudo, setConteudo] = useState("");
+  const [buttonsDraft, setButtonsDraft] = useState<Array<{ id: string; label: string }>>([]);
+  const [testOpen, setTestOpen] = useState<any | null>(null);
+  const [testForm, setTestForm] = useState({ to: "", nome: "", hora: "", convidados: "" });
+  const [testSending, setTestSending] = useState(false);
 
   const saveMut = useMutation({
-    mutationFn: async (vars: { id: string; conteudo: string }) => {
+    mutationFn: async (vars: { id: string; conteudo: string; buttons: Array<{ id: string; label: string }> }) => {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { error } = await supabase.from("wa_templates" as any).update({ conteudo: vars.conteudo }).eq("id", vars.id);
+      const { error } = await supabase
+        .from("wa_templates" as any)
+        .update({ conteudo: vars.conteudo, buttons: vars.buttons })
+        .eq("id", vars.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -668,6 +675,7 @@ function TemplatesPanel() {
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
   });
+
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 space-y-4">
