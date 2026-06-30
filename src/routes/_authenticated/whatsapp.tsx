@@ -440,7 +440,10 @@ function WhatsAppPage() {
                     if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
                   }}
                   deletePending={deleteMut.isPending}
+                  onRename={(newName) => renameMut.mutate({ id: ch.id, name: newName })}
+                  renamePending={renameMut.isPending}
                 />
+
               ))}
             </div>
           )
