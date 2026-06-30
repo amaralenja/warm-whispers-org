@@ -538,8 +538,9 @@ function TaskCard({
   onClick: () => void;
 }) {
   const assignees = task.assignee_ids.map((id) => memberById.get(id)).filter(Boolean) as Member[];
-  const checklistDone = task.checklist.filter((c) => c.done).length;
-  const checklistTotal = task.checklist.length;
+  const allItems = task.checklist.flatMap((g) => g.items);
+  const checklistDone = allItems.filter((c) => c.done).length;
+  const checklistTotal = allItems.length;
   const prazoDate = task.prazo ? new Date(task.prazo) : null;
   const isLate = prazoDate && prazoDate < new Date() && !task.concluida;
 
@@ -554,9 +555,13 @@ function TaskCard({
     >
       {task.labels.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
-          {task.labels.map((l) => (
-            <span key={l} className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-accent/20 text-accent">
-              {l}
+          {task.labels.map((l, i) => (
+            <span
+              key={`${l.texto}-${i}`}
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{ background: `${l.cor}33`, color: l.cor, border: `1px solid ${l.cor}55` }}
+            >
+              {l.texto}
             </span>
           ))}
         </div>
