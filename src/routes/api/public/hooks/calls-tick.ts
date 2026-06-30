@@ -67,11 +67,18 @@ export const Route = createFileRoute("/api/public/hooks/calls-tick")({
             // Sempre acrescenta os destinatários fixos dos templates de call
             // (cadastrados em "Lembrete de Call" / "Comparecimento de Call").
             try {
-              const { data: recips } = await supabaseAdmin
-                .from("wa_template_recipients" as any)
-                .select("telefone, nome, slug, ativo")
-                .in("slug", ["lembrete_call_v2", "lembrete_call", "comparecimento_call"])
-                .eq("ativo", true);
+              const { data: templates } = await supabaseAdmin
+                .from("wa_templates" as any)
+                .select("id")
+                .in("slug", ["lembrete_call_v2", "lembrete_call", "comparecimento_call"]);
+              const templateIds = ((templates ?? []) as any[]).map((t) => t.id).filter(Boolean);
+              const { data: recips } = templateIds.length
+                ? await supabaseAdmin
+                    .from("wa_template_recipients" as any)
+                    .select("telefone, nome, ativo")
+                    .in("template_id", templateIds)
+                    .eq("ativo", true)
+                : { data: [] };
               const extra = ((recips ?? []) as any[])
                 .filter((r) => r?.telefone)
                 .map((r) => ({ nome: r.nome ?? "", phone: String(r.telefone) }));
