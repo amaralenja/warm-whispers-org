@@ -88,6 +88,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
   "/sops": "sops",
+  "/tasks": "tasks",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 
