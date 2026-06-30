@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { canSee, type Permissoes } from "@/lib/menu-permissions";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -63,6 +64,23 @@ const highTicketItems: Item[] = [
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
 ];
 
+const URL_TO_KEY: Record<string, string> = {
+  "/dashboard": "dashboard",
+  "/relatorios": "relatorios",
+  "/ranking": "ranking",
+  "/ranking-tv": "ranking-tv",
+  "/financeiro": "financeiro",
+  "/crm": "crm",
+  "/vendedores": "vendedores",
+  "/whatsapp": "whatsapp",
+  "/chat": "chat",
+  "/flows": "flows",
+  "/calendar": "calendar",
+  "/quiz": "quiz",
+  "/meta-ads": "meta-ads",
+};
+const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -70,9 +88,29 @@ export function AppSidebar() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const highTicketActive = highTicketItems.some((i) => pathname === i.url);
+  // Permissões do vendedor (admins: null = vê tudo)
+  const [perm, setPerm] = useState<Permissoes | null>(null);
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("vendor_session") : null;
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s?.permissoes && typeof s.permissoes === "object") setPerm(s.permissoes);
+      else setPerm({});
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const visibleMain = mainItems.filter((i) => canSee(perm, keyFromUrl(i.url)));
+  const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
+  const visibleHT = highTicketItems.filter((i) => canSee(perm, "high-ticket", keyFromUrl(i.url)));
+  const showOpX1Group = canSee(perm, "operacao-x1") && visibleOpX1.length > 0;
+  const showHTGroup = canSee(perm, "high-ticket") && visibleHT.length > 0;
+
+  const highTicketActive = visibleHT.some((i) => pathname === i.url);
   const [highTicketOpen, setHighTicketOpen] = useState(highTicketActive);
-  const operacaoX1Active = operacaoX1Items.some((i) => pathname === i.url);
+  const operacaoX1Active = visibleOpX1.some((i) => pathname === i.url);
   const [operacaoX1Open, setOperacaoX1Open] = useState(operacaoX1Active);
 
 
@@ -136,9 +174,10 @@ export function AppSidebar() {
           )}
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
-              {mainItems.map(renderMenuItem)}
+              {visibleMain.map(renderMenuItem)}
 
               {/* Operação X1 — colapsável */}
+              {showOpX1Group && (
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Operação X1"
@@ -181,7 +220,7 @@ export function AppSidebar() {
 
                 {!collapsed && operacaoX1Open && (
                   <SidebarMenuSub className="mt-1 gap-1">
-                    {operacaoX1Items.map((sub) => {
+                    {visibleOpX1.map((sub) => {
                       const subActive = pathname === sub.url;
                       return (
                         <SidebarMenuSubItem key={sub.title}>
@@ -206,10 +245,12 @@ export function AppSidebar() {
                   </SidebarMenuSub>
                 )}
               </SidebarMenuItem>
+              )}
 
 
 
               {/* High Ticket — colapsável */}
+              {showHTGroup && (
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="High Ticket"
@@ -252,7 +293,7 @@ export function AppSidebar() {
 
                 {!collapsed && highTicketOpen && (
                   <SidebarMenuSub className="mt-1 gap-1">
-                    {highTicketItems.map((sub) => {
+                    {visibleHT.map((sub) => {
                       const subActive = pathname === sub.url;
                       return (
                         <SidebarMenuSubItem key={sub.title}>
@@ -277,6 +318,7 @@ export function AppSidebar() {
                   </SidebarMenuSub>
                 )}
               </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

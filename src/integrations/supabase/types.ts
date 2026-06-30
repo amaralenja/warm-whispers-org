@@ -960,7 +960,9 @@ export type Database = {
           id: number
           meta: number | null
           nome: string
+          permissoes: Json
           utm: string
+          wa_channel_ids: string[]
         }
         Insert: {
           ativo?: boolean | null
@@ -972,7 +974,9 @@ export type Database = {
           id?: never
           meta?: number | null
           nome: string
+          permissoes?: Json
           utm: string
+          wa_channel_ids?: string[]
         }
         Update: {
           ativo?: boolean | null
@@ -984,7 +988,9 @@ export type Database = {
           id?: never
           meta?: number | null
           nome?: string
+          permissoes?: Json
           utm?: string
+          wa_channel_ids?: string[]
         }
         Relationships: []
       }

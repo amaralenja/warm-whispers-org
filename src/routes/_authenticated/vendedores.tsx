@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, Copy, KeyRound, RefreshCw, Search, Target } from "lucide-react";
+import { Briefcase, Copy, KeyRound, RefreshCw, Search, Settings2, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { VendorPermissionsDialog } from "@/components/vendor-permissions-dialog";
 
 
 export const Route = createFileRoute("/_authenticated/vendedores")({
@@ -41,6 +42,7 @@ function initials(s: string | null) {
 function VendedoresPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
+  const [permVendor, setPermVendor] = useState<Vendedor | null>(null);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -240,10 +242,24 @@ function VendedoresPage() {
                 </div>
               </div>
 
+              <button
+                onClick={() => setPermVendor(v)}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-background/40 px-3 py-1.5 text-[0.7rem] font-medium text-muted-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-400"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Gerenciar acessos
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      <VendorPermissionsDialog
+        open={!!permVendor}
+        onOpenChange={(v) => !v && setPermVendor(null)}
+        vendorId={permVendor?.id ?? null}
+        vendorName={permVendor?.nome ?? null}
+      />
     </div>
   );
 }
