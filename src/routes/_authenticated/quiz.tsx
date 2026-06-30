@@ -782,12 +782,7 @@ function LeadCard({
             <span className="truncate">{lead.whatsapp}</span>
           </div>
         )}
-        {cleanIg && (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Instagram className="h-3 w-3 shrink-0 text-pink-400" />
-            <span className="truncate">@{cleanIg}</span>
-          </div>
-        )}
+        {cleanIg && <IgRow username={cleanIg} />}
       </div>
 
       {lead.utm_campaign && (
