@@ -963,18 +963,22 @@ function MembersDialog({
                   key={m.id}
                   className="flex items-center gap-3 rounded-lg border border-border bg-card/40 p-3"
                 >
-                  <Avatar className="h-10 w-10">
-                    {m.foto_url ? <AvatarImage src={m.foto_url} /> : null}
-                    <AvatarFallback style={{ background: m.cor, color: "#fff" }}>
-                      {initials(m.nome)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="h-10 w-10 rounded-full overflow-hidden border border-border bg-neutral-900 flex items-center justify-center shrink-0">
+                    {m.foto_url ? (
+                      <img src={m.foto_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="h-6 w-6 text-neutral-600" fill="currentColor">
+                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                      </svg>
+                    )}
+                  </div>
                   <div className="flex-1">
                     <div className="font-medium">{m.nome}</div>
                     <div className="text-xs text-muted-foreground">
-                      {m.funcao || "—"} {m.email ? `• ${m.email}` : ""}
+                      {m.funcao || "—"} {m.telefone ? `• ${m.telefone}` : m.email ? `• ${m.email}` : ""}
                     </div>
                   </div>
+
                   <Button size="sm" variant="ghost" onClick={() => setEditing(m)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
