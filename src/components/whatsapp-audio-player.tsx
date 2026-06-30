@@ -32,13 +32,13 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
     setDuration(0);
     setCurrent(0);
     setError(null);
-    if (!url || typeof url !== "string" || url.length === 0) {
+    if (!safeUrl || safeUrl.length === 0) {
       audioRef.current = null;
       return;
     }
     const audio = new Audio();
     audio.preload = "metadata";
-    audio.src = url;
+    audio.src = safeUrl;
     audioRef.current = audio;
 
     const onLoaded = () => setDuration(audio.duration || 0);
