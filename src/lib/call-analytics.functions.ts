@@ -1,10 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buildWhatsAppTemplateMessage, renderTemplateText } from "@/lib/wa-template-message";
-
-function renderTemplate(tpl: string, vars: Record<string, string>) {
-  return renderTemplateText(tpl, vars);
-}
 
 function normalizeBrPhone(raw: string): string {
   let digits = String(raw || "").replace(/\D/g, "");
@@ -196,6 +191,7 @@ async function computeAndSend(db: any, dateStr?: string) {
   const channelId = active?.id;
   if (!channelId) throw new Error("Nenhum canal de notificações conectado");
 
+  const { buildWhatsAppTemplateMessage } = await import("@/lib/wa-template-message");
   const body = buildWhatsAppTemplateMessage(tpl as any, {
     data: label,
     show_ups: String(showUps),
@@ -433,6 +429,7 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
         convidados: r.convidados ?? "",
       };
 
+      const { buildWhatsAppTemplateMessage } = await import("@/lib/wa-template-message");
       let body: any;
       if (isAttendance) {
         const tplButtons: Array<{ id: string; label: string }> =
@@ -505,6 +502,7 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
         criada: fmt((task as any)?.created_at),
         prazo: fmt((task as any)?.prazo),
       };
+      const { buildWhatsAppTemplateMessage } = await import("@/lib/wa-template-message");
       const body = buildWhatsAppTemplateMessage(tpl, vars);
 
       await db
