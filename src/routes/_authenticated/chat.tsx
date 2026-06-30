@@ -100,8 +100,44 @@ type SendVars = {
   caption?: string;
 };
 
-function initials(name: string | null | undefined, fallback: string) {
-  const n = (name || fallback || "?").trim();
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === "object") {
+    const data = (value as any).data;
+    const rows = (value as any).rows;
+    const items = (value as any).items;
+    if (Array.isArray(data)) return data as T[];
+    if (Array.isArray(rows)) return rows as T[];
+    if (Array.isArray(items)) return items as T[];
+  }
+  return [];
+}
+
+// Garante que renderizamos só string (algumas mensagens antigas guardaram objeto em text_body/caption).
+function toText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean" || typeof v === "bigint") return String(v);
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === "object") {
+    const anyV = v as Record<string, unknown>;
+    for (const key of ["body", "text", "message", "error", "name", "nome", "caption", "value", "id"]) {
+      const candidate = anyV[key];
+      if (typeof candidate === "string" && candidate.trim()) return candidate;
+      if (typeof candidate === "number" || typeof candidate === "boolean") return String(candidate);
+    }
+    try {
+      const json = JSON.stringify(v);
+      return json && json !== "{}" ? json : "";
+    } catch {
+      return "";
+    }
+  }
+  return String(v);
+}
+
+function initials(name: unknown, fallback: unknown) {
+  const n = (toText(name) || toText(fallback) || "?").trim();
   return n
     .split(" ")
     .filter(Boolean)
@@ -110,26 +146,19 @@ function initials(name: string | null | undefined, fallback: string) {
     .join("") || "?";
 }
 
-function formatTime(iso: string) {
-  const d = new Date(iso);
+function toSafeDate(value: unknown) {
+  const text = toText(value);
+  const date = new Date(text || Date.now());
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function formatTime(iso: unknown) {
+  const d = toSafeDate(iso);
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-// Garante que renderizamos só string (algumas mensagens antigas guardaram objeto em text_body/caption).
-function toText(v: unknown): string {
-  if (v == null) return "";
-  if (typeof v === "string") return v;
-  if (typeof v === "object") {
-    const anyV = v as any;
-    if (typeof anyV.body === "string") return anyV.body;
-    if (typeof anyV.text === "string") return anyV.text;
-    return "";
-  }
-  return String(v);
-}
-
-function formatDateLabel(iso: string) {
-  const d = new Date(iso);
+function formatDateLabel(iso: unknown) {
+  const d = toSafeDate(iso);
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
   if (sameDay) return "Hoje";
@@ -169,6 +198,7 @@ function ChatPage() {
   const [preview, setPreview] = useState<{ file: File; url: string; type: "image" | "video" | "document" } | null>(null);
   const [previewCaption, setPreviewCaption] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRafRef = useRef<number | null>(null);
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
 
@@ -195,18 +225,20 @@ function ChatPage() {
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
 
+  const conversationList = useMemo(() => asArray<Conv>(convs), [convs]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = (convs as unknown as Conv[]) ?? [];
+    const list = conversationList;
     if (!q) return list;
     return list.filter((c) =>
-      (c.contact_name ?? "").toLowerCase().includes(q) ||
-      c.contact_wa_id.includes(q) ||
-      (c.last_message_preview ?? "").toLowerCase().includes(q)
+      toText(c.contact_name).toLowerCase().includes(q) ||
+      toText(c.contact_wa_id).includes(q) ||
+      toText(c.last_message_preview).toLowerCase().includes(q)
     );
-  }, [convs, search]);
+  }, [conversationList, search]);
 
-  const active = ((convs as unknown as Conv[]) ?? []).find((c) => c.id === activeId) ?? null;
+  const active = conversationList.find((c) => String(c.id) === activeId) ?? null;
 
 
   const { data: messages = [] } = useQuery({
@@ -217,16 +249,33 @@ function ChatPage() {
     refetchOnWindowFocus: true,
   });
 
-  // Auto-scroll to bottom when messages change or conversation opens
-  const messagesLen = ((messages as unknown as Msg[]) ?? []).length;
-  useEffect(() => {
+  const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
+
+  function scrollToBottom() {
     const el = scrollRef.current;
     if (!el) return;
-    // Use rAF para garantir que rodou depois do paint (senão scrollHeight ainda é antigo)
-    const raf = requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    scrollRafRef.current = requestAnimationFrame(() => {
+      const node = scrollRef.current;
+      if (!node) return;
+      node.scrollTop = node.scrollHeight;
+      requestAnimationFrame(() => {
+        const latest = scrollRef.current;
+        if (latest) latest.scrollTop = latest.scrollHeight;
+      });
     });
-    return () => cancelAnimationFrame(raf);
+  }
+
+  // Auto-scroll to bottom when messages change or conversation opens
+  const messagesLen = messageList.length;
+  useEffect(() => {
+    scrollToBottom();
+    const timer = window.setTimeout(scrollToBottom, 120);
+    return () => {
+      window.clearTimeout(timer);
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messagesLen, activeId]);
 
   // Mark read when opening a conv (depend só em activeId + unread_count pra não loopar com a referência recalculada de `active`)
@@ -262,10 +311,11 @@ function ChatPage() {
         raw: { optimistic: true },
         created_at: new Date().toISOString(),
       };
-      qc.setQueryData(["wa-messages", vars.conversationId], (old: Msg[] | undefined) => [
-        ...((old as Msg[]) ?? []),
+      qc.setQueryData(["wa-messages", vars.conversationId], (old: unknown) => [
+        ...asArray<Msg>(old),
         optimistic,
       ]);
+      window.setTimeout(scrollToBottom, 0);
       return { optimisticId, conversationId: vars.conversationId };
     },
     onSuccess: () => {
@@ -278,8 +328,8 @@ function ChatPage() {
       setSendError(msg);
       toast.error(msg);
       if (ctx?.conversationId && ctx.optimisticId) {
-        qc.setQueryData(["wa-messages", ctx.conversationId], (old: Msg[] | undefined) =>
-          ((old as Msg[]) ?? []).map((m) =>
+        qc.setQueryData(["wa-messages", ctx.conversationId], (old: unknown) =>
+          asArray<Msg>(old).map((m) =>
             m.id === ctx.optimisticId ? { ...m, status: "failed", raw: { error: msg } } : m,
           ),
         );
@@ -390,7 +440,7 @@ function ChatPage() {
   }
 
   useEffect(() => {
-    const list = (messages as unknown as Msg[]) ?? [];
+    const list = messageList;
     const now = Date.now();
     for (const msg of list) {
       if (
@@ -402,13 +452,13 @@ function ChatPage() {
         !mediaCache[msg.id]?.error
       ) {
         // Aguarda 8s pra mensagens novas — webhook ainda pode estar baixando/uploadando
-        const ageMs = now - new Date(msg.created_at as any).getTime();
+        const ageMs = now - toSafeDate(msg.created_at).getTime();
         if (ageMs < 8000) continue;
         loadMedia(msg, { silent: ageMs < 30000 });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messageList]);
 
 
   return (
@@ -451,12 +501,14 @@ function ChatPage() {
             ) : (
               <div>
                 {filtered.map((c) => {
-                  const isActive = c.id === activeId;
+                  const contactWaId = toText(c.contact_wa_id);
+                  const contactName = toText(c.contact_name);
+                  const isActive = String(c.id) === activeId;
                   const preview = toText(c.last_message_preview);
                   return (
                     <button
-                      key={c.id}
-                      onClick={() => setActiveId(c.id)}
+                      key={String(c.id)}
+                      onClick={() => setActiveId(String(c.id))}
                       className={`group w-full border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive
                           ? "bg-chat-soft"
@@ -466,13 +518,13 @@ function ChatPage() {
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback className="rounded-full bg-chat-soft text-sm font-bold text-chat-accent">
-                            {initials(c.contact_name, c.contact_wa_id)}
+                            {initials(contactName, contactWaId)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="truncate text-[15px] font-semibold tracking-normal">
-                              {c.contact_name || c.contact_wa_id}
+                              {contactName || contactWaId}
                             </span>
                           </div>
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -484,9 +536,9 @@ function ChatPage() {
                           <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
                             {formatTime(c.last_message_at)}
                           </span>
-                          {c.unread_count > 0 ? (
+                          {Number(c.unread_count ?? 0) > 0 ? (
                             <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">
-                              {c.unread_count}
+                              {Number(c.unread_count ?? 0)}
                             </span>
                           ) : (
                             <span className={`h-2 w-2 rounded-full ${isActive ? "bg-chat-accent" : "bg-transparent"}`} />
@@ -525,13 +577,13 @@ function ChatPage() {
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <h3 className="truncate text-lg font-semibold tracking-normal">
-                        {active.contact_name || active.contact_wa_id}
+                        {toText(active.contact_name) || toText(active.contact_wa_id)}
                       </h3>
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{active.contact_wa_id}</p>
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
                   </div>
                 </div>
                 <FlowDispatcher
@@ -546,11 +598,11 @@ function ChatPage() {
                 className="chat-thread-glow min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-fancy"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-                  {((messages as unknown as Msg[]) ?? []).map((m, i, arr) => {
+                  {messageList.map((m, i, arr) => {
                     const prev = arr[i - 1];
-                    const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+                    const showDate = !prev || toSafeDate(prev.created_at).toDateString() !== toSafeDate(m.created_at).toDateString();
                     return (
-                      <div key={m.id}>
+                      <div key={String(m.id)}>
                         {showDate && (
                           <div className="my-5 flex justify-center">
                             <span className="rounded-full border border-chat-line bg-chat-panel px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
@@ -558,7 +610,7 @@ function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[m.id]} onLoadMedia={() => loadMedia(m)} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} />
                       </div>
                     );
                   })}
@@ -641,7 +693,7 @@ function ChatPage() {
       </div>
 
       <Dialog open={!!preview} onOpenChange={(o) => { if (!o) cancelPreview(); }}>
-        <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {preview?.type === "image" ? "Enviar imagem" : preview?.type === "video" ? "Enviar vídeo" : "Enviar documento"}
@@ -697,7 +749,7 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void }) {
   const isOut = msg.direction === "out";
   const body = toText(msg.text_body);
   const caption = toText(msg.caption);
@@ -710,7 +762,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
             : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
         }`}
       >
-        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} outgoing={isOut} />
+        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
         {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
         {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
         <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
@@ -722,11 +774,11 @@ function MessageBubble({ msg, mediaState, onLoadMedia }: { msg: Msg; mediaState?
   );
 }
 
-function MediaContent({ msg, mediaState, onLoadMedia, outgoing }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; outgoing?: boolean }) {
+function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; outgoing?: boolean }) {
   if (msg.msg_type === "text") return null;
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} />;
+    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
@@ -734,7 +786,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, outgoing }: { msg: Msg; me
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} />;
+      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
     }
     if (mediaState?.loading) {
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading outgoing={outgoing} />;
@@ -770,18 +822,20 @@ function MediaPlaceholder({
   onRetry?: () => void;
   outgoing?: boolean;
 }) {
-  const icon = type === "image" || type === "sticker"
+  const safeType = toText(type);
+  const safeFilename = toText(filename);
+  const icon = safeType === "image" || safeType === "sticker"
     ? <ImageIcon className="h-5 w-5" />
-    : type === "video"
+    : safeType === "video"
       ? <Video className="h-5 w-5" />
-      : type === "audio"
+      : safeType === "audio"
         ? <Mic className="h-5 w-5" />
         : <FileText className="h-5 w-5" />;
-  const label = type === "image" ? "Imagem"
-    : type === "sticker" ? "Figurinha"
-    : type === "video" ? "Vídeo"
-    : type === "audio" ? "Áudio"
-    : filename || "Documento";
+  const label = safeType === "image" ? "Imagem"
+    : safeType === "sticker" ? "Figurinha"
+    : safeType === "video" ? "Vídeo"
+    : safeType === "audio" ? "Áudio"
+    : safeFilename || "Documento";
 
   return (
     <div className={`mb-1 min-w-[280px] rounded-2xl border p-4 text-sm ${outgoing ? "border-chat-accent/25 bg-background/10" : "border-chat-line bg-background/25"}`}>
@@ -811,29 +865,32 @@ function MediaPlaceholder({
 }
 
 function RenderMedia({
-  type, url, mime, filename, outgoing,
-}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean }) {
-  if (type === "image" || type === "sticker") {
+  type, url, mime, filename, outgoing, onMediaSettled,
+}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void }) {
+  const safeType = toText(type);
+  const safeFilename = toText(filename);
+  if (safeType === "image" || safeType === "sticker") {
     return (
       <img
         src={url}
-        alt={filename ?? (type === "sticker" ? "Figurinha recebida" : "Imagem recebida")}
+        alt={safeFilename || (safeType === "sticker" ? "Figurinha recebida" : "Imagem recebida")}
         loading="lazy"
-        className={`mb-2 block rounded-2xl border border-chat-line object-contain ${type === "sticker" ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
+        onLoad={onMediaSettled}
+        className={`mb-2 block rounded-2xl border border-chat-line object-contain ${safeType === "sticker" ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
       />
     );
   }
-  if (type === "video") {
-    return <video src={url} controls className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
+  if (safeType === "video") {
+    return <video src={url} controls onLoadedMetadata={onMediaSettled} className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
-  if (type === "audio") {
+  if (safeType === "audio") {
     return <WhatsappAudioPlayer url={url} outgoing={outgoing} />;
   }
-  if (type === "document") {
+  if (safeType === "document") {
     return (
-      <a href={url} download={filename ?? "documento"} className="mb-1 flex min-w-72 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-semibold transition hover:bg-background/40">
+      <a href={url} download={safeFilename || "documento"} className="mb-1 flex min-w-72 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-semibold transition hover:bg-background/40">
         <FileText className="h-5 w-5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{filename ?? "Documento"}</span>
+        <span className="min-w-0 flex-1 truncate">{safeFilename || "Documento"}</span>
         <Download className="h-4 w-4 shrink-0" />
       </a>
     );
@@ -861,7 +918,7 @@ function FlowDispatcher({
 
   const compatible = useMemo(() => {
     const op = conversation.operacao_id;
-    return ((flows as any[]) ?? []).filter((f) => {
+    return asArray<any>(flows).filter((f) => {
       if (f?.ativo === false) return false;
       // Coerente com a operação: fluxo sem operação roda em qualquer; com operação só na mesma
       if (!f.operacao_id) return true;
@@ -913,9 +970,9 @@ function FlowDispatcher({
             >
               <Zap className="mt-0.5 h-4 w-4 shrink-0 text-chat-accent" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{f.nome}</div>
+                  <div className="text-sm font-medium truncate">{toText(f.nome) || "Fluxo sem nome"}</div>
                 {f.operacao_id && (
-                  <div className="text-[10px] text-muted-foreground">Operação: {f.operacao_id}</div>
+                    <div className="text-[10px] text-muted-foreground">Operação: {toText(f.operacao_id)}</div>
                 )}
               </div>
               {firing === f.id && <span className="text-[10px] text-muted-foreground">…</span>}
