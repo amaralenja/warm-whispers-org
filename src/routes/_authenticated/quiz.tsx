@@ -1102,48 +1102,65 @@ function IgRow({ username }: { username: string }) {
 
   if (status === "real" && profile) {
     return (
-      <div className="mt-1 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-1.5">
-        {profile.profile_pic_url ? (
-          <img
-            src={`/api/public/ig-image?u=${encodeURIComponent(profile.profile_pic_url)}`}
-            alt={profile.username}
-            className="h-9 w-9 rounded-full object-cover border border-emerald-500/50 bg-pink-500/10"
-            onError={(e) => {
-              const el = e.currentTarget as HTMLImageElement;
-              el.onerror = null;
-              el.replaceWith(Object.assign(document.createElement("div"), {
-                className: "h-9 w-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-emerald-500/50",
-                textContent: (profile.username?.[0] || "?").toUpperCase(),
-              }));
-            }}
-          />
-        ) : (
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-emerald-500/50">
-            {(profile.username?.[0] || "?").toUpperCase()}
-          </div>
-        )}
+      <div className="mt-1 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-500/[0.02] p-3 space-y-3">
+        <div className="flex items-start gap-3">
+          {profile.profile_pic_url ? (
+            <img
+              src={`/api/public/ig-image?u=${encodeURIComponent(profile.profile_pic_url)}`}
+              alt={profile.username}
+              className="h-16 w-16 rounded-full object-cover border-2 border-emerald-500/60 bg-pink-500/10 shrink-0"
+              onError={(e) => {
+                const el = e.currentTarget as HTMLImageElement;
+                el.onerror = null;
+                el.replaceWith(Object.assign(document.createElement("div"), {
+                  className: "h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-emerald-500/60 shrink-0",
+                  textContent: (profile.username?.[0] || "?").toUpperCase(),
+                }));
+              }}
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-emerald-500/60 shrink-0">
+              {(profile.username?.[0] || "?").toUpperCase()}
+            </div>
+          )}
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <a
-              href={profile.profile_url || `https://instagram.com/${username}`}
-              target="_blank" rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="truncate text-xs font-semibold text-emerald-300 hover:underline"
-            >
-              @{profile.username}
-            </a>
-            {profile.is_verified && <ShieldCheck className="h-3 w-3 text-blue-400" />}
-          </div>
-          <div className="flex gap-2 text-[10px] text-muted-foreground">
-            <span><b className="text-foreground">{fmtIg(profile.followers)}</b> seg</span>
-            <span><b className="text-foreground">{fmtIg(profile.following)}</b> seguindo</span>
-            <span><b className="text-foreground">{fmtIg(profile.posts_count)}</b> posts</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-bold text-emerald-200">
+                @{profile.username}
+              </span>
+              {profile.is_verified && <ShieldCheck className="h-3.5 w-3.5 text-blue-400 shrink-0" />}
+            </div>
+            {profile.full_name && (
+              <div className="truncate text-xs text-foreground/80 mt-0.5">{profile.full_name}</div>
+            )}
+            <div className="flex gap-3 text-[11px] text-muted-foreground mt-1.5">
+              <span><b className="text-foreground">{fmtIg(profile.followers)}</b> seg</span>
+              <span><b className="text-foreground">{fmtIg(profile.following)}</b> seg.</span>
+              <span><b className="text-foreground">{fmtIg(profile.posts_count)}</b> posts</span>
+            </div>
           </div>
         </div>
+
+        {profile.biography && (
+          <p className="text-[11px] text-foreground/70 leading-snug line-clamp-2 border-l-2 border-emerald-500/40 pl-2">
+            {profile.biography}
+          </p>
+        )}
+
+        <a
+          href={profile.profile_url || `https://instagram.com/${username}`}
+          target="_blank" rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white text-xs font-semibold py-2 transition shadow-sm"
+        >
+          <Instagram className="h-3.5 w-3.5" />
+          Visitar perfil
+        </a>
       </div>
     );
   }
+
 
   const color =
     status === "fake" ? "text-rose-400 line-through"
