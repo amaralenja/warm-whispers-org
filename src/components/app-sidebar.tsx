@@ -174,7 +174,7 @@ export function AppSidebar() {
           )}
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
-              {mainItems.map(renderMenuItem)}
+              {visibleMain.map(renderMenuItem)}
 
               {/* Operação X1 — colapsável */}
               <SidebarMenuItem>
