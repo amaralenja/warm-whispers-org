@@ -390,13 +390,14 @@ function ChatPage() {
     toast.dismiss("wa-media-upload");
   }
 
-  function openPreviewOrSend(file: File) {
-    if (pendingType === "audio") {
-      handleFileUpload(file);
+  function openPreviewOrSend(file: File, typeOverride?: typeof pendingType) {
+    const type = typeOverride ?? pendingType;
+    if (type === "audio") {
+      handleFileUpload(file, { type });
       return;
     }
     const url = URL.createObjectURL(file);
-    setPreview({ file, url, type: pendingType });
+    setPreview({ file, url, type });
     setPreviewCaption("");
   }
 
