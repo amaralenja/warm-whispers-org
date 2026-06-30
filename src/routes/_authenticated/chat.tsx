@@ -209,9 +209,21 @@ function ChatPage() {
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
 
+  // Se for sessão de vendedor, filtra só as conversas atribuídas a ele
+  const vendorId = useMemo<number | null>(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("vendor_session") : null;
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return typeof s?.id === "number" ? s.id : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const { data: convs = [] } = useQuery({
-    queryKey: ["wa-conversations", opFilter ?? "all"],
-    queryFn: () => listConvFn({ data: { operacaoId: opFilter } }),
+    queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin"],
+    queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
     refetchInterval: 5000,
     refetchOnWindowFocus: true,
   });
