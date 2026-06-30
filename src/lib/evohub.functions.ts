@@ -115,6 +115,7 @@ function getPhoneInfo(ch: any) {
 function withConnectUrl(ch: any): EvoChannel {
   const normalized = normalizeChannel(ch);
   const meta = normalizeMetadata(normalized.metadata);
+  const info = getPhoneInfo(normalized);
   return {
     id: normalized.id,
     name: normalized.name,
@@ -128,6 +129,8 @@ function withConnectUrl(ch: any): EvoChannel {
     created_at: normalized.created_at,
     updated_at: normalized.updated_at,
     connectUrl: normalized.token ? `${EVOHUB_CONNECT_BASE}/connect/${normalized.token}` : "",
+    displayPhoneNumber: info.displayPhoneNumber ?? (ch as any)?.display_phone_number ?? null,
+    verifiedName: info.verifiedName ?? (ch as any)?.verified_name ?? null,
   };
 }
 
