@@ -500,8 +500,6 @@ function FlowsGrouped({
   flows: any[];
   showOp: boolean;
   workspaces: { id: string; nome: string }[];
-  onMoveFolder: (id: string, folder: string | null) => void;
-  onEditCard: (f: any) => any;
   renderCard: (f: any) => any;
 }) {
   // Agrupa: operação -> pasta -> fluxos[]
