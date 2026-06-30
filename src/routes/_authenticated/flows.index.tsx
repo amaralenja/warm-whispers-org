@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   Workflow, Plus, Trash2, Power, PowerOff, Pencil,
-  Copy, Upload, Download, ClipboardCopy,
+  Copy, Upload, Download, ClipboardCopy, FileJson, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -22,6 +23,7 @@ import {
   listFlows, createFlow, deleteFlow, saveFlow,
   duplicateFlow, exportFlow, importFlow,
 } from "@/lib/flow-engine.functions";
+import { importZapVoiceBackup } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 
 export const Route = createFileRoute("/_authenticated/flows/")({
