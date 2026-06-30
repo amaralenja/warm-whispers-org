@@ -1322,19 +1322,30 @@ Deno.serve(async (req) => {
         const statusId = s?.id ?? s?.message_id;
         const status = s?.status ?? s?.value;
         if (!statusId || !status) continue;
+        let errorMessage: string | null = null;
+        if (status === "failed") {
+          const err = Array.isArray(s?.errors) ? s.errors[0] : null;
+          const parts = [err?.code, err?.title, err?.message, err?.error_data?.details]
+            .filter((p) => p !== null && p !== undefined && String(p).trim() !== "")
+            .map((p) => String(p));
+          errorMessage = parts.length ? parts.join(" · ") : "Falha desconhecida do Meta";
+          console.error("[wa-webhook] message failed", { statusId, channelId, errorMessage, raw: s });
+        }
+        const updateMsg: any = { status };
+        if (errorMessage) updateMsg.error_message = errorMessage;
         await supabase
           .from("wa_messages")
-          .update({ status })
+          .update(updateMsg)
           .eq("channel_id", channelId)
           .eq("wa_message_id", statusId);
         await supabase
           .from("wa_call_reminders")
-          .update({ status })
+          .update(updateMsg)
           .eq("channel_id", channelId)
           .eq("wa_message_id", statusId);
         await supabase
           .from("wa_task_notifications")
-          .update({ status })
+          .update(updateMsg)
           .eq("channel_id", channelId)
           .eq("wa_message_id", statusId);
       }

@@ -336,12 +336,12 @@ export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
     const [callRes, taskRes] = await Promise.all([
       context.supabase
         .from("wa_call_reminders" as any)
-        .select("id,event_id,channel_id,contact_wa,lead_nome,hora,convidados,status,sent_at,replied_at,wa_message_id,created_at,kind")
+        .select("id,event_id,channel_id,contact_wa,lead_nome,hora,convidados,status,sent_at,replied_at,wa_message_id,created_at,kind,error_message")
         .order("created_at", { ascending: false })
         .limit(limit),
       context.supabase
         .from("wa_task_notifications" as any)
-        .select("id,task_id,member_id,kind,channel_id,contact_wa,wa_message_id,status,sent_at,created_at")
+        .select("id,task_id,member_id,kind,channel_id,contact_wa,wa_message_id,status,sent_at,created_at,error_message")
         .order("created_at", { ascending: false })
         .limit(limit),
     ]);
@@ -363,6 +363,7 @@ export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
         createdAt: r.created_at ?? null,
         repliedAt: r.replied_at ?? null,
         channelId: r.channel_id ?? null,
+        errorMessage: r.error_message ?? null,
         details: [
           r.hora ? `Call ${r.hora}` : null,
           r.convidados ? `Convidados: ${r.convidados}` : null,
@@ -380,6 +381,7 @@ export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
         waMessageId: r.wa_message_id ?? null,
         sentAt: r.sent_at ?? null,
         createdAt: r.created_at ?? null,
+        errorMessage: r.error_message ?? null,
         details: r.task_id ? `Task ${String(r.task_id).slice(0, 8)}` : "",
       })),
     ];
