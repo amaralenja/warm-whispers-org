@@ -633,6 +633,10 @@ function ChatPage() {
                 />
               </header>
 
+              <ActiveFlowRuns conversationId={active.id} />
+
+
+
               <div
                 ref={scrollRef}
                 className="chat-thread-glow min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-fancy"
