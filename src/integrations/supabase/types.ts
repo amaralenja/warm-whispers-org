@@ -1808,6 +1808,45 @@ export type Database = {
           },
         ]
       }
+      wa_task_notifications: {
+        Row: {
+          channel_id: string | null
+          contact_wa: string
+          created_at: string
+          id: string
+          kind: string
+          member_id: string
+          sent_at: string | null
+          status: string
+          task_id: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          contact_wa: string
+          created_at?: string
+          id?: string
+          kind: string
+          member_id: string
+          sent_at?: string | null
+          status?: string
+          task_id: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          contact_wa?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          member_id?: string
+          sent_at?: string | null
+          status?: string
+          task_id?: string
+          wa_message_id?: string | null
+        }
+        Relationships: []
+      }
       wa_template_recipients: {
         Row: {
           ativo: boolean
