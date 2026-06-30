@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, Copy, KeyRound, RefreshCw, Search, Target } from "lucide-react";
+import { Briefcase, Copy, KeyRound, RefreshCw, Search, Settings2, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { VendorPermissionsDialog } from "@/components/vendor-permissions-dialog";
 
 
 export const Route = createFileRoute("/_authenticated/vendedores")({
