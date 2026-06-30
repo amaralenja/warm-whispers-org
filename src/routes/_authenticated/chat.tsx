@@ -1140,6 +1140,101 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   );
 }
 
+function FlowInlineBar({
+  conversation,
+  listFlowsFn,
+  triggerFn,
+}: {
+  conversation: Conv;
+  listFlowsFn: any;
+  triggerFn: any;
+}) {
+  const [q, setQ] = useState("");
+  const [firing, setFiring] = useState<string | null>(null);
+
+  const { data: flows = [] } = useQuery({
+    queryKey: ["flows-for-dispatch"],
+    queryFn: () => listFlowsFn(),
+    staleTime: 30_000,
+  });
+
+  const compatible = useMemo(() => {
+    const op = conversation.operacao_id;
+    const list = asArray<any>(flows).filter((f) => {
+      if (f?.ativo === false) return false;
+      if (!f.operacao_id) return true;
+      if (!op) return false;
+      return f.operacao_id === op;
+    });
+    const term = q.trim().toLowerCase();
+    if (!term) return list;
+    return list.filter((f) =>
+      toText(f.nome).toLowerCase().includes(term) ||
+      toText(f.folder).toLowerCase().includes(term)
+    );
+  }, [flows, conversation.operacao_id, q]);
+
+  function fire(flowId: string) {
+    setFiring(flowId);
+    toast.success("Fluxo disparado, rodando em segundo plano");
+    Promise.resolve(
+      triggerFn({
+        data: {
+          flow_id: flowId,
+          channel_id: conversation.channel_id,
+          contact_wa_id: conversation.contact_wa_id,
+          conversation_id: conversation.id,
+        },
+      }),
+    )
+      .catch((e: any) => toast.error(e?.message ?? "Erro ao disparar fluxo"))
+      .finally(() => setFiring(null));
+  }
+
+  return (
+    <div className="mx-auto mt-3 w-full max-w-5xl">
+      <div className="flex items-center gap-2 rounded-2xl border border-chat-line bg-chat-thread p-2">
+        <div className="relative flex-1">
+          <Zap className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-chat-accent" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar e disparar fluxo…"
+            className="h-10 rounded-xl border-0 bg-transparent pl-9 text-sm shadow-none focus-visible:ring-0"
+          />
+        </div>
+        <span className="px-2 text-[11px] text-muted-foreground">{compatible.length} disponíveis</span>
+      </div>
+      {q.trim() && (
+        <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-chat-line bg-chat-panel p-1 scrollbar-fancy">
+          {compatible.length === 0 ? (
+            <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+              Nenhum fluxo encontrado
+            </div>
+          ) : (
+            compatible.map((f: any) => (
+              <button
+                key={String(f.id)}
+                type="button"
+                disabled={firing === f.id}
+                onClick={() => fire(f.id)}
+                className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-chat-soft disabled:opacity-50"
+              >
+                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-chat-accent" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{toText(f.nome) || "Fluxo sem nome"}</div>
+                  {f.folder && <div className="truncate text-[10px] text-muted-foreground">📁 {toText(f.folder)}</div>}
+                </div>
+                {firing === f.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FlowDispatcher({
   conversation,
   listFlowsFn,
