@@ -237,16 +237,74 @@ async function evoMeta(path: string) {
   return res;
 }
 
-export async function transcribeWaAudio(mediaId: string, phoneNumberId: string): Promise<string> {
+async function evoMetaWithToken(path: string, token?: string | null) {
+  const key = token || process.env.EVOHUB_API_KEY;
+  if (!key) throw new Error("EvoHub/Meta token missing");
+  const res = await fetch(`${EVOHUB_BASE}/meta/${path}`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) throw new Error(`evo meta ${res.status}: ${await res.text()}`);
+  return res;
+}
+
+async function probeWaMediaToken(token: string, phoneNumberId?: string | null): Promise<boolean> {
+  if (!token || !phoneNumberId) return false;
+  try {
+    const res = await fetch(`${EVOHUB_BASE}/meta/v23.0/${phoneNumberId}?fields=id`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function resolveWaMediaToken(db: AnyDb, channelId: string, phoneNumberId?: string | null): Promise<string | null> {
+  const { data: local } = await db
+    .from("wa_channels")
+    .select("id,token,phone_number_id")
+    .eq("id", channelId)
+    .maybeSingle();
+  const localToken = local?.token ? String(local.token) : "";
+  const localPhoneId = phoneNumberId || local?.phone_number_id || null;
+  if (localToken && (!localPhoneId || await probeWaMediaToken(localToken, localPhoneId))) return localToken;
+
+  const apiKey = process.env.EVOHUB_API_KEY;
+  if (!apiKey || !localPhoneId) return localToken || apiKey || null;
+  try {
+    const res = await fetch(`${EVOHUB_BASE}/api/v1/channels`, {
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) return localToken || null;
+    const body = await res.json();
+    const list: any[] = Array.isArray(body) ? body : body?.data ?? body?.channels ?? [];
+    for (const row of list) {
+      const detailRes = await fetch(`${EVOHUB_BASE}/api/v1/channels/${row.id}`, {
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      }).catch(() => null);
+      const detail = detailRes?.ok ? await detailRes.json().catch(() => row) : row;
+      const token = detail?.token ? String(detail.token) : "";
+      if (token && await probeWaMediaToken(token, localPhoneId)) {
+        await db.from("wa_channels").update({ token, synced_at: new Date().toISOString() }).eq("id", channelId);
+        return token;
+      }
+    }
+  } catch (e) {
+    console.warn("[notif-ai] resolveWaMediaToken failed", (e as any)?.message ?? e);
+  }
+  return localToken || null;
+}
+
+export async function transcribeWaAudio(mediaId: string, phoneNumberId: string, mediaToken?: string): Promise<string> {
   // Step 1: get media URL from Meta (via EvoHub proxy)
-  const metaRes = await evoMeta(`${phoneNumberId}/${mediaId}`);
+  const metaRes = await evoMetaWithToken(`v23.0/${mediaId}`, mediaToken);
   const info = await metaRes.json();
   const url = info?.url;
   if (!url) throw new Error("media url não retornada");
 
   // Step 2: download bytes
   const dl = await fetch(url, {
-    headers: { Authorization: `Bearer ${process.env.EVOHUB_API_KEY}` },
+    headers: { Authorization: `Bearer ${mediaToken || process.env.EVOHUB_API_KEY}` },
   });
   if (!dl.ok) throw new Error(`download media ${dl.status}`);
   const buf = await dl.arrayBuffer();
@@ -272,13 +330,14 @@ export async function describeWaImage(
   mediaId: string,
   phoneNumberId: string,
   caption?: string,
+  mediaToken?: string,
 ): Promise<string> {
-  const metaRes = await evoMeta(`${phoneNumberId}/${mediaId}`);
+  const metaRes = await evoMetaWithToken(`v23.0/${mediaId}`, mediaToken);
   const info = await metaRes.json();
   const url = info?.url;
   if (!url) throw new Error("media url não retornada");
   const dl = await fetch(url, {
-    headers: { Authorization: `Bearer ${process.env.EVOHUB_API_KEY}` },
+    headers: { Authorization: `Bearer ${mediaToken || process.env.EVOHUB_API_KEY}` },
   });
   if (!dl.ok) throw new Error(`download image ${dl.status}`);
   const buf = await dl.arrayBuffer();

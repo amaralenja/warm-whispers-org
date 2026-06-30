@@ -3,7 +3,7 @@ import { Play, Pause, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WhatsappAudioPlayerProps {
-  url: string;
+  url: unknown;
   outgoing?: boolean;
 }
 
@@ -16,8 +16,29 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
+function safeText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value instanceof Error) return value.message;
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    for (const key of ["message", "error", "body", "text", "url"]) {
+      const candidate = obj[key];
+      if (typeof candidate === "string" && candidate.trim()) return candidate;
+    }
+    try {
+      const json = JSON.stringify(value);
+      return json && json !== "{}" ? json : "";
+    } catch {
+      return "";
+    }
+  }
+  return String(value);
+}
+
 export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps) {
-  const safeUrl = typeof url === "string" ? url : "";
+  const safeUrl = safeText(url);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -94,7 +115,7 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
       await audio.play();
       setPlaying(true);
     } catch (e: any) {
-      setError(e?.message || "Falha ao reproduzir");
+      setError(safeText(e?.message || e) || "Falha ao reproduzir");
     } finally {
       setLoading(false);
     }
@@ -183,7 +204,7 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
           </span>
           <span>{formatTime(duration)}</span>
         </div>
-        {error && <p className="text-[10px] text-destructive mt-0.5">{error}</p>}
+        {error && <p className="text-[10px] text-destructive mt-0.5">{safeText(error)}</p>}
       </div>
 
       <button
