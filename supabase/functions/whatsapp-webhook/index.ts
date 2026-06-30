@@ -423,12 +423,80 @@ function vendasDateExpr() {
   return `coalesce(to_date(nullif("Data",''), 'YYYY-MM-DD'), to_date(nullif("Data",''), 'DD/MM/YYYY'))`;
 }
 
+function b64url(buf: ArrayBuffer | Uint8Array | string): string {
+  let bytes: Uint8Array;
+  if (typeof buf === "string") bytes = new TextEncoder().encode(buf);
+  else if (buf instanceof ArrayBuffer) bytes = new Uint8Array(buf);
+  else bytes = buf;
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+function pemToAb(pem: string): ArrayBuffer {
+  const clean = pem.replace(/-----BEGIN [^-]+-----/g, "").replace(/-----END [^-]+-----/g, "").replace(/\s+/g, "");
+  const bin = atob(clean);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+let gcalTokenCache: { token: string; exp: number } | null = null;
+async function getGcalToken(): Promise<string | null> {
+  const raw = Deno.env.get("GOOGLE_CALENDAR_SERVICE_ACCOUNT");
+  if (!raw) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (gcalTokenCache && gcalTokenCache.exp - 60 > now) return gcalTokenCache.token;
+  try {
+    const sa = JSON.parse(raw) as { client_email: string; private_key: string; token_uri?: string };
+    const aud = sa.token_uri || "https://oauth2.googleapis.com/token";
+    const header = { alg: "RS256", typ: "JWT" };
+    const payload = { iss: sa.client_email, scope: "https://www.googleapis.com/auth/calendar.readonly", aud, iat: now, exp: now + 3600 };
+    const enc = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+    const key = await crypto.subtle.importKey("pkcs8", pemToAb(sa.private_key.replace(/\\n/g, "\n")), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+    const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(enc));
+    const jwt = `${enc}.${b64url(sig)}`;
+    const res = await fetch(aud, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    gcalTokenCache = { token: json.access_token, exp: now + (json.expires_in || 3600) };
+    return gcalTokenCache.token;
+  } catch (e) {
+    console.warn("[gcal] token error", (e as any)?.message);
+    return null;
+  }
+}
+async function fetchGcalEventsRange(fromIso: string, toIso: string): Promise<any[]> {
+  const calId = Deno.env.get("GOOGLE_CALENDAR_ID");
+  const token = await getGcalToken();
+  if (!calId || !token) return [];
+  const params = new URLSearchParams({ singleEvents: "true", orderBy: "startTime", maxResults: "100", timeMin: fromIso, timeMax: toIso });
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) { console.warn("[gcal] list error", res.status); return []; }
+  const json = await res.json();
+  return (json.items || []) as any[];
+}
+
 async function getAiSnapshot(supabase: any, contactWa: string, userText: string): Promise<string> {
   const today = todayIsoDate();
   const { start } = monthRange();
   const normalized = normalizeText(userText);
-  const wantsFull = /relatorio|resumo|dashboard|geral|tudo|hoje|venda|lead|task|tarefa|financeiro|quiz|call|ads|anuncio|facebook/.test(normalized);
+  const wantsFull = /relatorio|resumo|dashboard|geral|tudo|hoje|amanha|semana|venda|lead|task|tarefa|financeiro|quiz|call|agenda|reuniao|ads|anuncio|facebook/.test(normalized);
   if (!wantsFull) return "";
+
+  // Google Calendar: hoje + amanhã (BRT)
+  const todayStartUtc = new Date(`${today}T03:00:00.000Z`).toISOString();
+  const tomorrowEndUtc = new Date(new Date(`${today}T03:00:00.000Z`).getTime() + 2 * 86400_000).toISOString();
+  const gcalEvents = await fetchGcalEventsRange(todayStartUtc, tomorrowEndUtc).catch(() => []);
+  const fmtBr = (iso: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const isToday = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)) === today;
+  const callsHoje = gcalEvents.filter((e) => { const s = e.start?.dateTime || e.start?.date; return s && isToday(s); });
+  const callsAmanha = gcalEvents.filter((e) => { const s = e.start?.dateTime || e.start?.date; return s && !isToday(s); });
+  const callsHojeStr = callsHoje.length
+    ? callsHoje.slice(0, 15).map((e) => `${fmtBr(e.start.dateTime || e.start.date)} — ${e.summary || "(sem título)"}`).join("; ")
+    : "nenhuma agendada";
+  const callsAmanhaStr = callsAmanha.length
+    ? callsAmanha.slice(0, 10).map((e) => `${fmtBr(e.start.dateTime || e.start.date)} — ${e.summary || "(sem título)"}`).join("; ")
+    : "nenhuma agendada";
+
 
   const [salesToday, leadsToday, tasks, financeMonth, quizToday, callsToday, callsMonth, capiToday] = await Promise.all([
     supabase.from("vendas").select('"Ticket",nome_expert,"Nome","Data"'),
@@ -470,9 +538,12 @@ async function getAiSnapshot(supabase: any, contactWa: string, userText: string)
     `Quiz/HighTicket hoje: ${quizRows.length} lead(s); qualificados 5k-10k+: ${quizRows.filter((r) => Number(r.valor || 0) >= 5000).length}.`,
     `Tasks pendentes carregadas: ${tasksRows.length}. Próximas: ${tasksRows.slice(0, 5).map((t) => `${t.titulo} (${t.prazo || "sem prazo"})`).join("; ") || "nenhuma"}.`,
     `Financeiro mês: entradas ${money(entradas)}, saídas ${money(saidas)}, saldo ${money(entradas - saidas)}.`,
-    `Calls hoje registradas no sistema: ${callRowsToday.length}; show up ${callCount(callRowsToday, "show_up")}; no-show ${callCount(callRowsToday, "no_show")}; remarcadas ${callCount(callRowsToday, "rescheduled")}.`,
-    `Calls mês registradas: ${callRowsMonth.length}; show up ${callCount(callRowsMonth, "show_up")}; no-show ${callCount(callRowsMonth, "no_show")}; remarcadas ${callCount(callRowsMonth, "rescheduled")}.`,
+    `Calls AGENDADAS hoje no Google Calendar (${callsHoje.length}): ${callsHojeStr}.`,
+    `Calls AGENDADAS amanhã no Google Calendar (${callsAmanha.length}): ${callsAmanhaStr}.`,
+    `Comparecimento registrado hoje (wa_call_reminders): ${callRowsToday.length}; show up ${callCount(callRowsToday, "show_up")}; no-show ${callCount(callRowsToday, "no_show")}; remarcadas ${callCount(callRowsToday, "rescheduled")}.`,
+    `Comparecimento registrado mês: ${callRowsMonth.length}; show up ${callCount(callRowsMonth, "show_up")}; no-show ${callCount(callRowsMonth, "no_show")}; remarcadas ${callCount(callRowsMonth, "rescheduled")}.`,
     `Eventos Meta/CAPI hoje: ${adsRows.length}. Atenção: gasto de Ads depende da conexão Meta Ads estar configurada no módulo.`,
+
   ].join("\n");
 }
 
