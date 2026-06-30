@@ -78,7 +78,7 @@ function WhatsAppPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [newOp, setNewOp] = useState<string>(isGeral ? "" : workspace.id);
-  const [tab, setTab] = useState<"chat" | "notification">("chat");
+  const [tab, setTab] = useState<"chat" | "notification" | "logs">("chat");
 
   const [justCreated, setJustCreated] = useState<EvoChannel | null>(null);
   const [quotaError, setQuotaError] = useState(false);
@@ -352,6 +352,7 @@ function WhatsAppPage() {
           {([
             { id: "chat" as const, label: "Atendimento" },
             { id: "notification" as const, label: "Notificações" },
+            { id: "logs" as const, label: "Logs de disparo" },
           ]).map((t) => (
             <button
               key={t.id}
@@ -370,9 +371,10 @@ function WhatsAppPage() {
         {tab === "notification" && (
           <div className="space-y-4">
             <TemplatesPanel />
-            <DispatchLogsPanel />
           </div>
         )}
+
+        {tab === "logs" && <DispatchLogsPanel />}
 
 
 
