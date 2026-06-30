@@ -1376,6 +1376,7 @@ export type Database = {
           event_id: string
           hora: string | null
           id: string
+          kind: string
           lead_email: string | null
           lead_externalid: string | null
           lead_fbc: string | null
@@ -1395,6 +1396,7 @@ export type Database = {
           event_id: string
           hora?: string | null
           id?: string
+          kind?: string
           lead_email?: string | null
           lead_externalid?: string | null
           lead_fbc?: string | null
@@ -1414,6 +1416,7 @@ export type Database = {
           event_id?: string
           hora?: string | null
           id?: string
+          kind?: string
           lead_email?: string | null
           lead_externalid?: string | null
           lead_fbc?: string | null
