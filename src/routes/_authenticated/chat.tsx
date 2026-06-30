@@ -1047,6 +1047,44 @@ function RenderMedia({
   return null;
 }
 
+function WindowCountdown({ lastInboundAt }: { lastInboundAt: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const i = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(i);
+  }, []);
+  if (!lastInboundAt) {
+    return (
+      <div className="shrink-0 border-b border-chat-line bg-chat-soft/40 px-6 py-2">
+        <div className="mx-auto w-full max-w-5xl text-xs font-medium text-amber-500">
+          ⚠️ Janela de 24h fechada — aguardando primeira mensagem do lead
+        </div>
+      </div>
+    );
+  }
+  const closeAt = new Date(lastInboundAt).getTime() + 24 * 60 * 60 * 1000;
+  const ms = closeAt - now;
+  const open = ms > 0;
+  const h = Math.max(0, Math.floor(ms / 3_600_000));
+  const m = Math.max(0, Math.floor((ms % 3_600_000) / 60_000));
+  const pct = Math.max(0, Math.min(100, (ms / (24 * 60 * 60 * 1000)) * 100));
+  const tone = !open ? "text-red-500" : h < 2 ? "text-red-500" : h < 6 ? "text-amber-500" : "text-emerald-500";
+  const bar = !open ? "bg-red-500" : h < 2 ? "bg-red-500" : h < 6 ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <div className="shrink-0 border-b border-chat-line bg-chat-soft/40 px-6 py-2">
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-3">
+        <span className={`text-xs font-semibold ${tone}`}>
+          {open ? `⏱️ Janela 24h: ${h}h ${m}m restantes` : "⛔ Janela 24h fechada"}
+        </span>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-chat-line">
+          <div className={`h-full ${bar} transition-all`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   const qc = useQueryClient();
   const listActiveRunsFn = useServerFn(listActiveFlowRuns);
