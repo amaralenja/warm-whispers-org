@@ -77,7 +77,7 @@ async function findChannel(channelId: string) {
 
 async function findUsableMetaToken(phoneNumberId: string, preferredToken?: string) {
   if (preferredToken) {
-    const probe = await rawMetaProxy(preferredToken, `/v23.0/${phoneNumberId}?fields=id`).catch(() => null);
+    const probe = await rawMetaProxy(preferredToken, `/${phoneNumberId}?fields=id`).catch(() => null);
     if (probe?.ok) return preferredToken;
   }
 
@@ -87,7 +87,7 @@ async function findUsableMetaToken(phoneNumberId: string, preferredToken?: strin
     const detail = await evoApi(`/api/v1/channels/${row.id}`).catch(() => row);
     const token = detail?.token ? String(detail.token) : "";
     if (!token || token === preferredToken) continue;
-    const probe = await rawMetaProxy(token, `/v23.0/${phoneNumberId}?fields=id`).catch(() => null);
+    const probe = await rawMetaProxy(token, `/${phoneNumberId}?fields=id`).catch(() => null);
     if (probe?.ok) return token;
   }
 
@@ -236,7 +236,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };
     }
 
-    const { body: resp } = await metaProxyForChannel(ch, `/v23.0/${ch.phoneNumberId}/messages`, {
+    const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
       method: "POST",
       body: JSON.stringify(body),
     });
@@ -293,7 +293,7 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const ch = await findChannel(data.channelId);
-    const { body: resp } = await metaProxyForChannel(ch, `/v23.0/${data.mediaId}`);
+    const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}`);
     return { url: resp?.url as string | undefined, mime: resp?.mime_type as string | undefined };
   });
 
@@ -306,7 +306,7 @@ export const downloadIncomingMediaBase64 = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const ch = await findChannel(data.channelId);
-    const { body: meta, token } = await metaProxyForChannel(ch, `/v23.0/${data.mediaId}`);
+    const { body: meta, token } = await metaProxyForChannel(ch, `/${data.mediaId}`);
     const url = meta?.url as string | undefined;
     const mime = (meta?.mime_type as string | undefined) ?? "application/octet-stream";
     if (!url) throw new Error("URL de mídia não encontrada");
