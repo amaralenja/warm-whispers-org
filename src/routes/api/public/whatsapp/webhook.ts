@@ -184,6 +184,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     buttonId,
                     messageType: m.type ?? null,
                     isFirstMessage,
+                    db: supabaseAdmin,
                   });
                 } catch (e) {
                   console.error("[wa-webhook] flow dispatch error", e);
