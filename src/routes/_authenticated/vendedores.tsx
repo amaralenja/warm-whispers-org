@@ -157,6 +157,9 @@ function VendedoresPage() {
             </button>
           ))}
         </div>
+        <Button onClick={() => setCreating(true)} className="gap-1.5 bg-emerald-500 text-white hover:bg-emerald-600">
+          <Plus className="h-4 w-4" /> Novo vendedor
+        </Button>
       </div>
 
       {/* Grid */}
