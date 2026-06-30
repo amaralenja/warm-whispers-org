@@ -198,9 +198,20 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     if (data.type === "text") {
       if (!data.text) throw new Error("Texto vazio");
       body.text = { body: data.text };
-    } else if (data.type === "image" || data.type === "video" || data.type === "audio" || data.type === "sticker") {
+    } else if (data.type === "audio") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
-      body[data.type] = { link: data.mediaUrl, ...(data.caption && data.type !== "audio" && data.type !== "sticker" ? { caption: data.caption } : {}) };
+      // Convert to OGG/Opus mono so WhatsApp renders as a voice note with waveform.
+      let voiceUrl = data.mediaUrl;
+      try {
+        const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
+        voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
+      } catch (e) {
+        console.error("Transloadit voice conversion failed, sending original audio:", e);
+      }
+      body.audio = { link: voiceUrl, voice: true };
+    } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
+      if (!data.mediaUrl) throw new Error("URL da mídia ausente");
+      body[data.type] = { link: data.mediaUrl, ...(data.caption && data.type !== "sticker" ? { caption: data.caption } : {}) };
     } else if (data.type === "document") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };
