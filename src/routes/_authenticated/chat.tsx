@@ -206,15 +206,15 @@ function ChatPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, activeId]);
 
-  // Mark read when opening a conv
+  // Mark read when opening a conv (depend só em activeId + unread_count pra não loopar com a referência recalculada de `active`)
+  const unreadForActive = active?.unread_count ?? 0;
   useEffect(() => {
-    if (!activeId) return;
-    if (active && active.unread_count > 0) {
-      markReadFn({ data: { conversationId: activeId } }).then(() => {
-        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-      });
-    }
-  }, [activeId, active?.unread_count, markReadFn, qc, active]);
+    if (!activeId || unreadForActive <= 0) return;
+    markReadFn({ data: { conversationId: activeId } }).then(() => {
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, unreadForActive]);
 
   const sendMut = useMutation({
     mutationFn: (vars: Parameters<typeof sendFn>[0]["data"]) => sendFn({ data: vars }),
