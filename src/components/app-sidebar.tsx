@@ -52,7 +52,6 @@ const mainItems: Item[] = [
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
-  { title: "SOPs", url: "/sops", icon: BookOpenText },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
 ];
 
