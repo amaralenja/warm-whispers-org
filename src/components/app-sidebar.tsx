@@ -20,6 +20,7 @@ import {
   Workflow,
   Briefcase,
   User,
+  BookOpenText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
