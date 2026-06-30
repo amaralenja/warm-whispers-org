@@ -605,13 +605,22 @@ function TaskDialog({
       column_id: columnId,
     };
     if (isNew) {
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from("tasks" as any)
-        .insert({ ...payload, board_id: task.board_id, ordem: task.ordem });
+        .insert({ ...payload, board_id: task.board_id, ordem: task.ordem })
+        .select("id")
+        .single();
       if (error) {
         setSaving(false);
         return toast.error(error.message);
       }
+      // Dispara notificação WhatsApp pros assignees (fire & forget)
+      if (inserted && assignees.length > 0) {
+        import("@/lib/task-notifications.functions")
+          .then(({ notifyTaskCreated }) => notifyTaskCreated({ data: { taskId: (inserted as any).id } }))
+          .catch(() => {});
+      }
+
     } else {
       const { error } = await supabase.from("tasks" as any).update(payload).eq("id", task.id);
       if (error) {
