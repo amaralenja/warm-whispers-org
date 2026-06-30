@@ -193,10 +193,17 @@ export async function transcribeWaAudio(mediaId: string, phoneNumberId: string):
   return String(j?.text || "").trim();
 }
 
-// ---- Calendar reschedule (inline, reuses Google Calendar token logic) ----
+// ---- Calendar reschedule ----
 async function rescheduleCalendarEvent(eventId: string, startISO: string, durationMin: number) {
-  const { google } = await import("@/lib/google-calendar-internal.server");
-  return google.patchEventTime(eventId, startISO, durationMin);
+  const { gcal } = await import("@/lib/google-calendar.functions");
+  const endISO = new Date(new Date(startISO).getTime() + durationMin * 60_000).toISOString();
+  return gcal(`/events/${encodeURIComponent(eventId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      start: { dateTime: startISO, timeZone: "America/Sao_Paulo" },
+      end: { dateTime: endISO, timeZone: "America/Sao_Paulo" },
+    }),
+  });
 }
 
 // ---- Main entry points ----
