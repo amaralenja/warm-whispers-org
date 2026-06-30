@@ -847,7 +847,7 @@ function LeadCard({
       )}
 
       {/* INSTAGRAM verificado (card grande) */}
-      {cleanIg && <IgRow username={cleanIg} />}
+      {cleanIg && <IgRow username={cleanIg} autoVerify={weight >= 2} />}
 
       {/* CONTATO */}
       {(lead.email || lead.whatsapp) && (
