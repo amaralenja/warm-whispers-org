@@ -1121,11 +1121,12 @@ function IgRow({ username, autoVerify = true }: { username: string; autoVerify?:
   useEffect(() => {
     if (status !== "unknown") return;
     if (!isValidHandle) return;
+    if (!autoVerify) return; // economiza Bright Data: não verifica caixa < R$1k
     let cancelled = false;
     igEnqueue(async () => { if (!cancelled) await runVerify(); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, status, isValidHandle]);
+  }, [key, status, isValidHandle, autoVerify]);
 
   async function verify(e: React.MouseEvent) {
     e.stopPropagation();
