@@ -849,7 +849,7 @@ function TemplatesPanel() {
       <Dialog open={!!testOpen} onOpenChange={(v) => !v && setTestOpen(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Testar lembrete de call</DialogTitle>
+            <DialogTitle>Testar {testOpen?.slug === "comparecimento_call" ? "comparecimento" : "lembrete"} de call</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Telefone com DDD (ex: 11999999999)" value={testForm.to} onChange={(e) => setTestForm({ ...testForm, to: e.target.value })} />
@@ -865,9 +865,10 @@ function TemplatesPanel() {
               onClick={async () => {
                 setTestSending(true);
                 try {
-                  const { sendCallReminder } = await import("@/lib/call-reminders.functions");
-                  const res = await sendCallReminder({ data: { eventId: `test-${Date.now()}`, to: testForm.to, nome: testForm.nome, hora: testForm.hora, convidados: testForm.convidados } });
-                  toast.success(res.skipped ? "Já enviado recentemente" : "Lembrete enviado ✓");
+                  const mod = await import("@/lib/call-reminders.functions");
+                  const fn = testOpen?.slug === "comparecimento_call" ? mod.sendCallAttendance : mod.sendCallReminder;
+                  const res = await fn({ data: { eventId: `test-${Date.now()}`, to: testForm.to, nome: testForm.nome, hora: testForm.hora, convidados: testForm.convidados } });
+                  toast.success(res.skipped ? "Já enviado recentemente" : "Enviado ✓");
                   setTestOpen(null);
                 } catch (e: any) {
                   toast.error(e?.message ?? "Falha ao enviar");
