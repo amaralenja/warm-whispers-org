@@ -256,6 +256,14 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                         console.error("[wa-webhook] transcribe failed", e);
                       }
                     }
+                    if (!userText && m.type === "image" && m.image?.id && phoneNumberId) {
+                      try {
+                        const { describeWaImage } = await import("@/lib/notification-ai.server");
+                        userText = await describeWaImage(m.image.id, phoneNumberId, m.image.caption);
+                      } catch (e) {
+                        console.error("[wa-webhook] vision failed", e);
+                      }
+                    }
                     if (userText) {
                       const { continueNotificationSession } = await import("@/lib/notification-ai.server");
                       await continueNotificationSession({
