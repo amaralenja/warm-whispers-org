@@ -74,7 +74,7 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
       audio.removeEventListener("playing", onPlaying);
       audioRef.current = null;
     };
-  }, [url]);
+  }, [safeUrl]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed;
