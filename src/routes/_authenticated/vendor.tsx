@@ -6,7 +6,7 @@ import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar } from
 import logoMultium from "@/assets/logo-multium.webp";
 import { getVendorStats } from "@/lib/vendor.functions";
 
-export const Route = createFileRoute("/vendor")({
+export const Route = createFileRoute("/_authenticated/vendor")({
   ssr: false,
   head: () => ({ meta: [{ title: "Vendedor — MULTIUM" }] }),
   component: VendorPortal,
