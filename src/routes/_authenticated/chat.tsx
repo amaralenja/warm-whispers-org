@@ -896,6 +896,46 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
   return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} outgoing={outgoing} />;
 }
 
+function InteractiveContent({ msg, outgoing }: { msg: Msg; outgoing?: boolean }) {
+  const raw: any = msg.raw ?? {};
+  const interactive = raw.interactive ?? {};
+  // Outbound: buttons we sent
+  const sentButtons: Array<{ id: string; title: string }> = Array.isArray(interactive?.action?.buttons)
+    ? interactive.action.buttons.map((b: any) => ({
+        id: String(b?.reply?.id ?? b?.id ?? ""),
+        title: String(b?.reply?.title ?? b?.title ?? ""),
+      }))
+    : [];
+  const bodyText = toText(interactive?.body?.text ?? msg.text_body);
+  // Inbound: button_reply
+  const reply = interactive?.button_reply ?? interactive?.list_reply ?? raw?.button ?? null;
+  const replyText = reply ? toText(reply.title ?? reply.text ?? reply.payload) : "";
+
+  if (sentButtons.length > 0) {
+    return (
+      <div className="mb-1 space-y-2">
+        {bodyText && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{bodyText}</p>}
+        <div className="flex flex-col gap-1 border-t border-current/20 pt-2">
+          {sentButtons.map((b, i) => (
+            <div key={b.id || i} className={`rounded-xl px-3 py-2 text-center text-sm font-semibold ${outgoing ? "bg-background/15 text-current" : "bg-chat-soft text-chat-accent"}`}>
+              {b.title || "Botão"}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (replyText) {
+    return (
+      <div className="mb-1 inline-flex items-center gap-2 rounded-xl border border-current/25 bg-background/10 px-3 py-1.5 text-xs font-semibold">
+        ↩ {replyText}
+      </div>
+    );
+  }
+  return null;
+}
+
+
 function MediaPlaceholder({
   type,
   filename,
