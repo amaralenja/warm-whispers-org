@@ -922,42 +922,64 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
     return true;
   });
 
+  const initial = (lead.nome || lead.email || "?").trim().charAt(0).toUpperCase();
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {lead.nome || <span className="italic text-muted-foreground">sem nome</span>}
-            {lead.caixa_letra && (
-              <Badge className="bg-yellow-500/20 text-yellow-300">{lead.caixa_letra.toUpperCase()}</Badge>
-            )}
-          </DialogTitle>
-          <DialogDescription>
-            {timeAgo(lead.data_criacao)} · {lead.email || "sem email"} · {lead.whatsapp || "sem whatsapp"}
-          </DialogDescription>
+      <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden border-border/60 bg-gradient-to-b from-background to-background/95">
+        {/* Header com gradiente sutil */}
+        <DialogHeader className="px-6 pt-6 pb-5 border-b border-border/40 bg-gradient-to-br from-accent/[0.06] via-transparent to-transparent">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 grid place-items-center h-14 w-14 rounded-2xl bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/30 text-accent text-xl font-bold shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]">
+              {initial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex items-center gap-2 text-xl truncate">
+                <span className="truncate">{lead.nome || <span className="italic text-muted-foreground">sem nome</span>}</span>
+                {lead.caixa_letra && (
+                  <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 shrink-0">
+                    Caixa {lead.caixa_letra.toUpperCase()}
+                  </Badge>
+                )}
+              </DialogTitle>
+              <DialogDescription className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{timeAgo(lead.data_criacao)}</span>
+                {lead.email && <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{lead.email}</span>}
+                {lead.whatsapp && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{lead.whatsapp}</span>}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className={`rounded-lg border p-4 ${tier?.cls ?? "bg-accent/5 border-accent/30 text-accent"}`}>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wider opacity-80">
-              <DollarSign className="h-4 w-4" /> Ticket / Faturamento
+        {/* Corpo com scroll customizado dourado */}
+        <div className="scrollbar-fancy overflow-y-auto max-h-[70vh] px-6 py-5 space-y-5">
+          <div className={`rounded-xl border p-4 ${tier?.cls ?? "bg-accent/5 border-accent/30 text-accent"}`}>
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] opacity-80">
+              <DollarSign className="h-3.5 w-3.5" /> Ticket / Faturamento
             </div>
-            <div className="mt-1 text-2xl font-bold">{ticketLabel(lead)}</div>
+            <div className="mt-1 text-2xl font-bold tracking-tight">{ticketLabel(lead)}</div>
             {lead.caixa_label && <div className="text-xs opacity-70 mt-0.5">{lead.caixa_label}</div>}
           </div>
 
           <div>
-            <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Respostas do Quiz</h4>
+            <h4 className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-3 flex items-center gap-2">
+              <span className="h-px flex-1 bg-border/60" />
+              Respostas do Quiz
+              <span className="h-px flex-1 bg-border/60" />
+            </h4>
             {entries.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">Nenhuma resposta registrada.</p>
+              <p className="text-sm text-muted-foreground italic text-center py-8">Nenhuma resposta registrada.</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {entries.map(([k, v]) => (
-                  <div key={k} className="rounded-md border border-border bg-muted/20 p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <div
+                    key={k}
+                    className="group rounded-lg border border-border/60 bg-muted/10 hover:bg-muted/20 hover:border-accent/40 transition-colors p-3"
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80 group-hover:text-accent/80 transition-colors">
                       {ANSWER_LABELS[k] ?? k}
                     </div>
-                    <div className="text-sm font-medium mt-0.5 break-words">
+                    <div className="text-sm font-medium mt-1 break-words leading-snug">
                       {typeof v === "object" ? JSON.stringify(v) : String(v)}
                     </div>
                   </div>
@@ -968,12 +990,16 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
 
           {(lead.utm_source || lead.utm_campaign) && (
             <div>
-              <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Atribuição</h4>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {lead.utm_source && <div><span className="text-muted-foreground">source:</span> {lead.utm_source}</div>}
-                {lead.utm_medium && <div><span className="text-muted-foreground">medium:</span> {lead.utm_medium}</div>}
-                {lead.utm_campaign && <div className="col-span-2"><span className="text-muted-foreground">campaign:</span> {lead.utm_campaign}</div>}
-                {lead.utm_content && <div className="col-span-2"><span className="text-muted-foreground">content:</span> {lead.utm_content}</div>}
+              <h4 className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-3 flex items-center gap-2">
+                <span className="h-px flex-1 bg-border/60" />
+                Atribuição
+                <span className="h-px flex-1 bg-border/60" />
+              </h4>
+              <div className="rounded-lg border border-border/60 bg-muted/10 p-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                {lead.utm_source && <div><span className="text-muted-foreground">source:</span> <span className="font-medium">{lead.utm_source}</span></div>}
+                {lead.utm_medium && <div><span className="text-muted-foreground">medium:</span> <span className="font-medium">{lead.utm_medium}</span></div>}
+                {lead.utm_campaign && <div className="col-span-2"><span className="text-muted-foreground">campaign:</span> <span className="font-medium">{lead.utm_campaign}</span></div>}
+                {lead.utm_content && <div className="col-span-2"><span className="text-muted-foreground">content:</span> <span className="font-medium">{lead.utm_content}</span></div>}
               </div>
             </div>
           )}
