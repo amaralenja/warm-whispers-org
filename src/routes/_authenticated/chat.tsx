@@ -21,6 +21,8 @@ import {
   Radio,
   Headphones,
   Loader2,
+  MoreVertical,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
