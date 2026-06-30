@@ -952,6 +952,27 @@ function fmtIg(n?: number) {
   return String(n);
 }
 
+// ---- Fila global throttled p/ não estourar Bright Data ----
+const IG_QUEUE: Array<() => void> = [];
+let IG_BUSY = false;
+async function igEnqueue(task: () => Promise<void>) {
+  return new Promise<void>((resolve) => {
+    IG_QUEUE.push(async () => {
+      try { await task(); } finally { resolve(); }
+    });
+    igDrain();
+  });
+}
+async function igDrain() {
+  if (IG_BUSY) return;
+  const next = IG_QUEUE.shift();
+  if (!next) return;
+  IG_BUSY = true;
+  try { await next(); } finally {
+    setTimeout(() => { IG_BUSY = false; igDrain(); }, 1200);
+  }
+}
+
 function IgRow({ username }: { username: string }) {
   const key = username.toLowerCase();
   const initial = loadIgCache()[key];
@@ -959,9 +980,7 @@ function IgRow({ username }: { username: string }) {
   const [profile, setProfile] = useState<IgProfile | null>(initial?.profile ?? null);
   const fetchFn = useServerFn(fetchInstagramProfile);
 
-  async function verify(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (status === "checking") return;
+  async function runVerify() {
     setStatus("checking");
     try {
       const p: any = await fetchFn({ data: { input: username } });
@@ -979,13 +998,28 @@ function IgRow({ username }: { username: string }) {
       const c = loadIgCache(); c[key] = { status: "real", profile: prof }; saveIgCache(c);
       setProfile(prof);
       setStatus("real");
-      toast.success(`@${username} verificado ✓`);
-    } catch (err: any) {
+    } catch {
       const c = loadIgCache(); c[key] = { status: "fake" }; saveIgCache(c);
       setStatus("fake");
-      toast.error(`@${username} não encontrado`);
     }
   }
+
+  // Auto-verifica via fila global se ainda desconhecido (incluindo leads novos chegando do quiz)
+  useEffect(() => {
+    if (status !== "unknown") return;
+    let cancelled = false;
+    igEnqueue(async () => { if (!cancelled) await runVerify(); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  async function verify(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (status === "checking") return;
+    await runVerify();
+    if (status !== "fake") toast.success(`@${username} verificado ✓`);
+  }
+
 
   if (status === "real" && profile) {
     return (
