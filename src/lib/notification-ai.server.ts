@@ -261,7 +261,11 @@ export async function startNotificationSession(opts: {
 }) {
   const { db, channelId, contactWa, contactName, reminderId, calendarEventId, buttonId, hora } = opts;
 
-  // close any previous active session for this contact
+  // Allowlist: só responde se o número for de vendedor ou membro da equipe
+  if (!(await isAllowedContact(db, contactWa))) {
+    console.log("[notif-ai] contato fora da allowlist, ignorando", contactWa);
+    return;
+  }
   await db
     .from("wa_ai_sessions")
     .update({ status: "closed" })
