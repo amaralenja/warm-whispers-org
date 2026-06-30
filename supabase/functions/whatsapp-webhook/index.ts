@@ -1327,6 +1327,16 @@ Deno.serve(async (req) => {
           .update({ status })
           .eq("channel_id", channelId)
           .eq("wa_message_id", statusId);
+        await supabase
+          .from("wa_call_reminders")
+          .update({ status })
+          .eq("channel_id", channelId)
+          .eq("wa_message_id", statusId);
+        await supabase
+          .from("wa_task_notifications")
+          .update({ status })
+          .eq("channel_id", channelId)
+          .eq("wa_message_id", statusId);
       }
     }
   } catch (e) {

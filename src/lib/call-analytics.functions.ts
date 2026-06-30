@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sendWA } from "@/lib/flow-engine.server";
 
 function renderTemplate(tpl: string, vars: Record<string, string>) {
   return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
@@ -103,20 +102,30 @@ Faça uma análise rápida e prática.`;
 }
 
 async function computeAndSend(db: any, dateStr?: string) {
+  const { sendWA } = await import("@/lib/flow-engine.server");
   const { fromIso, toIso, label } = brtDayRange(dateStr);
 
-  // 1. Métricas de comparecimento (kind = attendance) baseadas em ack_button
+  // 1. Métricas de comparecimento (kind = attendance) baseadas no status salvo pelo botão
   const { data: attendance } = await db
     .from("wa_call_reminders" as any)
-    .select("ack_button, status")
+    .select("status")
     .eq("kind", "attendance")
     .gte("created_at", fromIso)
     .lt("created_at", toIso);
 
   const rows: any[] = (attendance ?? []) as any[];
-  const showUps = rows.filter((r) => String(r.ack_button ?? "").includes("showup")).length;
-  const noShows = rows.filter((r) => String(r.ack_button ?? "").includes("noshow")).length;
-  const remarcadas = rows.filter((r) => String(r.ack_button ?? "").includes("remarcada")).length;
+  const showUps = rows.filter((r) => {
+    const s = String(r.status ?? "").toLowerCase();
+    return s === "showup" || s === "show_up";
+  }).length;
+  const noShows = rows.filter((r) => {
+    const s = String(r.status ?? "").toLowerCase();
+    return s === "noshow" || s === "no_show";
+  }).length;
+  const remarcadas = rows.filter((r) => {
+    const s = String(r.status ?? "").toLowerCase();
+    return s === "remarcada" || s === "rescheduled";
+  }).length;
   const totalCalls = rows.length;
   const taxaShow = totalCalls > 0 ? (showUps / totalCalls) * 100 : 0;
 
@@ -223,7 +232,8 @@ async function computeAndSend(db: any, dateStr?: string) {
 export const sendCallAnalytics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { date?: string } | undefined) => ({ date: d?.date }))
-  .handler(async ({ data }) => {
+  .handler(async (ctx: any) => {
+    const data = ctx?.data ?? {};
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return await computeAndSend(supabaseAdmin, data.date);
   });
@@ -237,8 +247,12 @@ export async function runCallAnalyticsCron(dateStr?: string) {
 /** CRUD simples de destinatários */
 export const listTemplateRecipients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { templateId: string }) => d)
-  .handler(async ({ data, context }) => {
+  .inputValidator((d: { templateId: string } | undefined) => ({ templateId: d?.templateId ?? "" }))
+  .handler(async (ctx: any) => {
+    const data = ctx?.data ?? {};
+    const context = ctx?.context;
+    if (!data?.templateId) return [];
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const { data: rows, error } = await context.supabase
       .from("wa_template_recipients" as any)
       .select("*")
@@ -250,8 +264,16 @@ export const listTemplateRecipients = createServerFn({ method: "POST" })
 
 export const addTemplateRecipient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { templateId: string; telefone: string; nome?: string }) => d)
-  .handler(async ({ data, context }) => {
+  .inputValidator((d: { templateId: string; telefone: string; nome?: string } | undefined) => ({
+    templateId: d?.templateId ?? "",
+    telefone: d?.telefone ?? "",
+    nome: d?.nome,
+  }))
+  .handler(async (ctx: any) => {
+    const data = ctx?.data ?? {};
+    const context = ctx?.context;
+    if (!data?.templateId) throw new Error("Template obrigatório");
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const phone = normalizeBrPhone(data.telefone);
     if (!phone) throw new Error("Telefone inválido");
     const { data: row, error } = await context.supabase
@@ -265,8 +287,12 @@ export const addTemplateRecipient = createServerFn({ method: "POST" })
 
 export const removeTemplateRecipient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data, context }) => {
+  .inputValidator((d: { id: string } | undefined) => ({ id: d?.id ?? "" }))
+  .handler(async (ctx: any) => {
+    const data = ctx?.data ?? {};
+    const context = ctx?.context;
+    if (!data?.id) throw new Error("Destinatário obrigatório");
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const { error } = await context.supabase
       .from("wa_template_recipients" as any)
       .delete()
@@ -278,7 +304,9 @@ export const removeTemplateRecipient = createServerFn({ method: "POST" })
 /** Lista vendedores + team_members que têm telefone, normalizando o 9 */
 export const listRecipientCandidates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async (ctx: any) => {
+    const context = ctx?.context;
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const [vRes, tRes] = await Promise.all([
       context.supabase.from("vendedores").select("id, nome, telefone, foto_url").eq("ativo", true),
       context.supabase.from("team_members").select("id, nome, telefone, foto_url, funcao").eq("ativo", true),
@@ -295,6 +323,70 @@ export const listRecipientCandidates = createServerFn({ method: "GET" })
       out.push({ id: `t:${(t as any).id}`, nome: (t as any).nome, telefone: tel, origem: "equipe", subtitulo: (t as any).funcao, foto_url: (t as any).foto_url });
     }
     return out.sort((a, b) => a.nome.localeCompare(b.nome));
+  });
+
+export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { limit?: number } | undefined) => ({ limit: Math.min(Math.max(Number(d?.limit ?? 80), 1), 200) }))
+  .handler(async (ctx: any) => {
+    const context = ctx?.context;
+    const limit = ctx?.data?.limit ?? 80;
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
+
+    const [callRes, taskRes] = await Promise.all([
+      context.supabase
+        .from("wa_call_reminders" as any)
+        .select("id,event_id,channel_id,contact_wa,lead_nome,hora,convidados,status,sent_at,replied_at,wa_message_id,created_at,kind")
+        .order("created_at", { ascending: false })
+        .limit(limit),
+      context.supabase
+        .from("wa_task_notifications" as any)
+        .select("id,task_id,member_id,kind,channel_id,contact_wa,wa_message_id,status,sent_at,created_at")
+        .order("created_at", { ascending: false })
+        .limit(limit),
+    ]);
+
+    if (callRes.error) throw callRes.error;
+    if (taskRes.error) throw taskRes.error;
+
+    const logs = [
+      ...((callRes.data ?? []) as any[]).map((r) => ({
+        id: `call:${r.id}`,
+        sourceId: r.id,
+        type: r.kind === "attendance" ? "Comparecimento de call" : "Lembrete de call",
+        category: "call",
+        recipientName: r.lead_nome ?? null,
+        phone: r.contact_wa ?? null,
+        status: r.status ?? "pending",
+        waMessageId: r.wa_message_id ?? null,
+        sentAt: r.sent_at ?? null,
+        createdAt: r.created_at ?? null,
+        repliedAt: r.replied_at ?? null,
+        channelId: r.channel_id ?? null,
+        details: [
+          r.hora ? `Call ${r.hora}` : null,
+          r.convidados ? `Convidados: ${r.convidados}` : null,
+          r.event_id ? `Evento ${String(r.event_id).slice(0, 12)}` : null,
+        ].filter(Boolean).join(" · "),
+      })),
+      ...((taskRes.data ?? []) as any[]).map((r) => ({
+        id: `task:${r.id}`,
+        sourceId: r.id,
+        type: r.kind === "due_soon" ? "Tarefa perto do prazo" : r.kind === "overdue" ? "Tarefa vencida" : "Tarefa criada",
+        category: "task",
+        recipientName: null,
+        phone: r.contact_wa ?? null,
+        status: r.status ?? "pending",
+        waMessageId: r.wa_message_id ?? null,
+        sentAt: r.sent_at ?? null,
+        createdAt: r.created_at ?? null,
+        details: r.task_id ? `Task ${String(r.task_id).slice(0, 8)}` : "",
+      })),
+    ];
+
+    return logs
+      .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+      .slice(0, limit);
   });
 
 

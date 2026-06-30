@@ -48,6 +48,14 @@ import {
   type EvoChannel,
 } from "@/lib/evohub.functions";
 import { registerWhatsappWebhook } from "@/lib/whatsapp-chat.functions";
+import {
+  addTemplateRecipient,
+  listNotificationDispatchLogs,
+  listRecipientCandidates,
+  listTemplateRecipients,
+  removeTemplateRecipient,
+  sendCallAnalytics,
+} from "@/lib/call-analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   component: WhatsAppPage,
@@ -78,7 +86,8 @@ function WhatsAppPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [newOp, setNewOp] = useState<string>(isGeral ? "" : workspace.id);
-  const [tab, setTab] = useState<"chat" | "notification">("chat");
+  const [tab, setTab] = useState<"chat" | "notification" | "logs">("chat");
+  const connectionKind: "chat" | "notification" = tab === "notification" ? "notification" : "chat";
 
   const [justCreated, setJustCreated] = useState<EvoChannel | null>(null);
   const [quotaError, setQuotaError] = useState(false);
@@ -248,7 +257,7 @@ function WhatsAppPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>
-                      Nova conexão {tab === "notification" ? "(Notificador)" : "WhatsApp"}
+                      Nova conexão {connectionKind === "notification" ? "(Notificador)" : "WhatsApp"}
                     </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-2">
@@ -258,10 +267,10 @@ function WhatsAppPage() {
                         id="ch-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder={tab === "notification" ? "Ex.: Notificador Calls" : "Ex.: Atendimento Principal"}
+                        placeholder={connectionKind === "notification" ? "Ex.: Notificador Calls" : "Ex.: Atendimento Principal"}
                       />
                     </div>
-                    {tab === "notification" ? (
+                    {connectionKind === "notification" ? (
                       <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
                         Este número será marcado como <strong>Notificador</strong> e não fica vinculado a nenhuma operação — usado só para disparos automáticos (lembretes de call, templates, etc).
                       </div>
@@ -288,11 +297,11 @@ function WhatsAppPage() {
                     <Button
                       onClick={() => {
                         if (!name.trim()) return toast.error("Informe o nome da conexão");
-                        if (tab === "chat" && !newOp) return toast.error("Selecione uma operação");
+                        if (connectionKind === "chat" && !newOp) return toast.error("Selecione uma operação");
                         createMut.mutate({
                           name: name.trim(),
-                          operacaoId: tab === "notification" ? "" : newOp,
-                          kind: tab,
+                          operacaoId: connectionKind === "notification" ? "" : newOp,
+                          kind: connectionKind,
                         });
                       }}
                       disabled={createMut.isPending}
@@ -352,6 +361,7 @@ function WhatsAppPage() {
           {([
             { id: "chat" as const, label: "Atendimento" },
             { id: "notification" as const, label: "Notificações" },
+            { id: "logs" as const, label: "Logs de disparo" },
           ]).map((t) => (
             <button
               key={t.id}
@@ -367,7 +377,13 @@ function WhatsAppPage() {
           ))}
         </div>
 
-        {tab === "notification" && <TemplatesPanel />}
+        {tab === "notification" && (
+          <div className="space-y-4">
+            <TemplatesPanel />
+          </div>
+        )}
+
+        {tab === "logs" && <DispatchLogsPanel />}
 
 
 
@@ -377,58 +393,44 @@ function WhatsAppPage() {
           </div>
         )}
 
-        {/* Channel grid */}
-        {isLoading ? (
-          <div className="rounded-2xl border border-border bg-card p-16 text-center text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-          </div>
-        ) : channels.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card/30 p-16 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mx-auto mb-4 flex items-center justify-center">
-              <WhatsappIcon className="h-7 w-7 text-emerald-500" />
+        {tab !== "logs" && (
+          isLoading ? (
+            <div className="rounded-2xl border border-border bg-card p-16 text-center text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">
-              Nenhuma conexão por aqui ainda
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              {isGeral
-                ? 'Clica em "Nova conexão" pra começar.'
-                : `Nenhum número vinculado à operação "${workspace.nome}".`}
-            </p>
-            <Button
-              variant="outline"
-              className="mt-5"
-              onClick={() => syncAmaralMut.mutate()}
-              disabled={syncAmaralMut.isPending}
-            >
-              {syncAmaralMut.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Puxar conexão Amaral da EvoHub
-            </Button>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {channels.map((ch) => (
-              <ChannelCard
-                key={ch.id}
-                ch={ch}
-                opLabel={opLabel(ch.operacaoId)}
-                operacoes={operacoes}
-                onChangeOp={(v) =>
-                  setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })
-                }
-                onRegen={() => regenMut.mutate(ch.id)}
-                regenPending={regenMut.isPending}
-                onDelete={() => {
-                  if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
-                }}
-                deletePending={deleteMut.isPending}
-              />
-            ))}
-          </div>
+          ) : channels.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card/30 p-16 text-center">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mx-auto mb-4 flex items-center justify-center">
+                <WhatsappIcon className="h-7 w-7 text-emerald-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma conexão por aqui ainda</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {isGeral ? 'Clica em "Nova conexão" pra começar.' : `Nenhum número vinculado à operação "${workspace.nome}".`}
+              </p>
+              <Button variant="outline" className="mt-5" onClick={() => syncAmaralMut.mutate()} disabled={syncAmaralMut.isPending}>
+                {syncAmaralMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Puxar conexão Amaral da EvoHub
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {channels.map((ch) => (
+                <ChannelCard
+                  key={ch.id}
+                  ch={ch}
+                  opLabel={opLabel(ch.operacaoId)}
+                  operacoes={operacoes}
+                  onChangeOp={(v) => setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })}
+                  onRegen={() => regenMut.mutate(ch.id)}
+                  regenPending={regenMut.isPending}
+                  onDelete={() => {
+                    if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
+                  }}
+                  deletePending={deleteMut.isPending}
+                />
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
@@ -645,6 +647,11 @@ function ChannelCard({
 
 function TemplatesPanel() {
   const qc = useQueryClient();
+  const listRecipientsFn = useServerFn(listTemplateRecipients);
+  const addRecipientFn = useServerFn(addTemplateRecipient);
+  const removeRecipientFn = useServerFn(removeTemplateRecipient);
+  const listCandidatesFn = useServerFn(listRecipientCandidates);
+  const sendAnalyticsFn = useServerFn(sendCallAnalytics);
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["wa_templates"],
     queryFn: async () => {
@@ -674,8 +681,7 @@ function TemplatesPanel() {
   const { data: recipientsList = [], refetch: refetchRecipients } = useQuery({
     queryKey: ["wa_template_recipients", recipientsOpen?.id],
     queryFn: async () => {
-      const { listTemplateRecipients } = await import("@/lib/call-analytics.functions");
-      return await listTemplateRecipients({ data: { templateId: recipientsOpen!.id } });
+      return await listRecipientsFn({ data: { templateId: recipientsOpen!.id } });
     },
     enabled: !!recipientsOpen,
   });
@@ -683,8 +689,7 @@ function TemplatesPanel() {
   const { data: candidates = [] } = useQuery({
     queryKey: ["wa_recipient_candidates"],
     queryFn: async () => {
-      const { listRecipientCandidates } = await import("@/lib/call-analytics.functions");
-      return await listRecipientCandidates();
+      return await listCandidatesFn();
     },
     enabled: !!recipientsOpen,
   });
@@ -804,8 +809,7 @@ function TemplatesPanel() {
                       onClick={async () => {
                         setAnalyticsSending(true);
                         try {
-                          const { sendCallAnalytics } = await import("@/lib/call-analytics.functions");
-                          const r = await sendCallAnalytics({ data: {} });
+                          const r = await sendAnalyticsFn({ data: {} });
                           toast.success(r.sent ? `Analytics enviado p/ ${r.sent} contato(s)` : `Sem envio: ${r.skipped ?? "ok"}`);
                         } catch (e: any) {
                           toast.error(e?.message ?? "Falha");
@@ -1015,8 +1019,7 @@ function TemplatesPanel() {
                     className="text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0"
                     onClick={async () => {
                       try {
-                        const { removeTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                        await removeTemplateRecipient({ data: { id: r.id } });
+                        await removeRecipientFn({ data: { id: r.id } });
                         refetchRecipients();
                       } catch (e: any) {
                         toast.error(e?.message ?? "Erro");
@@ -1053,8 +1056,7 @@ function TemplatesPanel() {
                             className="shrink-0 h-7 text-xs"
                             onClick={async () => {
                               try {
-                                const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                                await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: c.telefone, nome: c.nome } });
+                                await addRecipientFn({ data: { templateId: recipientsOpen.id, telefone: c.telefone, nome: c.nome } });
                                 refetchRecipients();
                               } catch (e: any) {
                                 toast.error(e?.message ?? "Erro");
@@ -1078,8 +1080,7 @@ function TemplatesPanel() {
                   disabled={!newRecipientPhone.trim()}
                   onClick={async () => {
                     try {
-                      const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                      await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
+                      await addRecipientFn({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
                       setNewRecipientPhone("");
                       setNewRecipientNome("");
                       refetchRecipients();
@@ -1095,6 +1096,97 @@ function TemplatesPanel() {
         </DialogContent>
       </Dialog>
 
+    </div>
+  );
+}
+
+function DispatchLogsPanel() {
+  const listLogsFn = useServerFn(listNotificationDispatchLogs);
+  const { data: logs = [], isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["wa_notification_dispatch_logs"],
+    queryFn: async () => {
+      return await listLogsFn({ data: { limit: 120 } });
+    },
+    refetchInterval: 10000,
+  });
+
+  const fmt = (iso: string | null | undefined) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+    } catch {
+      return String(iso);
+    }
+  };
+
+  const statusInfo = (status: string | null | undefined) => {
+    const s = String(status ?? "pending").toLowerCase();
+    if (["read", "delivered", "showup", "noshow", "remarcada"].includes(s)) {
+      return { label: s === "read" ? "Lido" : s === "delivered" ? "Entregue" : s === "showup" ? "Show up" : s === "noshow" ? "No show" : "Remarcada", cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" };
+    }
+    if (s === "sent") return { label: "Enviado", cls: "border-blue-500/40 bg-blue-500/10 text-blue-300" };
+    if (s === "failed" || s === "undelivered") return { label: "Falhou", cls: "border-red-500/40 bg-red-500/10 text-red-300" };
+    return { label: "Pendente", cls: "border-amber-500/40 bg-amber-500/10 text-amber-300" };
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card/40 p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-400" /> Logs de disparo
+          </h3>
+          <p className="text-xs text-muted-foreground">Acompanhamento dos lembretes, comparecimentos e tarefas enviados pelo número notificador.</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Atualizar
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground"><Loader2 className="h-4 w-4 inline animate-spin mr-2" /> Carregando logs…</div>
+      ) : logs.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">Nenhum disparo registrado ainda.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-background/70 text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Quando</th>
+                <th className="px-3 py-2 text-left font-medium">Tipo</th>
+                <th className="px-3 py-2 text-left font-medium">Destinatário</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-left font-medium">ID WhatsApp</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background/30">
+              {logs.map((log: any) => {
+                const st = statusInfo(log.status);
+                return (
+                  <tr key={log.id} className="align-top">
+                    <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">{fmt(log.sentAt ?? log.createdAt)}</td>
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-foreground">{log.type}</div>
+                      {log.details && <div className="text-xs text-muted-foreground mt-0.5">{log.details}</div>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-foreground">{log.recipientName || "Sem nome"}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{log.phone ? `+${log.phone}` : "—"}</div>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                    </td>
+                    <td className="px-3 py-3 max-w-[260px]">
+                      <div className="truncate font-mono text-xs text-muted-foreground" title={log.waMessageId || ""}>{log.waMessageId || "—"}</div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
