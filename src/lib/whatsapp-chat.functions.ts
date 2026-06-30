@@ -42,14 +42,23 @@ async function evoApi(path: string, init?: RequestInit) {
   return body;
 }
 
+function buildMetaHeaders(channelToken: string, init?: RequestInit) {
+  const method = (init?.method || "GET").toUpperCase();
+  const hasBody = init?.body != null;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${channelToken}`,
+    ...(init?.headers as Record<string, string> | undefined || {}),
+  };
+  if (hasBody && method !== "GET" && !headers["Content-Type"] && !headers["content-type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  return headers;
+}
+
 async function metaProxy(channelToken: string, path: string, init?: RequestInit) {
   const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${channelToken}`,
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers: buildMetaHeaders(channelToken, init),
   });
   const text = await res.text();
   let body: any = null;
@@ -64,11 +73,7 @@ async function metaProxy(channelToken: string, path: string, init?: RequestInit)
 async function rawMetaProxy(channelToken: string, path: string, init?: RequestInit) {
   const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${channelToken}`,
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers: buildMetaHeaders(channelToken, init),
   });
   const text = await res.text();
   let body: any = null;
@@ -137,6 +142,7 @@ async function metaProxyForChannel(ch: { token: string; phoneNumberId?: string }
       message.includes("Unsupported get request") ||
       message.includes("missing permissions") ||
       message.includes("OAuth") ||
+      message.includes("INTERNAL") ||
       message.includes("401") ||
       message.includes("400") ||
       message.includes("500");
