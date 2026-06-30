@@ -1,6 +1,5 @@
 import { supabase } from './client'
 import { encodeVendorSessionHeader, getVendorSession } from '@/lib/vendor-session'
-import { createMiddleware } from '@tanstack/react-start'
 
 function buildAuthHeaders(existing?: HeadersInit): Headers {
   const headers = new Headers(existing)
@@ -8,22 +7,6 @@ function buildAuthHeaders(existing?: HeadersInit): Headers {
   if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
   return headers
 }
-
-export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
-  async ({ next }) => {
-    const headers = buildAuthHeaders()
-
-    try {
-      const result = await supabase.auth.getSession()
-      const token = result?.data?.session?.access_token
-      if (token) headers.set('Authorization', `Bearer ${token}`)
-    } catch (err) {
-      console.error('[attachSupabaseAuth] getSession failed', err)
-    }
-
-    return next({ headers })
-  },
-)
 
 // Custom fetch used by TanStack Start server functions.
 // Keeping auth/header attachment here avoids the fragile global functionMiddleware path
