@@ -161,52 +161,57 @@ async function loadAssigneePhones(db: any, ids: string[]): Promise<Array<{ id: s
 }
 
 /**
+ * Lógica pura de disparo do task_created — utilizável sem auth (cron, webhook, IA).
+ */
+export async function runTaskCreatedDispatch(db: any, taskId: string) {
+  if (!taskId) throw new Error("taskId obrigatório");
+
+  const taskRes = await db
+    .from("tasks" as any)
+    .select("id,titulo,prioridade,prazo,assignee_ids,created_at")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (taskRes?.error) throw new Error(taskRes.error.message);
+  const task = taskRes?.data;
+  if (!task) throw new Error("Tarefa não encontrada");
+
+  const tpl = await loadTemplate(db, "task_created");
+  if (!tpl) throw new Error("Template task_created não encontrado");
+
+  const members = await loadAssigneePhones(db, (task as any).assignee_ids ?? []);
+  if (!members.length) return { sent: 0, total: 0, reason: "sem assignees com telefone" };
+
+  const vars = {
+    titulo: String((task as any).titulo ?? ""),
+    prioridade: String((task as any).prioridade ?? "normal"),
+    criada: fmtDateTime((task as any).created_at),
+    prazo: fmtDateTime((task as any).prazo),
+  };
+  const text = renderTemplate(String(tpl.conteudo ?? ""), vars);
+  const body = buildWhatsappBody(tpl, vars, text);
+
+  let sent = 0;
+  const errors: string[] = [];
+  for (const m of members) {
+    try {
+      const r = await sendToMember(db, taskId, m.id, "created", m.phone, body);
+      if (!(r as any).skipped) sent += 1;
+    } catch (e: any) {
+      errors.push(`${m.nome}: ${e?.message ?? "erro"}`);
+    }
+  }
+  return { sent, total: members.length, errors };
+}
+
+/**
  * Dispara o template "task_created" para todos os assignees com telefone.
- * Chamado logo após criar uma task.
+ * Chamado logo após criar uma task (com auth).
  */
 export const notifyTaskCreated = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { taskId: string }) => ({ taskId: String(d?.taskId ?? "").trim() }))
   .handler(async ({ data, context }) => {
-    if (!data.taskId) throw new Error("taskId obrigatório");
-    const db = context.supabase;
-
-
-    const taskRes = await db
-      .from("tasks" as any)
-      .select("id,titulo,prioridade,prazo,assignee_ids,created_at")
-      .eq("id", data.taskId)
-      .maybeSingle();
-    if (taskRes?.error) throw new Error(taskRes.error.message);
-    const task = taskRes?.data;
-    if (!task) throw new Error("Tarefa não encontrada");
-
-    const tpl = await loadTemplate(db, "task_created");
-    if (!tpl) throw new Error("Template task_created não encontrado");
-
-    const members = await loadAssigneePhones(db, (task as any).assignee_ids ?? []);
-    if (!members.length) return { sent: 0, reason: "sem assignees com telefone" };
-
-    const vars = {
-      titulo: String((task as any).titulo ?? ""),
-      prioridade: String((task as any).prioridade ?? "normal"),
-      criada: fmtDateTime((task as any).created_at),
-      prazo: fmtDateTime((task as any).prazo),
-    };
-    const text = renderTemplate(String(tpl.conteudo ?? ""), vars);
-    const body = buildWhatsappBody(tpl, vars, text);
-
-    let sent = 0;
-    const errors: string[] = [];
-    for (const m of members) {
-      try {
-        const r = await sendToMember(db, data.taskId, m.id, "created", m.phone, body);
-        if (!(r as any).skipped) sent += 1;
-      } catch (e: any) {
-        errors.push(`${m.nome}: ${e?.message ?? "erro"}`);
-      }
-    }
-    return { sent, total: members.length, errors };
+    return runTaskCreatedDispatch(context.supabase, data.taskId);
   });
 
 /**
