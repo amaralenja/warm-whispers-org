@@ -118,14 +118,30 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   continue;
                 }
 
-                // increment unread on conversation
+                // Round-robin: atribui vendedor automaticamente se ainda não tem
                 try {
+                  const convId = (conv as any).id;
+                  const { data: convRow } = await supabaseAdmin
+                    .from("wa_conversations" as any)
+                    .select("assigned_vendor_id, unread_count")
+                    .eq("id", convId)
+                    .maybeSingle();
+                  const patch: Record<string, any> = {
+                    unread_count: ((convRow as any)?.unread_count ?? 0) + 1,
+                  };
+                  if (!(convRow as any)?.assigned_vendor_id) {
+                    const { data: vendorId } = await supabaseAdmin.rpc(
+                      "assign_vendor_for_channel" as any,
+                      { _channel_id: channelId },
+                    );
+                    if (vendorId) patch.assigned_vendor_id = vendorId;
+                  }
                   await supabaseAdmin
                     .from("wa_conversations" as any)
-                    .update({ unread_count: ((conv as any).unread_count ?? 0) + 1 })
-                    .eq("id", (conv as any).id);
+                    .update(patch)
+                    .eq("id", convId);
                 } catch (e) {
-                  console.error("[wa-webhook] unread bump error", e);
+                  console.error("[wa-webhook] assign/unread error", e);
                 }
 
 
