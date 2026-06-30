@@ -90,7 +90,8 @@ function WhatsAppPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (vars: { name: string; operacaoId: string }) => createFn({ data: vars }),
+    mutationFn: (vars: { name: string; operacaoId: string; kind: "chat" | "notification" }) => createFn({ data: vars }),
+
     onSuccess: (ch) => {
       toast.success("Conexão criada!");
       setName("");
