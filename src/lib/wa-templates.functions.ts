@@ -147,15 +147,42 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
       return { ok: res.ok, status: res.status, json };
     }
 
+    function extractMetaMsg(r: any): string {
+      const v = r?.json?.error?.variables?.message;
+      const direct = r?.json?.error?.error_user_msg ?? r?.json?.error?.message ?? r?.json?.message;
+      return String(v ?? direct ?? r?.json?.error ?? "");
+    }
+    function detectExistingCategory(msg: string): string | null {
+      // Meta msg: "A categoria X não corresponde à categoria já associada a este modelo, Y."
+      // EN: "Template category Y does not match ..."
+      if (/2388026/.test(msg) || /categoria j[áa] associada|already.*categor/i.test(msg)) {
+        const m = msg.match(/\b(UTILITY|MARKETING|AUTHENTICATION)\b[^A-Z]*$/);
+        if (m) return m[1];
+      }
+      return null;
+    }
+
     let result = await submit("UTILITY");
     let usedCategory = "UTILITY";
 
-    // If Meta complains about category mismatch (or EvoHub returns generic INTERNAL on UTILITY), retry as MARKETING
-    const errMsg = String(result.json?.error?.message ?? result.json?.error?.error_user_msg ?? result.json?.error ?? result.json?.message ?? "");
-    if (!result.ok && (/category|marketing|utility/i.test(errMsg) || /INTERNAL/i.test(errMsg) || result.status >= 500)) {
+    let errMsg = extractMetaMsg(result);
+    const existingCat = detectExistingCategory(errMsg);
+    if (!result.ok && existingCat && existingCat !== "UTILITY") {
+      // Template já existe no Meta com outra categoria, reenviar com a mesma
+      result = await submit(existingCat);
+      usedCategory = existingCat;
+    } else if (!result.ok && (/INTERNAL/i.test(errMsg) || result.status >= 500) && !existingCat) {
+      // Falha genérica do provider, tenta MARKETING como fallback
       result = await submit("MARKETING");
       usedCategory = "MARKETING";
+      const retryMsg = extractMetaMsg(result);
+      const retryExisting = detectExistingCategory(retryMsg);
+      if (!result.ok && retryExisting) {
+        result = await submit(retryExisting);
+        usedCategory = retryExisting;
+      }
     }
+
 
     if (!result.ok) {
       const detail = typeof result.json === "string"
