@@ -607,14 +607,14 @@ function QuizPage() {
             const origin = classifyLead(sample);
             const Icon = origin.icon;
             return (
-              <div key={key} className={`flex flex-col rounded-xl border ${origin.border} ${origin.bg} max-h-[78vh]`}>
-                <div className={`flex items-center justify-between px-3 py-2 border-b ${origin.border}`}>
+              <div key={key} className={`flex flex-col rounded-2xl border ${origin.border} ${origin.bg} max-h-[82vh]`}>
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${origin.border}`}>
                   <div className={`flex items-center gap-2 text-sm font-semibold ${origin.text}`}>
                     <Icon className="h-4 w-4" /> {origin.label}
                   </div>
                   <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
                 </div>
-                <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
+                <div className="flex-1 overflow-y-auto scrollbar-fancy p-3 space-y-3">
                   {items.map((l) => (
                     <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
                   ))}
@@ -623,20 +623,21 @@ function QuizPage() {
             );
           })}
           {grouped.fakes.length > 0 && reality !== "real" && (
-            <div className="flex flex-col rounded-xl border border-rose-500/30 bg-rose-500/5 max-h-[78vh]">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-rose-500/30">
+            <div className="flex flex-col rounded-2xl border border-rose-500/30 bg-rose-500/5 max-h-[82vh]">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-rose-500/30">
                 <div className="flex items-center gap-2 text-sm font-semibold text-rose-300">
                   <XCircle className="h-4 w-4" /> Fakes
                 </div>
                 <Badge variant="outline" className="text-[10px] border-rose-500/40 text-rose-300">{grouped.fakes.length}</Badge>
               </div>
-              <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
+              <div className="flex-1 overflow-y-auto scrollbar-fancy p-3 space-y-3">
                 {grouped.fakes.map((l) => (
                   <LeadCard key={l.id} lead={l} real={false} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
                 ))}
               </div>
             </div>
           )}
+
         </div>
       ) : (
         <Card>
