@@ -1376,6 +1376,7 @@ export type Database = {
           contact_wa: string
           convidados: string | null
           created_at: string
+          error_message: string | null
           event_id: string
           hora: string | null
           id: string
@@ -1396,6 +1397,7 @@ export type Database = {
           contact_wa: string
           convidados?: string | null
           created_at?: string
+          error_message?: string | null
           event_id: string
           hora?: string | null
           id?: string
@@ -1416,6 +1418,7 @@ export type Database = {
           contact_wa?: string
           convidados?: string | null
           created_at?: string
+          error_message?: string | null
           event_id?: string
           hora?: string | null
           id?: string
@@ -1741,6 +1744,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           direction: string
+          error_message: string | null
           from_wa_id: string | null
           id: string
           media_filename: string | null
@@ -1762,6 +1766,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           direction: string
+          error_message?: string | null
           from_wa_id?: string | null
           id?: string
           media_filename?: string | null
@@ -1783,6 +1788,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           direction?: string
+          error_message?: string | null
           from_wa_id?: string | null
           id?: string
           media_filename?: string | null
@@ -1813,6 +1819,7 @@ export type Database = {
           channel_id: string | null
           contact_wa: string
           created_at: string
+          error_message: string | null
           id: string
           kind: string
           member_id: string
@@ -1825,6 +1832,7 @@ export type Database = {
           channel_id?: string | null
           contact_wa: string
           created_at?: string
+          error_message?: string | null
           id?: string
           kind: string
           member_id: string
@@ -1837,6 +1845,7 @@ export type Database = {
           channel_id?: string | null
           contact_wa?: string
           created_at?: string
+          error_message?: string | null
           id?: string
           kind?: string
           member_id?: string
