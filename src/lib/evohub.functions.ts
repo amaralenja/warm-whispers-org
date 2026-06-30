@@ -44,6 +44,8 @@ export type EvoChannel = {
   created_at: string;
   updated_at: string;
   connectUrl: string;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
 };
 
 
