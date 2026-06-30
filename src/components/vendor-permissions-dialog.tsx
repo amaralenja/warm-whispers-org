@@ -137,17 +137,53 @@ export function VendorPermissionsDialog({
     setSaving(true);
     const { error } = await supabase
       .from("vendedores")
-      .update({ permissoes: permissoes as any, wa_channel_ids: channelIds as any })
+      .update({
+        permissoes: permissoes as any,
+        wa_channel_ids: channelIds as any,
+        lead_weight: leadWeight,
+      } as any)
       .eq("id", vendorId);
     setSaving(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success("Permissões salvas");
+    toast.success("Distribuição e permissões salvas");
     onSaved?.();
     onOpenChange(false);
   }
+
+  // calcula share % deste vendedor em cada canal, considerando o pool ao vivo + drafts
+  function shareForChannel(channelId: string): { pct: number; total: number; meu: number } {
+    const others = pool.filter((p) => p.id !== vendorId && p.wa_channel_ids.includes(channelId));
+    const meIn = channelIds.includes(channelId);
+    const meW = meIn ? Math.max(0, Number(leadWeight) || 0) : 0;
+    const sum = others.reduce((a, p) => a + Math.max(0, p.lead_weight), 0) + meW;
+    return {
+      pct: sum > 0 ? (meW / sum) * 100 : 0,
+      total: others.length + (meIn ? 1 : 0),
+      meu: meW,
+    };
+  }
+
+  async function balanceChannel(channelId: string) {
+    const ids = pool
+      .filter((p) => p.wa_channel_ids.includes(channelId) || (p.id === vendorId && channelIds.includes(channelId)))
+      .map((p) => p.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase
+      .from("vendedores")
+      .update({ lead_weight: 1 } as any)
+      .in("id", ids);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setLeadWeight(1);
+    setPool((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, lead_weight: 1 } : p)));
+    toast.success(`Distribuído igualmente entre ${ids.length} vendedores`);
+  }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
