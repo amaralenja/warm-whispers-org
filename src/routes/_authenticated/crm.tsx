@@ -181,6 +181,7 @@ function CRMPage() {
   const updateStageFn = useServerFn(updateCrmLeadStage);
   const { workspace, workspaces } = useWorkspace();
   const isGeral = workspace?.id === "all";
+  const isVendorSession = typeof window !== "undefined" && !!window.localStorage.getItem("vendor_session");
 
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [search, setSearch] = useState("");
@@ -213,7 +214,7 @@ function CRMPage() {
 
   const syncLeads = useMutation({
     mutationFn: async () => {
-      if (targetApiExperts.length === 0) {
+      if (isVendorSession || targetApiExperts.length === 0) {
         return { fetched: 0, inserted: 0, skipped: 0 };
       }
 
@@ -278,7 +279,7 @@ function CRMPage() {
     if (loadingApiKeys || !autoSyncKey || lastAutoSyncKey.current === autoSyncKey) return;
     lastAutoSyncKey.current = autoSyncKey;
     syncLeads.mutate();
-  }, [autoSyncKey, loadingApiKeys]);
+  }, [autoSyncKey, loadingApiKeys, isVendorSession]);
 
   // Apply filters
   const filtered = useMemo(() => {
@@ -373,14 +374,16 @@ function CRMPage() {
             variant="outline"
             size="sm"
             onClick={() => syncLeads.mutate()}
-            disabled={syncLeads.isPending || targetApiExperts.length === 0}
+            disabled={isVendorSession || syncLeads.isPending || targetApiExperts.length === 0}
           >
             <RefreshCw className={`mr-1.5 h-4 w-4 ${syncLeads.isPending ? "animate-spin" : ""}`} />
             {syncLeads.isPending ? "Puxando…" : "Puxar leads"}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
-            <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
-          </Button>
+          {!isVendorSession && (
+            <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
+              <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setTagsOpen(true)}>
             <TagIcon className="mr-1.5 h-4 w-4" /> Etiquetas
           </Button>
@@ -393,7 +396,7 @@ function CRMPage() {
         </div>
       </div>
 
-      {!loadingApiKeys && targetApiExperts.length === 0 && (
+      {!isVendorSession && !loadingApiKeys && targetApiExperts.length === 0 && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           {isGeral
             ? "Cadastre pelo menos uma API key nas operações para o CRM puxar leads automaticamente."
