@@ -626,7 +626,7 @@ function ChatPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-52 rounded-2xl border-chat-line bg-popover">
-                      <DropdownMenuItem onClick={() => { setPendingType("image"); fileInputRef.current?.click(); }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("image"); if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}>
                         <ImageIcon className="mr-2 h-4 w-4" /> Imagem
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setPendingType("video"); if (fileInputRef.current) { fileInputRef.current.accept = "video/*"; fileInputRef.current.click(); } }}>
