@@ -1768,8 +1768,10 @@ export type Database = {
           id: string
           meta_category: string | null
           meta_channel_id: string | null
+          meta_rejected_reason: string | null
           meta_status: string | null
           meta_submitted_at: string | null
+          meta_synced_at: string | null
           meta_template_id: string | null
           nome: string
           slug: string
@@ -1786,8 +1788,10 @@ export type Database = {
           id?: string
           meta_category?: string | null
           meta_channel_id?: string | null
+          meta_rejected_reason?: string | null
           meta_status?: string | null
           meta_submitted_at?: string | null
+          meta_synced_at?: string | null
           meta_template_id?: string | null
           nome: string
           slug: string
@@ -1804,8 +1808,10 @@ export type Database = {
           id?: string
           meta_category?: string | null
           meta_channel_id?: string | null
+          meta_rejected_reason?: string | null
           meta_status?: string | null
           meta_submitted_at?: string | null
+          meta_synced_at?: string | null
           meta_template_id?: string | null
           nome?: string
           slug?: string
