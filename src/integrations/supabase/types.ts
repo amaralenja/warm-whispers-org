@@ -1159,6 +1159,7 @@ export type Database = {
           funcao: string | null
           id: string
           nome: string
+          telefone: string | null
           updated_at: string
         }
         Insert: {
@@ -1170,6 +1171,7 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome: string
+          telefone?: string | null
           updated_at?: string
         }
         Update: {
@@ -1181,6 +1183,7 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome?: string
+          telefone?: string | null
           updated_at?: string
         }
         Relationships: []
