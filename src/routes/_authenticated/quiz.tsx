@@ -410,7 +410,11 @@ function QuizPage() {
   }, [filteredLeads, overrides]);
 
   const sortedLeads = useMemo(() => {
+    // Leads com caixa < R$1k (peso <= 1) vão sempre pro fim da lista
+    const isLow = (l: Lead) => caixaWeight(l) <= 1;
     return [...filteredLeads].sort((a, b) => {
+      const lowDiff = Number(isLow(a)) - Number(isLow(b));
+      if (lowDiff !== 0) return lowDiff;
       const wb = caixaWeight(b) - caixaWeight(a);
       if (wb !== 0) return wb;
       return (b.data_criacao || "").localeCompare(a.data_criacao || "");
