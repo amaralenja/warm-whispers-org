@@ -511,7 +511,8 @@ function ChatPage() {
 
   return (
     <div className="h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-chat-shell text-foreground">
-      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden border border-chat-line bg-chat-thread">
+      <div className="grid h-full min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-hidden bg-chat-thread">
+
 
         <aside className="flex min-h-0 flex-col border-r border-chat-line bg-chat-sidebar">
           <div className="shrink-0 border-b border-chat-line p-5">
@@ -669,7 +670,7 @@ function ChatPage() {
 
               <div
                 ref={scrollRef}
-                className="chat-thread-glow min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-fancy"
+                className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-6 py-6 scrollbar-fancy"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
                   {messageList.map((m, i, arr) => {
