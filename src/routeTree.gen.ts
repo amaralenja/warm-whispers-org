@@ -36,6 +36,7 @@ import { Route as ApiPublicNotificationAiContinueRouteImport } from './routes/ap
 import { Route as ApiPublicHooksTaskDueCheckRouteImport } from './routes/api/public/hooks/task-due-check'
 import { Route as ApiPublicHooksSendCallAnalyticsRouteImport } from './routes/api/public/hooks/send-call-analytics'
 import { Route as ApiPublicHooksSendAdsAnalyticsRouteImport } from './routes/api/public/hooks/send-ads-analytics'
+import { Route as ApiPublicHooksNotifyTaskCreatedRouteImport } from './routes/api/public/hooks/notify-task-created'
 import { Route as ApiPublicHooksCallsTickRouteImport } from './routes/api/public/hooks/calls-tick'
 
 const RankingTvRoute = RankingTvRouteImport.update({
@@ -179,6 +180,12 @@ const ApiPublicHooksSendAdsAnalyticsRoute =
     path: '/api/public/hooks/send-ads-analytics',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksNotifyTaskCreatedRoute =
+  ApiPublicHooksNotifyTaskCreatedRouteImport.update({
+    id: '/api/public/hooks/notify-task-created',
+    path: '/api/public/hooks/notify-task-created',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCallsTickRoute = ApiPublicHooksCallsTickRouteImport.update({
   id: '/api/public/hooks/calls-tick',
   path: '/api/public/hooks/calls-tick',
@@ -207,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
+  '/api/public/hooks/notify-task-created': typeof ApiPublicHooksNotifyTaskCreatedRoute
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
@@ -236,6 +244,7 @@ export interface FileRoutesByTo {
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
+  '/api/public/hooks/notify-task-created': typeof ApiPublicHooksNotifyTaskCreatedRoute
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
@@ -267,6 +276,7 @@ export interface FileRoutesById {
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
+  '/api/public/hooks/notify-task-created': typeof ApiPublicHooksNotifyTaskCreatedRoute
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/api/public/ig-image'
     | '/flows/'
     | '/api/public/hooks/calls-tick'
+    | '/api/public/hooks/notify-task-created'
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/api/public/ig-image'
     | '/flows'
     | '/api/public/hooks/calls-tick'
+    | '/api/public/hooks/notify-task-created'
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
@@ -357,6 +369,7 @@ export interface FileRouteTypes {
     | '/api/public/ig-image'
     | '/_authenticated/flows/'
     | '/api/public/hooks/calls-tick'
+    | '/api/public/hooks/notify-task-created'
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
@@ -372,6 +385,7 @@ export interface RootRouteChildren {
   RankingTvRoute: typeof RankingTvRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
   ApiPublicHooksCallsTickRoute: typeof ApiPublicHooksCallsTickRoute
+  ApiPublicHooksNotifyTaskCreatedRoute: typeof ApiPublicHooksNotifyTaskCreatedRoute
   ApiPublicHooksSendAdsAnalyticsRoute: typeof ApiPublicHooksSendAdsAnalyticsRoute
   ApiPublicHooksSendCallAnalyticsRoute: typeof ApiPublicHooksSendCallAnalyticsRoute
   ApiPublicHooksTaskDueCheckRoute: typeof ApiPublicHooksTaskDueCheckRoute
@@ -571,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSendAdsAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/notify-task-created': {
+      id: '/api/public/hooks/notify-task-created'
+      path: '/api/public/hooks/notify-task-created'
+      fullPath: '/api/public/hooks/notify-task-created'
+      preLoaderRoute: typeof ApiPublicHooksNotifyTaskCreatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/calls-tick': {
       id: '/api/public/hooks/calls-tick'
       path: '/api/public/hooks/calls-tick'
@@ -629,6 +650,7 @@ const rootRouteChildren: RootRouteChildren = {
   RankingTvRoute: RankingTvRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
   ApiPublicHooksCallsTickRoute: ApiPublicHooksCallsTickRoute,
+  ApiPublicHooksNotifyTaskCreatedRoute: ApiPublicHooksNotifyTaskCreatedRoute,
   ApiPublicHooksSendAdsAnalyticsRoute: ApiPublicHooksSendAdsAnalyticsRoute,
   ApiPublicHooksSendCallAnalyticsRoute: ApiPublicHooksSendCallAnalyticsRoute,
   ApiPublicHooksTaskDueCheckRoute: ApiPublicHooksTaskDueCheckRoute,
