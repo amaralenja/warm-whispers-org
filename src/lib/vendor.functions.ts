@@ -37,8 +37,8 @@ export const getVendorStats = createServerFn({ method: "POST" })
     );
     const { data: result, error } = await sb.rpc("get_vendor_stats", {
       _utm: data.utm,
-      _from: data.from ?? null,
-      _to: data.to ?? null,
+      _from: data.from ?? undefined,
+      _to: data.to ?? undefined,
     });
     if (error) throw new Error(error.message);
     return result as unknown as VendorStats;
