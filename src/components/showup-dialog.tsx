@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+
 import { Search, Zap, CheckCircle2, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -142,7 +142,7 @@ export function ShowUpDialog({
   defaultEmail?: string;
   defaultName?: string;
 }) {
-  const send = useServerFn(sendMetaEvent);
+  // Chamamos sendMetaEvent direto — useServerFn estava quebrando o mount do dialog
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<QuizLead[]>([]);
   const [searching, setSearching] = useState(false);
@@ -223,7 +223,7 @@ export function ShowUpDialog({
       }
       const [firstName, ...rest] = form.nome.trim().split(/\s+/);
       const lastName = rest.join(" ");
-      return send({
+      return sendMetaEvent({
         data: {
           eventName: "ShowUp",
           email: form.email,
