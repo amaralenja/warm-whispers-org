@@ -393,58 +393,44 @@ function WhatsAppPage() {
           </div>
         )}
 
-        {/* Channel grid */}
-        {isLoading ? (
-          <div className="rounded-2xl border border-border bg-card p-16 text-center text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-          </div>
-        ) : channels.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card/30 p-16 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mx-auto mb-4 flex items-center justify-center">
-              <WhatsappIcon className="h-7 w-7 text-emerald-500" />
+        {tab !== "logs" && (
+          isLoading ? (
+            <div className="rounded-2xl border border-border bg-card p-16 text-center text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">
-              Nenhuma conexão por aqui ainda
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              {isGeral
-                ? 'Clica em "Nova conexão" pra começar.'
-                : `Nenhum número vinculado à operação "${workspace.nome}".`}
-            </p>
-            <Button
-              variant="outline"
-              className="mt-5"
-              onClick={() => syncAmaralMut.mutate()}
-              disabled={syncAmaralMut.isPending}
-            >
-              {syncAmaralMut.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Puxar conexão Amaral da EvoHub
-            </Button>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {channels.map((ch) => (
-              <ChannelCard
-                key={ch.id}
-                ch={ch}
-                opLabel={opLabel(ch.operacaoId)}
-                operacoes={operacoes}
-                onChangeOp={(v) =>
-                  setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })
-                }
-                onRegen={() => regenMut.mutate(ch.id)}
-                regenPending={regenMut.isPending}
-                onDelete={() => {
-                  if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
-                }}
-                deletePending={deleteMut.isPending}
-              />
-            ))}
-          </div>
+          ) : channels.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card/30 p-16 text-center">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mx-auto mb-4 flex items-center justify-center">
+                <WhatsappIcon className="h-7 w-7 text-emerald-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma conexão por aqui ainda</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {isGeral ? 'Clica em "Nova conexão" pra começar.' : `Nenhum número vinculado à operação "${workspace.nome}".`}
+              </p>
+              <Button variant="outline" className="mt-5" onClick={() => syncAmaralMut.mutate()} disabled={syncAmaralMut.isPending}>
+                {syncAmaralMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Puxar conexão Amaral da EvoHub
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {channels.map((ch) => (
+                <ChannelCard
+                  key={ch.id}
+                  ch={ch}
+                  opLabel={opLabel(ch.operacaoId)}
+                  operacoes={operacoes}
+                  onChangeOp={(v) => setOpMut.mutate({ id: ch.id, operacaoId: v, currentMetadata: ch.metadata })}
+                  onRegen={() => regenMut.mutate(ch.id)}
+                  regenPending={regenMut.isPending}
+                  onDelete={() => {
+                    if (confirm(`Remover conexão "${ch.name}"?`)) deleteMut.mutate(ch.id);
+                  }}
+                  deletePending={deleteMut.isPending}
+                />
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
