@@ -396,7 +396,26 @@ export async function runFlowAdmin(args: {
   triggerContext?: any;
 }) {
   const flow = await loadFlow(args.flowId);
-  if (!flow.entry_node_id) throw new Error("Fluxo sem nó inicial");
+  const nodes: Node[] = (flow.nodes as Node[]) ?? [];
+  const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+  if (nodes.length === 0) throw new Error("Fluxo sem nós");
+
+  // Pick a sensible starting node:
+  // 1) entry_node_id if set (typically the trigger node)
+  // 2) otherwise the first trigger node
+  // 3) otherwise the first node with no incoming edges
+  // 4) otherwise the first node
+  let entryId: string | null = flow.entry_node_id ?? null;
+  if (!entryId) entryId = nodes.find((n) => n.type === "trigger")?.id ?? null;
+  if (!entryId) {
+    const targets = new Set(edges.map((e) => e.target));
+    entryId = nodes.find((n) => !targets.has(n.id))?.id ?? nodes[0].id;
+  }
+
+  const entryNode = nodes.find((n) => n.id === entryId);
+  // If the entry is a trigger node, skip to its next; otherwise start at the entry itself.
+  const startId =
+    entryNode?.type === "trigger" ? nextNodeId(edges, entryId!) : entryId;
 
   const { data: run, error } = await supabaseAdmin
     .from("wa_flow_runs" as any)
@@ -405,7 +424,7 @@ export async function runFlowAdmin(args: {
       conversation_id: args.conversationId,
       channel_id: args.channelId,
       contact_wa_id: args.contactWaId,
-      current_node_id: flow.entry_node_id,
+      current_node_id: startId ?? entryId,
       status: "running",
       context: { trigger: args.triggerContext ?? {} },
     })
@@ -422,14 +441,11 @@ export async function runFlowAdmin(args: {
     variables: { trigger: args.triggerContext ?? {} },
   };
 
-  // Skip the trigger node and move to its next
-  const edges: Edge[] = (flow.edges as Edge[]) ?? [];
-  const next = nextNodeId(edges, flow.entry_node_id);
-  if (!next) {
+  if (!startId) {
     await supabaseAdmin.from("wa_flow_runs" as any).update({ status: "completed" }).eq("id", ctx.runId);
-    return { runId: ctx.runId, completed: true };
+    return { runId: ctx.runId, completed: true, reason: "no_next_node" };
   }
-  await executeFrom(ctx, next);
+  await executeFrom(ctx, startId);
   return { runId: ctx.runId };
 }
 
