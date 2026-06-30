@@ -77,6 +77,22 @@ function VendorPortal() {
   const stats = data;
   const maxSerie = Math.max(1, ...(stats?.serieDiaria?.map((d) => d.total) ?? [0]));
 
+  // meta no banco = meta DIÁRIA. Multiplica pelos dias do período.
+  const diasPeriodo = Math.max(
+    1,
+    Math.round(
+      (Date.UTC(+range.to.slice(0, 4), +range.to.slice(5, 7) - 1, +range.to.slice(8, 10)) -
+        Date.UTC(+range.from.slice(0, 4), +range.from.slice(5, 7) - 1, +range.from.slice(8, 10))) /
+        86400000,
+    ) + 1,
+  );
+  const metaDiaria = Number(stats?.meta ?? 0);
+  const metaPeriodo = metaDiaria * diasPeriodo;
+  const metaPct = metaPeriodo > 0 ? Math.min(100, ((stats?.faturamento ?? 0) / metaPeriodo) * 100) : 0;
+  const faltaPeriodo = Math.max(0, metaPeriodo - (stats?.faturamento ?? 0));
+  const labelMeta =
+    preset === "hoje" ? "Meta do dia" : preset === "7d" ? "Meta da semana" : preset === "30d" ? "Meta dos 30 dias" : "Meta do mês";
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card/40 px-6 py-4 backdrop-blur sticky top-0 z-10">
