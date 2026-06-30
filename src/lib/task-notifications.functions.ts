@@ -118,10 +118,10 @@ async function loadAssigneePhones(db: any, ids: string[]): Promise<Array<{ id: s
 export const notifyTaskCreated = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { taskId: string }) => ({ taskId: String(d?.taskId ?? "").trim() }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     if (!data.taskId) throw new Error("taskId obrigatório");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin;
+    const db = context.supabase;
+
 
     const { data: task } = await db
       .from("tasks" as any)
