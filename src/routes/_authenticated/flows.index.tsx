@@ -191,8 +191,10 @@ function FlowsListPage() {
   }
 
 
+  // Fluxos sem operação são considerados "globais" e aparecem em qualquer workspace
+  // (importante pra vendedor enxergar fluxos compartilhados).
   const filtered = (flows as any[]).filter((f) =>
-    workspace.id === "all" ? true : f.operacao_id === workspace.id
+    workspace.id === "all" ? true : (!f.operacao_id || f.operacao_id === workspace.id),
   );
 
   const copyExport = async () => {
