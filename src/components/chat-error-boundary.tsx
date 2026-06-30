@@ -21,8 +21,8 @@ function safeErrorText(error: unknown, fallback: string) {
   return String(error) || fallback;
 }
 
-function safeStackText(error: unknown) {
-  if (error instanceof Error && error.stack) return error.stack;
+function safeStackText(error: unknown): string {
+  if (error instanceof Error && typeof error.stack === "string" && error.stack) return error.stack;
   return safeErrorText(error, "Sem detalhes técnicos disponíveis.");
 }
 
