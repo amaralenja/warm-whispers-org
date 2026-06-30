@@ -1703,6 +1703,7 @@ export type Database = {
           descricao: string | null
           edges: Json
           entry_node_id: string | null
+          folder: string | null
           id: string
           nodes: Json
           nome: string
@@ -1716,6 +1717,7 @@ export type Database = {
           descricao?: string | null
           edges?: Json
           entry_node_id?: string | null
+          folder?: string | null
           id?: string
           nodes?: Json
           nome: string
@@ -1729,6 +1731,7 @@ export type Database = {
           descricao?: string | null
           edges?: Json
           entry_node_id?: string | null
+          folder?: string | null
           id?: string
           nodes?: Json
           nome?: string

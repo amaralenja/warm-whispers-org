@@ -46,6 +46,7 @@ function FlowsListPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [op, setOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
+  const [folder, setFolder] = useState<string>("");
 
   // Import
   const [importOpen, setImportOpen] = useState(false);
@@ -71,15 +72,25 @@ function FlowsListPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (v: { nome: string; operacao_id: string | null }) => createFn({ data: v }),
+    mutationFn: (v: { nome: string; operacao_id: string | null; folder: string | null }) => createFn({ data: v }),
     onSuccess: (r: any) => {
       toast.success("Fluxo criado");
       qc.invalidateQueries({ queryKey: ["wa-flows"] });
       setOpen(false);
       setName("");
+      setFolder("");
       navigate({ to: "/flows/$flowId", params: { flowId: r.id } });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao criar fluxo"),
+  });
+
+  const moveFolderMut = useMutation({
+    mutationFn: (v: { id: string; folder: string | null }) => saveFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Pasta atualizada");
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
   const delMut = useMutation({
@@ -233,11 +244,15 @@ function FlowsListPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Pasta (opcional)</Label>
+                  <Input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="Ex.: Onboarding, Recuperação..." />
+                </div>
               </div>
               <DialogFooter>
                 <Button
                   disabled={!name.trim() || createMut.isPending}
-                  onClick={() => createMut.mutate({ nome: name.trim(), operacao_id: op || null })}
+                  onClick={() => createMut.mutate({ nome: name.trim(), operacao_id: op || null, folder: folder.trim() || null })}
                 >Criar</Button>
               </DialogFooter>
             </DialogContent>
@@ -250,8 +265,11 @@ function FlowsListPage() {
           Nenhum fluxo criado ainda. Clique em <strong>Novo fluxo</strong> ou <strong>Importar código</strong>.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((f: any) => {
+        <FlowsGrouped
+          flows={filtered}
+          showOp={workspace.id === "all"}
+          workspaces={workspaces}
+          renderCard={(f: any) => {
             const triggers = f.wa_flow_triggers ?? [];
             return (
               <div key={f.id} className="border border-border rounded-lg p-4 bg-card hover:border-emerald-500/40 transition-colors">
@@ -279,6 +297,16 @@ function FlowsListPage() {
                     <Link to="/flows/$flowId" params={{ flowId: f.id }}>
                       <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
                     </Link>
+                  </Button>
+                  <Button
+                    size="sm" variant="outline" title="Mover para pasta"
+                    onClick={() => {
+                      const v = prompt("Nome da pasta (vazio = sem pasta):", f.folder ?? "");
+                      if (v === null) return;
+                      moveFolderMut.mutate({ id: f.id, folder: v.trim() || null });
+                    }}
+                  >
+                    📁
                   </Button>
                   <Button
                     size="sm" variant="outline" title="Duplicar"
@@ -309,8 +337,8 @@ function FlowsListPage() {
                 </div>
               </div>
             );
-          })}
-        </div>
+          }}
+        />
       )}
 
       {/* Import Dialog */}
@@ -459,6 +487,69 @@ function FlowsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function FlowsGrouped({
+  flows,
+  showOp,
+  workspaces,
+  renderCard,
+}: {
+  flows: any[];
+  showOp: boolean;
+  workspaces: { id: string; nome: string }[];
+  renderCard: (f: any) => any;
+}) {
+  // Agrupa: operação -> pasta -> fluxos[]
+  const opsMap = new Map<string, Map<string, any[]>>();
+  for (const f of flows) {
+    const opId = String(f.operacao_id ?? "__sem_op__");
+    const fld = (f.folder && String(f.folder).trim()) || "__sem_pasta__";
+    if (!opsMap.has(opId)) opsMap.set(opId, new Map());
+    const fm = opsMap.get(opId)!;
+    if (!fm.has(fld)) fm.set(fld, []);
+    fm.get(fld)!.push(f);
+  }
+  const opName = (id: string) =>
+    id === "__sem_op__" ? "Sem operação" : workspaces.find((w) => w.id === id)?.nome ?? id;
+
+  const opEntries = Array.from(opsMap.entries()).sort((a, b) => opName(a[0]).localeCompare(opName(b[0])));
+
+  return (
+    <div className="space-y-8">
+      {opEntries.map(([opId, foldersMap]) => {
+        const folderEntries = Array.from(foldersMap.entries()).sort((a, b) => {
+          if (a[0] === "__sem_pasta__") return 1;
+          if (b[0] === "__sem_pasta__") return -1;
+          return a[0].localeCompare(b[0]);
+        });
+        return (
+          <section key={opId} className="space-y-4">
+            {showOp && (
+              <div className="flex items-center gap-2 border-b border-border pb-2">
+                <span className="text-lg">🏢</span>
+                <h2 className="text-lg font-semibold">{opName(opId)}</h2>
+                <Badge variant="outline" className="text-xs">
+                  {Array.from(foldersMap.values()).reduce((a, b) => a + b.length, 0)} fluxos
+                </Badge>
+              </div>
+            )}
+            {folderEntries.map(([fld, items]) => (
+              <div key={fld} className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <span>{fld === "__sem_pasta__" ? "📂 Sem pasta" : `📁 ${fld}`}</span>
+                  <span className="text-xs">({items.length})</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {items.map((f) => renderCard(f))}
+                </div>
+              </div>
+            ))}
+          </section>
+        );
+      })}
     </div>
   );
 }
