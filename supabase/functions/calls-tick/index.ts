@@ -380,7 +380,7 @@ Deno.serve(async (req) => {
       for (const p of phones) {
         const shared = { eventId: String(ev.id), to: p.phone, nome: p.nome ?? "", hora, convidados, leadEmail: p.email };
         try {
-          if (diffMin >= 25 && diffMin <= 35) {
+          if (diffMin > 2 && diffMin <= 35) {
             results.push({ kind: "reminder", eventId: ev.id, to: normalizeBrPhone(p.phone), ...(await sendCallReminder(db, shared)) });
           }
           if (diffMin >= -2 && diffMin <= 2) {
