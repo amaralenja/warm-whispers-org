@@ -96,7 +96,57 @@ function normalizeBrPhone(raw: string): string {
 }
 
 function renderTemplate(tpl: string, vars: Record<string, string>) {
-  return String(tpl || "").replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
+  return String(tpl || "").replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => vars[k] ?? "");
+}
+
+function templateName(tpl: any): string {
+  return String(tpl?.slug || tpl?.nome || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 512);
+}
+
+function varsFromContent(content: string): string[] {
+  const out: string[] = [];
+  String(content || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_: string, name: string) => {
+    if (!out.includes(name)) out.push(name);
+    return "";
+  });
+  return out;
+}
+
+function buildTemplateMessage(tpl: any, vars: Record<string, string>, buttonPayloads?: Record<string, string>) {
+  const name = templateName(tpl);
+  if (!name) throw new Error("Template sem slug/nome");
+  const orderedVars = Array.isArray(tpl?.vars) && tpl.vars.length ? tpl.vars.map(String) : varsFromContent(String(tpl?.conteudo ?? ""));
+  const components: any[] = [];
+  if (orderedVars.length) {
+    components.push({
+      type: "body",
+      parameters: orderedVars.map((key: string) => ({ type: "text", text: String(vars[key] ?? "") })),
+    });
+  }
+  const buttons = Array.isArray(tpl?.buttons) ? tpl.buttons : [];
+  buttons.slice(0, 3).forEach((button: any, index: number) => {
+    const id = String(button?.id ?? "").trim();
+    const payload = id ? buttonPayloads?.[id] : "";
+    if (!payload) return;
+    components.push({
+      type: "button",
+      sub_type: "quick_reply",
+      index: String(index),
+      parameters: [{ type: "payload", payload: payload.slice(0, 128) }],
+    });
+  });
+  return {
+    type: "template",
+    template: {
+      name,
+      language: { code: "pt_BR" },
+      ...(components.length ? { components } : {}),
+    },
+  };
 }
 
 async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 15000) {
@@ -218,16 +268,16 @@ async function sendCallReminder(db: any, input: Shared) {
   if (error || !ins) throw new Error(error?.message || "Falha ao criar lembrete");
 
   try {
-    const text = renderTemplate(String(tpl.conteudo ?? ""), {
+    const vars = {
       nome: input.nome || "",
       hora: input.hora || "",
       convidados: input.convidados || "",
-    });
-    const { waMsgId } = await sendWA(channelId, contactWa, { type: "text", text: { body: text } }, db);
+    };
+    const { waMsgId } = await sendWA(channelId, contactWa, buildTemplateMessage(tpl, vars), db);
     await db.from("wa_call_reminders").update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" }).eq("id", ins.id);
     return { reminderId: ins.id, waMsgId, channelId };
-  } catch (e) {
-    await db.from("wa_call_reminders").update({ status: "failed" }).eq("id", ins.id);
+  } catch (e: any) {
+    await db.from("wa_call_reminders").update({ status: "failed", error_message: e?.message ?? "Falha ao enviar lembrete" }).eq("id", ins.id);
     throw e;
   }
 }
@@ -268,11 +318,11 @@ async function sendCallAttendance(db: any, input: Shared) {
   if (error || !ins) throw new Error(error?.message || "Falha ao criar comparecimento");
 
   try {
-    const text = renderTemplate(String(tpl.conteudo ?? ""), {
+    const vars = {
       nome: input.nome || "",
       hora: input.hora || "",
       convidados: input.convidados || "",
-    });
+    };
     const tplButtons = Array.isArray(tpl.buttons) && tpl.buttons.length
       ? tpl.buttons
       : [
@@ -280,20 +330,16 @@ async function sendCallAttendance(db: any, input: Shared) {
           { id: "noshow", label: "❌ No show" },
           { id: "remarcada", label: "🔄 Call remarcada" },
         ];
-    const buttons = tplButtons.slice(0, 3).map((b: any) => ({
-      type: "reply",
-      reply: { id: `callack:${ins.id}:${b.id}`, title: String(b.label).slice(0, 20) },
-    }));
     const { waMsgId } = await sendWA(
       channelId,
       contactWa,
-      { type: "interactive", interactive: { type: "button", body: { text }, action: { buttons } } },
+      buildTemplateMessage(tpl, vars, Object.fromEntries(tplButtons.map((b: any) => [b.id, `callack:${ins.id}:${b.id}`]))),
       db,
     );
     await db.from("wa_call_reminders").update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" }).eq("id", ins.id);
     return { reminderId: ins.id, waMsgId, channelId };
-  } catch (e) {
-    await db.from("wa_call_reminders").update({ status: "failed" }).eq("id", ins.id);
+  } catch (e: any) {
+    await db.from("wa_call_reminders").update({ status: "failed", error_message: e?.message ?? "Falha ao enviar comparecimento" }).eq("id", ins.id);
     throw e;
   }
 }
