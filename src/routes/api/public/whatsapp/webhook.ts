@@ -182,6 +182,45 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   .upsert(insertPayload, { onConflict: "channel_id,wa_message_id" });
                 if (msgErr) console.error("[wa-webhook] insert msg error", msgErr);
 
+                // Handle call-reminder button replies (callack:<reminderId>:<action>)
+                if (buttonId && typeof buttonId === "string" && buttonId.startsWith("callack:")) {
+                  try {
+                    const parts = buttonId.split(":");
+                    const reminderId = parts[1];
+                    const action = (parts[2] ?? "").toLowerCase();
+                    if (reminderId && (action === "showup" || action === "noshow")) {
+                      const { data: rem } = await supabaseAdmin
+                        .from("wa_call_reminders" as any)
+                        .select("*")
+                        .eq("id", reminderId)
+                        .maybeSingle();
+                      if (rem) {
+                        await supabaseAdmin
+                          .from("wa_call_reminders" as any)
+                          .update({ status: action, replied_at: new Date().toISOString() })
+                          .eq("id", reminderId);
+                        if (action === "showup") {
+                          try {
+                            const { fireShowUpFromSnapshot } = await import("@/lib/meta-ads.server");
+                            await fireShowUpFromSnapshot({
+                              email: (rem as any).lead_email,
+                              phone: (rem as any).contact_wa,
+                              nome: (rem as any).lead_nome,
+                              externalId: (rem as any).lead_externalid,
+                              fbp: (rem as any).lead_fbp,
+                              fbc: (rem as any).lead_fbc,
+                            });
+                          } catch (e) {
+                            console.error("[wa-webhook] showup meta fire failed", e);
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    console.error("[wa-webhook] callack handle error", e);
+                  }
+                }
+
                 // Dispatch to flow engine (fire and continue; await so errors are logged)
                 try {
                   const { count: priorCount } = await supabaseAdmin
@@ -206,6 +245,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   console.error("[wa-webhook] flow dispatch error", e);
                 }
               }
+
 
 
               // Status updates (sent/delivered/read/failed)

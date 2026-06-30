@@ -1322,6 +1322,66 @@ export type Database = {
           },
         ]
       }
+      wa_call_reminders: {
+        Row: {
+          channel_id: string | null
+          contact_wa: string
+          convidados: string | null
+          created_at: string
+          event_id: string
+          hora: string | null
+          id: string
+          lead_email: string | null
+          lead_externalid: string | null
+          lead_fbc: string | null
+          lead_fbp: string | null
+          lead_nome: string | null
+          replied_at: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          contact_wa: string
+          convidados?: string | null
+          created_at?: string
+          event_id: string
+          hora?: string | null
+          id?: string
+          lead_email?: string | null
+          lead_externalid?: string | null
+          lead_fbc?: string | null
+          lead_fbp?: string | null
+          lead_nome?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          contact_wa?: string
+          convidados?: string | null
+          created_at?: string
+          event_id?: string
+          hora?: string | null
+          id?: string
+          lead_email?: string | null
+          lead_externalid?: string | null
+          lead_fbc?: string | null
+          lead_fbp?: string | null
+          lead_nome?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Relationships: []
+      }
       wa_channels: {
         Row: {
           app_source: string
@@ -1700,6 +1760,7 @@ export type Database = {
       wa_templates: {
         Row: {
           ativo: boolean
+          buttons: Json
           categoria: string
           conteudo: string
           created_at: string
@@ -1712,6 +1773,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          buttons?: Json
           categoria?: string
           conteudo: string
           created_at?: string
@@ -1724,6 +1786,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          buttons?: Json
           categoria?: string
           conteudo?: string
           created_at?: string
