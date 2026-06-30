@@ -836,8 +836,10 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void }) {
   const isOut = msg.direction === "out";
-  const body = toText(msg.text_body);
+  const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
+  const body = isInteractive ? "" : toText(msg.text_body);
   const caption = toText(msg.caption);
+
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
