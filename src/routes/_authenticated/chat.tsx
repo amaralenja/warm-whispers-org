@@ -909,10 +909,24 @@ function InteractiveContent({ msg, outgoing }: { msg: Msg; outgoing?: boolean })
       }))
     : [];
   const bodyText = toText(interactive?.body?.text ?? msg.text_body);
+  // Outbound CTA URL
+  const ctaUrl: { display_text?: string; url?: string } | null =
+    interactive?.type === "cta_url" ? (interactive?.action?.parameters ?? null) : null;
   // Inbound: button_reply
   const reply = interactive?.button_reply ?? interactive?.list_reply ?? raw?.button ?? null;
   const replyText = reply ? toText(reply.title ?? reply.text ?? reply.payload) : "";
 
+  if (ctaUrl?.url) {
+    return (
+      <div className="mb-1 space-y-2">
+        {bodyText && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{bodyText}</p>}
+        <a href={ctaUrl.url} target="_blank" rel="noreferrer"
+          className={`block rounded-xl px-3 py-2 text-center text-sm font-semibold underline ${outgoing ? "bg-background/15 text-current" : "bg-chat-soft text-chat-accent"}`}>
+          🔗 {ctaUrl.display_text || "Abrir link"}
+        </a>
+      </div>
+    );
+  }
   if (sentButtons.length > 0) {
     return (
       <div className="mb-1 space-y-2">
