@@ -44,6 +44,7 @@ import {
   setChannelOperacao,
   deleteWhatsappChannel,
   regenerateWhatsappToken,
+  renameWhatsappChannel,
   getWhatsappQuality,
   type EvoChannel,
 } from "@/lib/evohub.functions";
