@@ -224,14 +224,23 @@ export const listConversations = createServerFn({ method: "GET" })
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    // Excluir canais de notificação (não devem aparecer no chat ao vivo)
+    const { data: notifChans } = await db
+      .from("wa_channels" as any)
+      .select("id")
+      .eq("kind", "notification");
+    const notifIds = ((notifChans ?? []) as any[]).map((c) => c.id);
+
     let q = db
       .from("wa_conversations" as any)
       .select("*")
       .order("last_message_at", { ascending: false })
-      .limit(200);
+      .limit(200)
+      .neq("operacao_id", "__notificador__");
+    if (notifIds.length) q = q.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
     if ((context as any).vendor) {
-      const allowed = vendorChannelIds(context);
+      const allowed = vendorChannelIds(context).filter((id) => !notifIds.includes(id));
       if (allowed.length === 0) return [];
       q = q.eq("assigned_vendor_id", (context as any).vendor.id).in("channel_id", allowed);
     } else if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
