@@ -342,24 +342,51 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "send_buttons": {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
-      const buttons: Array<{ id: string; label: string }> = (node.data?.buttons ?? []).slice(0, 3);
-      if (!text || buttons.length === 0) throw new Error("Texto e pelo menos 1 botão obrigatórios");
-      const body = {
-        type: "interactive",
-        interactive: {
-          type: "button",
-          body: { text },
-          action: {
-            buttons: buttons.map((b) => ({
-              type: "reply",
-              reply: { id: b.id, title: b.label.slice(0, 20) },
-            })),
+      const all: Array<{ id: string; label: string; type?: string; url?: string }> = (node.data?.buttons ?? []).slice(0, 6);
+      if (!text || all.length === 0) throw new Error("Texto e pelo menos 1 botão obrigatórios");
+      const replies = all.filter((b) => (b.type ?? "reply") === "reply").slice(0, 3);
+      const urls = all.filter((b) => b.type === "url" && b.url);
+
+      // 1) Reply buttons (grouped, max 3) — single interactive button message.
+      if (replies.length > 0) {
+        const body = {
+          type: "interactive",
+          interactive: {
+            type: "button",
+            body: { text },
+            action: {
+              buttons: replies.map((b) => ({
+                type: "reply",
+                reply: { id: b.id, title: (b.label || "Opção").slice(0, 20) },
+              })),
+            },
           },
-        },
-      };
-      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-      await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
-      // After sending, automatically pause to wait for button reply.
+        };
+        const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+        await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
+      }
+
+      // 2) URL buttons — each one a separate cta_url interactive message.
+      for (const b of urls) {
+        const body = {
+          type: "interactive",
+          interactive: {
+            type: "cta_url",
+            body: { text: replies.length === 0 ? text : (b.label || text) },
+            action: {
+              name: "cta_url",
+              parameters: { display_text: (b.label || "Abrir").slice(0, 20), url: interpolate(String(b.url ?? ""), ctx) },
+            },
+          },
+        };
+        const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+        await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
+      }
+
+      // Pause waiting for button reply only if there are reply buttons.
+      if (replies.length === 0) {
+        return { log: { urls: urls.length } };
+      }
       const ttl = Number(node.data?.timeoutSeconds ?? 86400);
       return {
         pause: true,
