@@ -42,6 +42,8 @@ import {
   markConversationRead,
   sendWhatsappMessage,
   downloadIncomingMediaBase64,
+  transferConversation,
+  listVendorsForChannel,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
