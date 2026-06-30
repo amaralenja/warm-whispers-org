@@ -44,9 +44,18 @@ import {
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
+import { ChatErrorBoundary } from "@/components/chat-error-boundary";
+
+function ChatRoute() {
+  return (
+    <ChatErrorBoundary>
+      <ChatPage />
+    </ChatErrorBoundary>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/chat")({
-  component: ChatPage,
+  component: ChatRoute,
 });
 
 type Conv = {
