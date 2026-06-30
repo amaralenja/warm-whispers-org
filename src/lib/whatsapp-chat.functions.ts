@@ -339,7 +339,8 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const ch = await findChannel(data.channelId);
-    const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}`);
+    const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
+    const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
     return { url: resp?.url as string | undefined, mime: resp?.mime_type as string | undefined };
   });
 
@@ -352,7 +353,8 @@ export const downloadIncomingMediaBase64 = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const ch = await findChannel(data.channelId);
-    const { body: meta, token } = await metaProxyForChannel(ch, `/${data.mediaId}`);
+    const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
+    const { body: meta, token } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
     const url = meta?.url as string | undefined;
     const mime = (meta?.mime_type as string | undefined) ?? "application/octet-stream";
     if (!url) throw new Error("URL de mídia não encontrada");
