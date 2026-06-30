@@ -340,6 +340,74 @@ function FlowsListPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ZapVoice Import Dialog */}
+      <Dialog open={zvOpen} onOpenChange={setZvOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileJson className="h-5 w-5 text-emerald-500" /> Importar backup do ZapVoice
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <Label>Arquivo .json do ZapVoice</Label>
+              <Input
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => setZvFile(e.target.files?.[0] ?? null)}
+              />
+              {zvFile && (
+                <p className="text-[11px] text-muted-foreground">
+                  {zvFile.name} · {(zvFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Operação (opcional)</Label>
+              <Select value={zvOp} onValueChange={setZvOp}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {workspaces.filter((o) => o.id !== "all").map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={zvReplace} onCheckedChange={(v) => setZvReplace(!!v)} />
+              Substituir importações anteriores do ZapVoice (apaga fluxos com prefixo [ZV])
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Cada funil vira um fluxo com gatilho manual. Mensagens viram nós de texto, mídias são enviadas para o Storage e linkadas no nó correspondente.
+            </p>
+
+            {zvSummary && (
+              <div className="border border-emerald-500/30 bg-emerald-500/5 rounded-md p-3 text-sm space-y-1">
+                <div>✅ <strong>{zvSummary.funnels}</strong> funis · <strong>{zvSummary.steps}</strong> etapas · <strong>{zvSummary.uploads}</strong> arquivos</div>
+                {zvSummary.errors?.length > 0 && (
+                  <details className="text-xs text-amber-600 mt-1">
+                    <summary>{zvSummary.errors.length} erro(s) — clique para ver</summary>
+                    <ul className="mt-1 max-h-40 overflow-auto space-y-0.5 pl-3 list-disc">
+                      {zvSummary.errors.slice(0, 30).map((e: any, i: number) => (
+                        <li key={i}>{e.funnel ? `[${e.funnel}] ` : ""}{e.item ? `${e.item}: ` : ""}{e.message}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setZvOpen(false)}>Fechar</Button>
+            <Button disabled={!zvFile || zvMut.isPending} onClick={runZvImport}>
+              {zvMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando…</>
+                : <><Upload className="h-4 w-4 mr-2" /> Importar</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Export Dialog */}
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
         <DialogContent className="max-w-lg">
