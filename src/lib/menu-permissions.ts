@@ -11,6 +11,7 @@ export const MENU_TREE: MenuNode[] = [
   { key: "ranking", title: "Ranking", url: "/ranking" },
   { key: "ranking-tv", title: "Ranking TV", url: "/ranking-tv" },
   { key: "financeiro", title: "Financeiro", url: "/financeiro" },
+  { key: "tasks", title: "Tarefas", url: "/tasks" },
   {
     key: "operacao-x1",
     title: "Operação X1",
