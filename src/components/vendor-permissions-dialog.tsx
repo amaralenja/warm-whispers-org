@@ -43,6 +43,9 @@ export function VendorPermissionsDialog({
   const [permissoes, setPermissoes] = useState<Permissoes>(defaultPermissoes());
   const [channelIds, setChannelIds] = useState<string[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [leadWeight, setLeadWeight] = useState<number>(1);
+  const [pool, setPool] = useState<Array<{ id: number; nome: string | null; lead_weight: number; wa_channel_ids: string[] }>>([]);
+
 
   useEffect(() => {
     if (!open || vendorId == null) return;
