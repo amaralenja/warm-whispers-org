@@ -21,6 +21,7 @@ import {
   Briefcase,
   User,
   BookOpenText,
+  CheckSquare,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -52,6 +53,7 @@ const mainItems: Item[] = [
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
   { title: "SOPs", url: "/sops", icon: BookOpenText },
+  { title: "Tarefas", url: "/tasks", icon: CheckSquare },
 ];
 
 
@@ -86,6 +88,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
   "/sops": "sops",
+  "/tasks": "tasks",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 

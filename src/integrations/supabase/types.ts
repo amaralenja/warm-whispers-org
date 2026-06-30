@@ -1015,6 +1015,176 @@ export type Database = {
         }
         Relationships: []
       }
+      task_boards: {
+        Row: {
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_columns: {
+        Row: {
+          board_id: string
+          cor: string | null
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          board_id: string
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          board_id?: string
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_columns_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "task_boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          anexos: Json | null
+          assignee_ids: string[] | null
+          board_id: string
+          checklist: Json | null
+          column_id: string
+          concluida: boolean | null
+          created_at: string
+          descricao: string | null
+          id: string
+          labels: string[] | null
+          ordem: number
+          prazo: string | null
+          prioridade: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          anexos?: Json | null
+          assignee_ids?: string[] | null
+          board_id: string
+          checklist?: Json | null
+          column_id: string
+          concluida?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          labels?: string[] | null
+          ordem?: number
+          prazo?: string | null
+          prioridade?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          anexos?: Json | null
+          assignee_ids?: string[] | null
+          board_id?: string
+          checklist?: Json | null
+          column_id?: string
+          concluida?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          labels?: string[] | null
+          ordem?: number
+          prazo?: string | null
+          prioridade?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "task_boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "task_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          ativo: boolean | null
+          cor: string | null
+          created_at: string
+          email: string | null
+          foto_url: string | null
+          funcao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string
+          email?: string | null
+          foto_url?: string | null
+          funcao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string
+          email?: string | null
+          foto_url?: string | null
+          funcao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vendas: {
         Row: {
           Campanha: string | null

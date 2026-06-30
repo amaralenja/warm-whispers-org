@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedVendorRouteImport } from './routes/_authenticated/vendor'
 import { Route as AuthenticatedVendedoresRouteImport } from './routes/_authenticated/vendedores'
+import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedSopsRouteImport } from './routes/_authenticated/sops'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
@@ -63,6 +64,11 @@ const AuthenticatedVendorRoute = AuthenticatedVendorRouteImport.update({
 const AuthenticatedVendedoresRoute = AuthenticatedVendedoresRouteImport.update({
   id: '/vendedores',
   path: '/vendedores',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSopsRoute = AuthenticatedSopsRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/sops': typeof AuthenticatedSopsRoute
+  '/tasks': typeof AuthenticatedTasksRoute
   '/vendedores': typeof AuthenticatedVendedoresRoute
   '/vendor': typeof AuthenticatedVendorRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/sops': typeof AuthenticatedSopsRoute
+  '/tasks': typeof AuthenticatedTasksRoute
   '/vendedores': typeof AuthenticatedVendedoresRoute
   '/vendor': typeof AuthenticatedVendorRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/sops': typeof AuthenticatedSopsRoute
+  '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/vendedores': typeof AuthenticatedVendedoresRoute
   '/_authenticated/vendor': typeof AuthenticatedVendorRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/ranking'
     | '/relatorios'
     | '/sops'
+    | '/tasks'
     | '/vendedores'
     | '/vendor'
     | '/whatsapp'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
     | '/ranking'
     | '/relatorios'
     | '/sops'
+    | '/tasks'
     | '/vendedores'
     | '/vendor'
     | '/whatsapp'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
     | '/_authenticated/sops'
+    | '/_authenticated/tasks'
     | '/_authenticated/vendedores'
     | '/_authenticated/vendor'
     | '/_authenticated/whatsapp'
@@ -334,6 +346,13 @@ declare module '@tanstack/react-router' {
       path: '/vendedores'
       fullPath: '/vendedores'
       preLoaderRoute: typeof AuthenticatedVendedoresRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tasks': {
+      id: '/_authenticated/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthenticatedTasksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/sops': {
@@ -448,6 +467,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedSopsRoute: typeof AuthenticatedSopsRoute
+  AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedVendedoresRoute: typeof AuthenticatedVendedoresRoute
   AuthenticatedVendorRoute: typeof AuthenticatedVendorRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
@@ -466,6 +486,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedSopsRoute: AuthenticatedSopsRoute,
+  AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedVendedoresRoute: AuthenticatedVendedoresRoute,
   AuthenticatedVendorRoute: AuthenticatedVendorRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
