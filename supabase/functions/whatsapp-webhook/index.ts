@@ -529,25 +529,49 @@ async function composeAiReply(supabase: any, contactWa: string, userText: string
   const snapshot = await getAiSnapshot(supabase, contactWa, clean);
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) {
+    const appReply = await composeAiReplyViaApp(clean, snapshot).catch((e) => {
+      console.warn("[notif-ai edge] app OpenAI fallback falhou", (e as any)?.message ?? e);
+      return "";
+    });
+    if (appReply) return appReply;
     if (snapshot) return `Fechou, chefe. Segue o que achei:\n\n${snapshot}`;
     return "Fechou, chefe. Recebi sua mensagem, mas a chave da OpenAI não está disponível no webhook agora. Me pede um relatório que eu te retorno com os dados do sistema.";
   }
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.35,
+        messages: [
+          { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e útil, com linguagem informal profissional. Nunca invente número: use só o contexto real quando houver. Se pedirem uma ação que ainda exige confirmação, peça os dados faltantes." },
+          ...(snapshot ? [{ role: "system", content: snapshot }] : []),
+          { role: "user", content: clean },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`OpenAI chat HTTP ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    return String(json.choices?.[0]?.message?.content || "Fechou, chefe. Como posso te ajudar?").trim();
+  } catch (e) {
+    const appReply = await composeAiReplyViaApp(clean, snapshot).catch(() => "");
+    if (appReply) return appReply;
+    throw e;
+  }
+}
+
+async function composeAiReplyViaApp(userText: string, snapshot: string): Promise<string> {
+  const appUrl = Deno.env.get("NOTIFICATION_AI_APP_URL") || "https://project--4860a253-8e14-4836-a639-c7fb96d53545-dev.lovable.app";
+  const bridgeSecret = Deno.env.get("EVOHUB_WEBHOOK_SECRET") || "";
+  const res = await fetch(`${appUrl}/api/public/notification-ai/reply`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.35,
-      messages: [
-        { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e útil, com linguagem informal profissional. Nunca invente número: use só o contexto real quando houver. Se pedirem uma ação que ainda exige confirmação, peça os dados faltantes." },
-        ...(snapshot ? [{ role: "system", content: snapshot }] : []),
-        { role: "user", content: clean },
-      ],
-    }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bridgeSecret}` },
+    body: JSON.stringify({ userText, snapshot }),
   });
-  if (!res.ok) throw new Error(`OpenAI chat HTTP ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`app reply HTTP ${res.status}: ${await res.text()}`);
   const json = await res.json();
-  return String(json.choices?.[0]?.message?.content || "Fechou, chefe. Como posso te ajudar?").trim();
+  return String(json?.reply || "").trim();
 }
 
 async function postWaText(token: string, phoneNumberId: string, to: string, text: string) {
