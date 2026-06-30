@@ -103,13 +103,17 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     }
 
     const incomingVendorHeader = request.headers.get('x-vendor-session');
+    const authHeader = request.headers.get('authorization');
     const baseSupabase = createClient<Database>(
       SUPABASE_URL!,
       SUPABASE_PUBLISHABLE_KEY!,
       {
         global: {
           fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY!),
-          headers: incomingVendorHeader ? { 'x-vendor-session': incomingVendorHeader } : undefined,
+          headers: {
+            ...(incomingVendorHeader ? { 'x-vendor-session': incomingVendorHeader } : {}),
+            ...(authHeader ? { Authorization: authHeader } : {}),
+          },
         },
         auth: {
           storage: undefined,
@@ -118,8 +122,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         },
       }
     );
-
-    const authHeader = request.headers.get('authorization');
 
     // Se existe sessão de vendedor, ela deve prevalecer mesmo que o navegador ainda tenha
     // um token Supabase antigo salvo. Isso evita o vendedor cair nas RLS de admin e receber

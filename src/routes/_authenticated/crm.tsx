@@ -119,7 +119,10 @@ function CRMPage() {
   const { data: customStages = [] } = useCrmStages(stageOperacao);
 
   const stages: StageView[] = useMemo(() => {
-    return customStages.map((s) => stageView(s.id, s.nome, s.cor));
+    return [
+      ...DEFAULT_STAGES.map((s) => stageView(s.id, s.nome, s.cor)),
+      ...customStages.map((s) => stageView(s.id, s.nome, s.cor)),
+    ];
   }, [customStages]);
 
 

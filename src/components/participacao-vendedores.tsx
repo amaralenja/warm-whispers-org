@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import { Trophy, Users } from "lucide-react";
 import type { VendedorStat } from "@/lib/operacoes.functions";
 
@@ -43,34 +42,26 @@ export function ParticipacaoVendedores({
   loading?: boolean;
 }) {
   const vendedores: VendedorStat[] = Array.isArray(vendedoresProp) ? vendedoresProp : [];
-  const [hover, setHover] = useState<number | null>(null);
-
-  const total = useMemo(
-    () => vendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0),
-    [vendedores],
-  );
+  const total = vendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0);
 
   // Donut: top 6, agrupa o resto como "Outros"
-  const donutSegments = useMemo(() => {
-    const top = vendedores.slice(0, 6);
-    const rest = vendedores.slice(6);
-    const segs = top.map((v, i) => ({
-      label: v.utm,
-      value: v.faturamento,
-      color: colorFor(i),
-      pct: total > 0 ? v.faturamento / total : 0,
-    }));
-    if (rest.length > 0) {
-      const restSum = rest.reduce((acc, v) => acc + v.faturamento, 0);
-      segs.push({
-        label: `+${rest.length}`,
-        value: restSum,
-        color: "hsl(var(--muted-foreground) / 0.5)",
-        pct: total > 0 ? restSum / total : 0,
-      });
-    }
-    return segs;
-  }, [vendedores, total]);
+  const top = vendedores.slice(0, 6);
+  const rest = vendedores.slice(6);
+  const donutSegments = top.map((v, i) => ({
+    label: v.utm,
+    value: v.faturamento,
+    color: colorFor(i),
+    pct: total > 0 ? v.faturamento / total : 0,
+  }));
+  if (rest.length > 0) {
+    const restSum = rest.reduce((acc, v) => acc + v.faturamento, 0);
+    donutSegments.push({
+      label: `+${rest.length}`,
+      value: restSum,
+      color: "hsl(var(--muted-foreground) / 0.5)",
+      pct: total > 0 ? restSum / total : 0,
+    });
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card/60 to-card/20 backdrop-blur">
@@ -107,7 +98,7 @@ export function ParticipacaoVendedores({
           <>
             {/* Donut central */}
             <div className="relative mx-auto mb-5 h-44 w-44">
-              <Donut segments={donutSegments} hoverIndex={hover} />
+              <Donut segments={donutSegments} />
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-[0.55rem] uppercase tracking-[0.22em] text-muted-foreground">
                   Total
@@ -115,11 +106,6 @@ export function ParticipacaoVendedores({
                 <span className="mt-0.5 font-display text-lg font-semibold tabular-nums text-foreground">
                   {BRL(total)}
                 </span>
-                {hover != null && vendedores[hover] && (
-                  <span className="mt-1 text-[0.65rem] tabular-nums text-emerald-400">
-                    {asStr(vendedores[hover].utm)} · {(vendedores[hover].pctTotal * 100).toFixed(1)}%
-                  </span>
-                )}
               </div>
             </div>
 
@@ -128,18 +114,11 @@ export function ParticipacaoVendedores({
               {vendedores.slice(0, 10).map((v, i) => {
                 const color = colorFor(i);
                 const pct = v.pctTotal * 100;
-                const active = hover === i;
                 const isTop = i === 0;
                 return (
                   <div
                     key={asStr(v.utm)}
-                    onMouseEnter={() => setHover(i)}
-                    onMouseLeave={() => setHover(null)}
-                    className={`group relative grid grid-cols-[1.5rem_2rem_1fr_auto_auto] items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-all ${
-                      active
-                        ? "border-emerald-500/40 bg-emerald-500/5"
-                        : "border-transparent hover:border-border"
-                    }`}
+                    className="group relative grid grid-cols-[1.5rem_2rem_1fr_auto_auto] items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-1.5 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/5"
                   >
                     {/* posição */}
                     <span className="text-center text-[0.65rem] font-bold tabular-nums text-muted-foreground">
@@ -207,10 +186,8 @@ export function ParticipacaoVendedores({
 
 function Donut({
   segments,
-  hoverIndex,
 }: {
   segments: { label: string; value: number; color: string; pct: number }[];
-  hoverIndex: number | null;
 }) {
   const SIZE = 176;
   const C = SIZE / 2;
@@ -242,14 +219,12 @@ function Donut({
           `A ${INNER} ${INNER} 0 ${large} 0 ${xi1} ${yi1}`,
           "Z",
         ].join(" ");
-        const dim = hoverIndex != null && hoverIndex !== i;
         start = end;
         return (
           <path
             key={i}
             d={path}
             fill={s.color}
-            opacity={dim ? 0.25 : 1}
             style={{ transition: "opacity 200ms" }}
           />
         );
