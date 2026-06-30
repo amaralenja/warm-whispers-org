@@ -1012,6 +1012,7 @@ export type Database = {
           foto_url: string | null
           genero: string | null
           id: number
+          lead_weight: number
           meta: number | null
           nome: string
           permissoes: Json
@@ -1026,6 +1027,7 @@ export type Database = {
           foto_url?: string | null
           genero?: string | null
           id?: never
+          lead_weight?: number
           meta?: number | null
           nome: string
           permissoes?: Json
@@ -1040,6 +1042,7 @@ export type Database = {
           foto_url?: string | null
           genero?: string | null
           id?: never
+          lead_weight?: number
           meta?: number | null
           nome?: string
           permissoes?: Json
