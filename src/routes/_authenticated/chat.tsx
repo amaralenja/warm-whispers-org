@@ -21,6 +21,8 @@ import {
   Radio,
   Headphones,
   Loader2,
+  MoreVertical,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +44,8 @@ import {
   markConversationRead,
   sendWhatsappMessage,
   downloadIncomingMediaBase64,
+  transferConversation,
+  listVendorsForChannel,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
@@ -547,13 +551,14 @@ function ChatPage() {
                   const isActive = String(c.id) === activeId;
                   const preview = toText(c.last_message_preview);
                   return (
-                    <button
+                    <div
                       key={String(c.id)}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setActiveId(String(c.id))}
-                      className={`group w-full border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
-                        isActive
-                          ? "bg-chat-soft"
-                          : "hover:bg-chat-panel"
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
+                      className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
+                        isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
                       }`}
                     >
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
@@ -586,7 +591,18 @@ function ChatPage() {
                           )}
                         </div>
                       </div>
-                    </button>
+                      <div
+                        className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <ConversationActionsMenu
+                          conversationId={String(c.id)}
+                          channelId={toText(c.channel_id)}
+                          currentVendorId={(c as any).assigned_vendor_id ?? null}
+                        />
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -1128,6 +1144,82 @@ function FlowDispatcher({
             </DropdownMenuItem>
           ))
         )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ConversationActionsMenu({
+  conversationId,
+  channelId,
+  currentVendorId,
+}: {
+  conversationId: string;
+  channelId: string;
+  currentVendorId: number | null;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const listVendorsFn = useServerFn(listVendorsForChannel);
+  const transferFn = useServerFn(transferConversation);
+
+  const { data: vendors = [], isLoading } = useQuery({
+    queryKey: ["chat-transfer-vendors", channelId],
+    queryFn: () => listVendorsFn({ data: { channelId } }),
+    enabled: open && !!channelId,
+    staleTime: 30_000,
+  });
+
+  const transfer = async (vendorId: number | null) => {
+    try {
+      await transferFn({ data: { conversationId, vendorId } });
+      toast.success(vendorId ? "Lead transferido" : "Lead liberado");
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+    } catch (e: any) {
+      toast.error(`Falha ao transferir: ${e?.message ?? "erro"}`);
+    } finally {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="grid h-7 w-7 place-items-center rounded-full bg-chat-panel/90 text-muted-foreground hover:text-foreground"
+          aria-label="Mais ações"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 rounded-2xl border-chat-line bg-popover">
+        <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <UserCog className="h-3.5 w-3.5" /> Transferir para
+        </div>
+        {isLoading ? (
+          <div className="px-3 py-2 text-xs text-muted-foreground">Carregando…</div>
+        ) : !Array.isArray(vendors) || vendors.length === 0 ? (
+          <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum vendedor vinculado a este canal.</div>
+        ) : (
+          (vendors as Array<{ id: number; nome: string }>).map((v) => (
+            <DropdownMenuItem
+              key={v.id}
+              disabled={v.id === currentVendorId}
+              onSelect={(e) => { e.preventDefault(); transfer(v.id); }}
+              className="rounded-xl"
+            >
+              {v.nome}
+              {v.id === currentVendorId && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
+            </DropdownMenuItem>
+          ))
+        )}
+        <DropdownMenuItem
+          onSelect={(e) => { e.preventDefault(); transfer(null); }}
+          className="rounded-xl text-destructive focus:text-destructive"
+        >
+          Liberar (sem vendedor)
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
