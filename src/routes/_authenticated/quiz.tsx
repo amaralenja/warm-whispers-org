@@ -903,3 +903,67 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
     </Dialog>
   );
 }
+
+// ----- Verificação de Instagram (Bright Data) -----
+type IgStatus = "unknown" | "checking" | "real" | "fake";
+const IG_CACHE_KEY = "quiz_ig_verify_v1";
+
+function loadIgCache(): Record<string, "real" | "fake"> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(IG_CACHE_KEY) || "{}"); } catch { return {}; }
+}
+function saveIgCache(c: Record<string, "real" | "fake">) {
+  localStorage.setItem(IG_CACHE_KEY, JSON.stringify(c));
+}
+
+function IgRow({ username }: { username: string }) {
+  const key = username.toLowerCase();
+  const [status, setStatus] = useState<IgStatus>(() => loadIgCache()[key] ?? "unknown");
+  const fetchFn = useServerFn(fetchInstagramProfile);
+
+  async function verify(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (status === "checking") return;
+    setStatus("checking");
+    try {
+      await fetchFn({ data: { input: username } });
+      const c = loadIgCache(); c[key] = "real"; saveIgCache(c);
+      setStatus("real");
+      toast.success(`@${username} verificado ✓`);
+    } catch (err: any) {
+      const c = loadIgCache(); c[key] = "fake"; saveIgCache(c);
+      setStatus("fake");
+      toast.error(`@${username} não encontrado`);
+    }
+  }
+
+  const color =
+    status === "real" ? "text-emerald-400"
+    : status === "fake" ? "text-rose-400 line-through"
+    : "text-pink-400";
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Instagram className={`h-3 w-3 shrink-0 ${color}`} />
+      <span className={`truncate text-xs ${color}`}>@{username}</span>
+      {status === "fake" && (
+        <Badge className="h-4 px-1 text-[9px] bg-rose-500/20 text-rose-300 border-rose-500/40">
+          <ShieldAlert className="h-2.5 w-2.5 mr-0.5" /> fake
+        </Badge>
+      )}
+      {status === "real" && (
+        <ShieldCheck className="h-3 w-3 text-emerald-400" />
+      )}
+      {status !== "real" && status !== "fake" && (
+        <button
+          type="button"
+          onClick={verify}
+          className="ml-auto text-[9px] text-muted-foreground hover:text-accent transition flex items-center gap-0.5"
+          title="Verificar via Bright Data"
+        >
+          {status === "checking" ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : "checar"}
+        </button>
+      )}
+    </div>
+  );
+}
