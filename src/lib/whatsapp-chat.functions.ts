@@ -252,7 +252,9 @@ export const listMessages = createServerFn({ method: "GET" })
       .select("*")
       .eq("conversation_id", data.conversationId)
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(500);
+
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
