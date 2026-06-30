@@ -26,3 +26,11 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
 
   return fetch(input, { ...init, headers })
 }
+
+// No-op middleware kept for backwards-compat imports in src/start.ts.
+// Real auth/header attachment happens in fetchWithSupabaseAuth above.
+import { createMiddleware } from '@tanstack/react-start'
+export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
+  async ({ next }) => next(),
+)
+
