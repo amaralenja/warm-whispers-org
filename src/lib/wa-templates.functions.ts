@@ -19,11 +19,16 @@ function buildBodyAndVars(text: string) {
     }
     return `{{${idx + 1}}}`;
   });
-  // Meta rule (subcode 2388299): variables cannot be at the very start or end.
-  // Pad with a zero-width-ish marker (a dot) if needed.
-  const trimmed = body.trim();
-  if (/^\{\{\d+\}\}/.test(trimmed)) body = `. ${body}`;
-  if (/\{\{\d+\}\}$/.test(trimmed)) body = `${body} .`;
+
+  // Meta rule (subcode 2388299): variables cannot be the first or last
+  // meaningful content in the BODY. Punctuation-only padding is rejected too,
+  // so use real words before/after the variable when needed.
+  const startsWithVariable = (value: string) => /^[\s*_~`]*\{\{\d+\}\}/.test(value.trimStart());
+  const endsWithVariable = (value: string) => /\{\{\d+\}\}[\s*_~`.,;:!?)]*$/.test(value.trimEnd());
+
+  if (startsWithVariable(body)) body = `Mensagem: ${body}`;
+  if (endsWithVariable(body)) body = `${body}\n\nFim do resumo.`;
+
   return { body, vars: order };
 }
 
@@ -166,6 +171,9 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
       }
       return null;
     }
+    function isMetaValidationError(msg: string): boolean {
+      return /OAuthException|Invalid parameter|error_subcode|2388299|vari[áa]veis n[ãa]o podem estar no in[íi]cio|par[âa]metros iniciais/i.test(msg);
+    }
 
     let result = await submit("UTILITY");
     let usedCategory = "UTILITY";
@@ -176,7 +184,7 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
       // Template já existe no Meta com outra categoria, reenviar com a mesma
       result = await submit(existingCat);
       usedCategory = existingCat;
-    } else if (!result.ok && (/INTERNAL/i.test(errMsg) || result.status >= 500) && !existingCat) {
+    } else if (!result.ok && (/INTERNAL/i.test(errMsg) || result.status >= 500) && !existingCat && !isMetaValidationError(errMsg)) {
       // Falha genérica do provider, tenta MARKETING como fallback
       result = await submit("MARKETING");
       usedCategory = "MARKETING";
