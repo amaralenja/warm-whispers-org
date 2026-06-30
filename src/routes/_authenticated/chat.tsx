@@ -687,7 +687,7 @@ function ChatPage() {
                   ) : (
                     <WhatsappRecorder
                       disabled={sendMut.isPending}
-                      onSend={(file) => handleFileUpload(file, { type: "audio" })}
+                      onSend={(file: File) => handleFileUpload(file, { type: "audio" })}
                     />
                   )}
                 </div>
