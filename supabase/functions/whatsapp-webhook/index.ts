@@ -653,6 +653,24 @@ function taskMatchScore(task: any, rawTitle: string) {
   return terms.reduce((score, term) => score + (a.includes(term) ? 8 : 0), 0);
 }
 
+async function inferRecentTaskTitleFromHistory(supabase: any, contactWa: string): Promise<string> {
+  const history = await loadRecentAiMessages(supabase, contactWa).catch(() => []);
+  const text = history
+    .map((m) => String(m.content ?? ""))
+    .reverse()
+    .join("\n");
+  const patterns = [
+    /tarefa\s+["“']([^"”']{3,160})["”']/i,
+    /(?:criei|anotei|salvei|adicionei).*?["“']([^"”']{3,160})["”']/i,
+    /(?:t[íi]tulo|tarefa)\s*:\s*([^\n.]{3,160})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+  return "";
+}
+
 async function executeAiTool(supabase: any, name: string, args: any, contactWa: string): Promise<string> {
   try {
     if (name === "create_task") {
@@ -692,10 +710,11 @@ async function executeAiTool(supabase: any, name: string, args: any, contactWa: 
       return JSON.stringify({ ok: true, id: data?.id, titulo: data?.titulo, assignee: args.assignee_nome ?? null, prazo: args.prazo ?? null, notified });
     }
     if (name === "delete_task") {
-      const titulo = String(args?.titulo ?? "").trim();
+      let titulo = String(args?.titulo ?? "").trim();
       const deleteLatest = args?.delete_latest === true;
       const assigneeNome = String(args?.assignee_nome ?? "").trim();
-      if (!titulo && !deleteLatest) {
+      if (!titulo && deleteLatest) titulo = await inferRecentTaskTitleFromHistory(supabase, contactWa);
+      if (!titulo) {
         return JSON.stringify({ ok: false, error: "Preciso do título da tarefa pra excluir com segurança." });
       }
 
