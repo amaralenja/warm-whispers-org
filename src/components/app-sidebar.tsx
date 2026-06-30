@@ -68,6 +68,7 @@ const highTicketItems: Item[] = [
   { title: "Calendário Calls", url: "/calendar", icon: Calendar },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
+  { title: "SOPs / Processos", url: "/sops", icon: BookOpenText },
 ];
 
 const URL_TO_KEY: Record<string, string> = {
