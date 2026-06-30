@@ -428,8 +428,45 @@ function QuizPage() {
     qc.invalidateQueries({ queryKey: ["quiz-leads"] });
   }
 
+  // Batch: busca todos os @ do banco em uma chamada e compartilha via contexto
+  const allIgUsernames = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of leads) {
+      const u = (l.instagram ?? "").replace(/^@/, "").trim().toLowerCase();
+      if (u) set.add(u);
+    }
+    return Array.from(set);
+  }, [leads]);
+
+  const listIgFn = useServerFn(listInstagramLeads);
+  const { data: igDbRows = [] } = useQuery({
+    queryKey: ["ig-leads-batch", allIgUsernames.length, allIgUsernames.slice(0, 50).join(",")],
+    queryFn: () => listIgFn({ data: { usernames: allIgUsernames } }) as Promise<IgDbRow[]>,
+    enabled: allIgUsernames.length > 0,
+    staleTime: 60_000,
+  });
+
+  const [igLocalOverrides, setIgLocalOverrides] = useState<Record<string, IgDbRow>>({});
+  const igMap = useMemo(() => {
+    const m = new Map<string, IgDbRow>();
+    for (const r of igDbRows) m.set((r.username || "").toLowerCase(), r);
+    for (const [k, v] of Object.entries(igLocalOverrides)) m.set(k, v);
+    return m;
+  }, [igDbRows, igLocalOverrides]);
+
+  const igCtxValue = useMemo(
+    () => ({
+      map: igMap,
+      setLocal: (k: string, row: IgDbRow) =>
+        setIgLocalOverrides((p) => ({ ...p, [k]: row })),
+    }),
+    [igMap],
+  );
+
   return (
+    <IgDbContext.Provider value={igCtxValue}>
     <div className="p-6 space-y-6">
+
       {/* HERO HEADER */}
       <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent/10 via-card to-card p-6">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
