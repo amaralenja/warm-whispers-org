@@ -851,13 +851,13 @@ function TemplatesPanel() {
                     <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum número notificador conectado.</div>
                   )}
                   {notifChannels.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id} disabled={!c.hasWaba}>
-                      {c.name} {c.displayPhone ? `· ${c.displayPhone}` : ""} {!c.hasWaba ? "· (sem WABA)" : ""}
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} {c.displayPhone ? `· ${c.displayPhone}` : ""} {!c.hasWaba ? "· (WABA não detectada)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground">Só números com Meta Business Account conectado podem receber templates.</p>
+              <p className="text-[10px] text-muted-foreground">Vamos tentar enviar mesmo se a WABA não for detectada automaticamente.</p>
             </div>
             {approvalOpen && (
               <div className="rounded-lg border border-border bg-background/60 p-3">

@@ -69,14 +69,14 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
     if (!ch) throw new Error("Número não encontrado no EvoHub");
 
     const meta = typeof ch.metadata === "string" ? JSON.parse(ch.metadata) : (ch.metadata ?? {});
-    const metaConnection = ch.meta_connection ?? meta?.meta_connection ?? null;
+    const metaConnection = ch.meta_connection ?? meta?.meta_connection ?? ch.meta ?? meta?.meta ?? null;
     const wabaId: string | undefined =
       metaConnection?.waba_id ??
+      metaConnection?.wabaId ??
       metaConnection?.business_account_id ??
-      metaConnection?.whatsapp_business_account_id;
-    const chToken: string | undefined = ch.token;
-    if (!wabaId) throw new Error("Este número não tem WABA conectado — conecte via Meta antes de enviar templates");
-    if (!chToken) throw new Error("Token do canal indisponível");
+      metaConnection?.whatsapp_business_account_id ??
+      ch?.waba_id ?? ch?.wabaId ?? meta?.waba_id ?? meta?.wabaId;
+    const chToken: string | undefined = ch.token ?? ch.api_token ?? meta?.token;
 
     // 3. Build Meta payload
     const { body, vars } = buildBodyAndVars(String(tpl.conteudo ?? ""));
@@ -112,12 +112,25 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
       components,
     };
 
-    // 4. Submit
+    // 4. Submit — prefer Meta WABA endpoint; fallback to EvoHub channel-scoped endpoint.
     async function submit(category: string) {
-      const res = await fetch(`${EVOHUB_BASE}/meta/${wabaId}/message_templates`, {
+      const body = JSON.stringify({ ...payload, category });
+      if (wabaId && chToken) {
+        const res = await fetch(`${EVOHUB_BASE}/meta/${wabaId}/message_templates`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${chToken}`, "Content-Type": "application/json" },
+          body,
+        });
+        const text = await res.text();
+        let json: any = null;
+        try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+        return { ok: res.ok, status: res.status, json };
+      }
+      // Fallback: EvoHub channel-scoped template submission
+      const res = await fetch(`${EVOHUB_BASE}/api/v1/channels/${data.channelId}/templates`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${chToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, category }),
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body,
       });
       const text = await res.text();
       let json: any = null;
@@ -129,7 +142,7 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
     let usedCategory = "UTILITY";
 
     // If Meta complains about category mismatch, retry as MARKETING
-    const errMsg = String(result.json?.error?.message ?? result.json?.error ?? "");
+    const errMsg = String(result.json?.error?.message ?? result.json?.error ?? result.json?.message ?? "");
     if (!result.ok && /category/i.test(errMsg)) {
       result = await submit("MARKETING");
       usedCategory = "MARKETING";
