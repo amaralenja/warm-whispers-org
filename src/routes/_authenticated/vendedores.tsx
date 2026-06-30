@@ -42,6 +42,7 @@ function initials(s: string | null) {
 function VendedoresPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
+  const [permVendor, setPermVendor] = useState<Vendedor | null>(null);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
