@@ -685,6 +685,57 @@ export type Database = {
           },
         ]
       }
+      instagram_leads: {
+        Row: {
+          biography: string | null
+          created_at: string
+          fetched_at: string
+          followers: number | null
+          following: number | null
+          full_name: string | null
+          id: string
+          is_verified: boolean | null
+          posts_count: number | null
+          profile_pic_url: string | null
+          profile_url: string | null
+          raw: Json | null
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          biography?: string | null
+          created_at?: string
+          fetched_at?: string
+          followers?: number | null
+          following?: number | null
+          full_name?: string | null
+          id?: string
+          is_verified?: boolean | null
+          posts_count?: number | null
+          profile_pic_url?: string | null
+          profile_url?: string | null
+          raw?: Json | null
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          biography?: string | null
+          created_at?: string
+          fetched_at?: string
+          followers?: number | null
+          following?: number | null
+          full_name?: string | null
+          id?: string
+          is_verified?: boolean | null
+          posts_count?: number | null
+          profile_pic_url?: string | null
+          profile_url?: string | null
+          raw?: Json | null
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       meta_ads_config: {
         Row: {
           access_token: string
