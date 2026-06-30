@@ -1322,6 +1322,51 @@ export type Database = {
           },
         ]
       }
+      wa_ai_sessions: {
+        Row: {
+          calendar_event_id: string | null
+          channel_id: string
+          contact_name: string | null
+          contact_wa: string
+          context: Json
+          created_at: string
+          id: string
+          last_button: string | null
+          messages: Json
+          reminder_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          channel_id: string
+          contact_name?: string | null
+          contact_wa: string
+          context?: Json
+          created_at?: string
+          id?: string
+          last_button?: string | null
+          messages?: Json
+          reminder_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          calendar_event_id?: string | null
+          channel_id?: string
+          contact_name?: string | null
+          contact_wa?: string
+          context?: Json
+          created_at?: string
+          id?: string
+          last_button?: string | null
+          messages?: Json
+          reminder_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wa_call_reminders: {
         Row: {
           channel_id: string | null
