@@ -982,6 +982,39 @@ export type Database = {
         }
         Relationships: []
       }
+      sops: {
+        Row: {
+          categoria: string
+          conteudo: string
+          created_at: string
+          emoji: string | null
+          id: string
+          ordem: number
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          categoria?: string
+          conteudo?: string
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          ordem?: number
+          titulo?: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          conteudo?: string
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          ordem?: number
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vendas: {
         Row: {
           Campanha: string | null
