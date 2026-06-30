@@ -1805,6 +1805,44 @@ export type Database = {
           },
         ]
       }
+      wa_template_recipients: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string | null
+          telefone: string
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string | null
+          telefone: string
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string | null
+          telefone?: string
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_template_recipients_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "wa_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wa_templates: {
         Row: {
           ativo: boolean
@@ -1813,6 +1851,7 @@ export type Database = {
           conteudo: string
           created_at: string
           descricao: string | null
+          grupo: string
           id: string
           meta_category: string | null
           meta_channel_id: string | null
@@ -1833,6 +1872,7 @@ export type Database = {
           conteudo: string
           created_at?: string
           descricao?: string | null
+          grupo?: string
           id?: string
           meta_category?: string | null
           meta_channel_id?: string | null
@@ -1853,6 +1893,7 @@ export type Database = {
           conteudo?: string
           created_at?: string
           descricao?: string | null
+          grupo?: string
           id?: string
           meta_category?: string | null
           meta_channel_id?: string | null
