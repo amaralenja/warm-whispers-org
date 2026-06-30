@@ -222,6 +222,39 @@ export const markConversationRead = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const transferConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; vendorId: number | null }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    vendorId: d?.vendorId == null ? null : Number(d.vendorId),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId) throw new Error("conversationId obrigatório");
+    const { error } = await context.supabase
+      .from("wa_conversations" as any)
+      .update({ assigned_vendor_id: data.vendorId })
+      .eq("id", data.conversationId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listVendorsForChannel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { channelId: string }) => ({ channelId: String(d?.channelId ?? "") }))
+  .handler(async ({ context, data }) => {
+    let q = context.supabase
+      .from("vendedores" as any)
+      .select("id,nome,foto_url,wa_channel_ids,ativo")
+      .eq("ativo", true)
+      .order("nome");
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    const all = (rows ?? []) as Array<{ id: number; nome: string; foto_url: string | null; wa_channel_ids: string[] | null }>;
+    if (!data.channelId) return all;
+    return all.filter((v) => Array.isArray(v.wa_channel_ids) && v.wa_channel_ids.includes(data.channelId));
+  });
+
+
 // --- Send ---
 
 type SendInput = {
