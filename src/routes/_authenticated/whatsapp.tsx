@@ -658,6 +658,18 @@ function TemplatesPanel() {
   const [testOpen, setTestOpen] = useState<any | null>(null);
   const [testForm, setTestForm] = useState({ to: "", nome: "", hora: "", convidados: "" });
   const [testSending, setTestSending] = useState(false);
+  const [approvalOpen, setApprovalOpen] = useState<any | null>(null);
+  const [approvalChannelId, setApprovalChannelId] = useState<string>("");
+  const [approvalSending, setApprovalSending] = useState(false);
+
+  const { data: notifChannels = [] } = useQuery({
+    queryKey: ["wa_notification_channels"],
+    queryFn: async () => {
+      const { listNotificationChannels } = await import("@/lib/wa-templates.functions");
+      return await listNotificationChannels();
+    },
+    enabled: !!approvalOpen,
+  });
 
   const saveMut = useMutation({
     mutationFn: async (vars: { id: string; conteudo: string; buttons: Array<{ id: string; label: string }> }) => {
