@@ -9,12 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VendorRouteImport } from './routes/vendor'
 import { Route as RankingTvRouteImport } from './routes/ranking-tv'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
+import { Route as AuthenticatedVendorRouteImport } from './routes/_authenticated/vendor'
 import { Route as AuthenticatedVendedoresRouteImport } from './routes/_authenticated/vendedores'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
@@ -30,11 +30,6 @@ import { Route as ApiPublicIgImageRouteImport } from './routes/api/public/ig-ima
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 
-const VendorRoute = VendorRouteImport.update({
-  id: '/vendor',
-  path: '/vendor',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const RankingTvRoute = RankingTvRouteImport.update({
   id: '/ranking-tv',
   path: '/ranking-tv',
@@ -57,6 +52,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedVendorRoute = AuthenticatedVendorRouteImport.update({
+  id: '/vendor',
+  path: '/vendor',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedVendedoresRoute = AuthenticatedVendedoresRouteImport.update({
@@ -136,7 +136,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/ranking-tv': typeof RankingTvRoute
-  '/vendor': typeof VendorRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/chat': typeof AuthenticatedChatRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -147,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/vendedores': typeof AuthenticatedVendedoresRoute
+  '/vendor': typeof AuthenticatedVendorRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
@@ -157,7 +157,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/ranking-tv': typeof RankingTvRoute
-  '/vendor': typeof VendorRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/chat': typeof AuthenticatedChatRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -168,6 +167,7 @@ export interface FileRoutesByTo {
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/vendedores': typeof AuthenticatedVendedoresRoute
+  '/vendor': typeof AuthenticatedVendorRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
@@ -180,7 +180,6 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/ranking-tv': typeof RankingTvRoute
-  '/vendor': typeof VendorRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
@@ -191,6 +190,7 @@ export interface FileRoutesById {
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/vendedores': typeof AuthenticatedVendedoresRoute
+  '/_authenticated/vendor': typeof AuthenticatedVendorRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
@@ -203,7 +203,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/ranking-tv'
-    | '/vendor'
     | '/calendar'
     | '/chat'
     | '/crm'
@@ -214,6 +213,7 @@ export interface FileRouteTypes {
     | '/ranking'
     | '/relatorios'
     | '/vendedores'
+    | '/vendor'
     | '/whatsapp'
     | '/flows/$flowId'
     | '/api/public/ig-image'
@@ -224,7 +224,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/ranking-tv'
-    | '/vendor'
     | '/calendar'
     | '/chat'
     | '/crm'
@@ -235,6 +234,7 @@ export interface FileRouteTypes {
     | '/ranking'
     | '/relatorios'
     | '/vendedores'
+    | '/vendor'
     | '/whatsapp'
     | '/flows/$flowId'
     | '/api/public/ig-image'
@@ -246,7 +246,6 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/ranking-tv'
-    | '/vendor'
     | '/_authenticated/calendar'
     | '/_authenticated/chat'
     | '/_authenticated/crm'
@@ -257,6 +256,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
     | '/_authenticated/vendedores'
+    | '/_authenticated/vendor'
     | '/_authenticated/whatsapp'
     | '/_authenticated/flows/$flowId'
     | '/api/public/ig-image'
@@ -269,20 +269,12 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   RankingTvRoute: typeof RankingTvRoute
-  VendorRoute: typeof VendorRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vendor': {
-      id: '/vendor'
-      path: '/vendor'
-      fullPath: '/vendor'
-      preLoaderRoute: typeof VendorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/ranking-tv': {
       id: '/ranking-tv'
       path: '/ranking-tv'
@@ -316,6 +308,13 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp'
       fullPath: '/whatsapp'
       preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vendor': {
+      id: '/_authenticated/vendor'
+      path: '/vendor'
+      fullPath: '/vendor'
+      preLoaderRoute: typeof AuthenticatedVendorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vendedores': {
@@ -430,6 +429,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedVendedoresRoute: typeof AuthenticatedVendedoresRoute
+  AuthenticatedVendorRoute: typeof AuthenticatedVendorRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
   AuthenticatedFlowsFlowIdRoute: typeof AuthenticatedFlowsFlowIdRoute
   AuthenticatedFlowsIndexRoute: typeof AuthenticatedFlowsIndexRoute
@@ -446,6 +446,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedVendedoresRoute: AuthenticatedVendedoresRoute,
+  AuthenticatedVendorRoute: AuthenticatedVendorRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
   AuthenticatedFlowsFlowIdRoute: AuthenticatedFlowsFlowIdRoute,
   AuthenticatedFlowsIndexRoute: AuthenticatedFlowsIndexRoute,
@@ -459,7 +460,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   RankingTvRoute: RankingTvRoute,
-  VendorRoute: VendorRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
