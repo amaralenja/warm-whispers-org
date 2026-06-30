@@ -2,6 +2,7 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 import { fetchWithSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -23,7 +24,7 @@ export const startInstance = createStart(() => ({
   // function middleware here makes TanStack evaluate a client middleware during
   // React render/HMR and causes fake component crashes like
   // "Cannot destructure property 'data' of undefined" in *.functions.ts files.
-  functionMiddleware: [],
+  functionMiddleware: [attachSupabaseAuth],
   requestMiddleware: [errorMiddleware],
   serverFns: {
     fetch: fetchWithSupabaseAuth,
