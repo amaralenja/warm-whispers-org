@@ -659,9 +659,6 @@ function ChatPage() {
                       <DropdownMenuItem onClick={() => { setPendingType("video"); videoInputRef.current?.click(); }}>
                         <Video className="mr-2 h-4 w-4" /> Vídeo
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("audio"); audioInputRef.current?.click(); }}>
-                        <Mic className="mr-2 h-4 w-4" /> Áudio
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setPendingType("document"); docInputRef.current?.click(); }}>
                         <FileText className="mr-2 h-4 w-4" /> Documento
                       </DropdownMenuItem>
