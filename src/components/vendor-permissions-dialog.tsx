@@ -317,10 +317,15 @@ export function VendorPermissionsDialog({
               <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <Phone className="h-3.5 w-3.5" /> Números de WhatsApp atendidos
               </h4>
-              {channels.length === 0 ? (
+              {workspaceIds.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                  Nenhum canal cadastrado.
+                  Selecione ao menos um workspace acima para liberar números.
                 </div>
+              ) : visibleChannels.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  Nenhum número de WhatsApp conectado nos workspaces selecionados ainda.
+                </div>
+
               ) : (
                 <div className="space-y-3">
                   {groupedChannels.map(([op, list]) => (
