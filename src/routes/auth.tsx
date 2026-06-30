@@ -40,6 +40,7 @@ function AuthPage() {
         if (error) throw error;
         if (!data) throw new Error("Código inválido ou vendedor inativo");
         localStorage.setItem("vendor_session", JSON.stringify(data));
+        window.dispatchEvent(new Event("vendor-session-updated"));
         navigate({ to: "/vendor" });
         return;
       }

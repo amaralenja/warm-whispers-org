@@ -1018,6 +1018,7 @@ export type Database = {
           permissoes: Json
           utm: string
           wa_channel_ids: string[]
+          workspace_ids: string[] | null
         }
         Insert: {
           ativo?: boolean | null
@@ -1033,6 +1034,7 @@ export type Database = {
           permissoes?: Json
           utm: string
           wa_channel_ids?: string[]
+          workspace_ids?: string[] | null
         }
         Update: {
           ativo?: boolean | null
@@ -1048,6 +1050,7 @@ export type Database = {
           permissoes?: Json
           utm?: string
           wa_channel_ids?: string[]
+          workspace_ids?: string[] | null
         }
         Relationships: []
       }

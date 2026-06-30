@@ -4,6 +4,19 @@ import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
+type VendorContext = {
+  id: number;
+  nome?: string | null;
+  utm?: string | null;
+  expert?: string | null;
+  foto_url?: string | null;
+  codigo?: string | null;
+  ativo?: boolean | null;
+  permissoes?: Record<string, unknown> | null;
+  wa_channel_ids?: string[] | null;
+  workspace_ids?: string[] | null;
+};
+
 
 
 function isNewSupabaseApiKey(value: string): boolean {
@@ -30,6 +43,43 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+function decodeVendorHeader(value: string | null): { id: number; codigo: string } | null {
+  if (!value) return null;
+  try {
+    const json = Buffer.from(value, 'base64').toString('utf-8');
+    const parsed = JSON.parse(json);
+    const id = Number(parsed?.id);
+    const codigo = String(parsed?.codigo ?? '').trim();
+    if (!Number.isFinite(id) || id <= 0 || !codigo) return null;
+    return { id, codigo };
+  } catch {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(value));
+      const id = Number(parsed?.id);
+      const codigo = String(parsed?.codigo ?? '').trim();
+      if (!Number.isFinite(id) || id <= 0 || !codigo) return null;
+      return { id, codigo };
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function validateVendorSession(supabase: any, request: Request): Promise<VendorContext | null> {
+  const decoded = decodeVendorHeader(request.headers.get('x-vendor-session'));
+  if (!decoded) return null;
+  const { data, error } = await supabase.rpc('login_vendedor_by_codigo', { _codigo: decoded.codigo });
+  if (error || !data) return null;
+  const vendor = data as VendorContext;
+  if (Number(vendor.id) !== decoded.id) return null;
+  return {
+    ...vendor,
+    id: Number(vendor.id),
+    wa_channel_ids: Array.isArray(vendor.wa_channel_ids) ? vendor.wa_channel_ids.map(String) : [],
+    workspace_ids: Array.isArray(vendor.workspace_ids) ? vendor.workspace_ids.map(String) : null,
+  };
+}
+
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
@@ -52,7 +102,39 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Error('Unauthorized: No request headers available');
     }
 
+    const incomingVendorHeader = request.headers.get('x-vendor-session');
+    const baseSupabase = createClient<Database>(
+      SUPABASE_URL!,
+      SUPABASE_PUBLISHABLE_KEY!,
+      {
+        global: {
+          fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY!),
+          headers: incomingVendorHeader ? { 'x-vendor-session': incomingVendorHeader } : undefined,
+        },
+        auth: {
+          storage: undefined,
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
+
     const authHeader = request.headers.get('authorization');
+
+    // Se existe sessão de vendedor, ela deve prevalecer mesmo que o navegador ainda tenha
+    // um token Supabase antigo salvo. Isso evita o vendedor cair nas RLS de admin e receber
+    // "Inautorizado" nas telas liberadas pra ele.
+    const vendor = await validateVendorSession(baseSupabase, request);
+    if (vendor) {
+      return next({
+        context: {
+          supabase: baseSupabase,
+          userId: `vendor:${vendor.id}`,
+          claims: null as unknown,
+          vendor: vendor as VendorContext | null,
+        },
+      });
+    }
 
     if (!authHeader) {
       throw new Error('Unauthorized: No authorization header provided');
@@ -102,7 +184,8 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       context: {
         supabase,
         userId: data.claims.sub,
-        claims: data.claims,
+        claims: data.claims as unknown,
+        vendor: null as VendorContext | null,
       },
     });
   },

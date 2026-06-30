@@ -1,6 +1,34 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+async function dbFor(context: any) {
+  if (context?.vendor) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin as any;
+  }
+  return context.supabase as any;
+}
+
+function vendorChannelIds(context: any): string[] {
+  const ids = context?.vendor?.wa_channel_ids;
+  return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+}
+
+async function assertVendorConversationAccess(context: any, db: any, conversationId: string) {
+  if (!context?.vendor) return;
+  const { data: conv, error } = await db
+    .from("wa_conversations" as any)
+    .select("id,channel_id,assigned_vendor_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!conv) throw new Error("Conversa não encontrada");
+  const allowed = vendorChannelIds(context);
+  if (!allowed.includes(String((conv as any).channel_id)) || Number((conv as any).assigned_vendor_id) !== Number(context.vendor.id)) {
+    throw new Error("Inautorizado: este lead não está liberado para este vendedor");
+  }
+}
+
 // ============================================================
 // Types
 // ============================================================
@@ -41,7 +69,8 @@ export type FlowEdge = {
 export const listFlows = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const db = await dbFor(context);
+    const { data, error } = await db
       .from("wa_flows" as any)
       .select("*, wa_flow_triggers(*)")
       .order("updated_at", { ascending: false });
@@ -319,15 +348,44 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { flow_id: string; channel_id: string; contact_wa_id: string; conversation_id?: string }) => d)
   .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    if ((context as any).vendor) {
+      if (!vendorChannelIds(context).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
+      if (data.conversation_id) await assertVendorConversationAccess(context, db, data.conversation_id);
+    }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");
     return runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
       contactWaId: data.contact_wa_id,
       conversationId: data.conversation_id ?? null,
-      db: context.supabase,
+      db,
       triggerContext: { manual: true },
     });
+  });
+
+export const listActiveFlowRuns = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string }) => ({ conversationId: String(d?.conversationId ?? "") }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId) return [];
+    const db = await dbFor(context);
+    await assertVendorConversationAccess(context, db, data.conversationId);
+    const { data: runs, error } = await db
+      .from("wa_flow_runs" as any)
+      .select("id, flow_id, status, current_node_id, waiting_for, error, updated_at")
+      .eq("conversation_id", data.conversationId)
+      .in("status", ["queued", "running", "waiting"])
+      .order("updated_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const rows = ((runs ?? []) as any[]);
+    const ids = Array.from(new Set(rows.map((r) => r.flow_id).filter(Boolean).map(String)));
+    let nameById = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: flows } = await db.from("wa_flows" as any).select("id,nome").in("id", ids);
+      nameById = new Map(((flows ?? []) as any[]).map((f) => [String(f.id), String(f.nome ?? "Fluxo")]));
+    }
+    return rows.map((r) => ({ ...r, flow_nome: nameById.get(String(r.flow_id)) ?? "Fluxo" }));
   });
 
 export const fireNewLeadTrigger = createServerFn({ method: "POST" })

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Plus, Trash2, Tag as TagIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { createCrmTag, deleteCrmTag, listCrmTags } from "@/lib/crm.functions";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -18,15 +19,10 @@ const PRESET_COLORS = [
 ];
 
 export function useCrmTags(operacao: string | undefined) {
+  const listTagsFn = useServerFn(listCrmTags);
   return useQuery({
     queryKey: ["crm-tags", operacao ?? "all"],
-    queryFn: async () => {
-      let q = supabase.from("crm_tags").select("*").order("nome");
-      if (operacao && operacao !== "all") q = q.eq("operacao", operacao);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as CrmTag[];
-    },
+    queryFn: async () => (await listTagsFn({ data: { operacao: operacao ?? "all" } })) as CrmTag[],
   });
 }
 
@@ -34,6 +30,8 @@ export function TagsManagerDialog({
   open, onOpenChange, operacao,
 }: { open: boolean; onOpenChange: (v: boolean) => void; operacao: string }) {
   const qc = useQueryClient();
+  const createTagFn = useServerFn(createCrmTag);
+  const deleteTagFn = useServerFn(deleteCrmTag);
   const { data: tags = [], isLoading } = useCrmTags(operacao);
   const [nome, setNome] = useState("");
   const [cor, setCor] = useState(PRESET_COLORS[0]);
@@ -44,8 +42,7 @@ export function TagsManagerDialog({
     mutationFn: async () => {
       const n = nome.trim();
       if (!n) throw new Error("Nome obrigatório");
-      const { error } = await supabase.from("crm_tags").insert({ nome: n, cor, operacao });
-      if (error) throw error;
+      await createTagFn({ data: { nome: n, cor, operacao } });
     },
     onSuccess: () => {
       toast.success("Etiqueta criada");
@@ -56,10 +53,7 @@ export function TagsManagerDialog({
   });
 
   const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("crm_tags").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: async (id: string) => deleteTagFn({ data: { id } }),
     onSuccess: () => {
       toast.success("Etiqueta removida");
       qc.invalidateQueries({ queryKey: ["crm-tags"] });

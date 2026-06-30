@@ -22,6 +22,7 @@ import {
   User,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { saveVendorSession } from "@/lib/vendor-session";
 import {
   Sidebar,
   SidebarContent,
@@ -102,19 +103,22 @@ export function AppSidebar() {
       // Re-sincroniza com o banco pra refletir mudanças do admin sem precisar deslogar
       if (s?.id) {
         supabase
-          .from("vendedores")
-          .select("permissoes, wa_channel_ids, ativo")
-          .eq("id", s.id)
-          .maybeSingle()
+          .rpc("login_vendedor_by_codigo" as any, { _codigo: s.codigo })
           .then(({ data }) => {
             if (cancelled || !data) return;
-            const next = (data.permissoes ?? {}) as Permissoes;
+            const row = data as any;
+            if (Number(row.id) !== Number(s.id)) return;
+            const next = (row.permissoes ?? {}) as Permissoes;
             setPerm(next);
             try {
-              localStorage.setItem(
-                "vendor_session",
-                JSON.stringify({ ...s, permissoes: next, wa_channel_ids: data.wa_channel_ids ?? s.wa_channel_ids }),
-              );
+              saveVendorSession({
+                ...s,
+                ...row,
+                permissoes: next,
+                wa_channel_ids: Array.isArray(row.wa_channel_ids) ? row.wa_channel_ids : s.wa_channel_ids,
+                workspace_ids: Array.isArray(row.workspace_ids) ? row.workspace_ids : s.workspace_ids,
+              } as any);
+              window.dispatchEvent(new Event("vendor-session-updated"));
             } catch { /* noop */ }
           });
       }

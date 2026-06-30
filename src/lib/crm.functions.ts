@@ -1,0 +1,160 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+async function dbFor(context: any) {
+  if (context?.vendor) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin as any;
+  }
+  return context.supabase as any;
+}
+
+function vendorWorkspaceIds(context: any): string[] | null {
+  if (!context?.vendor) return null;
+  const ids = context.vendor.workspace_ids;
+  if (Array.isArray(ids)) return ids.map(String).filter(Boolean);
+  return context.vendor.expert ? [String(context.vendor.expert)] : [];
+}
+
+function applyVendorWorkspaceFilter(context: any, q: any) {
+  const allowed = vendorWorkspaceIds(context);
+  if (!allowed) return q;
+  if (allowed.length === 0) return null;
+  return q.in("expert", allowed);
+}
+
+async function assertLeadAccess(context: any, db: any, leadId: string) {
+  if (!context?.vendor) return;
+  const { data, error } = await db.from("crm_leads" as any).select("id,expert").eq("id", leadId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Lead não encontrado");
+  const allowed = vendorWorkspaceIds(context) ?? [];
+  if (!allowed.includes(String((data as any).expert ?? ""))) {
+    throw new Error("Inautorizado: vendedor sem acesso a este workspace");
+  }
+}
+
+function assertPayloadWorkspace(context: any, payload: any) {
+  if (!context?.vendor) return;
+  const allowed = vendorWorkspaceIds(context) ?? [];
+  const expert = String(payload?.expert ?? context.vendor.expert ?? "");
+  if (!expert || !allowed.includes(expert)) throw new Error("Inautorizado: vendedor sem acesso a este workspace");
+}
+
+export const listCrmExperts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await dbFor(context);
+    let q = db.from("experts" as any).select("id,nome,ativo,crm_api_key").order("nome");
+    const allowed = vendorWorkspaceIds(context);
+    if (allowed) {
+      if (allowed.length === 0) return [];
+      q = q.in("nome", allowed);
+    }
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as any[]).map((e) => ({ ...e, crm_api_key: context?.vendor ? null : e.crm_api_key }));
+  });
+
+export const listCrmLeads = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await dbFor(context);
+    let q: any = db.from("crm_leads" as any).select("*").order("ordem", { ascending: true }).order("created_at", { ascending: false });
+    q = applyVendorWorkspaceFilter(context, q);
+    if (!q) return [];
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const syncInsertCrmLeads = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { leads: any[] }) => ({ leads: Array.isArray(d?.leads) ? d.leads : [] }))
+  .handler(async ({ context, data }) => {
+    if (context?.vendor) throw new Error("Inautorizado: sincronização é restrita ao admin");
+    const db = await dbFor(context);
+    if (data.leads.length === 0) return [];
+    const { data: ins, error } = await db.from("crm_leads" as any).insert(data.leads).select("id");
+    if (error) throw new Error(error.message);
+    return ins ?? [];
+  });
+
+export const upsertCrmLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: any) => d ?? {})
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    if (data.id) {
+      await assertLeadAccess(context, db, String(data.id));
+      if (data.expert !== undefined) assertPayloadWorkspace(context, data);
+      const { error } = await db.from("crm_leads" as any).update(data).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { id: data.id };
+    }
+    assertPayloadWorkspace(context, data);
+    const { data: ins, error } = await db.from("crm_leads" as any).insert(data).select("id").single();
+    if (error) throw new Error(error.message);
+    return ins;
+  });
+
+export const deleteCrmLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    await assertLeadAccess(context, db, data.id);
+    const { error } = await db.from("crm_leads" as any).delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateCrmLeadStage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; status: string }) => ({ id: String(d?.id ?? ""), status: String(d?.status ?? "novo") }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    await assertLeadAccess(context, db, data.id);
+    const { error } = await db.from("crm_leads" as any).update({ status: data.status }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listCrmTags = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { operacao?: string }) => ({ operacao: d?.operacao ?? "all" }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    let q = db.from("crm_tags" as any).select("*").order("nome");
+    if (data.operacao && data.operacao !== "all") q = q.eq("operacao", data.operacao);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    const allowed = vendorWorkspaceIds(context);
+    if (!allowed) return rows ?? [];
+    return ((rows ?? []) as any[]).filter((t) => allowed.includes(String(t.operacao ?? "")));
+  });
+
+export const createCrmTag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { nome: string; cor: string; operacao: string }) => ({ nome: String(d?.nome ?? ""), cor: String(d?.cor ?? "#3b82f6"), operacao: String(d?.operacao ?? "all") }))
+  .handler(async ({ context, data }) => {
+    assertPayloadWorkspace(context, { expert: data.operacao });
+    const db = await dbFor(context);
+    const { error } = await db.from("crm_tags" as any).insert({ nome: data.nome, cor: data.cor, operacao: data.operacao });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteCrmTag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    if (context?.vendor) {
+      const { data: tag } = await db.from("crm_tags" as any).select("operacao").eq("id", data.id).maybeSingle();
+      assertPayloadWorkspace(context, { expert: (tag as any)?.operacao });
+    }
+    const { error } = await db.from("crm_tags" as any).delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

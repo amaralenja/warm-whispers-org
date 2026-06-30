@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Settings2, Phone, Scale } from "lucide-react";
+import { Loader2, Settings2, Phone, Scale, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { MENU_TREE, defaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
+import { BASE_WORKSPACES, type Workspace } from "@/lib/workspace-context";
 
 
 type Channel = {
@@ -42,6 +43,8 @@ export function VendorPermissionsDialog({
   const [saving, setSaving] = useState(false);
   const [permissoes, setPermissoes] = useState<Permissoes>(defaultPermissoes());
   const [channelIds, setChannelIds] = useState<string[]>([]);
+  const [workspaceIds, setWorkspaceIds] = useState<string[]>([]);
+  const [workspaceOptions, setWorkspaceOptions] = useState<Workspace[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [leadWeight, setLeadWeight] = useState<number>(1);
   const [pool, setPool] = useState<Array<{ id: number; nome: string | null; lead_weight: number; wa_channel_ids: string[] }>>([]);
@@ -53,10 +56,24 @@ export function VendorPermissionsDialog({
     (async () => {
       setLoading(true);
       try {
+        const customWorkspaces = (() => {
+          try {
+            const parsed = JSON.parse(localStorage.getItem("multium.workspace.list") || "[]");
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        })();
+        setWorkspaceOptions([
+          ...BASE_WORKSPACES.filter((w) => w.id !== "all"),
+          ...customWorkspaces
+            .filter((w: any) => w?.id && w?.nome)
+            .map((w: any) => ({ ...w, custom: true } as Workspace)),
+        ]);
         const [vendRes, chanRes, poolRes] = await Promise.all([
           supabase
             .from("vendedores")
-            .select("permissoes, wa_channel_ids, lead_weight")
+            .select("permissoes, wa_channel_ids, workspace_ids, lead_weight, expert")
             .eq("id", vendorId)
             .maybeSingle(),
           supabase
@@ -73,6 +90,7 @@ export function VendorPermissionsDialog({
         const merged = { ...defaultPermissoes(), ...((v?.permissoes as Permissoes) ?? {}) };
         setPermissoes(merged);
         setChannelIds(Array.isArray(v?.wa_channel_ids) ? v.wa_channel_ids : []);
+        setWorkspaceIds(Array.isArray(v?.workspace_ids) ? v.workspace_ids : (v?.expert ? [String(v.expert)] : []));
         setLeadWeight(Number(v?.lead_weight ?? 1));
         setChannels(((chanRes.data as any) ?? []) as Channel[]);
         setPool(
@@ -140,6 +158,7 @@ export function VendorPermissionsDialog({
       .update({
         permissoes: permissoes as any,
         wa_channel_ids: channelIds as any,
+        workspace_ids: workspaceIds as any,
         lead_weight: leadWeight,
       } as any)
       .eq("id", vendorId);
@@ -249,6 +268,36 @@ export function VendorPermissionsDialog({
             </section>
 
             {/* Canais */}
+            <section>
+              <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Briefcase className="h-3.5 w-3.5" /> Workspaces liberados
+              </h4>
+              {workspaceOptions.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  Nenhum workspace cadastrado.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-card/40 p-3">
+                  {workspaceOptions.map((w) => (
+                    <label key={w.id} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-sm hover:bg-accent/5">
+                      <Checkbox
+                        checked={workspaceIds.includes(w.id)}
+                        onCheckedChange={(v) =>
+                          setWorkspaceIds((prev) =>
+                            v ? Array.from(new Set([...prev, w.id])) : prev.filter((x) => x !== w.id),
+                          )
+                        }
+                      />
+                      <span>{w.nome}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2 text-[0.7rem] text-muted-foreground">
+                O vendedor só enxerga os workspaces marcados aqui — nada de “Geral”.
+              </p>
+            </section>
+
             <section>
               <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <Phone className="h-3.5 w-3.5" /> Números de WhatsApp atendidos
