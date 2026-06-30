@@ -1017,6 +1017,7 @@ function RenderMedia({
   type, url, mime, filename, outgoing, onMediaSettled,
 }: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void }) {
   const safeType = toText(type);
+  const safeUrl = toText(url);
   const safeFilename = toText(filename);
   if (safeType === "image" || safeType === "sticker") {
     return (
