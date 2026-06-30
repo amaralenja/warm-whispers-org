@@ -665,6 +665,10 @@ function ChatPage() {
               </header>
 
               <ActiveFlowRuns conversationId={active.id} />
+              <WindowCountdown lastInboundAt={
+                [...messageList].reverse().find((m) => m.direction === "in")?.created_at ?? null
+              } />
+
 
 
 
