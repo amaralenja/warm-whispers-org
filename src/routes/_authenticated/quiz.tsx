@@ -711,6 +711,7 @@ function QuizPage() {
 
       <LeadDetailDialog lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
+    </IgDbContext.Provider>
   );
 }
 
