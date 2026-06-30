@@ -31,6 +31,7 @@ import { Route as AuthenticatedFlowsIndexRouteImport } from './routes/_authentic
 import { Route as ApiPublicIgImageRouteImport } from './routes/api/public/ig-image'
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
+import { Route as ApiPublicHooksSendCallAnalyticsRouteImport } from './routes/api/public/hooks/send-call-analytics'
 
 const RankingTvRoute = RankingTvRouteImport.update({
   id: '/ranking-tv',
@@ -143,6 +144,12 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSendCallAnalyticsRoute =
+  ApiPublicHooksSendCallAnalyticsRouteImport.update({
+    id: '/api/public/hooks/send-call-analytics',
+    path: '/api/public/hooks/send-call-analytics',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -188,6 +196,7 @@ export interface FileRoutesByTo {
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
@@ -213,6 +222,7 @@ export interface FileRoutesById {
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows/'
+    | '/api/public/hooks/send-call-analytics'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows'
+    | '/api/public/hooks/send-call-analytics'
     | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
@@ -285,6 +297,7 @@ export interface FileRouteTypes {
     | '/_authenticated/flows/$flowId'
     | '/api/public/ig-image'
     | '/_authenticated/flows/'
+    | '/api/public/hooks/send-call-analytics'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -294,6 +307,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   RankingTvRoute: typeof RankingTvRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
+  ApiPublicHooksSendCallAnalyticsRoute: typeof ApiPublicHooksSendCallAnalyticsRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
@@ -453,6 +467,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/send-call-analytics': {
+      id: '/api/public/hooks/send-call-analytics'
+      path: '/api/public/hooks/send-call-analytics'
+      fullPath: '/api/public/hooks/send-call-analytics'
+      preLoaderRoute: typeof ApiPublicHooksSendCallAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -503,8 +524,19 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   RankingTvRoute: RankingTvRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
+  ApiPublicHooksSendCallAnalyticsRoute: ApiPublicHooksSendCallAnalyticsRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

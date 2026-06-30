@@ -666,6 +666,19 @@ function TemplatesPanel() {
   const [approvalChannelId, setApprovalChannelId] = useState<string>("");
   const [approvalSending, setApprovalSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [recipientsOpen, setRecipientsOpen] = useState<any | null>(null);
+  const [newRecipientPhone, setNewRecipientPhone] = useState("");
+  const [newRecipientNome, setNewRecipientNome] = useState("");
+  const [analyticsSending, setAnalyticsSending] = useState(false);
+
+  const { data: recipientsList = [], refetch: refetchRecipients } = useQuery({
+    queryKey: ["wa_template_recipients", recipientsOpen?.id],
+    queryFn: async () => {
+      const { listTemplateRecipients } = await import("@/lib/call-analytics.functions");
+      return await listTemplateRecipients({ data: { templateId: recipientsOpen!.id } });
+    },
+    enabled: !!recipientsOpen,
+  });
 
   const { data: notifChannels = [] } = useQuery({
     queryKey: ["wa_notification_channels"],
@@ -768,10 +781,34 @@ function TemplatesPanel() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                   {(t.slug === "lembrete_call_v2" || t.slug === "comparecimento_call") && (
                     <Button size="sm" variant="outline" onClick={() => { setTestOpen(t); setTestForm({ to: "", nome: "", hora: "", convidados: "" }); }}>Testar envio</Button>
                   )}
+                  {t.slug === "analytics_call" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                      disabled={analyticsSending}
+                      onClick={async () => {
+                        setAnalyticsSending(true);
+                        try {
+                          const { sendCallAnalytics } = await import("@/lib/call-analytics.functions");
+                          const r = await sendCallAnalytics({ data: {} });
+                          toast.success(r.sent ? `Analytics enviado p/ ${r.sent} contato(s)` : `Sem envio: ${r.skipped ?? "ok"}`);
+                        } catch (e: any) {
+                          toast.error(e?.message ?? "Falha");
+                        } finally {
+                          setAnalyticsSending(false);
+                        }
+                      }}
+                    >
+                      {analyticsSending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                      Enviar agora
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => setRecipientsOpen(t)}>Destinatários</Button>
                   <Button size="sm" variant="outline" className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" onClick={() => { setApprovalOpen(t); setApprovalChannelId(""); }}>Enviar p/ Meta</Button>
                   <Button size="sm" variant="outline" onClick={() => { setEditing(t); setConteudo(t.conteudo); setButtonsDraft(Array.isArray(t.buttons) ? t.buttons : []); }}>Editar</Button>
                 </div>
@@ -939,6 +976,62 @@ function TemplatesPanel() {
               {approvalSending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Enviar para aprovação
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!recipientsOpen} onOpenChange={(v) => { if (!v) { setRecipientsOpen(null); setNewRecipientPhone(""); setNewRecipientNome(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Destinatários · {recipientsOpen?.nome}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Números que vão receber este template. {recipientsOpen?.slug === "analytics_call" && "O diagnóstico do dia é enviado todo dia às 22h."}
+          </p>
+          <div className="space-y-2 max-h-[280px] overflow-y-auto">
+            {recipientsList.length === 0 ? (
+              <div className="text-xs text-muted-foreground italic py-4 text-center">Nenhum destinatário cadastrado.</div>
+            ) : recipientsList.map((r: any) => (
+              <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-foreground">{r.nome || "Sem nome"}</div>
+                  <div className="text-xs text-muted-foreground font-mono">+{r.telefone}</div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  onClick={async () => {
+                    try {
+                      const { removeTemplateRecipient } = await import("@/lib/call-analytics.functions");
+                      await removeTemplateRecipient({ data: { id: r.id } });
+                      refetchRecipients();
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Erro");
+                    }
+                  }}
+                >Remover</Button>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 pt-2 border-t border-border">
+            <input className="rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Nome (opcional)" value={newRecipientNome} onChange={(e) => setNewRecipientNome(e.target.value)} />
+            <input className="rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Telefone com DDD" value={newRecipientPhone} onChange={(e) => setNewRecipientPhone(e.target.value)} />
+            <Button
+              className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
+              disabled={!newRecipientPhone.trim()}
+              onClick={async () => {
+                try {
+                  const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
+                  await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
+                  setNewRecipientPhone("");
+                  setNewRecipientNome("");
+                  refetchRecipients();
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Erro");
+                }
+              }}
+            >Adicionar</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
