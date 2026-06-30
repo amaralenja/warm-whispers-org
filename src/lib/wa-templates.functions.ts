@@ -141,15 +141,21 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
     let result = await submit("UTILITY");
     let usedCategory = "UTILITY";
 
-    // If Meta complains about category mismatch, retry as MARKETING
-    const errMsg = String(result.json?.error?.message ?? result.json?.error ?? result.json?.message ?? "");
-    if (!result.ok && /category/i.test(errMsg)) {
+    // If Meta complains about category mismatch (or EvoHub returns generic INTERNAL on UTILITY), retry as MARKETING
+    const errMsg = String(result.json?.error?.message ?? result.json?.error?.error_user_msg ?? result.json?.error ?? result.json?.message ?? "");
+    if (!result.ok && (/category|marketing|utility/i.test(errMsg) || /INTERNAL/i.test(errMsg) || result.status >= 500)) {
       result = await submit("MARKETING");
       usedCategory = "MARKETING";
     }
 
     if (!result.ok) {
-      throw new Error(errMsg || `Falha ao enviar (HTTP ${result.status})`);
+      const detail = typeof result.json === "string"
+        ? result.json
+        : JSON.stringify(result.json ?? {}, null, 2);
+      const finalMsg = String(result.json?.error?.message ?? result.json?.error?.error_user_msg ?? result.json?.error ?? result.json?.message ?? "");
+      throw new Error(
+        `Falha ao enviar template (HTTP ${result.status})${finalMsg ? `: ${finalMsg}` : ""}\nDetalhe: ${detail.slice(0, 800)}`
+      );
     }
 
     // 5. Persist submission status on the template row
