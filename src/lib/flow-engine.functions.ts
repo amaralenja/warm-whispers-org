@@ -115,9 +115,10 @@ async function uniqueFlowName(
 
 export const createFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { nome: string; operacao_id?: string | null }) => ({
+  .inputValidator((d: { nome: string; operacao_id?: string | null; folder?: string | null }) => ({
     nome: String(d?.nome ?? "Novo Fluxo"),
     operacao_id: d?.operacao_id ?? null,
+    folder: d?.folder ? String(d.folder).trim() || null : null,
   }))
   .handler(async ({ context, data }) => {
     const startId = "n-trigger";
@@ -132,6 +133,7 @@ export const createFlow = createServerFn({ method: "POST" })
       .insert({
         nome,
         operacao_id: data.operacao_id,
+        folder: data.folder,
         ativo: true,
         entry_node_id: startId,
         nodes: [
