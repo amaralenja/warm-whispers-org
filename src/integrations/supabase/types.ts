@@ -328,6 +328,33 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_stages: {
+        Row: {
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+          operacao: string
+          ordem: number
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome: string
+          operacao: string
+          ordem?: number
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          operacao?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
       crm_tags: {
         Row: {
           cor: string
@@ -335,6 +362,7 @@ export type Database = {
           id: string
           nome: string
           operacao: string
+          stage_id: string | null
           updated_at: string
         }
         Insert: {
@@ -343,6 +371,7 @@ export type Database = {
           id?: string
           nome: string
           operacao?: string
+          stage_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -351,6 +380,7 @@ export type Database = {
           id?: string
           nome?: string
           operacao?: string
+          stage_id?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -136,14 +136,94 @@ export const listCrmTags = createServerFn({ method: "GET" })
 
 export const createCrmTag = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { nome: string; cor: string; operacao: string }) => ({ nome: String(d?.nome ?? ""), cor: String(d?.cor ?? "#3b82f6"), operacao: String(d?.operacao ?? "all") }))
+  .inputValidator((d: { nome: string; cor: string; operacao: string; stage_id?: string | null }) => ({
+    nome: String(d?.nome ?? ""),
+    cor: String(d?.cor ?? "#3b82f6"),
+    operacao: String(d?.operacao ?? "all"),
+    stage_id: d?.stage_id ? String(d.stage_id) : null,
+  }))
   .handler(async ({ context, data }) => {
     assertPayloadWorkspace(context, { expert: data.operacao });
     const db = await dbFor(context);
-    const { error } = await db.from("crm_tags" as any).insert({ nome: data.nome, cor: data.cor, operacao: data.operacao });
+    const { error } = await db.from("crm_tags" as any).insert({ nome: data.nome, cor: data.cor, operacao: data.operacao, stage_id: data.stage_id });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const updateCrmTag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; nome?: string; cor?: string; stage_id?: string | null }) => ({
+    id: String(d?.id ?? ""),
+    nome: d?.nome !== undefined ? String(d.nome) : undefined,
+    cor: d?.cor !== undefined ? String(d.cor) : undefined,
+    stage_id: d?.stage_id !== undefined ? (d.stage_id ? String(d.stage_id) : null) : undefined,
+  }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    if (context?.vendor) {
+      const { data: tag } = await db.from("crm_tags" as any).select("operacao").eq("id", data.id).maybeSingle();
+      assertPayloadWorkspace(context, { expert: (tag as any)?.operacao });
+    }
+    const patch: any = {};
+    if (data.nome !== undefined) patch.nome = data.nome;
+    if (data.cor !== undefined) patch.cor = data.cor;
+    if (data.stage_id !== undefined) patch.stage_id = data.stage_id;
+    const { error } = await db.from("crm_tags" as any).update(patch).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- Stages (colunas) ----------
+export const listCrmStages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { operacao?: string }) => ({ operacao: d?.operacao ?? "all" }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    let q = db.from("crm_stages" as any).select("*").order("ordem").order("created_at");
+    if (data.operacao && data.operacao !== "all") q = q.eq("operacao", data.operacao);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    const allowed = vendorWorkspaceIds(context);
+    if (!allowed) return rows ?? [];
+    return ((rows ?? []) as any[]).filter((t) => allowed.includes(String(t.operacao ?? "")));
+  });
+
+export const upsertCrmStage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id?: string; operacao: string; nome: string; cor?: string; ordem?: number }) => ({
+    id: d?.id ? String(d.id) : undefined,
+    operacao: String(d?.operacao ?? "all"),
+    nome: String(d?.nome ?? ""),
+    cor: String(d?.cor ?? "#3b82f6"),
+    ordem: Number.isFinite(d?.ordem) ? Number(d?.ordem) : 0,
+  }))
+  .handler(async ({ context, data }) => {
+    assertPayloadWorkspace(context, { expert: data.operacao });
+    const db = await dbFor(context);
+    if (data.id) {
+      const { error } = await db.from("crm_stages" as any).update({ nome: data.nome, cor: data.cor, ordem: data.ordem }).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { id: data.id };
+    }
+    const { data: ins, error } = await db.from("crm_stages" as any).insert({ operacao: data.operacao, nome: data.nome, cor: data.cor, ordem: data.ordem }).select("id").single();
+    if (error) throw new Error(error.message);
+    return ins;
+  });
+
+export const deleteCrmStage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    if (context?.vendor) {
+      const { data: st } = await db.from("crm_stages" as any).select("operacao").eq("id", data.id).maybeSingle();
+      assertPayloadWorkspace(context, { expert: (st as any)?.operacao });
+    }
+    const { error } = await db.from("crm_stages" as any).delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
 export const deleteCrmTag = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

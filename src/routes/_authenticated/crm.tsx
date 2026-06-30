@@ -1,20 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
-  User, MoreVertical, KeyRound, RefreshCw, Tag as TagIcon,
+  User, MoreVertical, Tag as TagIcon, Columns3,
 } from "lucide-react";
-import { TagsManagerDialog } from "@/components/tags-manager-dialog";
+import {
+  TagsManagerDialog, StagesManagerDialog, useCrmStages, DEFAULT_STAGES,
+} from "@/components/tags-manager-dialog";
 import { InstagramLookup } from "@/components/instagram-lookup";
-import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
 import {
   deleteCrmLead,
-  listCrmExperts,
   listCrmLeads,
-  syncInsertCrmLeads,
   updateCrmLeadStage,
   upsertCrmLead,
 } from "@/lib/crm.functions";
@@ -38,17 +37,28 @@ export const Route = createFileRoute("/_authenticated/crm")({
   component: CRMPage,
 });
 
-// ---------- Stages ----------
-const STAGES = [
-  { id: "novo",        label: "Novo",        color: "bg-blue-500",    border: "border-blue-500/40",    text: "text-blue-300",    soft: "bg-blue-500/10" },
-  { id: "contato",     label: "Em contato",  color: "bg-amber-500",   border: "border-amber-500/40",   text: "text-amber-300",   soft: "bg-amber-500/10" },
-  { id: "qualificado", label: "Qualificado", color: "bg-violet-500",  border: "border-violet-500/40",  text: "text-violet-300",  soft: "bg-violet-500/10" },
-  { id: "negociacao",  label: "Negociação",  color: "bg-orange-500",  border: "border-orange-500/40",  text: "text-orange-300",  soft: "bg-orange-500/10" },
-  { id: "ganho",       label: "Ganho",       color: "bg-emerald-500", border: "border-emerald-500/40", text: "text-emerald-300", soft: "bg-emerald-500/10" },
-  { id: "perdido",     label: "Perdido",     color: "bg-rose-500",    border: "border-rose-500/40",    text: "text-rose-300",    soft: "bg-rose-500/10" },
-] as const;
+type StageView = { id: string; label: string; color: string; soft: string; border: string; text: string };
 
-type Stage = typeof STAGES[number]["id"];
+function hexToSoft(hex: string, alpha = 0.1) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function stageView(id: string, nome: string, cor: string): StageView {
+  return {
+    id, label: nome,
+    color: "",
+    soft: "",
+    border: "",
+    text: "",
+    // we'll inline styles via cor in render
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...({ cor } as any),
+  };
+}
 
 type Lead = {
   id: string;
@@ -57,7 +67,7 @@ type Lead = {
   email: string | null;
   expert: string | null;
   fonte: string | null;
-  status: Stage | string;
+  status: string;
   responsavel_utm: string | null;
   responsavel_nome: string | null;
   valor_estimado: number | null;
@@ -70,218 +80,51 @@ type Lead = {
   updated_at: string;
 };
 
-type ExpertApiKey = { id: number; nome: string; ativo: boolean; crm_api_key: string | null };
-
-const API_BASE = "https://vyzap.lovable.app/api/public/v1";
 
 const BRL = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n || 0);
 
-function firstString(obj: Record<string, any>, keys: string[]): string | null {
-  for (const key of keys) {
-    const value = obj?.[key];
-    if (value == null) continue;
-    const str = String(value).trim();
-    if (str) return str;
-  }
-  return null;
-}
-
-function firstNumber(obj: Record<string, any>, keys: string[]): number | null {
-  for (const key of keys) {
-    const raw = obj?.[key];
-    if (raw == null || raw === "") continue;
-    const parsed = Number(String(raw).replace(/R\$\s?/g, "").replace(/\./g, "").replace(",", "."));
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
-}
-
-function extractLeadArray(payload: any): Record<string, any>[] {
-  if (Array.isArray(payload)) return payload;
-  const candidates = [payload?.leads, payload?.data, payload?.items, payload?.contacts, payload?.results];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate;
-    if (Array.isArray(candidate?.data)) return candidate.data;
-    if (Array.isArray(candidate?.items)) return candidate.items;
-  }
-  return [];
-}
-
-function normalizeApiLead(raw: Record<string, any>, expert: string, index: number): Partial<Lead> & { _syncKey: string } {
-  const externalId = firstString(raw, ["id", "lead_id", "leadId", "contact_id", "contactId", "uuid", "external_id", "externalId"]);
-  const telefone = firstString(raw, ["telefone", "phone", "celular", "whatsapp", "numero", "number", "mobile"]);
-  const email = firstString(raw, ["email", "e_mail"]);
-  const nome = firstString(raw, ["nome", "name", "full_name", "fullName", "lead_name", "leadName", "first_name", "firstName"])
-    ?? email
-    ?? telefone
-    ?? `Lead ${index + 1}`;
-  const fonte = firstString(raw, ["fonte", "source", "origem", "utm_source", "utmSource", "campaign", "campanha"]);
-  const responsavelUtm = firstString(raw, ["responsavel_utm", "utm", "utm_content", "utmContent", "vendedor_utm", "seller_utm"]);
-  const responsavelNome = firstString(raw, ["responsavel_nome", "responsavel", "seller", "seller_name", "vendedor", "vendedor_nome"]);
-  const valor = firstNumber(raw, ["valor_estimado", "valor", "value", "ticket", "revenue"]);
-  const createdAt = firstString(raw, ["created_at", "createdAt", "data", "date", "timestamp"]);
-  const tagsRaw = raw.tags ?? raw.tag;
-  const tags = Array.isArray(tagsRaw)
-    ? tagsRaw.map((tag) => String(tag).trim()).filter(Boolean)
-    : typeof tagsRaw === "string"
-      ? tagsRaw.split(",").map((tag) => tag.trim()).filter(Boolean)
-      : [];
-  const syncKey = `${expert}|${externalId || email || telefone || nome}`.toLowerCase();
-
-  return {
-    _syncKey: syncKey,
-    nome,
-    telefone,
-    email,
-    expert,
-    fonte: fonte ?? "Quiz API",
-    status: "novo",
-    responsavel_utm: responsavelUtm,
-    responsavel_nome: responsavelNome,
-    valor_estimado: valor ?? 0,
-    tags,
-    ultima_interacao: createdAt,
-    dados: {
-      origem: "crm_leads_x1_api",
-      external_id: externalId,
-      sync_key: syncKey,
-      raw,
-    },
-  };
-}
-
-async function fetchCrmApiLeads(expert: ExpertApiKey) {
-  const url = new URL(`${API_BASE}/contacts`);
-  url.searchParams.set("period", "all");
-  url.searchParams.set("limit", "500");
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${expert.crm_api_key}` },
-  });
-  if (!res.ok) throw new Error(`${expert.nome}: /contacts retornou HTTP ${res.status}`);
-  const text = await res.text();
-  let payload: any = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    throw new Error(`${expert.nome}: /contacts não retornou JSON. Confere a API key.`);
-  }
-  return extractLeadArray(payload).map((raw, index) => normalizeApiLead(raw, expert.nome, index));
-}
 
 // ---------- Page ----------
 function CRMPage() {
   const qc = useQueryClient();
   const fireNewLead = useServerFn(fireNewLeadTrigger);
-  const listExpertsFn = useServerFn(listCrmExperts);
   const listLeadsFn = useServerFn(listCrmLeads);
-  const insertSyncedLeadsFn = useServerFn(syncInsertCrmLeads);
   const upsertLeadFn = useServerFn(upsertCrmLead);
   const deleteLeadFn = useServerFn(deleteCrmLead);
   const updateStageFn = useServerFn(updateCrmLeadStage);
   const { workspace, workspaces } = useWorkspace();
   const isGeral = workspace?.id === "all";
-  const isVendorSession = typeof window !== "undefined" && !!window.localStorage.getItem("vendor_session");
 
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [search, setSearch] = useState("");
   const [opFilter, setOpFilter] = useState<string>("all");
   const [editing, setEditing] = useState<Lead | null>(null);
   const [creating, setCreating] = useState(false);
-  const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [stagesOpen, setStagesOpen] = useState(false);
 
   const operacoes = useMemo(
     () => workspaces.filter((w) => w.id !== "all").map((w) => w.nome),
     [workspaces],
   );
 
-  const { data: expertsWithKeys = [], isLoading: loadingApiKeys } = useQuery({
-    queryKey: ["experts-crm-keys"],
-    queryFn: async () => (await listExpertsFn()) as ExpertApiKey[],
-  });
-
-  const targetApiExperts = useMemo(() => {
-    const active = expertsWithKeys.filter((e) => e.ativo && e.crm_api_key);
-    if (isGeral) return active;
-    return active.filter((e) => e.nome === workspace?.nome);
-  }, [expertsWithKeys, isGeral, workspace?.nome]);
-
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["crm-leads"],
     queryFn: async () => (await listLeadsFn()) as Lead[],
   });
 
-  const syncLeads = useMutation({
-    mutationFn: async () => {
-      if (isVendorSession || targetApiExperts.length === 0) {
-        return { fetched: 0, inserted: 0, skipped: 0 };
-      }
+  // Dynamic stages: defaults + custom for the active operation
+  const stageOperacao = isGeral ? "all" : (workspace?.nome ?? "all");
+  const { data: customStages = [] } = useCrmStages(stageOperacao);
 
-      const batches = await Promise.all(targetApiExperts.map(fetchCrmApiLeads));
-      const fetched = batches.flat();
-      if (fetched.length === 0) {
-        return { fetched: 0, inserted: 0, skipped: 0 };
-      }
+  const stages: StageView[] = useMemo(() => {
+    const defaults = DEFAULT_STAGES.map((s) => stageView(s.id, s.nome, s.cor));
+    const customs = customStages.map((s) => stageView(s.id, s.nome, s.cor));
+    return [...defaults, ...customs];
+  }, [customStages]);
 
-      const existingRows = await listLeadsFn();
-
-      const existingKeys = new Set<string>();
-      for (const row of (existingRows ?? []) as any[]) {
-        const dados = row.dados && typeof row.dados === "object" ? row.dados : {};
-        if (dados.sync_key) existingKeys.add(String(dados.sync_key).toLowerCase());
-        const fallback = `${row.expert ?? ""}|${row.email || row.telefone || row.nome || ""}`.toLowerCase();
-        if (fallback !== "|") existingKeys.add(fallback);
-      }
-
-      const seenThisSync = new Set<string>();
-      const toInsert = fetched
-        .filter((lead) => {
-          if (existingKeys.has(lead._syncKey) || seenThisSync.has(lead._syncKey)) return false;
-          seenThisSync.add(lead._syncKey);
-          return true;
-        })
-        .map(({ _syncKey, ...lead }) => lead)
-        .filter((lead) => lead.nome?.trim());
-
-      let insertedIds: string[] = [];
-      if (toInsert.length > 0) {
-        const ins = await insertSyncedLeadsFn({ data: { leads: toInsert as any[] } });
-        insertedIds = (ins ?? []).map((r: any) => r.id);
-      }
-      // Fire "new_lead" triggers (non-blocking)
-      for (const id of insertedIds) {
-        fireNewLead({ data: { lead_id: id } }).catch(() => {});
-      }
-
-      return {
-        fetched: fetched.length,
-        inserted: toInsert.length,
-        skipped: fetched.length - toInsert.length,
-      };
-    },
-    onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["crm-leads"] });
-      if (result.inserted > 0) {
-        toast.success(`${result.inserted} lead${result.inserted === 1 ? "" : "s"} importado${result.inserted === 1 ? "" : "s"}`);
-      }
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao puxar leads da API"),
-  });
-
-  const lastAutoSyncKey = useRef("");
-  const autoSyncKey = useMemo(
-    () => targetApiExperts.map((e) => `${e.id}:${e.crm_api_key}`).join("|"),
-    [targetApiExperts],
-  );
-
-  useEffect(() => {
-    if (loadingApiKeys || !autoSyncKey || lastAutoSyncKey.current === autoSyncKey) return;
-    lastAutoSyncKey.current = autoSyncKey;
-    syncLeads.mutate();
-  }, [autoSyncKey, loadingApiKeys, isVendorSession]);
-
-  // Apply filters
+  // Filters
   const filtered = useMemo(() => {
     const opActive = isGeral ? opFilter : workspace?.nome;
     const term = search.trim().toLowerCase();
@@ -318,22 +161,14 @@ function CRMPage() {
   });
 
   const moveStage = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: Stage }) => updateStageFn({ data: { id, status } }),
+    mutationFn: async ({ id, status }: { id: string; status: string }) => updateStageFn({ data: { id, status } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crm-leads"] }),
   });
 
-  // Export CSV
   function exportCSV() {
     const rows = filtered;
-    if (!rows.length) {
-      toast.error("Nada para exportar");
-      return;
-    }
-    const headers = [
-      "nome", "telefone", "email", "expert", "fonte", "status",
-      "responsavel_nome", "valor_estimado", "tags", "notas",
-      "ultima_interacao", "created_at",
-    ];
+    if (!rows.length) { toast.error("Nada para exportar"); return; }
+    const headers = ["nome","telefone","email","expert","fonte","status","responsavel_nome","valor_estimado","tags","notas","ultima_interacao","created_at"];
     const csv = [
       headers.join(","),
       ...rows.map((r) =>
@@ -359,31 +194,18 @@ function CRMPage() {
   return (
     <div className="flex h-full flex-col gap-4 p-6">
       <InstagramLookup />
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">CRM Leads X1</h1>
           <p className="text-sm text-muted-foreground">
             {filtered.length} {filtered.length === 1 ? "lead" : "leads"}
             {!isGeral && ` em ${workspace?.nome}`}
-            {targetApiExperts.length > 0 && ` · ${targetApiExperts.length} API key${targetApiExperts.length > 1 ? "s" : ""} ativa${targetApiExperts.length > 1 ? "s" : ""}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => syncLeads.mutate()}
-            disabled={isVendorSession || syncLeads.isPending || targetApiExperts.length === 0}
-          >
-            <RefreshCw className={`mr-1.5 h-4 w-4 ${syncLeads.isPending ? "animate-spin" : ""}`} />
-            {syncLeads.isPending ? "Puxando…" : "Puxar leads"}
+          <Button variant="outline" size="sm" onClick={() => setStagesOpen(true)}>
+            <Columns3 className="mr-1.5 h-4 w-4" /> Colunas
           </Button>
-          {!isVendorSession && (
-            <Button variant="outline" size="sm" onClick={() => setApiKeysOpen(true)}>
-              <KeyRound className="mr-1.5 h-4 w-4" /> API Keys
-            </Button>
-          )}
           <Button variant="outline" size="sm" onClick={() => setTagsOpen(true)}>
             <TagIcon className="mr-1.5 h-4 w-4" /> Etiquetas
           </Button>
@@ -396,21 +218,6 @@ function CRMPage() {
         </div>
       </div>
 
-      {!isVendorSession && !loadingApiKeys && targetApiExperts.length === 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          {isGeral
-            ? "Cadastre pelo menos uma API key nas operações para o CRM puxar leads automaticamente."
-            : `A operação ${workspace?.nome} ainda não tem API key de CRM cadastrada.`}
-        </div>
-      )}
-
-      {syncLeads.data && syncLeads.data.fetched === 0 && targetApiExperts.length > 0 && (
-        <div className="rounded-xl border border-border bg-card/40 px-4 py-3 text-sm text-muted-foreground">
-          A API respondeu, mas não retornou nenhum lead em <code className="text-foreground">/api/public/v1/leads?period=30d</code>.
-        </div>
-      )}
-
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/40 p-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -424,57 +231,36 @@ function CRMPage() {
 
         {isGeral && (
           <Select value={opFilter} onValueChange={setOpFilter}>
-            <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue placeholder="Operação" />
-            </SelectTrigger>
+            <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Operação" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as operações</SelectItem>
-              {operacoes.map((o) => (
-                <SelectItem key={o} value={o}>{o}</SelectItem>
-              ))}
+              {operacoes.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
 
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-background/60 p-1">
-          <Button
-            size="sm"
-            variant={view === "kanban" ? "default" : "ghost"}
-            className="h-7 px-3"
-            onClick={() => setView("kanban")}
-          >
+          <Button size="sm" variant={view === "kanban" ? "default" : "ghost"} className="h-7 px-3" onClick={() => setView("kanban")}>
             <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Kanban
           </Button>
-          <Button
-            size="sm"
-            variant={view === "lista" ? "default" : "ghost"}
-            className="h-7 px-3"
-            onClick={() => setView("lista")}
-          >
+          <Button size="sm" variant={view === "lista" ? "default" : "ghost"} className="h-7 px-3" onClick={() => setView("lista")}>
             <List className="mr-1.5 h-3.5 w-3.5" /> Lista
           </Button>
         </div>
       </div>
 
-      {/* Content */}
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Carregando leads…
-        </div>
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Carregando leads…</div>
       ) : view === "kanban" ? (
-        <Kanban
-          leads={filtered}
-          onMove={(id, status) => moveStage.mutate({ id, status })}
-          onEdit={setEditing}
-        />
+        <Kanban stages={stages} leads={filtered} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} />
       ) : (
-        <Lista leads={filtered} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
+        <Lista stages={stages} leads={filtered} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
       )}
 
-      {/* Edit / Create dialog */}
       <LeadDialog
         open={creating || !!editing}
         lead={editing}
+        stages={stages}
         defaultExpert={!isGeral ? workspace?.nome : undefined}
         operacoes={operacoes}
         onClose={() => { setEditing(null); setCreating(false); }}
@@ -483,122 +269,40 @@ function CRMPage() {
         loading={upsert.isPending}
       />
 
-      <ApiKeysDialog open={apiKeysOpen} onClose={() => setApiKeysOpen(false)} />
-      <TagsManagerDialog open={tagsOpen} onOpenChange={setTagsOpen} operacao={workspace?.id ?? "all"} />
+      <TagsManagerDialog open={tagsOpen} onOpenChange={setTagsOpen} operacao={stageOperacao} />
+      <StagesManagerDialog open={stagesOpen} onOpenChange={setStagesOpen} operacao={stageOperacao} />
     </div>
   );
 }
 
-// ---------- API Keys Dialog ----------
-function ApiKeysDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
-
-  const { data: experts = [] } = useQuery({
-    queryKey: ["experts-crm-keys"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("experts")
-        .select("id, nome, ativo, crm_api_key")
-        .order("nome");
-      if (error) throw error;
-      return (data ?? []) as { id: number; nome: string; ativo: boolean; crm_api_key: string | null }[];
-    },
-    enabled: open,
-  });
-
-  const save = useMutation({
-    mutationFn: async (payload: { id: number; key: string }) => {
-      const { error } = await supabase
-        .from("experts")
-        .update({ crm_api_key: payload.key || null })
-        .eq("id", payload.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["experts-crm-keys"] });
-      toast.success("API Key salva");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>API Keys do CRM Leads X1</DialogTitle>
-          <DialogDescription>
-            Cole o Bearer Token de cada operação para puxar os leads automaticamente no CRM.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-          {experts.filter((e) => e.ativo).map((ex) => {
-            const current = drafts[ex.id] ?? ex.crm_api_key ?? "";
-            return (
-              <div key={ex.id} className="rounded-lg border border-border p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="font-medium">{ex.nome}</span>
-                  {ex.crm_api_key && (
-                    <Badge variant="secondary" className="text-xs">
-                      ••••{ex.crm_api_key.slice(-6)}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder="Bearer token…"
-                    value={current}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [ex.id]: e.target.value }))}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => save.mutate({ id: ex.id, key: current })}
-                    disabled={save.isPending}
-                  >
-                    Salvar
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-          {!experts.length && (
-            <p className="text-sm text-muted-foreground">Nenhuma operação ativa cadastrada.</p>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------- Kanban ----------
 function Kanban({
-  leads, onMove, onEdit,
+  stages, leads, onMove, onEdit,
 }: {
+  stages: StageView[];
   leads: Lead[];
-  onMove: (id: string, status: Stage) => void;
+  onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
 }) {
-  const [dragOver, setDragOver] = useState<Stage | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
-    for (const s of STAGES) map.set(s.id, []);
+    for (const s of stages) map.set(s.id, []);
     for (const l of leads) {
-      const arr = map.get(l.status) ?? map.get("novo")!;
-      arr.push(l);
+      const arr = map.get(l.status) ?? map.get("novo");
+      if (arr) arr.push(l);
     }
     return map;
-  }, [leads]);
+  }, [leads, stages]);
+
 
   function onDragStart(e: DragEvent<HTMLDivElement>, lead: Lead) {
     e.dataTransfer.setData("text/plain", lead.id);
     e.dataTransfer.effectAllowed = "move";
   }
 
-  function onDrop(e: DragEvent<HTMLDivElement>, status: Stage) {
+  function onDrop(e: DragEvent<HTMLDivElement>, status: string) {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
     setDragOver(null);
@@ -607,7 +311,8 @@ function Kanban({
 
   return (
     <div className="flex flex-1 gap-3 overflow-x-auto pb-2">
-      {STAGES.map((s) => {
+      {stages.map((s) => {
+
         const items = grouped.get(s.id) ?? [];
         const totalValor = items.reduce((a, b) => a + (b.valor_estimado ?? 0), 0);
         const isOver = dragOver === s.id;
@@ -702,8 +407,9 @@ function KanbanCard({
 
 // ---------- Lista ----------
 function Lista({
-  leads, onEdit, onRemove,
+  stages, leads, onEdit, onRemove,
 }: {
+  stages: StageView[];
   leads: Lead[];
   onEdit: (l: Lead) => void;
   onRemove: (id: string) => void;
@@ -730,7 +436,8 @@ function Lista({
             </td></tr>
           )}
           {leads.map((l) => {
-            const stage = STAGES.find((s) => s.id === l.status) ?? STAGES[0];
+            const stage = stages.find((s) => s.id === l.status) ?? stages[0];
+
             return (
               <tr key={l.id} className="border-t border-border/40 hover:bg-card/60">
                 <td className="px-4 py-3">
@@ -782,10 +489,11 @@ function Lista({
 
 // ---------- Dialog ----------
 function LeadDialog({
-  open, lead, defaultExpert, operacoes, onClose, onSubmit, onDelete, loading,
+  open, lead, stages, defaultExpert, operacoes, onClose, onSubmit, onDelete, loading,
 }: {
   open: boolean;
   lead: Lead | null;
+  stages: StageView[];
   defaultExpert?: string;
   operacoes: string[];
   onClose: () => void;
@@ -793,6 +501,7 @@ function LeadDialog({
   onDelete?: () => void;
   loading: boolean;
 }) {
+
   const [form, setForm] = useState<Partial<Lead>>({});
 
   // Reset form when opening
@@ -853,10 +562,11 @@ function LeadDialog({
               </Select>
             </Field>
             <Field label="Status">
-              <Select value={form.status ?? "novo"} onValueChange={(v) => set("status", v as Stage)}>
+              <Select value={form.status ?? "novo"} onValueChange={(v) => set("status", v as string)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STAGES.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                  {stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+
                 </SelectContent>
               </Select>
             </Field>
