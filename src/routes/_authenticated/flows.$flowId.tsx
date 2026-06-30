@@ -227,15 +227,22 @@ function CustomNode({ id, data, type, selected }: NodeProps) {
       )}
       {isButtons && (
         <div className="px-4 pb-3 space-y-2">
-          {(d.buttons ?? []).slice(0, 3).map((b: any, i: number) => (
-            <div key={b.id ?? i} className="relative">
-              <div className="text-sm bg-muted rounded-md px-3 py-2 text-center truncate border">{b.label || `Botão ${i + 1}`}</div>
-              <Handle
-                type="source" position={Position.Right} id={b.id}
-                style={{ top: "50%", background: meta.color, width: 12, height: 12 }}
-              />
-            </div>
-          ))}
+          {(d.buttons ?? []).slice(0, 6).map((b: any, i: number) => {
+            const isUrl = b.type === "url";
+            return (
+              <div key={b.id ?? i} className="relative">
+                <div className={`text-sm rounded-md px-3 py-2 text-center truncate border ${isUrl ? "bg-blue-500/10 border-blue-500/30 text-blue-600" : "bg-muted"}`}>
+                  {isUrl ? "🔗 " : ""}{b.label || `Botão ${i + 1}`}
+                </div>
+                {!isUrl && (
+                  <Handle
+                    type="source" position={Position.Right} id={b.id}
+                    style={{ top: "50%", background: meta.color, width: 12, height: 12 }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       {isRandom && (
