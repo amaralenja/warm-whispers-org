@@ -1033,9 +1033,10 @@ async function igDrain() {
 }
 
 function IgRow({ username }: { username: string }) {
-  const key = username.toLowerCase();
+  const key = (username || "").toLowerCase().trim().replace(/^@/, "").replace(/\/+$/, "");
+  const isValidHandle = /^[a-z0-9._]+$/i.test(key);
   const { map, setLocal } = useContext(IgDbContext);
-  const dbRow = map.get(key);
+  const dbRow = isValidHandle ? map.get(key) : undefined;
 
   function rowToProfile(r: IgDbRow | undefined): IgProfile | null {
     if (!r) return null;
@@ -1087,11 +1088,12 @@ function IgRow({ username }: { username: string }) {
   // Auto-verifica via fila global se ainda desconhecido (lead novo do quiz)
   useEffect(() => {
     if (status !== "unknown") return;
+    if (!isValidHandle) return;
     let cancelled = false;
     igEnqueue(async () => { if (!cancelled) await runVerify(); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, status]);
+  }, [key, status, isValidHandle]);
 
   async function verify(e: React.MouseEvent) {
     e.stopPropagation();
