@@ -131,7 +131,7 @@ async function findUsableMetaToken(phoneNumberId: string, preferredToken: string
   return preferredToken;
 }
 
-async function sendWA(channelId: string, to: string, body: any, db: any) {
+export async function sendWA(channelId: string, to: string, body: any, db: any) {
   const { token, phoneNumberId } = await fetchChannelToken(channelId, db);
   const toNormalized = normalizeBrWhatsappNumber(to);
   const payload = { messaging_product: "whatsapp", to: toNormalized, ...body };
