@@ -977,24 +977,25 @@ function FlowDispatcher({
     });
   }, [flows, conversation.operacao_id]);
 
-  async function fire(flowId: string) {
+  function fire(flowId: string) {
     setFiring(flowId);
-    try {
-      await triggerFn({
+    toast.success("Fluxo disparado, rodando em segundo plano");
+    setOpen(false);
+    // Fire-and-forget: não bloqueia a UI, usuário pode navegar pra outras conversas
+    Promise.resolve(
+      triggerFn({
         data: {
           flow_id: flowId,
           channel_id: conversation.channel_id,
           contact_wa_id: conversation.contact_wa_id,
           conversation_id: conversation.id,
         },
-      });
-      toast.success("Fluxo disparado");
-      setOpen(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao disparar fluxo");
-    } finally {
-      setFiring(null);
-    }
+      }),
+    )
+      .catch((e: any) => {
+        toast.error(e?.message ?? "Erro ao disparar fluxo");
+      })
+      .finally(() => setFiring(null));
   }
 
   return (
