@@ -223,7 +223,7 @@ function ChatPage() {
       const { data } = await supabase
         .from("wa_channels" as any)
         .select("id,name,display_phone_number,verified_name");
-      return (data ?? []) as Array<{ id: string; name: string | null; display_phone_number: string | null; verified_name: string | null }>;
+      return (data ?? []) as unknown as Array<{ id: string; name: string | null; display_phone_number: string | null; verified_name: string | null }>;
     },
     staleTime: 60_000,
   });
