@@ -594,7 +594,7 @@ function ChatPage() {
                     }
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) handleFileUpload(f);
+                      if (f) openPreviewOrSend(f);
                       e.target.value = "";
                     }}
                   />
