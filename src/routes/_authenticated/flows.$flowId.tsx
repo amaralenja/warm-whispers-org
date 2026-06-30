@@ -716,35 +716,69 @@ function Inspector({
           </>
         )}
 
-        {node.type === "send_buttons" && (
-          <div className="space-y-2">
-            <Label>Botões (até 3)</Label>
-            {(d.buttons ?? []).map((b: any, i: number) => (
-              <div key={b.id ?? i} className="flex gap-1.5">
-                <Input
-                  value={b.label} placeholder={`Botão ${i + 1}`}
-                  maxLength={20}
-                  onChange={(e) => {
-                    const arr = [...(d.buttons ?? [])];
-                    arr[i] = { ...arr[i], label: e.target.value };
-                    onChange({ buttons: arr });
-                  }}
-                />
-                <Button size="icon" variant="ghost" onClick={() => {
-                  const arr = (d.buttons ?? []).filter((_: any, j: number) => j !== i);
-                  onChange({ buttons: arr });
-                }}><X className="h-3 w-3" /></Button>
+        {node.type === "send_buttons" && (() => {
+          const list: any[] = d.buttons ?? [];
+          const replyCount = list.filter((b) => (b.type ?? "reply") === "reply").length;
+          return (
+            <div className="space-y-2">
+              <Label>Botões (até 3 de resposta + URLs)</Label>
+              {list.map((b: any, i: number) => {
+                const btype = b.type ?? "reply";
+                return (
+                  <div key={b.id ?? i} className="space-y-1.5 border rounded-md p-2">
+                    <div className="flex gap-1.5 items-center">
+                      <select
+                        className="text-xs bg-background border rounded px-1.5 py-1"
+                        value={btype}
+                        onChange={(e) => {
+                          const arr = [...list];
+                          arr[i] = { ...arr[i], type: e.target.value };
+                          onChange({ buttons: arr });
+                        }}
+                      >
+                        <option value="reply">Resposta</option>
+                        <option value="url">URL</option>
+                      </select>
+                      <Input
+                        value={b.label ?? ""} placeholder={`Texto do botão ${i + 1}`}
+                        maxLength={20}
+                        onChange={(e) => {
+                          const arr = [...list];
+                          arr[i] = { ...arr[i], label: e.target.value };
+                          onChange({ buttons: arr });
+                        }}
+                      />
+                      <Button size="icon" variant="ghost" onClick={() => {
+                        onChange({ buttons: list.filter((_: any, j: number) => j !== i) });
+                      }}><X className="h-3 w-3" /></Button>
+                    </div>
+                    {btype === "url" && (
+                      <Input
+                        value={b.url ?? ""} placeholder="https://..."
+                        onChange={(e) => {
+                          const arr = [...list];
+                          arr[i] = { ...arr[i], url: e.target.value };
+                          onChange({ buttons: arr });
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              <div className="flex gap-1.5">
+                {replyCount < 3 && (
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => {
+                    onChange({ buttons: [...list, { id: `btn-${Date.now()}`, label: "", type: "reply" }] });
+                  }}><Plus className="h-3 w-3 mr-1" /> Resposta</Button>
+                )}
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => {
+                  onChange({ buttons: [...list, { id: `btn-${Date.now()}`, label: "", type: "url", url: "" }] });
+                }}><Plus className="h-3 w-3 mr-1" /> URL</Button>
               </div>
-            ))}
-            {(d.buttons ?? []).length < 3 && (
-              <Button size="sm" variant="outline" className="w-full" onClick={() => {
-                const arr = [...(d.buttons ?? []), { id: `btn-${Date.now()}`, label: "" }];
-                onChange({ buttons: arr });
-              }}><Plus className="h-3 w-3 mr-1" /> Adicionar botão</Button>
-            )}
-            <p className="text-[10px] text-muted-foreground">Cada botão é uma saída separada no canvas.</p>
-          </div>
-        )}
+              <p className="text-[10px] text-muted-foreground">Cada botão de <b>resposta</b> vira uma saída no canvas e o fluxo aguarda o clique. Botões de <b>URL</b> são apenas links clicáveis.</p>
+            </div>
+          );
+        })()}
 
         {node.type === "wait_message" && (() => {
           const totalSecs = Number(d.timeoutSeconds ?? 86400);
