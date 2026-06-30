@@ -385,14 +385,14 @@ type SendInput = {
 // Brazilian numbers: WhatsApp Cloud API expects mobile as 55 + DDD + 9 + 8 digits.
 // Many contacts arrive without the "9" (legacy 10-digit format). Insert it when missing.
 function normalizeBrWhatsappNumber(raw: string): string {
-  const digits = String(raw ?? "").replace(/\D/g, "");
-  if (!digits.startsWith("55")) return digits;
+  let digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
   // 55 + DDD(2) + number(8 or 9)
   if (digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
-    // Only add 9 if it looks like a mobile (first digit >= 6 in old plans, but safest: always)
-    if (rest.length === 8 && !rest.startsWith("9")) {
+    // WhatsApp BR mobile: add the extra 9 even when the old 8-digit number starts with 9.
+    if (rest.length === 8) {
       return `55${ddd}9${rest}`;
     }
   }

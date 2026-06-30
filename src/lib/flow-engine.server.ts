@@ -37,12 +37,12 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = API
 }
 
 function normalizeBrWhatsappNumber(raw: string): string {
-  const digits = String(raw ?? "").replace(/\D/g, "");
-  if (!digits.startsWith("55")) return digits;
+  let digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
   if (digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
-    if (rest.length === 8 && !rest.startsWith("9")) return `55${ddd}9${rest}`;
+    if (rest.length === 8) return `55${ddd}9${rest}`;
   }
   return digits;
 }

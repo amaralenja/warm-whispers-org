@@ -15,7 +15,7 @@ function normalizeBrPhone(raw: string): string {
   if (d.length === 12 && d.startsWith("55")) {
     const ddd = d.slice(2, 4);
     const rest = d.slice(4);
-    if (!rest.startsWith("9")) d = "55" + ddd + "9" + rest;
+    if (rest.length === 8) d = "55" + ddd + "9" + rest;
   }
   return d;
 }
