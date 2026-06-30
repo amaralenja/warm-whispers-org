@@ -67,24 +67,24 @@ type ChatMsg =
   | { role: "assistant"; content: string | null; tool_calls?: any[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
-const SYSTEM_PROMPT = `Você é a assistente de IA da Multum, atendendo no WhatsApp pelo número de notificações dos lembretes de call.
+const SYSTEM_PROMPT = `Você é a assistente de IA da Multum, atendendo no WhatsApp pelo número de notificações. Você fala com vendedores e membros do time.
 
-Seu trabalho: confirmar a resposta da pessoa de forma humana, curta e direta. Você responde a participantes que clicaram em um botão de confirmação de presença numa call agendada.
+Você pode:
+- Confirmar presença em call (showup/no-show/remarcada) quando a pessoa responder a um lembrete.
+- Listar as próximas calls da agenda.
+- Criar nova call no Google Calendar.
+- Remarcar call existente.
+- Cancelar call existente.
 
 Estilo:
 - Português BR informal, vibe de gente real, NUNCA robótica.
-- Mensagens curtas (1 a 3 frases). Sem floreio, sem "espero que esteja bem".
-- NUNCA use travessão (— ou –). Use vírgula ou ponto final.
-- Não invente datas, horários ou nomes que não foram informados.
-- Se a pessoa quiser remarcar, peça a nova data e horário em linguagem natural. Quando ela disser, chame a tool reschedule_call.
-- Se ela disser que já remarcou por conta própria, chame end_session com resumo "remarcou_sozinho".
-- Quando a conversa estiver resolvida (presença confirmada, ausência registrada, call remarcada), chame end_session pra fechar.
+- Mensagens curtas (1 a 3 frases). Sem floreio.
+- NUNCA use travessão (— ou –). Use vírgula ou ponto.
+- Não invente datas, horários ou nomes. Se faltar info, pergunte.
+- Sempre que for executar uma ação (criar, remarcar, cancelar), chame a tool correspondente em vez de prometer fazer depois.
+- Quando o assunto fechar, chame end_session.
 
-Contexto que você sempre tem:
-- A pessoa acabou de clicar em um botão de confirmação. O botão clicado vem como contexto no início da conversa.
-- Você tem acesso à tool reschedule_call (atualiza o evento no Google Calendar) e end_session (encerra a conversa).
-
-Importante: não fale "como uma IA", não se apresente formalmente. Aja como um membro do time confirmando a presença.`;
+Hoje é ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "full", timeStyle: "short" })} (America/Sao_Paulo). Use isso pra resolver "amanhã", "sexta", etc.`;
 
 function getOpenAIKey() {
   const key = process.env.OPENAI_API_KEY;
@@ -96,25 +96,43 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "reschedule_call",
-      description:
-        "Remarca a call da pessoa no Google Calendar. Use quando ela informar uma nova data e horário em qualquer formato natural (ex: 'amanhã 15h', 'sexta às 10', '08/01 14:30'). Resolva pra ISO 8601 no timezone America/Sao_Paulo antes de chamar.",
+      name: "list_upcoming_calls",
+      description: "Lista próximas calls do Google Calendar. Use quando o usuário pedir agenda, 'minhas calls', 'o que tenho hoje'.",
+      parameters: {
+        type: "object",
+        properties: { days_ahead: { type: "number", description: "Janela em dias. Default 7." } },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_call",
+      description: "Cria nova call no Google Calendar. Resolva data/hora pra ISO 8601 com offset -03:00.",
       parameters: {
         type: "object",
         properties: {
-          start_iso: {
-            type: "string",
-            description:
-              "Novo horário de início no formato ISO 8601 com offset -03:00 (ex: 2026-07-02T15:00:00-03:00).",
-          },
-          duration_minutes: {
-            type: "number",
-            description: "Duração em minutos. Default 60 se a pessoa não falar.",
-          },
-          motivo: {
-            type: "string",
-            description: "Motivo curto da remarcação (opcional).",
-          },
+          titulo: { type: "string" },
+          start_iso: { type: "string", description: "Início ISO 8601 com -03:00." },
+          duration_minutes: { type: "number", description: "Default 60." },
+          descricao: { type: "string" },
+        },
+        required: ["titulo", "start_iso"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reschedule_call",
+      description: "Remarca call existente. Se não houver event_id na sessão, chame list_upcoming_calls antes.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "ID do evento (opcional se a sessão já tem calendar_event_id)." },
+          start_iso: { type: "string", description: "Novo início ISO 8601 com -03:00." },
+          duration_minutes: { type: "number", description: "Default 60." },
+          motivo: { type: "string" },
         },
         required: ["start_iso"],
       },
@@ -123,18 +141,22 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "end_session",
-      description:
-        "Encerra a conversa quando o assunto estiver resolvido. Use sempre que tudo já estiver fechado (presença confirmada, no-show anotado, remarcada concluída ou pessoa disse que já remarcou).",
+      name: "cancel_call",
+      description: "Cancela (deleta) uma call do Google Calendar.",
       parameters: {
         type: "object",
-        properties: {
-          resumo: {
-            type: "string",
-            description:
-              "Resumo de 1 linha do desfecho (ex: 'remarcada para 02/07 15h', 'no_show registrado', 'remarcou_sozinho').",
-          },
-        },
+        properties: { event_id: { type: "string" } },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "end_session",
+      description: "Encerra a conversa quando o assunto estiver resolvido.",
+      parameters: {
+        type: "object",
+        properties: { resumo: { type: "string" } },
         required: ["resumo"],
       },
     },
@@ -383,7 +405,7 @@ export async function continueNotificationSession(opts: {
     return;
   }
 
-  const { data: sessRow } = await db
+  let { data: sessRow } = await db
     .from("wa_ai_sessions")
     .select("*")
     .eq("channel_id", channelId)
@@ -392,7 +414,30 @@ export async function continueNotificationSession(opts: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!sessRow) return;
+
+  // Cold session: criar uma nova quando a pessoa manda mensagem sem ter clicado em botão
+  if (!sessRow) {
+    const { data: inserted, error: insErr } = await db
+      .from("wa_ai_sessions")
+      .insert({
+        channel_id: channelId,
+        contact_wa: contactWa,
+        contact_name: null,
+        reminder_id: null,
+        calendar_event_id: null,
+        status: "active",
+        last_button: null,
+        messages: [],
+        context: { cold_start: true, started_at: new Date().toISOString() },
+      })
+      .select("*")
+      .single();
+    if (insErr || !inserted) {
+      console.error("[notif-ai] falha criando sessão fria", insErr);
+      return;
+    }
+    sessRow = inserted;
+  }
   const sess = sessRow as SessionRow;
 
   sess.messages = Array.isArray(sess.messages) ? sess.messages : [];
@@ -430,21 +475,60 @@ export async function continueNotificationSession(opts: {
       } catch {}
       let toolOut = "";
       try {
-        if (name === "reschedule_call") {
-          if (!sess.calendar_event_id) {
-            toolOut = JSON.stringify({ ok: false, error: "sem calendar_event_id na sessão" });
+        if (name === "list_upcoming_calls") {
+          const { gcal } = await import("@/lib/google-calendar.functions");
+          const days = Math.max(1, Math.min(60, Number(args.days_ahead || 7)));
+          const timeMin = new Date().toISOString();
+          const timeMax = new Date(Date.now() + days * 86400_000).toISOString();
+          const params = new URLSearchParams({
+            timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "20",
+          });
+          const r: any = await gcal(`/events?${params.toString()}`);
+          const items = (r?.items ?? []).map((ev: any) => ({
+            event_id: ev.id,
+            titulo: ev.summary,
+            inicio: ev.start?.dateTime || ev.start?.date,
+            fim: ev.end?.dateTime || ev.end?.date,
+          }));
+          toolOut = JSON.stringify({ ok: true, calls: items });
+        } else if (name === "create_call") {
+          const { gcal } = await import("@/lib/google-calendar.functions");
+          const startISO = String(args.start_iso || "");
+          const dur = Number(args.duration_minutes || 60);
+          const endISO = new Date(new Date(startISO).getTime() + dur * 60_000).toISOString();
+          const created: any = await gcal(`/events`, {
+            method: "POST",
+            body: JSON.stringify({
+              summary: String(args.titulo || "Call"),
+              description: args.descricao || "",
+              start: { dateTime: startISO, timeZone: "America/Sao_Paulo" },
+              end: { dateTime: endISO, timeZone: "America/Sao_Paulo" },
+            }),
+          });
+          toolOut = JSON.stringify({ ok: true, event_id: created?.id, inicio: startISO });
+        } else if (name === "reschedule_call") {
+          const eventId = String(args.event_id || sess.calendar_event_id || "");
+          if (!eventId) {
+            toolOut = JSON.stringify({ ok: false, error: "sem event_id; chame list_upcoming_calls antes" });
           } else {
             const startISO = String(args.start_iso || "");
             const dur = Number(args.duration_minutes || 60);
-            await rescheduleCalendarEvent(sess.calendar_event_id, startISO, dur);
-            // update reminder status
+            await rescheduleCalendarEvent(eventId, startISO, dur);
             if (sess.reminder_id) {
-              await db
-                .from("wa_call_reminders")
+              await db.from("wa_call_reminders")
                 .update({ status: "remarcada", replied_at: await nowISO() })
                 .eq("id", sess.reminder_id);
             }
             toolOut = JSON.stringify({ ok: true, novo_inicio: startISO, duracao: dur });
+          }
+        } else if (name === "cancel_call") {
+          const { gcal } = await import("@/lib/google-calendar.functions");
+          const eventId = String(args.event_id || sess.calendar_event_id || "");
+          if (!eventId) {
+            toolOut = JSON.stringify({ ok: false, error: "sem event_id; chame list_upcoming_calls antes" });
+          } else {
+            await gcal(`/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+            toolOut = JSON.stringify({ ok: true, cancelada: true });
           }
         } else if (name === "end_session") {
           sess.status = "closed";
@@ -460,7 +544,6 @@ export async function continueNotificationSession(opts: {
     }
 
     if (sess.status === "closed") {
-      // give the model one more pass to send a closing line, then break
       const wrap = await callOpenAI(sess.messages);
       const last = wrap?.choices?.[0]?.message?.content;
       if (last) {
