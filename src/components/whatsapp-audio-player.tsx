@@ -17,6 +17,7 @@ function formatTime(s: number) {
 }
 
 export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps) {
+  const safeUrl = typeof url === "string" ? url : "";
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
