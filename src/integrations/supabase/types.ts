@@ -1252,6 +1252,7 @@ export type Database = {
           meta: number | null
           nome: string
           permissoes: Json
+          telefone: string | null
           utm: string
           wa_channel_ids: string[]
           workspace_ids: string[] | null
@@ -1268,6 +1269,7 @@ export type Database = {
           meta?: number | null
           nome: string
           permissoes?: Json
+          telefone?: string | null
           utm: string
           wa_channel_ids?: string[]
           workspace_ids?: string[] | null
@@ -1284,6 +1286,7 @@ export type Database = {
           meta?: number | null
           nome?: string
           permissoes?: Json
+          telefone?: string | null
           utm?: string
           wa_channel_ids?: string[]
           workspace_ids?: string[] | null
