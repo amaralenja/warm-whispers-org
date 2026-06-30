@@ -693,6 +693,43 @@ Deno.serve(async (req) => {
 
         if (msgErr) console.error("[wa-webhook] upsert msg error", msgErr);
 
+        // Bridge: se canal for de notificação, dispara IA no app TanStack
+        try {
+          const { data: chRow } = await supabase
+            .from("wa_channels")
+            .select("kind")
+            .eq("id", channelId)
+            .maybeSingle();
+          if ((chRow as any)?.kind === "notification") {
+            const appUrl =
+              Deno.env.get("PUBLIC_APP_URL") ||
+              "https://project--4860a253-8e14-4836-a639-c7fb96d53545.lovable.app";
+            const bridgeSecret = Deno.env.get("EVOHUB_WEBHOOK_SECRET") || "";
+            const audioMediaId = m.audio?.id || (m.type === "audio" ? media?.id : null);
+            const imageMediaId = m.image?.id || (m.type === "image" ? media?.id : null);
+            const imageCaption = m.image?.caption || null;
+            // fire-and-forget (não bloqueia webhook)
+            fetch(`${appUrl}/api/public/notification-ai/continue`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${bridgeSecret}`,
+              },
+              body: JSON.stringify({
+                channelId,
+                contactWa: String(m.from),
+                text: m.text?.body ?? buttonText ?? null,
+                audioMediaId,
+                imageMediaId,
+                imageCaption,
+                phoneNumberId,
+              }),
+            }).catch((e) => console.warn("[wa-webhook] bridge fetch falhou", e?.message ?? e));
+          }
+        } catch (e) {
+          console.warn("[wa-webhook] bridge route erro", (e as any)?.message ?? e);
+        }
+
         // Baixa a mídia direto do Meta Graph e armazena no bucket wa-media para
         // que o chat renderize via media_url (sem precisar baixar via browser).
         if (media?.id && matched.token) {
