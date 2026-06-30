@@ -630,36 +630,28 @@ function ChatPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-52 rounded-2xl border-chat-line bg-popover">
-                      <DropdownMenuItem onClick={() => { setPendingType("image"); if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("image"); imageInputRef.current?.click(); }}>
                         <ImageIcon className="mr-2 h-4 w-4" /> Imagem
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("video"); if (fileInputRef.current) { fileInputRef.current.accept = "video/*"; fileInputRef.current.click(); } }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("video"); videoInputRef.current?.click(); }}>
                         <Video className="mr-2 h-4 w-4" /> Vídeo
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("audio"); if (fileInputRef.current) { fileInputRef.current.accept = "audio/*"; fileInputRef.current.click(); } }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("audio"); audioInputRef.current?.click(); }}>
                         <Mic className="mr-2 h-4 w-4" /> Áudio
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("document"); if (fileInputRef.current) { fileInputRef.current.accept = "*"; fileInputRef.current.click(); } }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("document"); docInputRef.current?.click(); }}>
                         <FileText className="mr-2 h-4 w-4" /> Documento
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept={
-                      pendingType === "image" ? "image/*"
-                      : pendingType === "video" ? "video/*"
-                      : pendingType === "audio" ? "audio/*"
-                      : "*"
-                    }
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) openPreviewOrSend(f);
-                      e.target.value = "";
-                    }}
-                  />
+                  <input ref={imageInputRef} type="file" className="hidden" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/*"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPendingType("image"); openPreviewOrSend(f); } e.target.value = ""; }} />
+                  <input ref={videoInputRef} type="file" className="hidden" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/*"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPendingType("video"); openPreviewOrSend(f); } e.target.value = ""; }} />
+                  <input ref={audioInputRef} type="file" className="hidden" accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/*"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPendingType("audio"); openPreviewOrSend(f); } e.target.value = ""; }} />
+                  <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPendingType("document"); openPreviewOrSend(f); } e.target.value = ""; }} />
                   <Textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
