@@ -415,9 +415,13 @@ function QuizPage() {
 
   const grouped = useMemo(() => {
     const g: Record<OriginKey, Lead[]> = { facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
-    for (const l of sortedLeads) g[classifyLead(l).key].push(l);
-    return g;
-  }, [sortedLeads]);
+    const fakes: Lead[] = [];
+    for (const l of sortedLeads) {
+      if (!leadIsReal(l)) { fakes.push(l); continue; }
+      g[classifyLead(l).key].push(l);
+    }
+    return { ...g, fakes };
+  }, [sortedLeads, overrides]);
 
   function refresh() {
     setLiveCount(0);
