@@ -12,14 +12,19 @@ async function dbFor(context: any) {
 function vendorWorkspaceIds(context: any): string[] | null {
   if (!context?.vendor) return null;
   const ids = context.vendor.workspace_ids;
-  if (Array.isArray(ids)) return ids.map(String).filter(Boolean);
-  return context.vendor.expert ? [String(context.vendor.expert)] : [];
+  const expert = context.vendor.expert ? [String(context.vendor.expert)] : [];
+  if (Array.isArray(ids)) {
+    const list = ids.map(String).filter(Boolean);
+    // Empty array → cai pro expert do vendedor pra não bloquear acesso.
+    return list.length > 0 ? list : expert;
+  }
+  return expert;
 }
 
 function applyVendorWorkspaceFilter(context: any, q: any) {
   const allowed = vendorWorkspaceIds(context);
   if (!allowed) return q;
-  if (allowed.length === 0) return null;
+  if (allowed.length === 0) return q; // sem expert → não filtra (mostra geral)
   return q.in("expert", allowed);
 }
 
