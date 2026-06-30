@@ -409,23 +409,28 @@ function ChatPage() {
     const type = opts?.type ?? pendingType;
     const caption = opts?.caption ?? "";
     toast.loading("Enviando mídia…", { id: "wa-media-upload" });
-    const uploaded = await uploadMediaFn({ data: {
-      channelId: active.channel_id,
-      conversationId: active.id,
-      filename: file.name,
-      contentType: file.type || "application/octet-stream",
-      base64: await fileToBase64(file),
-    }});
-    sendMut.mutate({
-      channelId: active.channel_id,
-      conversationId: active.id,
-      to: active.contact_wa_id,
-      type,
-      mediaUrl: uploaded.signedUrl,
-      filename: file.name,
-      caption: caption.trim() || undefined,
-    });
-    toast.dismiss("wa-media-upload");
+    try {
+      const uploaded = await uploadMediaFn({ data: {
+        channelId: active.channel_id,
+        conversationId: active.id,
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        base64: await fileToBase64(file),
+      }});
+      sendMut.mutate({
+        channelId: active.channel_id,
+        conversationId: active.id,
+        to: active.contact_wa_id,
+        type,
+        mediaUrl: uploaded.signedUrl,
+        filename: file.name,
+        caption: caption.trim() || undefined,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload falhou");
+    } finally {
+      toast.dismiss("wa-media-upload");
+    }
   }
 
   function openPreviewOrSend(file: File, typeOverride?: typeof pendingType) {
