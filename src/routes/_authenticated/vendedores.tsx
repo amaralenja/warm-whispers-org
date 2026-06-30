@@ -242,10 +242,24 @@ function VendedoresPage() {
                 </div>
               </div>
 
+              <button
+                onClick={() => setPermVendor(v)}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-background/40 px-3 py-1.5 text-[0.7rem] font-medium text-muted-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-400"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Gerenciar acessos
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      <VendorPermissionsDialog
+        open={!!permVendor}
+        onOpenChange={(v) => !v && setPermVendor(null)}
+        vendorId={permVendor?.id ?? null}
+        vendorName={permVendor?.nome ?? null}
+      />
     </div>
   );
 }
