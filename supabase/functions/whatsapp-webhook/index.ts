@@ -483,7 +483,9 @@ async function transcribeAudioWithOpenAI(bytes: Uint8Array, mime: string): Promi
   const form = new FormData();
   form.append("model", "whisper-1");
   form.append("language", "pt");
-  form.append("file", new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)], { type: mime || "audio/ogg" }), `audio.${ext}`);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  form.append("file", new Blob([copy.buffer], { type: mime || "audio/ogg" }), `audio.${ext}`);
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
