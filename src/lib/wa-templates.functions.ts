@@ -11,7 +11,7 @@ const EVOHUB_BASE = "https://api.evohub.ai";
  */
 function buildBodyAndVars(text: string) {
   const order: string[] = [];
-  const body = text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, name) => {
+  let body = text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, name) => {
     let idx = order.indexOf(name);
     if (idx === -1) {
       order.push(name);
@@ -19,6 +19,11 @@ function buildBodyAndVars(text: string) {
     }
     return `{{${idx + 1}}}`;
   });
+  // Meta rule (subcode 2388299): variables cannot be at the very start or end.
+  // Pad with a zero-width-ish marker (a dot) if needed.
+  const trimmed = body.trim();
+  if (/^\{\{\d+\}\}/.test(trimmed)) body = `. ${body}`;
+  if (/\{\{\d+\}\}$/.test(trimmed)) body = `${body} .`;
   return { body, vars: order };
 }
 
