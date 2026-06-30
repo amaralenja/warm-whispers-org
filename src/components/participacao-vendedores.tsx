@@ -39,14 +39,15 @@ export function ParticipacaoVendedores({
   vendedores,
   loading,
 }: {
-  vendedores: VendedorStat[];
+  vendedores?: VendedorStat[] | null;
   loading?: boolean;
 }) {
+  const safeVendedores: VendedorStat[] = Array.isArray(vendedores) ? vendedores : [];
   const [hover, setHover] = useState<number | null>(null);
 
   const total = useMemo(
-    () => vendedores.reduce((acc, v) => acc + v.faturamento, 0),
-    [vendedores],
+    () => safeVendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0),
+    [safeVendedores],
   );
 
   // Donut: top 6, agrupa o resto como "Outros"
