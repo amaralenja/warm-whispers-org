@@ -142,6 +142,7 @@ async function metaProxyForChannel(ch: { token: string; phoneNumberId?: string }
       message.includes("Unsupported get request") ||
       message.includes("missing permissions") ||
       message.includes("OAuth") ||
+      message.includes("INTERNAL") ||
       message.includes("401") ||
       message.includes("400") ||
       message.includes("500");
