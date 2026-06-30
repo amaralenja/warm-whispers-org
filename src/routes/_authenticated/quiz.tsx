@@ -1064,7 +1064,7 @@ async function igDrain() {
   }
 }
 
-function IgRow({ username }: { username: string }) {
+function IgRow({ username, autoVerify = true }: { username: string; autoVerify?: boolean }) {
   const key = (username || "").toLowerCase().trim().replace(/^@/, "").replace(/\/+$/, "");
   const isValidHandle = /^[a-z0-9._]+$/i.test(key);
   const { map, setLocal } = useContext(IgDbContext);
