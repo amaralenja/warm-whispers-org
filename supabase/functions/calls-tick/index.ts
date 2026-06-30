@@ -394,16 +394,26 @@ Deno.serve(async (req) => {
         .filter(Boolean);
 
       let phones: Array<{ nome?: string; phone: string; email?: string }> = [];
+      let clientName = "";
       if (attendees.length) {
         const { data: leads } = await db.from("crm_leads").select("nome,telefone,email").in("email", attendees);
         phones = (leads ?? [])
           .filter((l: any) => l?.telefone)
           .map((l: any) => ({ nome: l.nome, phone: l.telefone, email: l.email }));
+        const namedLead = (leads ?? []).find((l: any) => l?.nome);
+        if (namedLead) clientName = String(namedLead.nome);
       }
 
       if (!phones.length && ev.description) {
         const m = String(ev.description).match(/(\+?\d[\d\s().-]{8,})/g);
         if (m) phones = m.slice(0, 5).map((p) => ({ phone: p.replace(/\D/g, "") }));
+      }
+
+      // Nome do cliente da call: prioriza lead encontrado, senão deriva do título do evento
+      if (!clientName) {
+        const summary = String(ev.summary ?? "").trim();
+        const cleaned = summary.replace(/^(call|reuni[aã]o|meeting|consultoria)[\s:–\-]+/i, "").trim();
+        clientName = cleaned || summary;
       }
 
       const seen = new Set(phones.map((p) => normalizeBrPhone(p.phone)));
@@ -424,7 +434,8 @@ Deno.serve(async (req) => {
       const convidados = attendees.join(", ");
 
       for (const p of phones) {
-        const shared = { eventId: String(ev.id), to: p.phone, nome: p.nome ?? "", hora, convidados, leadEmail: p.email };
+        // {{nome}} no template = nome do CLIENTE da call (não do destinatário do aviso)
+        const shared = { eventId: String(ev.id), to: p.phone, nome: clientName || p.nome || "", hora, convidados, leadEmail: p.email };
         try {
           if (diffMin > 2 && diffMin <= 35) {
             results.push({ kind: "reminder", eventId: ev.id, to: normalizeBrPhone(p.phone), ...(await sendCallReminder(db, shared)) });
