@@ -517,8 +517,8 @@ function ChannelCard({
     refetchInterval: 120_000,
   });
 
-  const phone = q?.displayPhoneNumber ?? ch.metadata?.meta_connection?.phone_number ?? null;
-  const display = q?.verifiedName ?? ch.metadata?.meta_connection?.display_name ?? ch.name;
+  const phone = q?.displayPhoneNumber ?? (ch as any)?.displayPhoneNumber ?? ch.metadata?.meta_connection?.phone_number ?? ch.metadata?.meta_connection?.phone_numbers?.[0]?.display_phone_number ?? null;
+  const display = q?.verifiedName ?? (ch as any)?.verifiedName ?? ch.metadata?.meta_connection?.display_name ?? ch.metadata?.meta_connection?.phone_numbers?.[0]?.verified_name ?? ch.name;
 
   // Simplified state: if active → conectado; pending → aguardando; else → caiu
   const state: "conectado" | "aguardando" | "caiu" =
