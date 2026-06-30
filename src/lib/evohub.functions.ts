@@ -283,9 +283,10 @@ export const syncWhatsappChannelByName = createServerFn({ method: "POST" })
 
 export const createWhatsappChannel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { name: string; operacaoId: string }) => ({
+  .inputValidator((d: { name: string; operacaoId: string; kind?: "chat" | "notification" }) => ({
     name: String(d?.name ?? "").trim(),
     operacaoId: String(d?.operacaoId ?? "").trim(),
+    kind: d?.kind === "notification" ? "notification" : "chat" as "chat" | "notification",
   }))
   .handler(async ({ context, data }) => {
     if (!data.name) throw new Error("Nome obrigatório");
@@ -295,12 +296,13 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
       body: JSON.stringify({
         name: data.name,
         type: "whatsapp",
-        metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE },
+        metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE, kind: data.kind },
       }),
     });
-    await upsertLocalChannel(context.supabase, ch, data.operacaoId);
-    return withConnectUrl(ch);
+    await upsertLocalChannel(context.supabase, { ...ch, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, data.operacaoId);
+    return withConnectUrl({ ...ch, kind: data.kind });
   });
+
 
 
 export const setChannelOperacao = createServerFn({ method: "POST" })
