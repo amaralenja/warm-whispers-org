@@ -328,6 +328,19 @@ function TasksPage() {
           </Button>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => {
+              if (!activeBoardId) return toast.error("Selecione um quadro");
+              const firstCol = columns[0];
+              if (!firstCol) return toast.error("Crie uma coluna primeiro");
+              setCreatingInColumn(firstCol.id);
+            }}
+            disabled={!activeBoardId || columns.length === 0}
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            <Plus className="mr-1 h-4 w-4" /> Nova tarefa
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowMembers(true)}>
             <UsersIcon className="mr-1 h-4 w-4" /> Equipe ({members.length})
           </Button>
@@ -338,7 +351,8 @@ function TasksPage() {
       </div>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-gradient-to-br from-background to-background/70">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-fancy bg-gradient-to-br from-background to-background/70">
+
         {!activeBoard ? (
           <div className="flex h-full items-center justify-center text-muted-foreground">
             {boardsQ.isLoading ? "Carregando..." : "Nenhum quadro. Crie o primeiro!"}
