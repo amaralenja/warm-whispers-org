@@ -218,3 +218,60 @@ export const listNotificationChannels = createServerFn({ method: "POST" })
       };
     });
   });
+
+/**
+ * Sincroniza status (APPROVED/PENDING/REJECTED) com a Meta para todos os
+ * templates já enviados (que têm meta_template_id e meta_channel_id).
+ */
+export const syncMetaTemplates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const key = process.env.EVOHUB_API_KEY;
+    if (!key) throw new Error("EVOHUB_API_KEY não configurada");
+
+    const { data: rows, error } = await context.supabase
+      .from("wa_templates" as any)
+      .select("id, meta_template_id, meta_channel_id, slug, nome")
+      .not("meta_template_id", "is", null);
+    if (error) throw new Error(error.message);
+
+    const listRes = await fetch(`${EVOHUB_BASE}/api/v1/channels`, {
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    });
+    const listJson: any = await listRes.json().catch(() => null);
+    const list: any[] = Array.isArray(listJson) ? listJson : listJson?.data ?? listJson?.channels ?? [];
+
+    let updated = 0;
+    for (const row of (rows ?? []) as any[]) {
+      const ch = list.find((c) => String(c.id) === String(row.meta_channel_id));
+      if (!ch) continue;
+      const meta = typeof ch.metadata === "string" ? JSON.parse(ch.metadata) : (ch.metadata ?? {});
+      const metaConn = ch.meta_connection ?? meta?.meta_connection ?? null;
+      const wabaId: string | undefined =
+        metaConn?.waba_id ?? metaConn?.business_account_id ?? metaConn?.whatsapp_business_account_id ??
+        ch?.waba_id ?? meta?.waba_id;
+      const chToken: string | undefined = ch.token ?? ch.api_token ?? meta?.token;
+      if (!wabaId || !chToken) continue;
+
+      const res = await fetch(
+        `${EVOHUB_BASE}/meta/${wabaId}/message_templates?fields=name,status,category,id,rejected_reason&limit=200`,
+        { headers: { Authorization: `Bearer ${chToken}`, "Content-Type": "application/json" } },
+      );
+      const json: any = await res.json().catch(() => null);
+      const tpls: any[] = Array.isArray(json?.data) ? json.data : [];
+      const match = tpls.find((t) => String(t.id) === String(row.meta_template_id))
+        ?? tpls.find((t) => String(t.name) === String(row.slug ?? row.nome));
+      if (!match) continue;
+
+      await context.supabase
+        .from("wa_templates" as any)
+        .update({
+          meta_status: match.status ?? null,
+          meta_category: match.category ?? null,
+        })
+        .eq("id", row.id);
+      updated += 1;
+    }
+    return { ok: true, updated, total: (rows ?? []).length };
+  });
+
