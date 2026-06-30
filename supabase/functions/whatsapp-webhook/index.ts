@@ -359,6 +359,307 @@ function normalizeTimestamp(value: any): string {
   return Number.isFinite(parsed) ? String(Math.floor(parsed / 1000)) : String(Math.floor(Date.now() / 1000));
 }
 
+function normalizeBrWhatsappNumber(raw: string): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits.startsWith("55")) return digits;
+  if (digits.length === 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    if (rest.length === 8 && !rest.startsWith("9")) return `55${ddd}9${rest}`;
+  }
+  return digits;
+}
+
+function brPhoneVariants(raw: string): string[] {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return [];
+  let local = digits.startsWith("55") ? digits.slice(2) : digits;
+  local = local.replace(/^0+/, "");
+  if (local.length < 10 || local.length > 11) return [digits];
+  const ddd = local.slice(0, 2);
+  const rest = local.slice(2);
+  const sem9 = rest.length === 9 && rest.startsWith("9") ? rest.slice(1) : rest.length === 8 ? rest : null;
+  const com9 = rest.length === 8 ? "9" + rest : rest.length === 9 ? rest : null;
+  const out = new Set<string>([digits]);
+  if (sem9) {
+    out.add(`55${ddd}${sem9}`);
+    out.add(`${ddd}${sem9}`);
+  }
+  if (com9) {
+    out.add(`55${ddd}${com9}`);
+    out.add(`${ddd}${com9}`);
+  }
+  return Array.from(out);
+}
+
+async function isAiAllowedContact(supabase: any, contactWa: string): Promise<boolean> {
+  const variants = brPhoneVariants(contactWa);
+  if (!variants.length) return false;
+  const [{ data: vend }, { data: team }] = await Promise.all([
+    supabase.from("vendedores").select("telefone").not("telefone", "is", null),
+    supabase.from("team_members").select("telefone").not("telefone", "is", null),
+  ]);
+  const all = new Set<string>();
+  for (const row of (vend ?? []) as any[]) brPhoneVariants(row.telefone).forEach((v) => all.add(v));
+  for (const row of (team ?? []) as any[]) brPhoneVariants(row.telefone).forEach((v) => all.add(v));
+  return variants.some((v) => all.has(v));
+}
+
+function money(v: any): string {
+  const n = Number(v || 0);
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function todayIsoDate() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+function monthRange() {
+  const parts = todayIsoDate().split("-");
+  return { start: `${parts[0]}-${parts[1]}-01`, today: todayIsoDate() };
+}
+
+function vendasDateExpr() {
+  return `coalesce(to_date(nullif("Data",''), 'YYYY-MM-DD'), to_date(nullif("Data",''), 'DD/MM/YYYY'))`;
+}
+
+async function getAiSnapshot(supabase: any, contactWa: string, userText: string): Promise<string> {
+  const today = todayIsoDate();
+  const { start } = monthRange();
+  const normalized = normalizeText(userText);
+  const wantsFull = /relatorio|resumo|dashboard|geral|tudo|hoje|venda|lead|task|tarefa|financeiro|quiz|call|ads|anuncio|facebook/.test(normalized);
+  if (!wantsFull) return "";
+
+  const [salesToday, leadsToday, tasks, financeMonth, quizToday, callsToday, callsMonth, capiToday] = await Promise.all([
+    supabase.from("vendas").select('"Ticket",nome_expert,"Nome","Data"'),
+    supabase.from("crm_leads").select("id,expert,status,responsavel_nome,created_at").gte("created_at", `${today}T00:00:00-03:00`),
+    supabase.from("tasks").select("titulo,prazo,prioridade,concluida,assignee_ids").eq("concluida", false).order("prazo", { ascending: true }).limit(20),
+    supabase.from("financeiro").select("tipo,valor,status,data_ref,data_vencimento").gte("data_ref", start).lte("data_ref", today),
+    supabase.from("ht_leads").select("id,status,valor,created_at").gte("created_at", `${today}T00:00:00-03:00`),
+    supabase.from("wa_call_reminders").select("status,kind,hora,lead_nome,created_at").gte("created_at", `${today}T00:00:00-03:00`),
+    supabase.from("wa_call_reminders").select("status,kind,created_at").gte("created_at", `${start}T00:00:00-03:00`),
+    supabase.from("meta_ads_event_logs").select("event_name,status,value,created_at").gte("created_at", `${today}T00:00:00-03:00`),
+  ]);
+
+  const salesRows = ((salesToday.data ?? []) as any[]).filter((r) => String(r.Data ?? "").includes(today) || String(r.Data ?? "").includes(today.split("-").reverse().join("/")));
+  const salesTotal = salesRows.reduce((acc, r) => acc + Number(String(r.Ticket ?? "0").replace(/[^\d,.-]/g, "").replace(".", "").replace(",", ".") || 0), 0);
+  const bySeller = new Map<string, { count: number; value: number }>();
+  for (const r of salesRows) {
+    const name = r.nome_expert || "Sem vendedor";
+    const val = Number(String(r.Ticket ?? "0").replace(/[^\d,.-]/g, "").replace(".", "").replace(",", ".") || 0);
+    const cur = bySeller.get(name) ?? { count: 0, value: 0 };
+    cur.count += 1; cur.value += val; bySeller.set(name, cur);
+  }
+  const topSeller = Array.from(bySeller.entries()).sort((a, b) => b[1].value - a[1].value)[0];
+
+  const leadRows = (leadsToday.data ?? []) as any[];
+  const quizRows = (quizToday.data ?? []) as any[];
+  const financeRows = (financeMonth.data ?? []) as any[];
+  const entradas = financeRows.filter((r) => normalizeText(r.tipo) === "entrada").reduce((a, r) => a + Number(r.valor || 0), 0);
+  const saidas = financeRows.filter((r) => normalizeText(r.tipo) === "saida" || normalizeText(r.tipo) === "despesa").reduce((a, r) => a + Number(r.valor || 0), 0);
+  const callRowsToday = (callsToday.data ?? []) as any[];
+  const callRowsMonth = (callsMonth.data ?? []) as any[];
+  const callCount = (rows: any[], status: string) => rows.filter((r) => normalizeText(r.status) === normalizeText(status)).length;
+  const tasksRows = (tasks.data ?? []) as any[];
+  const adsRows = (capiToday.data ?? []) as any[];
+
+  return [
+    `CONTEXTO REAL DO SISTEMA (${today}, BRT):`,
+    `Vendas hoje: ${salesRows.length} venda(s), total ${money(salesTotal)}. Top vendedor: ${topSeller ? `${topSeller[0]} (${topSeller[1].count} venda(s), ${money(topSeller[1].value)})` : "sem vendas registradas"}.`,
+    `Leads CRM hoje: ${leadRows.length}. Por status: ${JSON.stringify(leadRows.reduce((a: any, r) => (a[r.status || "sem_status"] = (a[r.status || "sem_status"] || 0) + 1, a), {}))}.`,
+    `Quiz/HighTicket hoje: ${quizRows.length} lead(s); qualificados 5k-10k+: ${quizRows.filter((r) => Number(r.valor || 0) >= 5000).length}.`,
+    `Tasks pendentes carregadas: ${tasksRows.length}. Próximas: ${tasksRows.slice(0, 5).map((t) => `${t.titulo} (${t.prazo || "sem prazo"})`).join("; ") || "nenhuma"}.`,
+    `Financeiro mês: entradas ${money(entradas)}, saídas ${money(saidas)}, saldo ${money(entradas - saidas)}.`,
+    `Calls hoje registradas no sistema: ${callRowsToday.length}; show up ${callCount(callRowsToday, "show_up")}; no-show ${callCount(callRowsToday, "no_show")}; remarcadas ${callCount(callRowsToday, "rescheduled")}.`,
+    `Calls mês registradas: ${callRowsMonth.length}; show up ${callCount(callRowsMonth, "show_up")}; no-show ${callCount(callRowsMonth, "no_show")}; remarcadas ${callCount(callRowsMonth, "rescheduled")}.`,
+    `Eventos Meta/CAPI hoje: ${adsRows.length}. Atenção: gasto de Ads depende da conexão Meta Ads estar configurada no módulo.`,
+  ].join("\n");
+}
+
+async function transcribeAudioWithOpenAI(bytes: Uint8Array, mime: string): Promise<string> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) return "";
+  const ext = extToMime(mime || "audio/ogg");
+  const form = new FormData();
+  form.append("model", "whisper-1");
+  form.append("language", "pt");
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  form.append("file", new Blob([copy.buffer], { type: mime || "audio/ogg" }), `audio.${ext}`);
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`OpenAI transcription HTTP ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  return String(json.text || "").trim();
+}
+
+async function describeImageWithOpenAI(bytes: Uint8Array, mime: string, caption?: string | null): Promise<string> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) return caption || "imagem recebida";
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  const dataUrl = `data:${mime || "image/jpeg"};base64,${btoa(binary)}`;
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      messages: [{ role: "user", content: [
+        { type: "text", text: `Descreva em português, objetivamente, a imagem recebida no WhatsApp. Legenda: ${caption || "sem legenda"}` },
+        { type: "image_url", image_url: { url: dataUrl } },
+      ] }],
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenAI vision HTTP ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  return String(json.choices?.[0]?.message?.content || caption || "imagem recebida").trim();
+}
+
+async function composeAiReply(supabase: any, contactWa: string, userText: string): Promise<string> {
+  const clean = userText.trim();
+  const norm = normalizeText(clean);
+  if (/^(opa|oi|ol[áa]|bom dia|boa tarde|boa noite|e ai|e aí|\.)\W*$/.test(norm)) {
+    return "Opa, tudo bem? Como posso te ajudar hoje? Pode pedir relatório, vendas, leads, tarefas, calls, financeiro, quiz ou Ads.";
+  }
+  const snapshot = await getAiSnapshot(supabase, contactWa, clean);
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) {
+    const appReply = await composeAiReplyViaApp(clean, snapshot).catch((e) => {
+      console.warn("[notif-ai edge] app OpenAI fallback falhou", (e as any)?.message ?? e);
+      return "";
+    });
+    if (appReply) return appReply;
+    if (snapshot) return `Fechou, chefe. Segue o que achei:\n\n${snapshot}`;
+    return "Fechou, chefe. Recebi sua mensagem, mas a chave da OpenAI não está disponível no webhook agora. Me pede um relatório que eu te retorno com os dados do sistema.";
+  }
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.35,
+        messages: [
+          { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e útil, com linguagem informal profissional. Nunca invente número: use só o contexto real quando houver. Se pedirem uma ação que ainda exige confirmação, peça os dados faltantes." },
+          ...(snapshot ? [{ role: "system", content: snapshot }] : []),
+          { role: "user", content: clean },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`OpenAI chat HTTP ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    return String(json.choices?.[0]?.message?.content || "Fechou, chefe. Como posso te ajudar?").trim();
+  } catch (e) {
+    const appReply = await composeAiReplyViaApp(clean, snapshot).catch(() => "");
+    if (appReply) return appReply;
+    throw e;
+  }
+}
+
+async function composeAiReplyViaApp(userText: string, snapshot: string): Promise<string> {
+  const appUrl = Deno.env.get("NOTIFICATION_AI_APP_URL") || "https://project--4860a253-8e14-4836-a639-c7fb96d53545-dev.lovable.app";
+  const bridgeSecret = Deno.env.get("EVOHUB_WEBHOOK_SECRET") || "";
+  const res = await fetch(`${appUrl}/api/public/notification-ai/reply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bridgeSecret}` },
+    body: JSON.stringify({ userText, snapshot }),
+  });
+  if (!res.ok) throw new Error(`app reply HTTP ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  return String(json?.reply || "").trim();
+}
+
+async function postWaText(token: string, phoneNumberId: string, to: string, text: string) {
+  const payload = { messaging_product: "whatsapp", to: normalizeBrWhatsappNumber(to), type: "text", text: { body: text, preview_url: false } };
+  let res = await fetch(`${EVOHUB_BASE}/meta/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  let bodyText = await res.text();
+  let json: any = null;
+  try { json = bodyText ? JSON.parse(bodyText) : null; } catch { json = bodyText; }
+  if (!res.ok) throw new Error(`Meta send HTTP ${res.status}: ${bodyText}`);
+  return { waMsgId: json?.messages?.[0]?.id ?? null, payload };
+}
+
+async function persistAiSession(supabase: any, channelId: string, contactWa: string, userText: string, assistantText: string) {
+  const { data: existing } = await supabase
+    .from("wa_ai_sessions")
+    .select("id,messages")
+    .eq("channel_id", channelId)
+    .eq("contact_wa", contactWa)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const messages = Array.isArray(existing?.messages) ? existing.messages : [];
+  messages.push({ role: "user", content: userText, at: new Date().toISOString() });
+  messages.push({ role: "assistant", content: assistantText, at: new Date().toISOString() });
+  if (existing?.id) {
+    await supabase.from("wa_ai_sessions").update({ messages, updated_at: new Date().toISOString() }).eq("id", existing.id);
+  } else {
+    await supabase.from("wa_ai_sessions").insert({ channel_id: channelId, contact_wa: contactWa, status: "active", messages, context: {} });
+  }
+}
+
+async function runNotificationAiEdge(opts: {
+  supabase: any;
+  matched: ChannelInfo;
+  channelId: string;
+  phoneNumberId: string | null;
+  conversationId: string;
+  from: string;
+  message: any;
+  buttonText?: string | null;
+  media?: any;
+}) {
+  const { supabase, matched, channelId, phoneNumberId, conversationId, from, message: m, buttonText, media } = opts;
+  if (!phoneNumberId) throw new Error("notification channel sem phone_number_id");
+  const allowed = await isAiAllowedContact(supabase, from);
+  if (!allowed) {
+    console.log("[notif-ai edge] contato fora da allowlist", { from });
+    return;
+  }
+  let userText = String(m.text?.body ?? buttonText ?? media?.caption ?? "").trim();
+  const token = await resolveUsableToken(matched);
+  if (!token) throw new Error("notification channel sem token utilizável");
+
+  if (!userText && media?.id && (m.type === "audio" || m.type === "image")) {
+    const downloaded = await downloadMetaMedia(token, media.id);
+    if (downloaded && m.type === "audio") userText = await transcribeAudioWithOpenAI(downloaded.bytes, downloaded.mime);
+    if (downloaded && m.type === "image") userText = await describeImageWithOpenAI(downloaded.bytes, downloaded.mime, media.caption);
+  }
+  if (!userText) userText = `[${m.type || "mensagem"} recebida]`;
+
+  const reply = await composeAiReply(supabase, from, userText);
+  const { waMsgId, payload } = await postWaText(token, phoneNumberId, from, reply);
+  await persistAiSession(supabase, channelId, from, userText, reply);
+  await supabase.from("wa_messages").insert({
+    conversation_id: conversationId,
+    channel_id: channelId,
+    wa_message_id: waMsgId,
+    direction: "out",
+    msg_type: "text",
+    text_body: reply,
+    from_wa_id: phoneNumberId,
+    to_wa_id: normalizeBrWhatsappNumber(from),
+    raw: payload,
+    status: "sent",
+  });
+  await supabase.from("wa_conversations").update({
+    last_message_at: new Date().toISOString(),
+    last_message_preview: reply.slice(0, 120),
+    last_message_direction: "out",
+  }).eq("id", conversationId);
+  console.log("[notif-ai edge] respondeu", { channelId, from, waMsgId });
+}
+
 function stableHash(input: string) {
   let hash = 0;
   for (let i = 0; i < input.length; i++) hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
@@ -693,7 +994,8 @@ Deno.serve(async (req) => {
 
         if (msgErr) console.error("[wa-webhook] upsert msg error", msgErr);
 
-        // Bridge: se canal for de notificação, dispara IA no app TanStack
+        // IA do número de notificações: roda aqui dentro da Edge Function, com service role real.
+        // Mantém o bridge TanStack só como fallback legado; o app publicado não tem service role.
         try {
           const { data: chRow } = await supabase
             .from("wa_channels")
@@ -701,33 +1003,20 @@ Deno.serve(async (req) => {
             .eq("id", channelId)
             .maybeSingle();
           if ((chRow as any)?.kind === "notification") {
-            const appUrl =
-              Deno.env.get("PUBLIC_APP_URL") ||
-              "https://project--4860a253-8e14-4836-a639-c7fb96d53545.lovable.app";
-            const bridgeSecret = Deno.env.get("EVOHUB_WEBHOOK_SECRET") || "";
-            const audioMediaId = m.audio?.id || (m.type === "audio" ? media?.id : null);
-            const imageMediaId = m.image?.id || (m.type === "image" ? media?.id : null);
-            const imageCaption = m.image?.caption || null;
-            // fire-and-forget (não bloqueia webhook)
-            fetch(`${appUrl}/api/public/notification-ai/continue`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${bridgeSecret}`,
-              },
-              body: JSON.stringify({
-                channelId,
-                contactWa: String(m.from),
-                text: m.text?.body ?? buttonText ?? null,
-                audioMediaId,
-                imageMediaId,
-                imageCaption,
-                phoneNumberId,
-              }),
-            }).catch((e) => console.warn("[wa-webhook] bridge fetch falhou", e?.message ?? e));
+            await runNotificationAiEdge({
+              supabase,
+              matched,
+              channelId,
+              phoneNumberId,
+              conversationId: (conv as any).id,
+              from: String(m.from),
+              message: m,
+              buttonText,
+              media,
+            });
           }
         } catch (e) {
-          console.warn("[wa-webhook] bridge route erro", (e as any)?.message ?? e);
+          console.warn("[notif-ai edge] erro", (e as any)?.message ?? e);
         }
 
         // Baixa a mídia direto do Meta Graph e armazena no bucket wa-media para
