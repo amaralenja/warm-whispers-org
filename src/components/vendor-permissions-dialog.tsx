@@ -113,16 +113,31 @@ export function VendorPermissionsDialog({
     };
   }, [open, vendorId]);
 
+  const visibleChannels = useMemo(
+    () => channels.filter((c) => c.operacao_id && workspaceIds.includes(c.operacao_id)),
+    [channels, workspaceIds],
+  );
+
   const groupedChannels = useMemo(() => {
     const m = new Map<string, Channel[]>();
-    for (const c of channels) {
+    for (const c of visibleChannels) {
       const k = c.operacao_id || "Outros";
       const arr = m.get(k) ?? [];
       arr.push(c);
       m.set(k, arr);
     }
     return Array.from(m.entries());
-  }, [channels]);
+  }, [visibleChannels]);
+
+  // Sempre que um workspace é desmarcado, remove canais daquele workspace da seleção
+  useEffect(() => {
+    const allowed = new Set(visibleChannels.map((c) => c.id));
+    setChannelIds((prev) => {
+      const next = prev.filter((id) => allowed.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [visibleChannels]);
+
 
   function setLeaf(groupKey: string, leafKey: string, v: boolean) {
     setPermissoes((prev) => {
@@ -206,7 +221,7 @@ export function VendorPermissionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto scrollbar-fancy">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5 text-emerald-400" />
@@ -302,10 +317,15 @@ export function VendorPermissionsDialog({
               <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <Phone className="h-3.5 w-3.5" /> Números de WhatsApp atendidos
               </h4>
-              {channels.length === 0 ? (
+              {workspaceIds.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                  Nenhum canal cadastrado.
+                  Selecione ao menos um workspace acima para liberar números.
                 </div>
+              ) : visibleChannels.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  Nenhum número de WhatsApp conectado nos workspaces selecionados ainda.
+                </div>
+
               ) : (
                 <div className="space-y-3">
                   {groupedChannels.map(([op, list]) => (
