@@ -239,3 +239,141 @@ export const sendCallAttendance = createServerFn({ method: "POST" })
       throw new Error(e?.message ?? "Falha ao enviar comparecimento");
     }
   });
+
+// ===== Internal helpers callable from cron / admin code (no auth middleware) =====
+
+export async function sendCallReminderInternal(db: any, raw: SharedInput) {
+  const data = normalizeInput(raw);
+  if (!data.eventId) throw new Error("eventId obrigatório");
+  if (!data.to) throw new Error("Telefone obrigatório");
+
+  const tpl = await loadTemplate(db, "lembrete_call_v2").catch(() => loadTemplate(db, "lembrete_call"));
+  const channelId = data.channelId || (await findNotificationChannel(db));
+  if (!channelId) throw new Error("Nenhum canal de notificações conectado");
+  const contactWa = normalizeBrPhone(data.to);
+  if (!contactWa) throw new Error("Telefone inválido");
+
+  const { data: existing } = await db
+    .from("wa_call_reminders" as any)
+    .select("id")
+    .eq("event_id", data.eventId)
+    .eq("contact_wa", contactWa)
+    .eq("kind", "reminder")
+    .gte("created_at", new Date(Date.now() - 6 * 3600_000).toISOString())
+    .limit(1);
+  if ((existing ?? []).length > 0) return { skipped: true, reason: "already_sent_recent" };
+
+  const { data: ins, error: insErr } = await db
+    .from("wa_call_reminders" as any)
+    .insert({
+      event_id: data.eventId,
+      channel_id: channelId,
+      contact_wa: contactWa,
+      lead_email: data.leadEmail,
+      lead_nome: data.nome || null,
+      lead_externalid: data.leadExternalId,
+      lead_fbp: data.leadFbp,
+      lead_fbc: data.leadFbc,
+      hora: data.hora || null,
+      convidados: data.convidados || null,
+      status: "pending",
+      kind: "reminder",
+    })
+    .select("id")
+    .single();
+  if (insErr || !ins) throw new Error(insErr?.message || "Falha ao criar lembrete");
+  const reminderId = (ins as any).id as string;
+
+  const text = renderTemplate(String(tpl.conteudo ?? ""), {
+    nome: data.nome || "",
+    hora: data.hora || "",
+    convidados: data.convidados || "",
+  });
+  try {
+    const { waMsgId } = await sendWA(channelId, contactWa, { type: "text", text: { body: text } }, db);
+    await db.from("wa_call_reminders" as any)
+      .update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" })
+      .eq("id", reminderId);
+    return { reminderId, waMsgId, channelId };
+  } catch (e: any) {
+    await db.from("wa_call_reminders" as any).update({ status: "failed" }).eq("id", reminderId);
+    throw new Error(e?.message ?? "Falha ao enviar lembrete");
+  }
+}
+
+export async function sendCallAttendanceInternal(db: any, raw: SharedInput) {
+  const data = normalizeInput(raw);
+  if (!data.eventId) throw new Error("eventId obrigatório");
+  if (!data.to) throw new Error("Telefone obrigatório");
+
+  const tpl = await loadTemplate(db, "comparecimento_call");
+  const channelId = data.channelId || (await findNotificationChannel(db));
+  if (!channelId) throw new Error("Nenhum canal de notificações conectado");
+  const contactWa = normalizeBrPhone(data.to);
+  if (!contactWa) throw new Error("Telefone inválido");
+
+  const { data: existing } = await db
+    .from("wa_call_reminders" as any)
+    .select("id")
+    .eq("event_id", data.eventId)
+    .eq("contact_wa", contactWa)
+    .eq("kind", "attendance")
+    .gte("created_at", new Date(Date.now() - 6 * 3600_000).toISOString())
+    .limit(1);
+  if ((existing ?? []).length > 0) return { skipped: true, reason: "already_sent_recent" };
+
+  const { data: ins, error: insErr } = await db
+    .from("wa_call_reminders" as any)
+    .insert({
+      event_id: data.eventId,
+      channel_id: channelId,
+      contact_wa: contactWa,
+      lead_email: data.leadEmail,
+      lead_nome: data.nome || null,
+      lead_externalid: data.leadExternalId,
+      lead_fbp: data.leadFbp,
+      lead_fbc: data.leadFbc,
+      hora: data.hora || null,
+      convidados: data.convidados || null,
+      status: "pending",
+      kind: "attendance",
+    })
+    .select("id")
+    .single();
+  if (insErr || !ins) throw new Error(insErr?.message || "Falha ao criar comparecimento");
+  const reminderId = (ins as any).id as string;
+
+  const text = renderTemplate(String(tpl.conteudo ?? ""), {
+    nome: data.nome || "",
+    hora: data.hora || "",
+    convidados: data.convidados || "",
+  });
+
+  const tplButtons: Array<{ id: string; label: string }> =
+    Array.isArray(tpl.buttons) && tpl.buttons.length > 0
+      ? tpl.buttons
+      : [
+          { id: "showup", label: "✅ Show up" },
+          { id: "noshow", label: "❌ No show" },
+          { id: "remarcada", label: "🔄 Call remarcada" },
+        ];
+  const replyButtons = tplButtons.slice(0, 3).map((b) => ({
+    type: "reply",
+    reply: { id: `callack:${reminderId}:${b.id}`, title: b.label.slice(0, 20) },
+  }));
+  const body = {
+    type: "interactive",
+    interactive: { type: "button", body: { text }, action: { buttons: replyButtons } },
+  };
+
+  try {
+    const { waMsgId } = await sendWA(channelId, contactWa, body, db);
+    await db.from("wa_call_reminders" as any)
+      .update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" })
+      .eq("id", reminderId);
+    return { reminderId, waMsgId, channelId };
+  } catch (e: any) {
+    await db.from("wa_call_reminders" as any).update({ status: "failed" }).eq("id", reminderId);
+    throw new Error(e?.message ?? "Falha ao enviar comparecimento");
+  }
+}
