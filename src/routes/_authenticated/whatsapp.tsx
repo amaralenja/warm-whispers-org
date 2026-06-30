@@ -704,9 +704,23 @@ function TemplatesPanel() {
                     ))}
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => { setEditing(t); setConteudo(t.conteudo); }}>Editar</Button>
+                <div className="flex gap-2 shrink-0">
+                  {t.slug === "lembrete_call" && (
+                    <Button size="sm" variant="outline" onClick={() => { setTestOpen(t); setTestForm({ to: "", nome: "", hora: "", convidados: "" }); }}>Testar envio</Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => { setEditing(t); setConteudo(t.conteudo); setButtonsDraft(Array.isArray(t.buttons) ? t.buttons : []); }}>Editar</Button>
+                </div>
               </div>
               <pre className="mt-3 whitespace-pre-wrap text-sm text-foreground/90 bg-background/60 rounded-lg p-3 border border-border">{t.conteudo}</pre>
+              {Array.isArray(t.buttons) && t.buttons.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {t.buttons.map((b: any) => (
+                    <span key={b.id} className="text-[11px] px-2 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 font-medium">
+                      {b.label} <span className="opacity-60 font-mono">[{b.id}]</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -722,12 +736,43 @@ function TemplatesPanel() {
             value={conteudo}
             onChange={(e) => setConteudo(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">Use {`{{nome}}`} e {`{{hora}}`} para inserir as variáveis disponíveis.</p>
+          <p className="text-xs text-muted-foreground">Use {`{{nome}}`}, {`{{hora}}`} e {`{{convidados}}`} para inserir variáveis.</p>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-foreground">Botões interativos (máx. 3)</p>
+              {buttonsDraft.length < 3 && (
+                <Button size="sm" variant="outline" onClick={() => setButtonsDraft([...buttonsDraft, { id: `btn${buttonsDraft.length + 1}`, label: "Novo botão" }])}>
+                  + Adicionar botão
+                </Button>
+              )}
+            </div>
+            {buttonsDraft.map((b, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  className="w-28 rounded-md border border-border bg-background px-2 py-1 text-xs font-mono"
+                  placeholder="id"
+                  value={b.id}
+                  onChange={(e) => { const next = [...buttonsDraft]; next[idx] = { ...b, id: e.target.value }; setButtonsDraft(next); }}
+                />
+                <input
+                  className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                  placeholder="Texto do botão (máx. 20)"
+                  maxLength={20}
+                  value={b.label}
+                  onChange={(e) => { const next = [...buttonsDraft]; next[idx] = { ...b, label: e.target.value }; setButtonsDraft(next); }}
+                />
+                <Button size="sm" variant="ghost" onClick={() => setButtonsDraft(buttonsDraft.filter((_, i) => i !== idx))}>×</Button>
+              </div>
+            ))}
+            <p className="text-[10px] text-muted-foreground">Para o lembrete de call use ids <code>showup</code> e <code>noshow</code> para acionar a marcação automática.</p>
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
             <Button
               className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
-              onClick={() => editing && saveMut.mutate({ id: editing.id, conteudo })}
+              onClick={() => editing && saveMut.mutate({ id: editing.id, conteudo, buttons: buttonsDraft })}
               disabled={saveMut.isPending}
             >
               {saveMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Salvar
@@ -735,6 +780,43 @@ function TemplatesPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!testOpen} onOpenChange={(v) => !v && setTestOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Testar lembrete de call</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Telefone com DDD (ex: 11999999999)" value={testForm.to} onChange={(e) => setTestForm({ ...testForm, to: e.target.value })} />
+            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Nome do convidado" value={testForm.nome} onChange={(e) => setTestForm({ ...testForm, nome: e.target.value })} />
+            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Horário (ex: 11:00)" value={testForm.hora} onChange={(e) => setTestForm({ ...testForm, hora: e.target.value })} />
+            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Outros convidados (opcional)" value={testForm.convidados} onChange={(e) => setTestForm({ ...testForm, convidados: e.target.value })} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestOpen(null)}>Cancelar</Button>
+            <Button
+              className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
+              disabled={testSending || !testForm.to.trim() || !testForm.nome.trim() || !testForm.hora.trim()}
+              onClick={async () => {
+                setTestSending(true);
+                try {
+                  const { sendCallReminder } = await import("@/lib/call-reminders.functions");
+                  const res = await sendCallReminder({ data: { eventId: `test-${Date.now()}`, to: testForm.to, nome: testForm.nome, hora: testForm.hora, convidados: testForm.convidados } });
+                  toast.success(res.skipped ? "Já enviado recentemente" : "Lembrete enviado ✓");
+                  setTestOpen(null);
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Falha ao enviar");
+                } finally {
+                  setTestSending(false);
+                }
+              }}
+            >
+              {testSending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Enviar agora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
