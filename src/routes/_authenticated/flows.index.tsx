@@ -492,3 +492,68 @@ function FlowsListPage() {
     </div>
   );
 }
+
+function FlowsGrouped({
+  flows,
+  showOp,
+  workspaces,
+  renderCard,
+}: {
+  flows: any[];
+  showOp: boolean;
+  workspaces: { id: string; nome: string }[];
+  onMoveFolder: (id: string, folder: string | null) => void;
+  onEditCard: (f: any) => any;
+  renderCard: (f: any) => any;
+}) {
+  // Agrupa: operação -> pasta -> fluxos[]
+  const opsMap = new Map<string, Map<string, any[]>>();
+  for (const f of flows) {
+    const opId = String(f.operacao_id ?? "__sem_op__");
+    const fld = (f.folder && String(f.folder).trim()) || "__sem_pasta__";
+    if (!opsMap.has(opId)) opsMap.set(opId, new Map());
+    const fm = opsMap.get(opId)!;
+    if (!fm.has(fld)) fm.set(fld, []);
+    fm.get(fld)!.push(f);
+  }
+  const opName = (id: string) =>
+    id === "__sem_op__" ? "Sem operação" : workspaces.find((w) => w.id === id)?.nome ?? id;
+
+  const opEntries = Array.from(opsMap.entries()).sort((a, b) => opName(a[0]).localeCompare(opName(b[0])));
+
+  return (
+    <div className="space-y-8">
+      {opEntries.map(([opId, foldersMap]) => {
+        const folderEntries = Array.from(foldersMap.entries()).sort((a, b) => {
+          if (a[0] === "__sem_pasta__") return 1;
+          if (b[0] === "__sem_pasta__") return -1;
+          return a[0].localeCompare(b[0]);
+        });
+        return (
+          <section key={opId} className="space-y-4">
+            {showOp && (
+              <div className="flex items-center gap-2 border-b border-border pb-2">
+                <span className="text-lg">🏢</span>
+                <h2 className="text-lg font-semibold">{opName(opId)}</h2>
+                <Badge variant="outline" className="text-xs">
+                  {Array.from(foldersMap.values()).reduce((a, b) => a + b.length, 0)} fluxos
+                </Badge>
+              </div>
+            )}
+            {folderEntries.map(([fld, items]) => (
+              <div key={fld} className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <span>{fld === "__sem_pasta__" ? "📂 Sem pasta" : `📁 ${fld}`}</span>
+                  <span className="text-xs">({items.length})</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {items.map((f) => renderCard(f))}
+                </div>
+              </div>
+            ))}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
