@@ -629,7 +629,7 @@ function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
 function HallCard({ kind, item, meta }: { kind: "lobo" | "rainha"; item: HallEntry | null; meta: number }) {
   const cfg = kind === "lobo"
     ? { emoji: "🐺", title: "Lobo do X1", emptyText: "Em busca do Lobo...", gradBg: "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(0,0,0,0.4))", border: "rgba(251,191,36,0.5)", shadow: "0 0 20px rgba(251,191,36,0.2)", ringClass: "border-amber-400", titleClass: "text-amber-400" }
-    : { emoji: "👑", title: "Rainha do X1", emptyText: "Em busca da Rainha...", gradBg: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(236,72,153,0.1))", border: "rgba(168,85,247,0.5)", shadow: "0 0 20px rgba(168,85,247,0.2)", ringClass: "border-fuchsia-500", titleClass: "bg-gradient-to-r from-purple-400 to-fuchsia-500 bg-clip-text text-transparent" };
+    : { emoji: "👑", title: "Rainha do Mês", emptyText: "Sem vendas no mês passado", gradBg: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(236,72,153,0.1))", border: "rgba(168,85,247,0.5)", shadow: "0 0 20px rgba(168,85,247,0.2)", ringClass: "border-fuchsia-500", titleClass: "bg-gradient-to-r from-purple-400 to-fuchsia-500 bg-clip-text text-transparent" };
 
   if (!item) {
     return (
@@ -638,7 +638,7 @@ function HallCard({ kind, item, meta }: { kind: "lobo" | "rainha"; item: HallEnt
         <div>
           <h4 className="text-xs font-black uppercase tracking-wider text-white">{cfg.title}</h4>
           <p className="text-[10px] italic text-gray-400">{cfg.emptyText}</p>
-          <p className="mt-0.5 text-[8px] uppercase text-white/30">Meta: {BRL(meta)} / Mês</p>
+          {kind === "lobo" && <p className="mt-0.5 text-[8px] uppercase text-white/30">Meta: {BRL(meta)} / Mês</p>}
         </div>
       </div>
     );
