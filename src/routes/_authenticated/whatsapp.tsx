@@ -79,6 +79,7 @@ function WhatsAppPage() {
   const [name, setName] = useState("");
   const [newOp, setNewOp] = useState<string>(isGeral ? "" : workspace.id);
   const [tab, setTab] = useState<"chat" | "notification" | "logs">("chat");
+  const connectionKind: "chat" | "notification" = tab === "notification" ? "notification" : "chat";
 
   const [justCreated, setJustCreated] = useState<EvoChannel | null>(null);
   const [quotaError, setQuotaError] = useState(false);
@@ -248,7 +249,7 @@ function WhatsAppPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>
-                      Nova conexão {tab === "notification" ? "(Notificador)" : "WhatsApp"}
+                      Nova conexão {connectionKind === "notification" ? "(Notificador)" : "WhatsApp"}
                     </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-2">
@@ -258,10 +259,10 @@ function WhatsAppPage() {
                         id="ch-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder={tab === "notification" ? "Ex.: Notificador Calls" : "Ex.: Atendimento Principal"}
+                        placeholder={connectionKind === "notification" ? "Ex.: Notificador Calls" : "Ex.: Atendimento Principal"}
                       />
                     </div>
-                    {tab === "notification" ? (
+                    {connectionKind === "notification" ? (
                       <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
                         Este número será marcado como <strong>Notificador</strong> e não fica vinculado a nenhuma operação — usado só para disparos automáticos (lembretes de call, templates, etc).
                       </div>
@@ -288,11 +289,11 @@ function WhatsAppPage() {
                     <Button
                       onClick={() => {
                         if (!name.trim()) return toast.error("Informe o nome da conexão");
-                        if (tab === "chat" && !newOp) return toast.error("Selecione uma operação");
+                        if (connectionKind === "chat" && !newOp) return toast.error("Selecione uma operação");
                         createMut.mutate({
                           name: name.trim(),
-                          operacaoId: tab === "notification" ? "" : newOp,
-                          kind: tab,
+                          operacaoId: connectionKind === "notification" ? "" : newOp,
+                          kind: connectionKind,
                         });
                       }}
                       disabled={createMut.isPending}
