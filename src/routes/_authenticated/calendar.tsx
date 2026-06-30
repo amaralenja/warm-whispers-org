@@ -304,7 +304,6 @@ function CalendarPage() {
   const PRESET_LABELS: Record<string, string> = {
     hoje: "Hoje",
     ontem: "Ontem",
-    semana: "Esta semana",
     "7d": "Últimos 7 dias",
     "15d": "Últimos 15 dias",
     "30d": "Últimos 30 dias",

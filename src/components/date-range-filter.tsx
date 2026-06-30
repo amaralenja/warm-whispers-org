@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export type RangePreset = "hoje" | "ontem" | "semana" | "mes" | "ano" | "7d" | "15d" | "30d" | "custom";
+export type RangePreset = "hoje" | "ontem" | "mes" | "ano" | "7d" | "15d" | "30d" | "custom";
 
 export type DateRangeValue = {
   preset: RangePreset;
@@ -36,12 +36,6 @@ export function computeRange(preset: RangePreset): DateRangeValue {
     y.setUTCDate(y.getUTCDate() - 1);
     return { preset, from: iso(y), to: iso(y) };
   }
-  if (preset === "semana") {
-    const weekStart = new Date(today);
-    const day = weekStart.getUTCDay();
-    weekStart.setUTCDate(weekStart.getUTCDate() - day + (day === 0 ? -6 : 1));
-    return { preset, from: iso(weekStart), to: iso(today) };
-  }
   if (preset === "7d") {
     const s = new Date(today);
     s.setUTCDate(s.getUTCDate() - 6);
@@ -71,7 +65,6 @@ export function computeRange(preset: RangePreset): DateRangeValue {
 const PRESETS: { id: Exclude<RangePreset, "custom">; label: string }[] = [
   { id: "hoje", label: "Hoje" },
   { id: "ontem", label: "Ontem" },
-  { id: "semana", label: "Semana" },
   { id: "7d", label: "7 dias" },
   { id: "15d", label: "15 dias" },
   { id: "mes", label: "Mês" },
