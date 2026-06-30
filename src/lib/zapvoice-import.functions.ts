@@ -230,36 +230,42 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
             let nodeData: any = {};
 
             if (s.type === "message") {
-              const msgObj = messagesById.get(s.itemId);
-              const objMatch = objectsById.get(s.itemId)
-                ?? b.objectsList?.find((o: any) => o?.itemId === s.itemId);
+              const objMatch =
+                b.objectsList?.find((o: any) => o?.id === s.itemId)
+                ?? objectsById.get(s.itemId);
+              const msgMeta = messagesById.get(s.itemId);
 
-              const extractText = (o: any): string | null => {
-                if (!o) return null;
-                for (const k of ["text", "content", "message", "body", "value"]) {
-                  const v = o?.[k];
-                  if (typeof v === "string" && v.trim()) return v;
+              let text: string | null = null;
+              let brokenRef = false;
+
+              if (!objMatch) {
+                brokenRef = true;
+              } else {
+                const d = (objMatch as any)?.data;
+                if (typeof d === "string" && d.length > 0 && !d.startsWith("data:")) {
+                  text = d;
                 }
-                const d = o?.data;
-                if (typeof d === "string" && d.trim() && !d.startsWith("data:")) return d;
-                return null;
-              };
-
-              const text = extractText(msgObj) ?? extractText(objMatch);
+              }
 
               if (text) {
-                nodeData = { text: String(text) };
+                nodeData = { text };
               } else {
                 nodeData = {
-                  text: "ERRO: conteúdo não encontrado",
+                  text: brokenRef
+                    ? "ERRO: referência quebrada (objectsList sem id correspondente)"
+                    : "ERRO: conteúdo não encontrado",
                   _debug: {
                     original_item_id: s.itemId,
                     original_sequence_id: s.id,
-                    original_message_object: msgObj ?? null,
+                    original_message_meta: msgMeta ?? null,
                     original_object_list_match: objMatch ?? null,
                   },
                 };
-                summary.errors.push({ funnel: f.name, item: s.itemId, message: "texto não encontrado em messages/objectsList" });
+                summary.errors.push({
+                  funnel: f.name,
+                  item: s.itemId,
+                  message: brokenRef ? "referência quebrada em objectsList" : "object.data ausente ou inválido",
+                });
               }
             } else {
               const kind = s.type === "audio" ? "audio" : s.type === "document" ? "document" : "media";
