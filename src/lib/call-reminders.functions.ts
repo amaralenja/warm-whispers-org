@@ -115,8 +115,9 @@ export const sendCallReminder = createServerFn({ method: "POST" })
       Array.isArray((tpl as any).buttons) && (tpl as any).buttons.length > 0
         ? (tpl as any).buttons
         : [
-            { id: "showup", label: "✅ Estarei presente" },
-            { id: "noshow", label: "❌ Não vou conseguir" },
+            { id: "showup", label: "✅ Show up" },
+            { id: "noshow", label: "❌ No show" },
+            { id: "remarcada", label: "🔄 Call remarcada" },
           ];
 
     const replyButtons = tplButtons.slice(0, 3).map((b) => ({
