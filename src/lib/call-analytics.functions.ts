@@ -114,9 +114,18 @@ async function computeAndSend(db: any, dateStr?: string) {
     .lt("created_at", toIso);
 
   const rows: any[] = (attendance ?? []) as any[];
-  const showUps = rows.filter((r) => String(r.status ?? "").includes("showup")).length;
-  const noShows = rows.filter((r) => String(r.status ?? "").includes("noshow")).length;
-  const remarcadas = rows.filter((r) => String(r.status ?? "").includes("remarcada")).length;
+  const showUps = rows.filter((r) => {
+    const s = String(r.status ?? "").toLowerCase();
+    return s === "showup" || s === "show_up";
+  }).length;
+  const noShows = rows.filter((r) => {
+    const s = String(r.status ?? "").toLowerCase();
+    return s === "noshow" || s === "no_show";
+  }).length;
+  const remarcadas = rows.filter((r) => {
+    const s = String(r.status ?? "").toLowerCase();
+    return s === "remarcada" || s === "rescheduled";
+  }).length;
   const totalCalls = rows.length;
   const taxaShow = totalCalls > 0 ? (showUps / totalCalls) * 100 : 0;
 
@@ -238,11 +247,12 @@ export async function runCallAnalyticsCron(dateStr?: string) {
 /** CRUD simples de destinatários */
 export const listTemplateRecipients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { templateId: string }) => d)
+  .inputValidator((d: { templateId: string } | undefined) => ({ templateId: d?.templateId ?? "" }))
   .handler(async (ctx: any) => {
-    const data = ctx?.data;
+    const data = ctx?.data ?? {};
     const context = ctx?.context;
     if (!data?.templateId) return [];
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const { data: rows, error } = await context.supabase
       .from("wa_template_recipients" as any)
       .select("*")
@@ -254,11 +264,16 @@ export const listTemplateRecipients = createServerFn({ method: "POST" })
 
 export const addTemplateRecipient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { templateId: string; telefone: string; nome?: string }) => d)
+  .inputValidator((d: { templateId: string; telefone: string; nome?: string } | undefined) => ({
+    templateId: d?.templateId ?? "",
+    telefone: d?.telefone ?? "",
+    nome: d?.nome,
+  }))
   .handler(async (ctx: any) => {
-    const data = ctx?.data;
+    const data = ctx?.data ?? {};
     const context = ctx?.context;
     if (!data?.templateId) throw new Error("Template obrigatório");
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const phone = normalizeBrPhone(data.telefone);
     if (!phone) throw new Error("Telefone inválido");
     const { data: row, error } = await context.supabase
@@ -272,11 +287,12 @@ export const addTemplateRecipient = createServerFn({ method: "POST" })
 
 export const removeTemplateRecipient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string } | undefined) => ({ id: d?.id ?? "" }))
   .handler(async (ctx: any) => {
-    const data = ctx?.data;
+    const data = ctx?.data ?? {};
     const context = ctx?.context;
     if (!data?.id) throw new Error("Destinatário obrigatório");
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const { error } = await context.supabase
       .from("wa_template_recipients" as any)
       .delete()
@@ -290,6 +306,7 @@ export const listRecipientCandidates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (ctx: any) => {
     const context = ctx?.context;
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
     const [vRes, tRes] = await Promise.all([
       context.supabase.from("vendedores").select("id, nome, telefone, foto_url").eq("ativo", true),
       context.supabase.from("team_members").select("id, nome, telefone, foto_url, funcao").eq("ativo", true),
@@ -314,6 +331,7 @@ export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
   .handler(async (ctx: any) => {
     const context = ctx?.context;
     const limit = ctx?.data?.limit ?? 80;
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
 
     const [callRes, taskRes] = await Promise.all([
       context.supabase
@@ -343,7 +361,13 @@ export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
         waMessageId: r.wa_message_id ?? null,
         sentAt: r.sent_at ?? null,
         createdAt: r.created_at ?? null,
-        details: [r.hora ? `Call ${r.hora}` : null, r.convidados ? `Convidados: ${r.convidados}` : null].filter(Boolean).join(" · "),
+        repliedAt: r.replied_at ?? null,
+        channelId: r.channel_id ?? null,
+        details: [
+          r.hora ? `Call ${r.hora}` : null,
+          r.convidados ? `Convidados: ${r.convidados}` : null,
+          r.event_id ? `Evento ${String(r.event_id).slice(0, 12)}` : null,
+        ].filter(Boolean).join(" · "),
       })),
       ...((taskRes.data ?? []) as any[]).map((r) => ({
         id: `task:${r.id}`,
