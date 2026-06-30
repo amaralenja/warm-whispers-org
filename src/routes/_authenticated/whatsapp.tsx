@@ -161,6 +161,15 @@ function WhatsAppPage() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar operação"),
   });
 
+  const renameMut = useMutation({
+    mutationFn: (vars: { id: string; name: string }) => renameFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("Nome atualizado");
+      qc.invalidateQueries({ queryKey: ["whatsapp-channels"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao renomear"),
+  });
+
   const allChannels = (data ?? []) as EvoChannel[];
   // Notification channels are global (operacao = __notificador__) — never filter by workspace.
   const scoped = allChannels.filter((c) => {
