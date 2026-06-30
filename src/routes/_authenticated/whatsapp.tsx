@@ -781,10 +781,34 @@ function TemplatesPanel() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                   {(t.slug === "lembrete_call_v2" || t.slug === "comparecimento_call") && (
                     <Button size="sm" variant="outline" onClick={() => { setTestOpen(t); setTestForm({ to: "", nome: "", hora: "", convidados: "" }); }}>Testar envio</Button>
                   )}
+                  {t.slug === "analytics_call" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                      disabled={analyticsSending}
+                      onClick={async () => {
+                        setAnalyticsSending(true);
+                        try {
+                          const { sendCallAnalytics } = await import("@/lib/call-analytics.functions");
+                          const r = await sendCallAnalytics({ data: {} });
+                          toast.success(r.sent ? `Analytics enviado p/ ${r.sent} contato(s)` : `Sem envio: ${r.skipped ?? "ok"}`);
+                        } catch (e: any) {
+                          toast.error(e?.message ?? "Falha");
+                        } finally {
+                          setAnalyticsSending(false);
+                        }
+                      }}
+                    >
+                      {analyticsSending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                      Enviar agora
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => setRecipientsOpen(t)}>Destinatários</Button>
                   <Button size="sm" variant="outline" className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" onClick={() => { setApprovalOpen(t); setApprovalChannelId(""); }}>Enviar p/ Meta</Button>
                   <Button size="sm" variant="outline" onClick={() => { setEditing(t); setConteudo(t.conteudo); setButtonsDraft(Array.isArray(t.buttons) ? t.buttons : []); }}>Editar</Button>
                 </div>
