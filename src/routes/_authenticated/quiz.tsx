@@ -599,7 +599,7 @@ function QuizPage() {
           </CardContent>
         </Card>
       ) : view === "kanban" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {ORIGIN_ORDER.map((key) => {
             const items = grouped[key] ?? [];
             if (items.length === 0) return null;
@@ -607,14 +607,14 @@ function QuizPage() {
             const origin = classifyLead(sample);
             const Icon = origin.icon;
             return (
-              <div key={key} className={`flex flex-col rounded-xl border ${origin.border} ${origin.bg} max-h-[78vh]`}>
-                <div className={`flex items-center justify-between px-3 py-2 border-b ${origin.border}`}>
+              <div key={key} className={`flex flex-col rounded-2xl border ${origin.border} ${origin.bg} max-h-[82vh]`}>
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${origin.border}`}>
                   <div className={`flex items-center gap-2 text-sm font-semibold ${origin.text}`}>
                     <Icon className="h-4 w-4" /> {origin.label}
                   </div>
                   <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
                 </div>
-                <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
+                <div className="flex-1 overflow-y-auto scrollbar-fancy p-3 space-y-3">
                   {items.map((l) => (
                     <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
                   ))}
@@ -623,20 +623,21 @@ function QuizPage() {
             );
           })}
           {grouped.fakes.length > 0 && reality !== "real" && (
-            <div className="flex flex-col rounded-xl border border-rose-500/30 bg-rose-500/5 max-h-[78vh]">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-rose-500/30">
+            <div className="flex flex-col rounded-2xl border border-rose-500/30 bg-rose-500/5 max-h-[82vh]">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-rose-500/30">
                 <div className="flex items-center gap-2 text-sm font-semibold text-rose-300">
                   <XCircle className="h-4 w-4" /> Fakes
                 </div>
                 <Badge variant="outline" className="text-[10px] border-rose-500/40 text-rose-300">{grouped.fakes.length}</Badge>
               </div>
-              <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
+              <div className="flex-1 overflow-y-auto scrollbar-fancy p-3 space-y-3">
                 {grouped.fakes.map((l) => (
                   <LeadCard key={l.id} lead={l} real={false} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
                 ))}
               </div>
             </div>
           )}
+
         </div>
       ) : (
         <Card>
@@ -750,24 +751,25 @@ function StatPill({
 
 function RealityToggle({ real, onChange }: { real: boolean; onChange: (r: Reality | null) => void }) {
   return (
-    <div className="inline-flex rounded-md border border-border overflow-hidden text-[11px]">
+    <div className="inline-flex rounded-lg border border-border overflow-hidden text-xs font-semibold shadow-sm">
       <button
         type="button"
         onClick={() => onChange(real ? null : "real")}
-        className={`px-2 py-1 flex items-center gap-1 transition ${real ? "bg-emerald-500/20 text-emerald-300" : "text-muted-foreground hover:bg-accent/10"}`}
+        className={`px-3 py-1.5 flex items-center gap-1.5 transition ${real ? "bg-emerald-500/25 text-emerald-200" : "text-muted-foreground hover:bg-accent/10"}`}
       >
-        <CheckCircle2 className="h-3 w-3" /> Real
+        <CheckCircle2 className="h-3.5 w-3.5" /> Real
       </button>
       <button
         type="button"
         onClick={() => onChange(!real ? null : "fake")}
-        className={`px-2 py-1 flex items-center gap-1 border-l border-border transition ${!real ? "bg-rose-500/20 text-rose-300" : "text-muted-foreground hover:bg-accent/10"}`}
+        className={`px-3 py-1.5 flex items-center gap-1.5 border-l border-border transition ${!real ? "bg-rose-500/25 text-rose-200" : "text-muted-foreground hover:bg-accent/10"}`}
       >
-        <XCircle className="h-3 w-3" /> Fake
+        <XCircle className="h-3.5 w-3.5" /> Fake
       </button>
     </div>
   );
 }
+
 
 function LeadCard({
   lead, real, onToggle, onOpen,
@@ -790,48 +792,48 @@ function LeadCard({
   return (
     <div
       className={[
-        "group relative flex flex-col gap-3 rounded-xl border bg-card/60 backdrop-blur-sm p-4 transition-all",
+        "group relative flex flex-col gap-3.5 rounded-2xl border bg-card/70 backdrop-blur-sm p-5 transition-all",
         real ? "" : "opacity-60",
         isHigh
-          ? "border-yellow-500/30 shadow-[0_0_30px_-12px_rgba(234,179,8,0.4)]"
-          : "border-border/60 hover:border-border",
-        onOpen ? "cursor-pointer hover:bg-card/80" : "",
+          ? "border-yellow-500/40 shadow-[0_0_40px_-12px_rgba(234,179,8,0.5)]"
+          : "border-border/60 hover:border-border hover:shadow-lg",
+        onOpen ? "cursor-pointer hover:bg-card/90" : "",
       ].join(" ")}
       onClick={onOpen}
     >
       {/* HEADER: nome + origem */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={`truncate text-[15px] font-semibold leading-tight ${lead.nome ? "" : "italic text-muted-foreground text-sm"}`}>
+          <h3 className={`truncate text-base font-bold leading-tight ${lead.nome ? "" : "italic text-muted-foreground"}`}>
             {lead.nome || "sem nome"}
           </h3>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Icon className={`h-3 w-3 ${origin.text}`} />
-            <span>{origin.label}</span>
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Icon className={`h-3.5 w-3.5 ${origin.text}`} />
+            <span className="font-medium">{origin.label}</span>
             <span className="opacity-40">·</span>
             <span>{timeAgo(lead.data_criacao)}</span>
           </div>
         </div>
         {isHigh && (
-          <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-md bg-yellow-500/15 border border-yellow-500/30">
-            <Crown className="h-3.5 w-3.5 text-yellow-400" />
+          <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/40">
+            <Crown className="h-4.5 w-4.5 text-yellow-400" />
           </div>
         )}
       </div>
 
       {/* TICKET / CAIXA */}
       {ticket !== "—" && (
-        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${tier?.cls ?? "bg-muted/30 border-border text-foreground"}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <Wallet className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <div className={`flex items-center justify-between rounded-xl border px-4 py-2.5 ${tier?.cls ?? "bg-muted/30 border-border text-foreground"}`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Wallet className="h-4 w-4 shrink-0 opacity-70" />
             <div className="min-w-0">
-              <div className="text-[9px] uppercase tracking-wider opacity-60 leading-none">Caixa</div>
-              <div className="text-[13px] font-bold leading-tight mt-0.5 truncate">{ticket}</div>
+              <div className="text-[10px] uppercase tracking-wider opacity-60 leading-none">Caixa</div>
+              <div className="text-sm font-bold leading-tight mt-1 truncate">{ticket}</div>
             </div>
           </div>
-          {weight >= 5 && <span className="text-base">🔥</span>}
+          {weight >= 5 && <span className="text-xl">🔥</span>}
           {letter && weight < 5 && (
-            <span className="text-[10px] font-mono font-bold opacity-70">{letter}</span>
+            <span className="text-xs font-mono font-bold opacity-70">{letter}</span>
           )}
         </div>
       )}
@@ -841,16 +843,16 @@ function LeadCard({
 
       {/* CONTATO */}
       {(lead.email || lead.whatsapp) && (
-        <div className="space-y-1 text-xs">
+        <div className="space-y-1.5 text-xs">
           {lead.whatsapp && (
-            <div className="flex items-center gap-2 text-foreground/80">
-              <MessageCircle className="h-3 w-3 shrink-0 text-emerald-400" />
-              <span className="truncate">{lead.whatsapp}</span>
+            <div className="flex items-center gap-2 text-foreground/85">
+              <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              <span className="truncate font-medium">{lead.whatsapp}</span>
             </div>
           )}
           {lead.email && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="h-3 w-3 shrink-0" />
+              <Mail className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{lead.email}</span>
             </div>
           )}
@@ -859,8 +861,8 @@ function LeadCard({
 
       {/* UTM */}
       {lead.utm_campaign && (
-        <div className="text-[10px] text-muted-foreground truncate border-t border-border/40 pt-2">
-          <TrendingUp className="inline h-2.5 w-2.5 mr-1 opacity-60" />
+        <div className="text-[11px] text-muted-foreground truncate border-t border-border/40 pt-2.5">
+          <TrendingUp className="inline h-3 w-3 mr-1 opacity-60" />
           {String(lead.utm_campaign)}
         </div>
       )}
@@ -868,8 +870,8 @@ function LeadCard({
       {/* FOOTER ações */}
       <div className="mt-auto flex items-center justify-between gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
         {onOpen && (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1 -ml-2" onClick={onOpen}>
-            <Eye className="h-3 w-3" /> Respostas
+          <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs gap-1.5 -ml-2" onClick={onOpen}>
+            <Eye className="h-3.5 w-3.5" /> Respostas
           </Button>
         )}
         <RealityToggle real={real} onChange={onToggle} />
@@ -877,6 +879,7 @@ function LeadCard({
     </div>
   );
 }
+
 
 
 const ANSWER_LABELS: Record<string, string> = {
@@ -1099,48 +1102,65 @@ function IgRow({ username }: { username: string }) {
 
   if (status === "real" && profile) {
     return (
-      <div className="mt-1 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-1.5">
-        {profile.profile_pic_url ? (
-          <img
-            src={`/api/public/ig-image?u=${encodeURIComponent(profile.profile_pic_url)}`}
-            alt={profile.username}
-            className="h-9 w-9 rounded-full object-cover border border-emerald-500/50 bg-pink-500/10"
-            onError={(e) => {
-              const el = e.currentTarget as HTMLImageElement;
-              el.onerror = null;
-              el.replaceWith(Object.assign(document.createElement("div"), {
-                className: "h-9 w-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-emerald-500/50",
-                textContent: (profile.username?.[0] || "?").toUpperCase(),
-              }));
-            }}
-          />
-        ) : (
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-emerald-500/50">
-            {(profile.username?.[0] || "?").toUpperCase()}
-          </div>
-        )}
+      <div className="mt-1 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-500/[0.02] p-3 space-y-3">
+        <div className="flex items-start gap-3">
+          {profile.profile_pic_url ? (
+            <img
+              src={`/api/public/ig-image?u=${encodeURIComponent(profile.profile_pic_url)}`}
+              alt={profile.username}
+              className="h-16 w-16 rounded-full object-cover border-2 border-emerald-500/60 bg-pink-500/10 shrink-0"
+              onError={(e) => {
+                const el = e.currentTarget as HTMLImageElement;
+                el.onerror = null;
+                el.replaceWith(Object.assign(document.createElement("div"), {
+                  className: "h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-emerald-500/60 shrink-0",
+                  textContent: (profile.username?.[0] || "?").toUpperCase(),
+                }));
+              }}
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-emerald-500/60 shrink-0">
+              {(profile.username?.[0] || "?").toUpperCase()}
+            </div>
+          )}
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <a
-              href={profile.profile_url || `https://instagram.com/${username}`}
-              target="_blank" rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="truncate text-xs font-semibold text-emerald-300 hover:underline"
-            >
-              @{profile.username}
-            </a>
-            {profile.is_verified && <ShieldCheck className="h-3 w-3 text-blue-400" />}
-          </div>
-          <div className="flex gap-2 text-[10px] text-muted-foreground">
-            <span><b className="text-foreground">{fmtIg(profile.followers)}</b> seg</span>
-            <span><b className="text-foreground">{fmtIg(profile.following)}</b> seguindo</span>
-            <span><b className="text-foreground">{fmtIg(profile.posts_count)}</b> posts</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-bold text-emerald-200">
+                @{profile.username}
+              </span>
+              {profile.is_verified && <ShieldCheck className="h-3.5 w-3.5 text-blue-400 shrink-0" />}
+            </div>
+            {profile.full_name && (
+              <div className="truncate text-xs text-foreground/80 mt-0.5">{profile.full_name}</div>
+            )}
+            <div className="flex gap-3 text-[11px] text-muted-foreground mt-1.5">
+              <span><b className="text-foreground">{fmtIg(profile.followers)}</b> seg</span>
+              <span><b className="text-foreground">{fmtIg(profile.following)}</b> seg.</span>
+              <span><b className="text-foreground">{fmtIg(profile.posts_count)}</b> posts</span>
+            </div>
           </div>
         </div>
+
+        {profile.biography && (
+          <p className="text-[11px] text-foreground/70 leading-snug line-clamp-2 border-l-2 border-emerald-500/40 pl-2">
+            {profile.biography}
+          </p>
+        )}
+
+        <a
+          href={profile.profile_url || `https://instagram.com/${username}`}
+          target="_blank" rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white text-xs font-semibold py-2 transition shadow-sm"
+        >
+          <Instagram className="h-3.5 w-3.5" />
+          Visitar perfil
+        </a>
       </div>
     );
   }
+
 
   const color =
     status === "fake" ? "text-rose-400 line-through"
