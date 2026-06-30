@@ -52,11 +52,12 @@ function interpolate(tpl: string, ctx: Ctx): string {
 }
 
 async function fetchChannelToken(channelId: string): Promise<{ token: string; phoneNumberId: string }> {
-  const { data: local } = await supabaseAdmin
+  const { data: localRow } = await supabaseAdmin
     .from("wa_channels" as any)
     .select("id,token,phone_number_id,metadata")
     .eq("id", channelId)
     .maybeSingle();
+  const local = localRow as any;
   const localToken = local?.token ? String(local.token) : "";
   const localPhoneNumberId = local?.phone_number_id
     ? String(local.phone_number_id)
