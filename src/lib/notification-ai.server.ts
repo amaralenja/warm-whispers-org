@@ -405,7 +405,7 @@ export async function continueNotificationSession(opts: {
     return;
   }
 
-  const { data: sessRow } = await db
+  let { data: sessRow } = await db
     .from("wa_ai_sessions")
     .select("*")
     .eq("channel_id", channelId)
@@ -414,7 +414,30 @@ export async function continueNotificationSession(opts: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!sessRow) return;
+
+  // Cold session: criar uma nova quando a pessoa manda mensagem sem ter clicado em botão
+  if (!sessRow) {
+    const { data: inserted, error: insErr } = await db
+      .from("wa_ai_sessions")
+      .insert({
+        channel_id: channelId,
+        contact_wa: contactWa,
+        contact_name: null,
+        reminder_id: null,
+        calendar_event_id: null,
+        status: "active",
+        last_button: null,
+        messages: [],
+        context: { cold_start: true, started_at: new Date().toISOString() },
+      })
+      .select("*")
+      .single();
+    if (insErr || !inserted) {
+      console.error("[notif-ai] falha criando sessão fria", insErr);
+      return;
+    }
+    sessRow = inserted;
+  }
   const sess = sessRow as SessionRow;
 
   sess.messages = Array.isArray(sess.messages) ? sess.messages : [];
