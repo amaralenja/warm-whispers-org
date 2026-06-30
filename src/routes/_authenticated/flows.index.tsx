@@ -265,8 +265,13 @@ function FlowsListPage() {
           Nenhum fluxo criado ainda. Clique em <strong>Novo fluxo</strong> ou <strong>Importar código</strong>.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((f: any) => {
+        <FlowsGrouped
+          flows={filtered}
+          showOp={workspace.id === "all"}
+          workspaces={workspaces}
+          onMoveFolder={(id, f) => moveFolderMut.mutate({ id, folder: f })}
+          onEditCard={(f) => f}
+          renderCard={(f: any) => {
             const triggers = f.wa_flow_triggers ?? [];
             return (
               <div key={f.id} className="border border-border rounded-lg p-4 bg-card hover:border-emerald-500/40 transition-colors">
@@ -294,6 +299,16 @@ function FlowsListPage() {
                     <Link to="/flows/$flowId" params={{ flowId: f.id }}>
                       <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
                     </Link>
+                  </Button>
+                  <Button
+                    size="sm" variant="outline" title="Mover para pasta"
+                    onClick={() => {
+                      const v = prompt("Nome da pasta (vazio = sem pasta):", f.folder ?? "");
+                      if (v === null) return;
+                      moveFolderMut.mutate({ id: f.id, folder: v.trim() || null });
+                    }}
+                  >
+                    📁
                   </Button>
                   <Button
                     size="sm" variant="outline" title="Duplicar"
@@ -324,8 +339,8 @@ function FlowsListPage() {
                 </div>
               </div>
             );
-          })}
-        </div>
+          }}
+        />
       )}
 
       {/* Import Dialog */}
