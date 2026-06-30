@@ -415,9 +415,13 @@ function QuizPage() {
 
   const grouped = useMemo(() => {
     const g: Record<OriginKey, Lead[]> = { facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
-    for (const l of sortedLeads) g[classifyLead(l).key].push(l);
-    return g;
-  }, [sortedLeads]);
+    const fakes: Lead[] = [];
+    for (const l of sortedLeads) {
+      if (!leadIsReal(l)) { fakes.push(l); continue; }
+      g[classifyLead(l).key].push(l);
+    }
+    return { ...g, fakes };
+  }, [sortedLeads, overrides]);
 
   function refresh() {
     setLiveCount(0);
@@ -558,7 +562,7 @@ function QuizPage() {
           </CardContent>
         </Card>
       ) : view === "kanban" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
           {ORIGIN_ORDER.map((key) => {
             const items = grouped[key] ?? [];
             if (items.length === 0) return null;
@@ -581,6 +585,21 @@ function QuizPage() {
               </div>
             );
           })}
+          {grouped.fakes.length > 0 && reality !== "real" && (
+            <div className="flex flex-col rounded-xl border border-rose-500/30 bg-rose-500/5 max-h-[78vh]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-rose-500/30">
+                <div className="flex items-center gap-2 text-sm font-semibold text-rose-300">
+                  <XCircle className="h-4 w-4" /> Fakes
+                </div>
+                <Badge variant="outline" className="text-[10px] border-rose-500/40 text-rose-300">{grouped.fakes.length}</Badge>
+              </div>
+              <div className="flex-1 overflow-y-auto scrollbar-fancy p-2 space-y-2">
+                {grouped.fakes.map((l) => (
+                  <LeadCard key={l.id} lead={l} real={false} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <Card>
