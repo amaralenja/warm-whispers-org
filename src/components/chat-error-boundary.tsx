@@ -51,11 +51,11 @@ export class ChatErrorBoundary extends Component<Props, State> {
           <div>
             <h3 className="text-lg font-semibold">Algo travou no Chat ao Vivo</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {safeErrorText(this.state.error, "Erro desconhecido")}
+              {String(safeErrorText(this.state.error, "Erro desconhecido"))}
             </p>
           </div>
           <pre className="max-h-44 overflow-auto rounded-xl bg-background/40 p-3 text-left text-[11px] leading-relaxed text-muted-foreground">
-            {safeStackText(this.state.error)}
+            {String(safeStackText(this.state.error))}
           </pre>
           <button
             type="button"
