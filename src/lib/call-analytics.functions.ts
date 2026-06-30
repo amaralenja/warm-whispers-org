@@ -391,4 +391,155 @@ export const listNotificationDispatchLogs = createServerFn({ method: "POST" })
       .slice(0, limit);
   });
 
+export const retryNotificationDispatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { logId: string }) => ({ logId: String(d?.logId ?? "").trim() }))
+  .handler(async (ctx: any) => {
+    const context = ctx?.context;
+    const logId = ctx?.data?.logId as string;
+    if (!context?.supabase) throw new Error("Contexto Supabase indisponível");
+    if (!logId || !logId.includes(":")) throw new Error("logId inválido");
+
+    const [kind, rawId] = logId.split(":");
+    const db = context.supabase;
+    const { sendWA } = await import("@/lib/flow-engine.server");
+
+    const renderTpl = (tpl: string, vars: Record<string, string>) =>
+      String(tpl ?? "").replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
+
+    const loadTpl = async (slug: string) => {
+      const { data } = await db.from("wa_templates" as any).select("*").eq("slug", slug).maybeSingle();
+      return data as any;
+    };
+
+    if (kind === "call") {
+      const { data: row, error } = await db
+        .from("wa_call_reminders" as any)
+        .select("*")
+        .eq("id", rawId)
+        .maybeSingle();
+      if (error || !row) throw new Error("Registro não encontrado");
+      const r = row as any;
+      if (!r.contact_wa) throw new Error("Sem telefone");
+      if (!r.channel_id) throw new Error("Sem canal vinculado");
+
+      const isAttendance = r.kind === "attendance";
+      const slug = isAttendance ? "comparecimento_call" : "lembrete_call_v2";
+      const tpl = (await loadTpl(slug)) ?? (await loadTpl("lembrete_call"));
+      if (!tpl) throw new Error(`Template ${slug} não encontrado`);
+
+      const text = renderTpl(String(tpl.conteudo ?? ""), {
+        nome: r.lead_nome ?? "",
+        hora: r.hora ?? "",
+        convidados: r.convidados ?? "",
+      });
+
+      let body: any;
+      if (isAttendance) {
+        const tplButtons: Array<{ id: string; label: string }> =
+          Array.isArray(tpl.buttons) && tpl.buttons.length > 0
+            ? tpl.buttons
+            : [
+                { id: "showup", label: "✅ Show up" },
+                { id: "noshow", label: "❌ No show" },
+                { id: "remarcada", label: "🔄 Call remarcada" },
+              ];
+        body = {
+          type: "interactive",
+          interactive: {
+            type: "button",
+            body: { text },
+            action: {
+              buttons: tplButtons.slice(0, 3).map((b) => ({
+                type: "reply",
+                reply: { id: `callack:${rawId}:${b.id}`, title: b.label.slice(0, 20) },
+              })),
+            },
+          },
+        };
+      } else {
+        body = { type: "text", text: { body: text } };
+      }
+
+      await db
+        .from("wa_call_reminders" as any)
+        .update({ status: "pending", error_message: null })
+        .eq("id", rawId);
+
+      try {
+        const { waMsgId } = await sendWA(r.channel_id, r.contact_wa, body, db);
+        await db
+          .from("wa_call_reminders" as any)
+          .update({ status: "sent", sent_at: new Date().toISOString(), wa_message_id: waMsgId, error_message: null })
+          .eq("id", rawId);
+        return { ok: true, waMsgId };
+      } catch (e: any) {
+        const msg = e?.message ?? "Falha ao reenviar";
+        await db
+          .from("wa_call_reminders" as any)
+          .update({ status: "failed", error_message: msg })
+          .eq("id", rawId);
+        throw new Error(msg);
+      }
+    }
+
+    if (kind === "task") {
+      const { data: row, error } = await db
+        .from("wa_task_notifications" as any)
+        .select("*")
+        .eq("id", rawId)
+        .maybeSingle();
+      if (error || !row) throw new Error("Registro não encontrado");
+      const r = row as any;
+      if (!r.contact_wa) throw new Error("Sem telefone");
+      if (!r.channel_id) throw new Error("Sem canal vinculado");
+
+      const { data: task } = await db
+        .from("tasks" as any)
+        .select("id,titulo,prioridade,prazo,created_at")
+        .eq("id", r.task_id)
+        .maybeSingle();
+      const slug = r.kind === "due_soon" ? "task_due_soon" : r.kind === "overdue" ? "task_overdue" : "task_created";
+      const tpl = await loadTpl(slug);
+      if (!tpl) throw new Error(`Template ${slug} não encontrado`);
+
+      const fmt = (iso: any) => {
+        if (!iso) return "";
+        try { return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }); } catch { return ""; }
+      };
+      const vars = {
+        titulo: String((task as any)?.titulo ?? ""),
+        prioridade: String((task as any)?.prioridade ?? "normal"),
+        criada: fmt((task as any)?.created_at),
+        prazo: fmt((task as any)?.prazo),
+      };
+      const text = renderTpl(String(tpl.conteudo ?? ""), vars);
+      const body = { type: "text", text: { body: text } };
+
+      await db
+        .from("wa_task_notifications" as any)
+        .update({ status: "pending", error_message: null })
+        .eq("id", rawId);
+
+      try {
+        const { waMsgId } = await sendWA(r.channel_id, r.contact_wa, body, db);
+        await db
+          .from("wa_task_notifications" as any)
+          .update({ status: "sent", sent_at: new Date().toISOString(), wa_message_id: waMsgId, error_message: null })
+          .eq("id", rawId);
+        return { ok: true, waMsgId };
+      } catch (e: any) {
+        const msg = e?.message ?? "Falha ao reenviar";
+        await db
+          .from("wa_task_notifications" as any)
+          .update({ status: "failed", error_message: msg })
+          .eq("id", rawId);
+        throw new Error(msg);
+      }
+    }
+
+    throw new Error("Tipo de log não suportado");
+  });
+
+
 
