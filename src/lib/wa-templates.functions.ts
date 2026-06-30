@@ -272,7 +272,7 @@ export const syncMetaTemplates = createServerFn({ method: "POST" })
     const { data: rows, error } = await context.supabase
       .from("wa_templates" as any)
       .select("id, meta_template_id, meta_channel_id, slug, nome")
-      .not("meta_template_id", "is", null);
+      .not("meta_channel_id", "is", null);
     if (error) throw new Error(error.message);
 
     const listRes = await fetch(`${EVOHUB_BASE}/api/v1/channels`, {
@@ -281,37 +281,68 @@ export const syncMetaTemplates = createServerFn({ method: "POST" })
     const listJson: any = await listRes.json().catch(() => null);
     const list: any[] = Array.isArray(listJson) ? listJson : listJson?.data ?? listJson?.channels ?? [];
 
+    // Cache templates per channel to avoid duplicate fetches
+    const cache = new Map<string, any[]>();
+
+    async function fetchAllForChannel(channelId: string): Promise<any[]> {
+      if (cache.has(channelId)) return cache.get(channelId)!;
+      const ch = list.find((c) => String(c.id) === String(channelId));
+      const all: any[] = [];
+      if (ch) {
+        const meta = typeof ch.metadata === "string" ? JSON.parse(ch.metadata) : (ch.metadata ?? {});
+        const metaConn = ch.meta_connection ?? meta?.meta_connection ?? ch.meta ?? meta?.meta ?? null;
+        const wabaId: string | undefined =
+          metaConn?.waba_id ?? metaConn?.wabaId ?? metaConn?.business_account_id ?? metaConn?.whatsapp_business_account_id ??
+          ch?.waba_id ?? ch?.wabaId ?? meta?.waba_id ?? meta?.wabaId;
+        const chToken: string | undefined = ch.token ?? ch.api_token ?? meta?.token;
+        if (wabaId && chToken) {
+          let url: string | null = `${EVOHUB_BASE}/meta/${wabaId}/message_templates?fields=name,status,category,id,rejected_reason&limit=200`;
+          while (url) {
+            const r = await fetch(url, {
+              headers: { Authorization: `Bearer ${chToken}`, "Content-Type": "application/json" },
+            });
+            const j: any = await r.json().catch(() => null);
+            if (Array.isArray(j?.data)) all.push(...j.data);
+            url = j?.paging?.next ?? null;
+          }
+        }
+      }
+      // Fallback: EvoHub channel-scoped templates
+      if (all.length === 0) {
+        const r = await fetch(`${EVOHUB_BASE}/api/v1/channels/${channelId}/templates`, {
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        });
+        const j: any = await r.json().catch(() => null);
+        const arr: any[] = Array.isArray(j) ? j : j?.data ?? j?.templates ?? [];
+        all.push(...arr);
+      }
+      cache.set(channelId, all);
+      return all;
+    }
+
     let updated = 0;
+    const misses: any[] = [];
     for (const row of (rows ?? []) as any[]) {
-      const ch = list.find((c) => String(c.id) === String(row.meta_channel_id));
-      if (!ch) continue;
-      const meta = typeof ch.metadata === "string" ? JSON.parse(ch.metadata) : (ch.metadata ?? {});
-      const metaConn = ch.meta_connection ?? meta?.meta_connection ?? null;
-      const wabaId: string | undefined =
-        metaConn?.waba_id ?? metaConn?.business_account_id ?? metaConn?.whatsapp_business_account_id ??
-        ch?.waba_id ?? meta?.waba_id;
-      const chToken: string | undefined = ch.token ?? ch.api_token ?? meta?.token;
-      if (!wabaId || !chToken) continue;
-
-      const res = await fetch(
-        `${EVOHUB_BASE}/meta/${wabaId}/message_templates?fields=name,status,category,id,rejected_reason&limit=200`,
-        { headers: { Authorization: `Bearer ${chToken}`, "Content-Type": "application/json" } },
-      );
-      const json: any = await res.json().catch(() => null);
-      const tpls: any[] = Array.isArray(json?.data) ? json.data : [];
-      const match = tpls.find((t) => String(t.id) === String(row.meta_template_id))
-        ?? tpls.find((t) => String(t.name) === String(row.slug ?? row.nome));
-      if (!match) continue;
-
+      const tpls = await fetchAllForChannel(String(row.meta_channel_id));
+      const match =
+        (row.meta_template_id && tpls.find((t) => String(t.id) === String(row.meta_template_id))) ||
+        tpls.find((t) => String(t.name) === String(row.slug ?? "")) ||
+        tpls.find((t) => String(t.name) === String(row.nome ?? ""));
+      if (!match) {
+        misses.push({ id: row.id, slug: row.slug, totalInChannel: tpls.length });
+        continue;
+      }
       await context.supabase
         .from("wa_templates" as any)
         .update({
           meta_status: match.status ?? null,
           meta_category: match.category ?? null,
+          meta_template_id: match.id ?? row.meta_template_id ?? null,
         })
         .eq("id", row.id);
       updated += 1;
     }
-    return { ok: true, updated, total: (rows ?? []).length };
+    return { ok: true, updated, total: (rows ?? []).length, misses: misses.slice(0, 5) };
   });
+
 
