@@ -1,0 +1,4 @@
+UPDATE public.wa_templates
+SET conteudo = E'📊 *Relatório Ads — {{periodo}}*\n\n🧠 *Diagnóstico*\n{{diagnostico}}\n\n💸 Investido: {{investido}}\n💰 Faturamento: {{faturamento}}\n📈 Lucro: {{lucro}}\n🎯 ROAS: {{roas}}\n\n🛒 Compras: {{compras}} | CPA: {{cpa}}\n🧲 Leads: {{leads}} | CPL: {{cpl}}\n\n👆 Cliques: {{cliques}} | CTR: {{ctr}}\n💵 CPC: {{cpc}} | CPM: {{cpm}}\n👀 Impressões: {{impressoes}} | Alcance: {{alcance}}\n\n🛍️ Add to cart: {{add_to_cart}} | Checkout: {{initiate_checkout}} | LPV: {{lpv}}\n\n📣 Campanhas ativas: {{campanhas_ativas}}/{{campanhas_total}}\n\n🏆 *Top campanhas*\n{{top_campanhas}}\n\n⚠️ *Atenção (CPA alto)*\n{{alertas_cpa}}\n\n— Multum Ads 🚀',
+    meta_template_id = NULL
+WHERE slug = 'analytics_ads';
