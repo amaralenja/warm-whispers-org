@@ -50,6 +50,8 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { useServerFn } from "@tanstack/react-start";
 import { fetchInstagramProfile, listInstagramLeads } from "@/lib/instagram.functions";
 import { toast } from "sonner";
+import { DragScroll } from "@/components/drag-scroll";
+
 
 export const Route = createFileRoute("/_authenticated/quiz")({
   component: QuizPage,
