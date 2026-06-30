@@ -1176,6 +1176,11 @@ function DispatchLogsPanel() {
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                      {log.errorMessage && (
+                        <div className="mt-1 max-w-[260px] text-[11px] text-red-300/90 leading-snug break-words" title={log.errorMessage}>
+                          {log.errorMessage}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-3 max-w-[260px]">
                       <div className="truncate font-mono text-xs text-muted-foreground" title={log.waMessageId || ""}>{log.waMessageId || "—"}</div>
