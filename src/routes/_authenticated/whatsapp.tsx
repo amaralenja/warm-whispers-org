@@ -276,7 +276,7 @@ function WhatsAppPage() {
                       onClick={() => {
                         if (!name.trim()) return toast.error("Informe o nome da conexão");
                         if (!newOp) return toast.error("Selecione uma operação");
-                        createMut.mutate({ name: name.trim(), operacaoId: newOp });
+                        createMut.mutate({ name: name.trim(), operacaoId: newOp, kind: tab });
                       }}
                       disabled={createMut.isPending}
                       className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
