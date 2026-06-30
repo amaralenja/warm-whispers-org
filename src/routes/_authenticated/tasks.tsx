@@ -884,7 +884,37 @@ function MembersDialog({
         </DialogHeader>
 
         {editing ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Avatar + upload */}
+            <div className="flex items-center gap-4">
+              <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-border bg-neutral-900 flex items-center justify-center">
+                {editing.foto_url ? (
+                  <img src={editing.foto_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-12 w-12 text-neutral-600" fill="currentColor">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="inline-flex items-center gap-2 cursor-pointer rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-accent">
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {editing.foto_url ? "Trocar foto" : "Enviar foto (opcional)"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {editing.foto_url && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ ...editing, foto_url: null })}>
+                    Remover foto
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <div>
               <Label>Nome</Label>
               <Input value={editing.nome ?? ""} onChange={(e) => setEditing({ ...editing, nome: e.target.value })} />
@@ -898,37 +928,31 @@ function MembersDialog({
                 />
               </div>
               <div>
-                <Label>Email</Label>
+                <Label>Telefone (WhatsApp)</Label>
                 <Input
-                  value={editing.email ?? ""}
-                  onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+                  value={editing.telefone ?? ""}
+                  placeholder="(11) 99999-9999"
+                  onChange={(e) => setEditing({ ...editing, telefone: e.target.value })}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Foto (URL)</Label>
-                <Input
-                  value={editing.foto_url ?? ""}
-                  onChange={(e) => setEditing({ ...editing, foto_url: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Cor</Label>
-                <Input
-                  type="color"
-                  value={editing.cor ?? "#6366f1"}
-                  onChange={(e) => setEditing({ ...editing, cor: e.target.value })}
-                />
-              </div>
+            <div>
+              <Label>Cor (fallback)</Label>
+              <Input
+                type="color"
+                value={editing.cor ?? "#1f2937"}
+                onChange={(e) => setEditing({ ...editing, cor: e.target.value })}
+                className="h-10 w-20"
+              />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditing(null)}>
                 Cancelar
               </Button>
-              <Button onClick={save}>Salvar</Button>
+              <Button onClick={save} disabled={uploading}>Salvar</Button>
             </DialogFooter>
           </div>
+
         ) : (
           <>
             <div className="max-h-[60vh] space-y-2 overflow-y-auto scrollbar-fancy">
