@@ -249,7 +249,7 @@ export const listVendorsForChannel = createServerFn({ method: "GET" })
       .order("nome");
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    const all = (rows ?? []) as Array<{ id: number; nome: string; foto_url: string | null; wa_channel_ids: string[] | null }>;
+    const all = ((rows ?? []) as unknown) as Array<{ id: number; nome: string; foto_url: string | null; wa_channel_ids: string[] | null }>;
     if (!data.channelId) return all;
     return all.filter((v) => Array.isArray(v.wa_channel_ids) && v.wa_channel_ids.includes(data.channelId));
   });
