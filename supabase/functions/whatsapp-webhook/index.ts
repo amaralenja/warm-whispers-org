@@ -1304,7 +1304,7 @@ Deno.serve(async (req) => {
             last_message_preview: previewFor(m),
             last_message_direction: "in",
           }, { onConflict: "channel_id,contact_wa_id" })
-          .select("id, unread_count")
+          .select("id, unread_count, assigned_vendor_id")
           .single();
 
         if (convErr || !conv) {
@@ -1312,9 +1312,24 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        const conversationPatch: Record<string, unknown> = {
+          unread_count: ((conv as any).unread_count ?? 0) + 1,
+        };
+
+        if (!(conv as any).assigned_vendor_id) {
+          const { data: vendorId, error: assignErr } = await supabase.rpc("assign_vendor_for_channel", {
+            _channel_id: channelId,
+          });
+          if (assignErr) {
+            console.error("[wa-webhook] assign_vendor_for_channel error", assignErr);
+          } else if (vendorId) {
+            conversationPatch.assigned_vendor_id = vendorId;
+          }
+        }
+
         await supabase
           .from("wa_conversations")
-          .update({ unread_count: ((conv as any).unread_count ?? 0) + 1 })
+          .update(conversationPatch)
           .eq("id", (conv as any).id);
 
         // Cria lead no CRM da operação se ainda não existir (por telefone + expert)

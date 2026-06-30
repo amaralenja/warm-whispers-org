@@ -82,8 +82,16 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               const phoneNumberId = value?.metadata?.phone_number_id ?? null;
               const displayPhone = value?.metadata?.display_phone_number ?? null;
 
-              // Resolve channel via phone_number_id later by linking it in DB; for now use phoneNumberId as channel_id key fallback.
-              const channelId = phoneNumberId ?? "unknown";
+              const { data: matchedChannel } = phoneNumberId
+                ? await supabaseAdmin
+                    .from("wa_channels" as any)
+                    .select("id,operacao_id")
+                    .eq("phone_number_id", phoneNumberId)
+                    .maybeSingle()
+                : { data: null } as any;
+
+              const channelId = String((matchedChannel as any)?.id ?? phoneNumberId ?? "unknown");
+              const operacaoId = (matchedChannel as any)?.operacao_id ?? null;
 
               const contacts: any[] = Array.isArray(value?.contacts) ? value.contacts : [];
               const contactNameByWaId: Record<string, string> = {};
@@ -105,6 +113,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                       phone_number_id: phoneNumberId,
                       contact_wa_id: m.from,
                       contact_name: contactName,
+                      operacao_id: operacaoId,
                       last_message_at: new Date(parseInt(m.timestamp, 10) * 1000).toISOString(),
                       last_message_preview: previewFor(m),
                       last_message_direction: "in",
