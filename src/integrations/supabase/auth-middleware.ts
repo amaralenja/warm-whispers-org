@@ -121,9 +121,11 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
 
     const authHeader = request.headers.get('authorization');
 
-    if (!authHeader) {
-      const vendor = await validateVendorSession(baseSupabase, request);
-      if (!vendor) throw new Error('Unauthorized: No authorization header provided');
+    // Se existe sessão de vendedor, ela deve prevalecer mesmo que o navegador ainda tenha
+    // um token Supabase antigo salvo. Isso evita o vendedor cair nas RLS de admin e receber
+    // "Inautorizado" nas telas liberadas pra ele.
+    const vendor = await validateVendorSession(baseSupabase, request);
+    if (vendor) {
       return next({
         context: {
           supabase: baseSupabase,
@@ -132,6 +134,10 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
           vendor: vendor as VendorContext | null,
         },
       });
+    }
+
+    if (!authHeader) {
+      throw new Error('Unauthorized: No authorization header provided');
     }
 
     if (!authHeader.startsWith('Bearer ')) {
