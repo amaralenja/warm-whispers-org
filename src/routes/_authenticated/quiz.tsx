@@ -751,24 +751,25 @@ function StatPill({
 
 function RealityToggle({ real, onChange }: { real: boolean; onChange: (r: Reality | null) => void }) {
   return (
-    <div className="inline-flex rounded-md border border-border overflow-hidden text-[11px]">
+    <div className="inline-flex rounded-lg border border-border overflow-hidden text-xs font-semibold shadow-sm">
       <button
         type="button"
         onClick={() => onChange(real ? null : "real")}
-        className={`px-2 py-1 flex items-center gap-1 transition ${real ? "bg-emerald-500/20 text-emerald-300" : "text-muted-foreground hover:bg-accent/10"}`}
+        className={`px-3 py-1.5 flex items-center gap-1.5 transition ${real ? "bg-emerald-500/25 text-emerald-200" : "text-muted-foreground hover:bg-accent/10"}`}
       >
-        <CheckCircle2 className="h-3 w-3" /> Real
+        <CheckCircle2 className="h-3.5 w-3.5" /> Real
       </button>
       <button
         type="button"
         onClick={() => onChange(!real ? null : "fake")}
-        className={`px-2 py-1 flex items-center gap-1 border-l border-border transition ${!real ? "bg-rose-500/20 text-rose-300" : "text-muted-foreground hover:bg-accent/10"}`}
+        className={`px-3 py-1.5 flex items-center gap-1.5 border-l border-border transition ${!real ? "bg-rose-500/25 text-rose-200" : "text-muted-foreground hover:bg-accent/10"}`}
       >
-        <XCircle className="h-3 w-3" /> Fake
+        <XCircle className="h-3.5 w-3.5" /> Fake
       </button>
     </div>
   );
 }
+
 
 function LeadCard({
   lead, real, onToggle, onOpen,
