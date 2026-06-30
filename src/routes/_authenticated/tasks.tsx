@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -46,6 +47,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
+import { notifyTaskCreated } from "@/lib/task-notifications.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({
   component: TasksPage,
@@ -654,6 +656,7 @@ function TaskDialog({
     task.checklist.length > 0 ? task.checklist : [],
   );
   const [saving, setSaving] = useState(false);
+  const notifyTaskCreatedFn = useServerFn(notifyTaskCreated);
 
   function addChecklist() {
     setChecklists([
@@ -692,9 +695,16 @@ function TaskDialog({
         return toast.error(error.message);
       }
       if (inserted && assignees.length > 0) {
-        import("@/lib/task-notifications.functions")
-          .then(({ notifyTaskCreated }) => notifyTaskCreated({ data: { taskId: (inserted as any).id } }))
-          .catch(() => {});
+        try {
+          const result = await notifyTaskCreatedFn({ data: { taskId: (inserted as any).id } });
+          if ((result as any)?.sent > 0) {
+            toast.success(`Notificação enviada pra ${(result as any).sent} responsável(is)`);
+          } else if ((result as any)?.reason) {
+            toast.warning(`Tarefa criada, mas sem disparo: ${(result as any).reason}`);
+          }
+        } catch (e: any) {
+          toast.error(`Tarefa criada, mas o WhatsApp não disparou: ${e?.message ?? "erro"}`);
+        }
       }
     } else {
       const { error } = await supabase.from("tasks" as any).update(payload).eq("id", task.id);
