@@ -176,7 +176,9 @@ export function AppSidebar() {
           )}
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
+              {perm !== null && renderMenuItem({ title: "Meu Painel", url: "/vendor", icon: User })}
               {visibleMain.map(renderMenuItem)}
+
 
               {/* Operação X1 — colapsável */}
               {showOpX1Group && (
