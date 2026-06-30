@@ -318,8 +318,8 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
         metadata: { operacao_id: opId, app_source: APP_SOURCE, kind: data.kind },
       }),
     });
-    await upsertLocalChannel(context.supabase, { ...ch, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, opId);
-    return withConnectUrl({ ...ch, kind: data.kind });
+    await upsertLocalChannel(context.supabase, { ...ch, kind: data.kind, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, opId, data.kind);
+    return withConnectUrl({ ...ch, kind: data.kind, metadata: { ...(ch?.metadata ?? {}), kind: data.kind, operacao_id: opId } });
   });
 
 
