@@ -538,9 +538,12 @@ async function getAiSnapshot(supabase: any, contactWa: string, userText: string)
     `Quiz/HighTicket hoje: ${quizRows.length} lead(s); qualificados 5k-10k+: ${quizRows.filter((r) => Number(r.valor || 0) >= 5000).length}.`,
     `Tasks pendentes carregadas: ${tasksRows.length}. Próximas: ${tasksRows.slice(0, 5).map((t) => `${t.titulo} (${t.prazo || "sem prazo"})`).join("; ") || "nenhuma"}.`,
     `Financeiro mês: entradas ${money(entradas)}, saídas ${money(saidas)}, saldo ${money(entradas - saidas)}.`,
-    `Calls hoje registradas no sistema: ${callRowsToday.length}; show up ${callCount(callRowsToday, "show_up")}; no-show ${callCount(callRowsToday, "no_show")}; remarcadas ${callCount(callRowsToday, "rescheduled")}.`,
-    `Calls mês registradas: ${callRowsMonth.length}; show up ${callCount(callRowsMonth, "show_up")}; no-show ${callCount(callRowsMonth, "no_show")}; remarcadas ${callCount(callRowsMonth, "rescheduled")}.`,
+    `Calls AGENDADAS hoje no Google Calendar (${callsHoje.length}): ${callsHojeStr}.`,
+    `Calls AGENDADAS amanhã no Google Calendar (${callsAmanha.length}): ${callsAmanhaStr}.`,
+    `Comparecimento registrado hoje (wa_call_reminders): ${callRowsToday.length}; show up ${callCount(callRowsToday, "show_up")}; no-show ${callCount(callRowsToday, "no_show")}; remarcadas ${callCount(callRowsToday, "rescheduled")}.`,
+    `Comparecimento registrado mês: ${callRowsMonth.length}; show up ${callCount(callRowsMonth, "show_up")}; no-show ${callCount(callRowsMonth, "no_show")}; remarcadas ${callCount(callRowsMonth, "rescheduled")}.`,
     `Eventos Meta/CAPI hoje: ${adsRows.length}. Atenção: gasto de Ads depende da conexão Meta Ads estar configurada no módulo.`,
+
   ].join("\n");
 }
 
