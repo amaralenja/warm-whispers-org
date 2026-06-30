@@ -657,11 +657,6 @@ function ChatPage() {
                     })()}
                   </div>
                 </div>
-                <FlowDispatcher
-                  conversation={active}
-                  listFlowsFn={listFlowsFn}
-                  triggerFn={triggerFlowFn}
-                />
               </header>
 
               <ActiveFlowRuns conversationId={active.id} />
