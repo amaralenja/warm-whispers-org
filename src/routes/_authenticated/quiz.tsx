@@ -45,6 +45,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   Loader2,
+  Clock,
+  Mail,
+  Phone,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useServerFn } from "@tanstack/react-start";
