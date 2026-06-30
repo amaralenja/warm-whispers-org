@@ -44,6 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/tasks")({
@@ -52,6 +53,8 @@ export const Route = createFileRoute("/_authenticated/tasks")({
 
 type Board = { id: string; nome: string; cor: string };
 type Column = { id: string; board_id: string; nome: string; cor: string; ordem: number };
+type ChecklistItem = { id: string; texto: string; done: boolean };
+type ChecklistGroup = { id: string; titulo: string; items: ChecklistItem[] };
 type Task = {
   id: string;
   board_id: string;
@@ -61,8 +64,8 @@ type Task = {
   prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo: string | null;
   assignee_ids: string[];
-  labels: string[];
-  checklist: { id: string; texto: string; done: boolean }[];
+  labels: { texto: string; cor: string }[];
+  checklist: ChecklistGroup[];
   ordem: number;
   concluida: boolean;
 };
@@ -84,6 +87,42 @@ const PRIO_COLORS: Record<string, string> = {
   alta: "bg-orange-500/20 text-orange-300 border-orange-500/40",
   urgente: "bg-red-500/20 text-red-300 border-red-500/40",
 };
+
+const LABEL_COLORS = [
+  { name: "Vermelho", value: "#ef4444" },
+  { name: "Laranja", value: "#f97316" },
+  { name: "Âmbar", value: "#f59e0b" },
+  { name: "Verde", value: "#22c55e" },
+  { name: "Teal", value: "#14b8a6" },
+  { name: "Azul", value: "#3b82f6" },
+  { name: "Roxo", value: "#a855f7" },
+  { name: "Rosa", value: "#ec4899" },
+  { name: "Cinza", value: "#64748b" },
+];
+
+function normalizeChecklist(raw: unknown): ChecklistGroup[] {
+  if (!Array.isArray(raw)) return [];
+  if (raw.length === 0) return [];
+  // Legacy: array of {id, texto, done}
+  if ("texto" in (raw[0] as any) && !("items" in (raw[0] as any))) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        titulo: "Checklist",
+        items: raw as ChecklistItem[],
+      },
+    ];
+  }
+  return raw as ChecklistGroup[];
+}
+
+function normalizeLabels(raw: unknown): { texto: string; cor: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((l: any) =>
+    typeof l === "string" ? { texto: l, cor: "#64748b" } : { texto: l.texto, cor: l.cor ?? "#64748b" },
+  );
+}
+
 
 function initials(n: string) {
   return n
@@ -144,7 +183,11 @@ function TasksPage() {
         .eq("board_id", activeBoardId!)
         .order("ordem");
       if (error) throw error;
-      return (data ?? []) as unknown as Task[];
+      return ((data ?? []) as any[]).map((t) => ({
+        ...t,
+        labels: normalizeLabels(t.labels),
+        checklist: normalizeChecklist(t.checklist),
+      })) as Task[];
     },
   });
 
@@ -285,6 +328,19 @@ function TasksPage() {
           </Button>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => {
+              if (!activeBoardId) return toast.error("Selecione um quadro");
+              const firstCol = columns[0];
+              if (!firstCol) return toast.error("Crie uma coluna primeiro");
+              setCreatingInColumn(firstCol.id);
+            }}
+            disabled={!activeBoardId || columns.length === 0}
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            <Plus className="mr-1 h-4 w-4" /> Nova tarefa
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowMembers(true)}>
             <UsersIcon className="mr-1 h-4 w-4" /> Equipe ({members.length})
           </Button>
@@ -295,7 +351,8 @@ function TasksPage() {
       </div>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-gradient-to-br from-background to-background/70">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-fancy bg-gradient-to-br from-background to-background/70">
+
         {!activeBoard ? (
           <div className="flex h-full items-center justify-center text-muted-foreground">
             {boardsQ.isLoading ? "Carregando..." : "Nenhum quadro. Crie o primeiro!"}
@@ -496,8 +553,9 @@ function TaskCard({
   onClick: () => void;
 }) {
   const assignees = task.assignee_ids.map((id) => memberById.get(id)).filter(Boolean) as Member[];
-  const checklistDone = task.checklist.filter((c) => c.done).length;
-  const checklistTotal = task.checklist.length;
+  const allItems = task.checklist.flatMap((g) => g.items);
+  const checklistDone = allItems.filter((c) => c.done).length;
+  const checklistTotal = allItems.length;
   const prazoDate = task.prazo ? new Date(task.prazo) : null;
   const isLate = prazoDate && prazoDate < new Date() && !task.concluida;
 
@@ -512,9 +570,13 @@ function TaskCard({
     >
       {task.labels.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
-          {task.labels.map((l) => (
-            <span key={l} className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-accent/20 text-accent">
-              {l}
+          {task.labels.map((l, i) => (
+            <span
+              key={`${l.texto}-${i}`}
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{ background: `${l.cor}33`, color: l.cor, border: `1px solid ${l.cor}55` }}
+            >
+              {l.texto}
             </span>
           ))}
         </div>
@@ -582,14 +644,29 @@ function TaskDialog({
   const [titulo, setTitulo] = useState(task.titulo);
   const [descricao, setDescricao] = useState(task.descricao ?? "");
   const [prioridade, setPrioridade] = useState(task.prioridade);
-  const [prazo, setPrazo] = useState(task.prazo ? task.prazo.slice(0, 10) : "");
+  const [prazo, setPrazo] = useState<Date | undefined>(task.prazo ? new Date(task.prazo) : undefined);
   const [assignees, setAssignees] = useState<string[]>(task.assignee_ids);
-  const [labels, setLabels] = useState<string[]>(task.labels);
+  const [labels, setLabels] = useState<{ texto: string; cor: string }[]>(task.labels);
   const [labelInput, setLabelInput] = useState("");
+  const [labelColor, setLabelColor] = useState(LABEL_COLORS[5].value);
   const [columnId, setColumnId] = useState(task.column_id);
-  const [checklist, setChecklist] = useState(task.checklist);
-  const [newItem, setNewItem] = useState("");
+  const [checklists, setChecklists] = useState<ChecklistGroup[]>(
+    task.checklist.length > 0 ? task.checklist : [],
+  );
   const [saving, setSaving] = useState(false);
+
+  function addChecklist() {
+    setChecklists([
+      ...checklists,
+      { id: crypto.randomUUID(), titulo: `Checklist ${checklists.length + 1}`, items: [] },
+    ]);
+  }
+  function updateChecklist(id: string, patch: Partial<ChecklistGroup>) {
+    setChecklists(checklists.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+  function removeChecklist(id: string) {
+    setChecklists(checklists.filter((c) => c.id !== id));
+  }
 
   async function save() {
     if (!titulo.trim()) return toast.error("Título obrigatório");
@@ -598,10 +675,10 @@ function TaskDialog({
       titulo: titulo.trim(),
       descricao,
       prioridade,
-      prazo: prazo ? new Date(prazo + "T12:00:00").toISOString() : null,
+      prazo: prazo ? prazo.toISOString() : null,
       assignee_ids: assignees,
       labels,
-      checklist,
+      checklist: checklists,
       column_id: columnId,
     };
     if (isNew) {
@@ -614,13 +691,11 @@ function TaskDialog({
         setSaving(false);
         return toast.error(error.message);
       }
-      // Dispara notificação WhatsApp pros assignees (fire & forget)
       if (inserted && assignees.length > 0) {
         import("@/lib/task-notifications.functions")
           .then(({ notifyTaskCreated }) => notifyTaskCreated({ data: { taskId: (inserted as any).id } }))
           .catch(() => {});
       }
-
     } else {
       const { error } = await supabase.from("tasks" as any).update(payload).eq("id", task.id);
       if (error) {
@@ -644,20 +719,39 @@ function TaskDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto scrollbar-fancy">
         <DialogHeader>
-          <DialogTitle>{isNew ? "Nova Tarefa" : "Editar Tarefa"}</DialogTitle>
+          <DialogTitle className="text-xl">{isNew ? "✨ Nova Tarefa" : "Editar Tarefa"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <Label>Título</Label>
-            <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} autoFocus />
+            <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+              Título da tarefa
+            </Label>
+            <Input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              autoFocus
+              placeholder="Ex.: Gravar vídeo de apresentação"
+              className="text-base"
+            />
           </div>
+
           <div>
-            <Label>Descrição</Label>
-            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
+            <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+              Descrição
+            </Label>
+            <Textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              rows={3}
+              placeholder="Detalhe o que precisa ser feito, links úteis, contexto, critérios de aceite…"
+            />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <Label>Coluna</Label>
+              <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+                Coluna
+              </Label>
               <Select value={columnId} onValueChange={setColumnId}>
                 <SelectTrigger>
                   <SelectValue />
@@ -672,27 +766,60 @@ function TaskDialog({
               </Select>
             </div>
             <div>
-              <Label>Prioridade</Label>
+              <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+                Prioridade
+              </Label>
               <Select value={prioridade} onValueChange={(v) => setPrioridade(v as any)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="baixa">Baixa</SelectItem>
-                  <SelectItem value="media">Média</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem>
-                  <SelectItem value="urgente">Urgente</SelectItem>
+                  <SelectItem value="baixa">🟢 Baixa</SelectItem>
+                  <SelectItem value="media">🔵 Média</SelectItem>
+                  <SelectItem value="alta">🟠 Alta</SelectItem>
+                  <SelectItem value="urgente">🔴 Urgente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Prazo</Label>
-              <Input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
+              <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+                Prazo
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`w-full justify-start text-left font-normal ${!prazo && "text-muted-foreground"}`}
+                  >
+                    <CalIcon className="mr-2 h-4 w-4" />
+                    {prazo
+                      ? prazo.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+                      : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={prazo} onSelect={setPrazo} initialFocus />
+                  {prazo && (
+                    <div className="border-t border-border p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setPrazo(undefined)}
+                      >
+                        Limpar data
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
           <div>
-            <Label className="mb-2 block">Responsáveis</Label>
+            <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+              Responsáveis
+            </Label>
             <div className="flex flex-wrap gap-2">
               {members.map((m) => {
                 const sel = assignees.includes(m.id);
@@ -726,70 +853,160 @@ function TaskDialog({
           </div>
 
           <div>
-            <Label className="mb-2 block">Labels</Label>
+            <Label className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+              Labels
+            </Label>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Use labels coloridas pra categorizar (ex.: <em>Marketing</em>, <em>Bug</em>, <em>Urgente</em>)
+              e filtrar rapidamente no quadro.
+            </p>
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {labels.map((l) => (
-                <Badge key={l} variant="secondary" className="gap-1">
-                  {l}
-                  <button onClick={() => setLabels(labels.filter((x) => x !== l))}>
+              {labels.map((l, i) => (
+                <span
+                  key={`${l.texto}-${i}`}
+                  className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
+                  style={{ background: `${l.cor}33`, color: l.cor, border: `1px solid ${l.cor}66` }}
+                >
+                  {l.texto}
+                  <button onClick={() => setLabels(labels.filter((_, idx) => idx !== i))}>
                     <X className="h-3 w-3" />
                   </button>
-                </Badge>
+                </span>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1">
+                {LABEL_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setLabelColor(c.value)}
+                    title={c.name}
+                    className={`h-5 w-5 rounded-full transition ${
+                      labelColor === c.value ? "ring-2 ring-offset-2 ring-offset-background ring-foreground" : ""
+                    }`}
+                    style={{ background: c.value }}
+                  />
+                ))}
+              </div>
               <Input
-                placeholder="Adicionar label..."
+                placeholder="Nome da label e Enter…"
                 value={labelInput}
                 onChange={(e) => setLabelInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && labelInput.trim()) {
-                    setLabels([...labels, labelInput.trim()]);
+                    e.preventDefault();
+                    setLabels([...labels, { texto: labelInput.trim(), cor: labelColor }]);
                     setLabelInput("");
                   }
                 }}
+                className="flex-1 min-w-[180px]"
               />
             </div>
           </div>
 
           <div>
-            <Label className="mb-2 block">Checklist</Label>
-            <div className="space-y-1.5">
-              {checklist.map((c) => (
-                <div key={c.id} className="flex items-center gap-2 rounded bg-muted/40 px-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={c.done}
-                    onChange={(e) =>
-                      setChecklist(
-                        checklist.map((x) => (x.id === c.id ? { ...x, done: e.target.checked } : x)),
-                      )
-                    }
-                  />
-                  <span className={`flex-1 text-sm ${c.done ? "line-through text-muted-foreground" : ""}`}>
-                    {c.texto}
-                  </span>
-                  <button onClick={() => setChecklist(checklist.filter((x) => x.id !== c.id))}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <Label className="block text-xs uppercase tracking-wide text-muted-foreground">
+                  Checklists
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Quebre a tarefa em sub-itens. Pode criar múltiplos checklists (ex.: <em>Pré-produção</em>,{" "}
+                  <em>Edição</em>).
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addChecklist}>
+                <Plus className="mr-1 h-4 w-4" /> Checklist
+              </Button>
             </div>
-            <div className="mt-2 flex gap-2">
-              <Input
-                placeholder="Novo item..."
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newItem.trim()) {
-                    setChecklist([
-                      ...checklist,
-                      { id: crypto.randomUUID(), texto: newItem.trim(), done: false },
-                    ]);
-                    setNewItem("");
-                  }
-                }}
-              />
+            <div className="space-y-3">
+              {checklists.map((group) => {
+                const done = group.items.filter((i) => i.done).length;
+                const pct = group.items.length ? Math.round((done / group.items.length) * 100) : 0;
+                return (
+                  <div key={group.id} className="rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-accent" />
+                      <Input
+                        value={group.titulo}
+                        onChange={(e) => updateChecklist(group.id, { titulo: e.target.value })}
+                        className="h-7 flex-1 border-0 bg-transparent px-1 text-sm font-semibold focus-visible:ring-1"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {done}/{group.items.length}
+                      </span>
+                      <button onClick={() => removeChecklist(group.id)} title="Remover checklist">
+                        <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                    {group.items.length > 0 && (
+                      <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-accent transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      {group.items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2 rounded px-1 py-0.5">
+                          <input
+                            type="checkbox"
+                            checked={item.done}
+                            onChange={(e) =>
+                              updateChecklist(group.id, {
+                                items: group.items.map((x) =>
+                                  x.id === item.id ? { ...x, done: e.target.checked } : x,
+                                ),
+                              })
+                            }
+                          />
+                          <span
+                            className={`flex-1 text-sm ${
+                              item.done ? "line-through text-muted-foreground" : ""
+                            }`}
+                          >
+                            {item.texto}
+                          </span>
+                          <button
+                            onClick={() =>
+                              updateChecklist(group.id, {
+                                items: group.items.filter((x) => x.id !== item.id),
+                              })
+                            }
+                          >
+                            <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <Input
+                      placeholder="Adicionar item e Enter…"
+                      className="mt-2 h-8 text-sm"
+                      onKeyDown={(e) => {
+                        const v = (e.target as HTMLInputElement).value.trim();
+                        if (e.key === "Enter" && v) {
+                          e.preventDefault();
+                          updateChecklist(group.id, {
+                            items: [...group.items, { id: crypto.randomUUID(), texto: v, done: false }],
+                          });
+                          (e.target as HTMLInputElement).value = "";
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              })}
+              {checklists.length === 0 && (
+                <button
+                  type="button"
+                  onClick={addChecklist}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition hover:border-accent hover:text-accent"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar primeiro checklist
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -807,7 +1024,7 @@ function TaskDialog({
             </Button>
             <Button onClick={save} disabled={saving}>
               <Check className="mr-1 h-4 w-4" />
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : isNew ? "Criar tarefa" : "Salvar"}
             </Button>
           </div>
         </DialogFooter>
@@ -815,6 +1032,7 @@ function TaskDialog({
     </Dialog>
   );
 }
+
 
 function MembersDialog({
   members,
