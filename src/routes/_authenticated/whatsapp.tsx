@@ -680,6 +680,16 @@ function TemplatesPanel() {
     enabled: !!recipientsOpen,
   });
 
+  const { data: candidates = [] } = useQuery({
+    queryKey: ["wa_recipient_candidates"],
+    queryFn: async () => {
+      const { listRecipientCandidates } = await import("@/lib/call-analytics.functions");
+      return await listRecipientCandidates();
+    },
+    enabled: !!recipientsOpen,
+  });
+
+
   const { data: notifChannels = [] } = useQuery({
     queryKey: ["wa_notification_channels"],
     queryFn: async () => {
