@@ -91,6 +91,39 @@ export type DateRange = { from?: string | null; to?: string | null; expert?: str
 const CAIO_UTMS = ["GC", "BP"];
 const GUSTAVO_UTMS = ["LS", "LF"];
 
+async function dbFor(context: any) {
+  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin as any;
+  }
+  return context.supabase as any;
+}
+
+function vendorWorkspaceIds(context: any): string[] | null {
+  if (!context?.vendor) return null;
+  const ids = context.vendor.workspace_ids;
+  const expert = context.vendor.expert ? [String(context.vendor.expert)] : [];
+  if (Array.isArray(ids)) {
+    const list = ids.map(String).filter(Boolean);
+    return list.length > 0 ? list : expert;
+  }
+  return expert;
+}
+
+const EMPTY_OPERACOES: OperacoesPayload = {
+  experts: [],
+  totalFaturamento: 0,
+  totalVendas: 0,
+  totalReembolsos: 0,
+  totalValorReembolsado: 0,
+  ticketMedioGeral: 0,
+  gastosMes: 0,
+  saldoEstimado: 0,
+  vendedores: [],
+  serieDiaria: [],
+  reembolsos: [],
+};
+
 function classifyOpByUtm(raw: unknown): string | null {
   const utm = String(raw ?? "").trim().toUpperCase();
   if (!utm) return null;
@@ -106,8 +139,14 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     const context = opts?.context;
     const data = opts?.data ?? {};
     if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
-    const { supabase } = context;
-    const expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
+    const supabase = await dbFor(context);
+    let expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
+    const allowedWorkspaces = vendorWorkspaceIds(context);
+    if (allowedWorkspaces) {
+      if (allowedWorkspaces.length === 0) return EMPTY_OPERACOES;
+      if (expertFilter && !allowedWorkspaces.includes(expertFilter)) return EMPTY_OPERACOES;
+      expertFilter = expertFilter ?? allowedWorkspaces[0];
+    }
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
     const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
 

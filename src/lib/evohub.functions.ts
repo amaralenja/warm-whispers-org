@@ -52,6 +52,19 @@ export type EvoChannel = {
 const APP_SOURCE = "lovable-crm";
 const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
 
+async function dbFor(context: any) {
+  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin as any;
+  }
+  return context.supabase as any;
+}
+
+function vendorChannelIds(context: any): string[] {
+  const ids = context?.vendor?.wa_channel_ids;
+  return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+}
+
 function normalizeMetadata(metadata: any): Record<string, any> | null {
   if (!metadata) return null;
   if (typeof metadata === "string") {
@@ -225,20 +238,23 @@ function mergeLocalIntoRemote(ch: any, local?: any) {
 export const listWhatsappChannels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const db = await dbFor(context);
+    const vendorAllowed = context?.vendor ? new Set(vendorChannelIds(context)) : null;
+    if (vendorAllowed && vendorAllowed.size === 0) return [];
     const data = await evoFetch("/api/v1/channels");
     const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
-    const local = await loadLocalChannels(context.supabase);
+    const local = await loadLocalChannels(db);
     const localById = new Map(local.map((row: any) => [String(row.id), row]));
 
     // If Amaral already exists in EvoHub but wasn't created from Motion, register only this channel locally.
     // We intentionally do not auto-import other numbers, so webhooks from unrelated EvoHub channels stay ignored.
-    await Promise.all(
+    if (!context?.vendor) await Promise.all(
       list
         .filter((c) => isWhatsappChannel(c) && shouldAutoImport(c) && !localById.has(String(c.id)))
         .map(async (c) => {
           try {
             const full = await evoFetch(`/api/v1/channels/${c.id}`).catch(() => c);
-            const saved = await upsertLocalChannel(context.supabase, full, "Caio");
+            const saved = await upsertLocalChannel(db, full, "Caio");
             localById.set(String(saved.id), { id: saved.id, operacao_id: "Caio", metadata: saved.metadata });
           } catch {
             localById.set(String(c.id), { id: c.id, operacao_id: "Caio", metadata: { app_source: APP_SOURCE, operacao_id: "Caio", meta_connection: getMetaConnection(c) } });
@@ -246,7 +262,12 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
         }),
     );
 
-    const visible = list.filter((c) => isWhatsappChannel(c) && (belongsToMotion(c) || localById.has(String(c.id)) || shouldAutoImport(c)));
+    const visible = list.filter((c) => {
+      const id = String(c?.id ?? "");
+      if (!isWhatsappChannel(c)) return false;
+      if (vendorAllowed && !vendorAllowed.has(id)) return false;
+      return belongsToMotion(c) || localById.has(id) || (!context?.vendor && shouldAutoImport(c));
+    });
 
     // EvoHub /channels list doesn't include meta_connection; fetch full detail per channel so phone + name render.
     const enriched = await Promise.all(
@@ -255,7 +276,7 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
         try {
           const full = await evoFetch(`/api/v1/channels/${c.id}`);
           // Persist phone info locally so subsequent renders are instant.
-          await upsertLocalChannel(context.supabase, full, localById.get(String(c.id))?.operacao_id ?? null).catch(() => null);
+          if (!context?.vendor) await upsertLocalChannel(db, full, localById.get(String(c.id))?.operacao_id ?? null).catch(() => null);
           return full;
         } catch {
           return c;

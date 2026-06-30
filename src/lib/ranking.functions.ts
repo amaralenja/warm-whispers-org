@@ -58,15 +58,49 @@ export type RankingPayload = {
 
 export type RankingInput = { from?: string | null; to?: string | null; expert?: string | null };
 
+async function dbFor(context: any) {
+  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin as any;
+  }
+  return context.supabase as any;
+}
+
+function vendorWorkspaceIds(context: any): string[] | null {
+  if (!context?.vendor) return null;
+  const ids = context.vendor.workspace_ids;
+  const expert = context.vendor.expert ? [String(context.vendor.expert)] : [];
+  if (Array.isArray(ids)) {
+    const list = ids.map(String).filter(Boolean);
+    return list.length > 0 ? list : expert;
+  }
+  return expert;
+}
+
+const EMPTY_RANKING: RankingPayload = {
+  ranking: [],
+  totalFaturamento: 0,
+  totalVendas: 0,
+  ticketMedioGeral: 0,
+  vendedoresAtivos: 0,
+  semUtm: { faturamento: 0, vendas: 0 },
+};
+
 export const getRankingStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: RankingInput | undefined) => input ?? {})
   .handler(async (opts): Promise<RankingPayload> => {
     const context = opts?.context;
     if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
-    const { supabase } = context;
+    const supabase = await dbFor(context);
     const data = opts.data ?? {};
-    const expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
+    let expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
+    const allowedWorkspaces = vendorWorkspaceIds(context);
+    if (allowedWorkspaces) {
+      if (allowedWorkspaces.length === 0) return EMPTY_RANKING;
+      if (expertFilter && !allowedWorkspaces.includes(expertFilter)) return EMPTY_RANKING;
+      expertFilter = expertFilter ?? allowedWorkspaces[0];
+    }
     const fromTs = data.from ? isoToTs(data.from) : null;
     const toTs = data.to ? isoToTs(data.to) : null;
     const inRange = (ts: number | null) => {
