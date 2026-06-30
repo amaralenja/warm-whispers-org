@@ -318,13 +318,14 @@ export const saveTriggers = createServerFn({ method: "POST" })
 export const triggerFlowManually = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { flow_id: string; channel_id: string; contact_wa_id: string; conversation_id?: string }) => d)
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");
     return runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
       contactWaId: data.contact_wa_id,
       conversationId: data.conversation_id ?? null,
+      db: context.supabase,
       triggerContext: { manual: true },
     });
   });
@@ -332,8 +333,8 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
 export const fireNewLeadTrigger = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { lead_id: string }) => ({ lead_id: String(d?.lead_id ?? "") }))
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
     if (!data.lead_id) return { matched: 0 };
     const { dispatchNewLead } = await import("@/lib/flow-engine.server");
-    return dispatchNewLead({ leadId: data.lead_id });
+    return dispatchNewLead({ leadId: data.lead_id, db: context.supabase });
   });

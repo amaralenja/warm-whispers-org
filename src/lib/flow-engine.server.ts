@@ -1,8 +1,6 @@
 // Server-only flow engine. Safe to import from server routes/functions.
 // Never import this from client modules.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
 const EVOHUB_BASE = "https://api.evohub.ai";
 const API_TIMEOUT_MS = 15_000;
 
@@ -12,12 +10,18 @@ type Ctx = {
   channelId: string;
   contactWaId: string;
   conversationId: string | null;
+  db: any;
   variables: Record<string, any>;
   lastInput?: { text?: string | null; buttonId?: string | null; messageType?: string | null };
 };
 
 type Node = { id: string; type: string; data: any };
 type Edge = { id: string; source: string; target: string; sourceHandle?: string | null };
+
+async function getAdminDb() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -51,8 +55,8 @@ function interpolate(tpl: string, ctx: Ctx): string {
     .replace(/\{\{\s*input\.texto\s*\}\}/g, ctx.lastInput?.text ?? "");
 }
 
-async function fetchChannelToken(channelId: string): Promise<{ token: string; phoneNumberId: string }> {
-  const { data: localRow } = await supabaseAdmin
+async function fetchChannelToken(channelId: string, db: any): Promise<{ token: string; phoneNumberId: string }> {
+  const { data: localRow } = await db
     .from("wa_channels" as any)
     .select("id,token,phone_number_id,metadata")
     .eq("id", channelId)
@@ -81,8 +85,8 @@ async function fetchChannelToken(channelId: string): Promise<{ token: string; ph
   return { token: ch.token, phoneNumberId };
 }
 
-async function sendWA(channelId: string, to: string, body: any) {
-  const { token, phoneNumberId } = await fetchChannelToken(channelId);
+async function sendWA(channelId: string, to: string, body: any, db: any) {
+  const { token, phoneNumberId } = await fetchChannelToken(channelId, db);
   const toNormalized = normalizeBrWhatsappNumber(to);
   const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta/${phoneNumberId}/messages`, {
     method: "POST",
@@ -98,7 +102,7 @@ async function sendWA(channelId: string, to: string, body: any) {
 
 async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
   if (!ctx.conversationId) return;
-  await supabaseAdmin.from("wa_messages" as any).insert({
+  await ctx.db.from("wa_messages" as any).insert({
     conversation_id: ctx.conversationId,
     channel_id: ctx.channelId,
     wa_message_id: waMsgId,
@@ -113,15 +117,15 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     status: "sent",
     raw: body,
   });
-  await supabaseAdmin.from("wa_conversations" as any).update({
+  await ctx.db.from("wa_conversations" as any).update({
     last_message_at: new Date().toISOString(),
     last_message_preview: type === "text" ? (body?.text?.body ?? "").slice(0, 120) : `[${type}]`,
     last_message_direction: "out",
   }).eq("id", ctx.conversationId);
 }
 
-async function logExecution(runId: string, node: Node, status: string, output?: any, error?: string, started?: number) {
-  await supabaseAdmin.from("wa_flow_executions" as any).insert({
+async function logExecution(db: any, runId: string, node: Node, status: string, output?: any, error?: string, started?: number) {
+  await db.from("wa_flow_executions" as any).insert({
     run_id: runId,
     node_id: node.id,
     node_type: node.type,
@@ -142,8 +146,8 @@ function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): 
   return edge?.target ?? null;
 }
 
-async function loadFlow(flowId: string) {
-  const { data, error } = await supabaseAdmin
+async function loadFlow(flowId: string, db: any) {
+  const { data, error } = await db
     .from("wa_flows" as any)
     .select("*")
     .eq("id", flowId)
@@ -153,7 +157,7 @@ async function loadFlow(flowId: string) {
 }
 
 async function executeFrom(ctx: Ctx, startNodeId: string) {
-  const flow = await loadFlow(ctx.flowId);
+  const flow = await loadFlow(ctx.flowId, ctx.db);
   const nodes: Node[] = (flow.nodes as Node[]) ?? [];
   const edges: Edge[] = (flow.edges as Edge[]) ?? [];
 
@@ -169,7 +173,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
       const result = await runNode(node, ctx);
 
       // Update run pointer
-      await supabaseAdmin.from("wa_flow_runs" as any).update({
+      await ctx.db.from("wa_flow_runs" as any).update({
         current_node_id: node.id,
         context: ctx.variables,
         status: result.pause ? "waiting" : "running",
@@ -177,19 +181,19 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
         expires_at: result.expiresAt ?? null,
       }).eq("id", ctx.runId);
 
-      await logExecution(ctx.runId, node, "ok", result.log ?? null, undefined, started);
+      await logExecution(ctx.db, ctx.runId, node, "ok", result.log ?? null, undefined, started);
 
       if (result.pause) return;
       if (result.end) {
-        await supabaseAdmin.from("wa_flow_runs" as any).update({
+        await ctx.db.from("wa_flow_runs" as any).update({
           status: "completed", waiting_for: null,
         }).eq("id", ctx.runId);
         return;
       }
       currentId = nextNodeId(edges, node.id, result.handle);
     } catch (e: any) {
-      await logExecution(ctx.runId, node, "error", null, String(e?.message ?? e), started);
-      await supabaseAdmin.from("wa_flow_runs" as any).update({
+      await logExecution(ctx.db, ctx.runId, node, "error", null, String(e?.message ?? e), started);
+      await ctx.db.from("wa_flow_runs" as any).update({
         status: "failed", error: String(e?.message ?? e),
       }).eq("id", ctx.runId);
       return;
@@ -197,7 +201,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
   }
 
   if (!currentId) {
-    await supabaseAdmin.from("wa_flow_runs" as any).update({
+    await ctx.db.from("wa_flow_runs" as any).update({
       status: "completed", waiting_for: null,
     }).eq("id", ctx.runId);
   }
@@ -221,7 +225,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
       if (!text) return {};
       const body = { type: "text", text: { body: text } };
-      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body);
+      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized);
       return { log: { text } };
     }
@@ -253,7 +257,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (mediaType === "document" && filename) inner.filename = filename;
       }
       const body: any = { type: mediaType, [mediaType]: inner };
-      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body);
+      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
       return { log: { url: finalUrl } };
     }
@@ -275,7 +279,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
           },
         },
       };
-      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body);
+      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
       // After sending, automatically pause to wait for button reply.
       const ttl = Number(node.data?.timeoutSeconds ?? 86400);
@@ -339,7 +343,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
       // Resolve tag names from ids
       const allIds = [...new Set([...addIds, ...removeIds])];
-      const { data: tagRows } = await supabaseAdmin
+      const { data: tagRows } = await ctx.db
         .from("crm_tags" as any).select("id,nome").in("id", allIds);
       const nameById = new Map<string, string>((tagRows ?? []).map((t: any) => [t.id, t.nome]));
       const addNames = addIds.map((id) => nameById.get(id)).filter(Boolean) as string[];
@@ -349,7 +353,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const phone = String(ctx.contactWaId ?? "").replace(/\D/g, "");
       if (!phone) return { log: { skipped: "no phone" } };
       const tail = phone.slice(-10);
-      const { data: leads } = await supabaseAdmin
+      const { data: leads } = await ctx.db
         .from("crm_leads" as any).select("id,tags,telefone").ilike("telefone", `%${tail}%`).limit(5);
 
       for (const l of leads ?? []) {
@@ -357,7 +361,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         const next = new Set(cur);
         for (const n of addNames) next.add(n);
         for (const n of removeNames) next.delete(n);
-        await supabaseAdmin.from("crm_leads" as any).update({ tags: Array.from(next) }).eq("id", (l as any).id);
+        await ctx.db.from("crm_leads" as any).update({ tags: Array.from(next) }).eq("id", (l as any).id);
       }
       return { log: { added: addNames, removed: removeNames, leads: leads?.length ?? 0 } };
     }
@@ -436,8 +440,10 @@ export async function runFlowAdmin(args: {
   contactWaId: string;
   conversationId: string | null;
   triggerContext?: any;
+  db?: any;
 }) {
-  const flow = await loadFlow(args.flowId);
+  const db = args.db ?? await getAdminDb();
+  const flow = await loadFlow(args.flowId, db);
   const nodes: Node[] = (flow.nodes as Node[]) ?? [];
   const edges: Edge[] = (flow.edges as Edge[]) ?? [];
   if (nodes.length === 0) throw new Error("Fluxo sem nós");
@@ -459,7 +465,7 @@ export async function runFlowAdmin(args: {
   const startId =
     entryNode?.type === "trigger" ? nextNodeId(edges, entryId!) : entryId;
 
-  const { data: run, error } = await supabaseAdmin
+  const { data: run, error } = await db
     .from("wa_flow_runs" as any)
     .insert({
       flow_id: args.flowId,
@@ -480,11 +486,12 @@ export async function runFlowAdmin(args: {
     channelId: args.channelId,
     contactWaId: args.contactWaId,
     conversationId: args.conversationId,
+    db,
     variables: { trigger: args.triggerContext ?? {} },
   };
 
   if (!startId) {
-    await supabaseAdmin.from("wa_flow_runs" as any).update({ status: "completed" }).eq("id", ctx.runId);
+    await db.from("wa_flow_runs" as any).update({ status: "completed" }).eq("id", ctx.runId);
     return { runId: ctx.runId, completed: true, reason: "no_next_node" };
   }
   await executeFrom(ctx, startId);
@@ -494,9 +501,11 @@ export async function runFlowAdmin(args: {
 export async function advanceWaitingRun(args: {
   conversationId: string;
   input: { text?: string | null; buttonId?: string | null; messageType?: string | null };
+  db?: any;
 }) {
+  const db = args.db ?? await getAdminDb();
   // Find a waiting run for this conversation
-  const { data: run } = await supabaseAdmin
+  const { data: run } = await db
     .from("wa_flow_runs" as any)
     .select("*")
     .eq("conversation_id", args.conversationId)
@@ -507,7 +516,7 @@ export async function advanceWaitingRun(args: {
   if (!run) return null;
 
   const r = run as any;
-  const flow = await loadFlow(r.flow_id);
+  const flow = await loadFlow(r.flow_id, db);
   const edges: Edge[] = (flow.edges as Edge[]) ?? [];
 
   const ctx: Ctx = {
@@ -516,6 +525,7 @@ export async function advanceWaitingRun(args: {
     channelId: r.channel_id,
     contactWaId: r.contact_wa_id,
     conversationId: r.conversation_id,
+    db,
     variables: r.context ?? {},
     lastInput: args.input,
   };
@@ -530,13 +540,13 @@ export async function advanceWaitingRun(args: {
   }
 
   if (!nextId) {
-    await supabaseAdmin.from("wa_flow_runs" as any).update({
+    await db.from("wa_flow_runs" as any).update({
       status: "completed", waiting_for: null,
     }).eq("id", r.id);
     return { runId: r.id, completed: true };
   }
 
-  await supabaseAdmin.from("wa_flow_runs" as any).update({
+  await db.from("wa_flow_runs" as any).update({
     status: "running", waiting_for: null,
   }).eq("id", r.id);
   await executeFrom(ctx, nextId);
@@ -552,16 +562,19 @@ export async function dispatchIncomingForFlows(args: {
   buttonId: string | null;
   messageType?: string | null;
   isFirstMessage: boolean;
+  db?: any;
 }) {
+  const db = args.db ?? await getAdminDb();
   // 1. Advance a waiting run if any
   const advanced = await advanceWaitingRun({
     conversationId: args.conversationId,
     input: { text: args.text, buttonId: args.buttonId, messageType: args.messageType ?? null },
+    db,
   });
   if (advanced) return advanced;
 
   // 2. Look up active triggers
-  const { data: triggers } = await supabaseAdmin
+  const { data: triggers } = await db
     .from("wa_flow_triggers" as any)
     .select("*, wa_flows!inner(id, ativo, entry_node_id)")
     .eq("ativo", true);
@@ -592,6 +605,7 @@ export async function dispatchIncomingForFlows(args: {
         channelId: args.channelId,
         contactWaId: args.contactWaId,
         conversationId: args.conversationId,
+        db,
         triggerContext: { tipo: trg.tipo, valor: trg.valor, input: args.text },
       });
     }
@@ -601,15 +615,16 @@ export async function dispatchIncomingForFlows(args: {
 }
 
 // Dispatch flows tied to "new_lead" trigger when a CRM lead is inserted.
-export async function dispatchNewLead(args: { leadId: string }) {
-  const { data: lead } = await supabaseAdmin
+export async function dispatchNewLead(args: { leadId: string; db?: any }) {
+  const db = args.db ?? await getAdminDb();
+  const { data: lead } = await db
     .from("crm_leads" as any).select("*").eq("id", args.leadId).maybeSingle();
   if (!lead) return { matched: 0, reason: "lead not found" };
   const l: any = lead;
   const phoneDigits = String(l.telefone ?? "").replace(/\D/g, "");
   if (!phoneDigits) return { matched: 0, reason: "no phone" };
 
-  const { data: triggers } = await supabaseAdmin
+  const { data: triggers } = await db
     .from("wa_flow_triggers" as any)
     .select("*, wa_flows!inner(id, ativo, entry_node_id, operacao_id)")
     .eq("ativo", true)
@@ -627,6 +642,7 @@ export async function dispatchNewLead(args: { leadId: string }) {
       channelId: trg.channel_id,
       contactWaId: phoneDigits,
       conversationId: null,
+      db,
       triggerContext: { tipo: "new_lead", lead: { id: l.id, nome: l.nome, telefone: l.telefone, email: l.email } },
     });
     started++;
