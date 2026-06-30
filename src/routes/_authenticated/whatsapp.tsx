@@ -666,6 +666,19 @@ function TemplatesPanel() {
   const [approvalChannelId, setApprovalChannelId] = useState<string>("");
   const [approvalSending, setApprovalSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [recipientsOpen, setRecipientsOpen] = useState<any | null>(null);
+  const [newRecipientPhone, setNewRecipientPhone] = useState("");
+  const [newRecipientNome, setNewRecipientNome] = useState("");
+  const [analyticsSending, setAnalyticsSending] = useState(false);
+
+  const { data: recipientsList = [], refetch: refetchRecipients } = useQuery({
+    queryKey: ["wa_template_recipients", recipientsOpen?.id],
+    queryFn: async () => {
+      const { listTemplateRecipients } = await import("@/lib/call-analytics.functions");
+      return await listTemplateRecipients({ data: { templateId: recipientsOpen!.id } });
+    },
+    enabled: !!recipientsOpen,
+  });
 
   const { data: notifChannels = [] } = useQuery({
     queryKey: ["wa_notification_channels"],
