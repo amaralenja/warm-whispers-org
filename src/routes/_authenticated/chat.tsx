@@ -46,6 +46,8 @@ import {
 import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 
 function ChatRoute() {
@@ -625,6 +627,25 @@ function ChatPage() {
 
               <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
                 <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
+                        <Smile className="h-5 w-5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" side="top" className="w-auto border-0 bg-transparent p-0 shadow-xl">
+                      <EmojiPicker
+                        onEmojiClick={(emoji) => setDraft((d) => d + emoji.emoji)}
+                        theme={Theme.AUTO}
+                        emojiStyle={EmojiStyle.NATIVE}
+                        searchPlaceholder="Buscar emoji"
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
+                        height={400}
+                        width={340}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
@@ -672,9 +693,6 @@ function ChatPage() {
                       {sendError}
                     </div>
                   )}
-                  <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
-                    <Smile className="h-5 w-5" />
-                  </Button>
                   {draft.trim() ? (
                     <Button
                       size="icon"
