@@ -193,13 +193,27 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const mediaType = node.type.replace("send_", "");
       const caption = node.data?.caption ? interpolate(String(node.data.caption), ctx) : undefined;
       const filename = node.data?.filename || undefined;
-      const inner: any = { link: url };
-      if (mediaType !== "audio" && mediaType !== "sticker" && caption) inner.caption = caption;
-      if (mediaType === "document" && filename) inner.filename = filename;
+
+      let finalUrl = url;
+      const inner: any = {};
+      if (mediaType === "audio") {
+        try {
+          const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
+          finalUrl = await convertAudioToWhatsappVoice(url);
+        } catch (e) {
+          console.error("Flow voice conversion failed:", e);
+        }
+        inner.link = finalUrl;
+        inner.voice = true;
+      } else {
+        inner.link = finalUrl;
+        if (mediaType !== "sticker" && caption) inner.caption = caption;
+        if (mediaType === "document" && filename) inner.filename = filename;
+      }
       const body: any = { type: mediaType, [mediaType]: inner };
       const { waMsgId, phoneNumberId } = await sendWA(ctx.channelId, ctx.contactWaId, body);
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId);
-      return { log: { url } };
+      return { log: { url: finalUrl } };
     }
 
     case "send_buttons": {
