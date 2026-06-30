@@ -751,7 +751,15 @@ function TemplatesPanel() {
             <div key={t.id} className="rounded-xl border border-border bg-background/40 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-medium text-foreground">{t.nome}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-medium text-foreground">{t.nome}</div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${statusBadge(t.meta_status)}`}>
+                      {statusLabel(t.meta_status)}
+                    </span>
+                    {t.meta_category && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">{t.meta_category}</span>
+                    )}
+                  </div>
                   {t.descricao && <div className="text-xs text-muted-foreground mt-0.5">{t.descricao}</div>}
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">{t.slug}</span>
