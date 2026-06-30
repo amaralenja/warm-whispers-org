@@ -633,6 +633,10 @@ function ChatPage() {
                 />
               </header>
 
+              <ActiveFlowRuns conversationId={active.id} />
+
+
+
               <div
                 ref={scrollRef}
                 className="chat-thread-glow min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-fancy"
@@ -948,6 +952,88 @@ function RenderMedia({
   return null;
 }
 
+function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
+  const qc = useQueryClient();
+  const { data: runs = [] } = useQuery({
+    queryKey: ["flow-runs-active", conversationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("wa_flow_runs" as any)
+        .select("id, flow_id, status, current_node_id, waiting_for, error, updated_at")
+        .eq("conversation_id", conversationId)
+        .in("status", ["queued", "running", "waiting"])
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return asArray<any>(data);
+    },
+    refetchInterval: 4000,
+  });
+
+  const flowIds = useMemo(() => Array.from(new Set(asArray<any>(runs).map((r) => r.flow_id).filter(Boolean))), [runs]);
+  const { data: flowsInfo = [] } = useQuery({
+    queryKey: ["flow-runs-info", flowIds.join(",")],
+    queryFn: async () => {
+      if (!flowIds.length) return [];
+      const { data, error } = await supabase
+        .from("wa_flows" as any)
+        .select("id, nome")
+        .in("id", flowIds);
+      if (error) throw error;
+      return asArray<any>(data);
+    },
+    enabled: flowIds.length > 0,
+  });
+  const nameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const f of asArray<any>(flowsInfo)) m.set(String(f.id), String(f.nome ?? "Fluxo"));
+    return m;
+  }, [flowsInfo]);
+
+  useEffect(() => {
+    const ch = supabase
+      .channel(`flow-runs-${conversationId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wa_flow_runs", filter: `conversation_id=eq.${conversationId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [conversationId, qc]);
+
+  if (!asArray<any>(runs).length) return null;
+
+  return (
+    <div className="shrink-0 border-b border-chat-line bg-chat-soft/40 px-6 py-2">
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2">
+        {asArray<any>(runs).map((r) => {
+          const name = nameById.get(String(r.flow_id)) ?? "Fluxo";
+          const step = r.current_node_id ? String(r.current_node_id).slice(0, 8) : "início";
+          const statusLabel =
+            r.status === "queued" ? "na fila" : r.status === "waiting" ? `aguardando ${r.waiting_for ?? ""}` : "executando";
+          return (
+            <div
+              key={String(r.id)}
+              className="inline-flex items-center gap-2 rounded-full border border-chat-line bg-chat-panel px-3 py-1 text-xs"
+            >
+              <Loader2 className="h-3 w-3 animate-spin text-chat-accent" />
+              <span className="font-semibold text-foreground">{name}</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground">{statusLabel}</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-mono text-[10px] text-muted-foreground">etapa {step}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FlowDispatcher({
   conversation,
   listFlowsFn,
@@ -977,24 +1063,25 @@ function FlowDispatcher({
     });
   }, [flows, conversation.operacao_id]);
 
-  async function fire(flowId: string) {
+  function fire(flowId: string) {
     setFiring(flowId);
-    try {
-      await triggerFn({
+    toast.success("Fluxo disparado, rodando em segundo plano");
+    setOpen(false);
+    // Fire-and-forget: não bloqueia a UI, usuário pode navegar pra outras conversas
+    Promise.resolve(
+      triggerFn({
         data: {
           flow_id: flowId,
           channel_id: conversation.channel_id,
           contact_wa_id: conversation.contact_wa_id,
           conversation_id: conversation.id,
         },
-      });
-      toast.success("Fluxo disparado");
-      setOpen(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao disparar fluxo");
-    } finally {
-      setFiring(null);
-    }
+      }),
+    )
+      .catch((e: any) => {
+        toast.error(e?.message ?? "Erro ao disparar fluxo");
+      })
+      .finally(() => setFiring(null));
   }
 
   return (
