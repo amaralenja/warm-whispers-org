@@ -48,6 +48,14 @@ import {
   type EvoChannel,
 } from "@/lib/evohub.functions";
 import { registerWhatsappWebhook } from "@/lib/whatsapp-chat.functions";
+import {
+  addTemplateRecipient,
+  listNotificationDispatchLogs,
+  listRecipientCandidates,
+  listTemplateRecipients,
+  removeTemplateRecipient,
+  sendCallAnalytics,
+} from "@/lib/call-analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   component: WhatsAppPage,
@@ -653,6 +661,11 @@ function ChannelCard({
 
 function TemplatesPanel() {
   const qc = useQueryClient();
+  const listRecipientsFn = useServerFn(listTemplateRecipients);
+  const addRecipientFn = useServerFn(addTemplateRecipient);
+  const removeRecipientFn = useServerFn(removeTemplateRecipient);
+  const listCandidatesFn = useServerFn(listRecipientCandidates);
+  const sendAnalyticsFn = useServerFn(sendCallAnalytics);
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["wa_templates"],
     queryFn: async () => {
@@ -682,8 +695,7 @@ function TemplatesPanel() {
   const { data: recipientsList = [], refetch: refetchRecipients } = useQuery({
     queryKey: ["wa_template_recipients", recipientsOpen?.id],
     queryFn: async () => {
-      const { listTemplateRecipients } = await import("@/lib/call-analytics.functions");
-      return await listTemplateRecipients({ data: { templateId: recipientsOpen!.id } });
+      return await listRecipientsFn({ data: { templateId: recipientsOpen!.id } });
     },
     enabled: !!recipientsOpen,
   });
@@ -691,8 +703,7 @@ function TemplatesPanel() {
   const { data: candidates = [] } = useQuery({
     queryKey: ["wa_recipient_candidates"],
     queryFn: async () => {
-      const { listRecipientCandidates } = await import("@/lib/call-analytics.functions");
-      return await listRecipientCandidates();
+      return await listCandidatesFn();
     },
     enabled: !!recipientsOpen,
   });
@@ -812,8 +823,7 @@ function TemplatesPanel() {
                       onClick={async () => {
                         setAnalyticsSending(true);
                         try {
-                          const { sendCallAnalytics } = await import("@/lib/call-analytics.functions");
-                          const r = await sendCallAnalytics({ data: {} });
+                          const r = await sendAnalyticsFn({ data: {} });
                           toast.success(r.sent ? `Analytics enviado p/ ${r.sent} contato(s)` : `Sem envio: ${r.skipped ?? "ok"}`);
                         } catch (e: any) {
                           toast.error(e?.message ?? "Falha");
@@ -1023,8 +1033,7 @@ function TemplatesPanel() {
                     className="text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0"
                     onClick={async () => {
                       try {
-                        const { removeTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                        await removeTemplateRecipient({ data: { id: r.id } });
+                        await removeRecipientFn({ data: { id: r.id } });
                         refetchRecipients();
                       } catch (e: any) {
                         toast.error(e?.message ?? "Erro");
@@ -1061,8 +1070,7 @@ function TemplatesPanel() {
                             className="shrink-0 h-7 text-xs"
                             onClick={async () => {
                               try {
-                                const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                                await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: c.telefone, nome: c.nome } });
+                                await addRecipientFn({ data: { templateId: recipientsOpen.id, telefone: c.telefone, nome: c.nome } });
                                 refetchRecipients();
                               } catch (e: any) {
                                 toast.error(e?.message ?? "Erro");
@@ -1086,8 +1094,7 @@ function TemplatesPanel() {
                   disabled={!newRecipientPhone.trim()}
                   onClick={async () => {
                     try {
-                      const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                      await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
+                      await addRecipientFn({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
                       setNewRecipientPhone("");
                       setNewRecipientNome("");
                       refetchRecipients();
