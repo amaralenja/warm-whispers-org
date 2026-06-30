@@ -680,6 +680,16 @@ function TemplatesPanel() {
     enabled: !!recipientsOpen,
   });
 
+  const { data: candidates = [] } = useQuery({
+    queryKey: ["wa_recipient_candidates"],
+    queryFn: async () => {
+      const { listRecipientCandidates } = await import("@/lib/call-analytics.functions");
+      return await listRecipientCandidates();
+    },
+    enabled: !!recipientsOpen,
+  });
+
+
   const { data: notifChannels = [] } = useQuery({
     queryKey: ["wa_notification_channels"],
     queryFn: async () => {
@@ -1016,28 +1026,71 @@ function TemplatesPanel() {
                 </div>
               ))}
             </div>
-            <div className="space-y-2 pt-3 border-t border-border">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Adicionar destinatário</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input className="rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Nome (opcional)" value={newRecipientNome} onChange={(e) => setNewRecipientNome(e.target.value)} />
-                <input className="rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Telefone com DDD" value={newRecipientPhone} onChange={(e) => setNewRecipientPhone(e.target.value)} />
+            <div className="space-y-3 pt-3 border-t border-border">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Adicionar do time</div>
+                {candidates.length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic">Nenhum vendedor ou membro da equipe com telefone cadastrado.</div>
+                ) : (
+                  <div className="max-h-[180px] overflow-y-auto space-y-1 pr-1">
+                    {candidates.map((c: any) => {
+                      const alreadyAdded = recipientsList.some((r: any) => r.telefone === c.telefone);
+                      return (
+                        <div key={c.id} className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background/30 px-2.5 py-1.5">
+                          <div className="min-w-0 flex items-center gap-2">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${c.origem === "vendedor" ? "bg-blue-500/15 text-blue-300" : "bg-purple-500/15 text-purple-300"}`}>
+                              {c.origem === "vendedor" ? "Vendedor" : "Equipe"}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm text-foreground truncate">{c.nome}</div>
+                              <div className="text-[11px] text-muted-foreground font-mono">+{c.telefone}</div>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={alreadyAdded}
+                            className="shrink-0 h-7 text-xs"
+                            onClick={async () => {
+                              try {
+                                const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
+                                await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: c.telefone, nome: c.nome } });
+                                refetchRecipients();
+                              } catch (e: any) {
+                                toast.error(e?.message ?? "Erro");
+                              }
+                            }}
+                          >{alreadyAdded ? "Adicionado" : "Adicionar"}</Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <Button
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
-                disabled={!newRecipientPhone.trim()}
-                onClick={async () => {
-                  try {
-                    const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
-                    await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
-                    setNewRecipientPhone("");
-                    setNewRecipientNome("");
-                    refetchRecipients();
-                  } catch (e: any) {
-                    toast.error(e?.message ?? "Erro");
-                  }
-                }}
-              >Adicionar destinatário</Button>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Ou adicionar manualmente</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input className="rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Nome (opcional)" value={newRecipientNome} onChange={(e) => setNewRecipientNome(e.target.value)} />
+                  <input className="rounded-md border border-border bg-background px-3 py-2 text-sm" placeholder="Telefone com DDD" value={newRecipientPhone} onChange={(e) => setNewRecipientPhone(e.target.value)} />
+                </div>
+                <Button
+                  className="w-full mt-2 bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
+                  disabled={!newRecipientPhone.trim()}
+                  onClick={async () => {
+                    try {
+                      const { addTemplateRecipient } = await import("@/lib/call-analytics.functions");
+                      await addTemplateRecipient({ data: { templateId: recipientsOpen.id, telefone: newRecipientPhone, nome: newRecipientNome || undefined } });
+                      setNewRecipientPhone("");
+                      setNewRecipientNome("");
+                      refetchRecipients();
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Erro");
+                    }
+                  }}
+                >Adicionar destinatário</Button>
+              </div>
             </div>
+
           </div>
         </DialogContent>
       </Dialog>

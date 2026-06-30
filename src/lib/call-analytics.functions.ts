@@ -7,12 +7,22 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 }
 
 function normalizeBrPhone(raw: string): string {
-  const digits = String(raw || "").replace(/\D/g, "");
+  let digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return "";
-  if (digits.startsWith("55")) return digits;
-  if (digits.length === 11 || digits.length === 10) return "55" + digits;
+  // Garante prefixo 55
+  if (!digits.startsWith("55")) {
+    if (digits.length === 11 || digits.length === 10) digits = "55" + digits;
+  }
+  // Após 55 + DDD (2 dígitos), celular deve ter 9 dígitos começando com 9.
+  // Se vier no formato antigo (8 dígitos), insere o 9.
+  if (digits.length === 12 && digits.startsWith("55")) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    if (!rest.startsWith("9")) digits = "55" + ddd + "9" + rest;
+  }
   return digits;
 }
+
 
 function todayBrtDateString(): string {
   // BRT = UTC-3
@@ -264,4 +274,27 @@ export const removeTemplateRecipient = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+/** Lista vendedores + team_members que têm telefone, normalizando o 9 */
+export const listRecipientCandidates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [vRes, tRes] = await Promise.all([
+      context.supabase.from("vendedores").select("id, nome, telefone, foto_url").eq("ativo", true),
+      context.supabase.from("team_members").select("id, nome, telefone, foto_url, funcao").eq("ativo", true),
+    ]);
+    const out: Array<{ id: string; nome: string; telefone: string; origem: "vendedor" | "equipe"; subtitulo?: string; foto_url?: string | null }> = [];
+    for (const v of vRes.data ?? []) {
+      const tel = normalizeBrPhone((v as any).telefone ?? "");
+      if (!tel) continue;
+      out.push({ id: `v:${(v as any).id}`, nome: (v as any).nome, telefone: tel, origem: "vendedor", foto_url: (v as any).foto_url });
+    }
+    for (const t of tRes.data ?? []) {
+      const tel = normalizeBrPhone((t as any).telefone ?? "");
+      if (!tel) continue;
+      out.push({ id: `t:${(t as any).id}`, nome: (t as any).nome, telefone: tel, origem: "equipe", subtitulo: (t as any).funcao, foto_url: (t as any).foto_url });
+    }
+    return out.sort((a, b) => a.nome.localeCompare(b.nome));
+  });
+
 
