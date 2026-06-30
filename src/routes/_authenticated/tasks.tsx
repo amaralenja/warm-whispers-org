@@ -816,14 +816,47 @@ function MembersDialog({
 }) {
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
 
+  const [uploading, setUploading] = useState(false);
+
+  async function handlePhoto(file: File | null) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = () => { img.src = reader.result as string; };
+        reader.onerror = reject;
+        img.onload = () => {
+          const size = 256;
+          const canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d")!;
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale, h = img.height * scale;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setEditing((p) => ({ ...(p ?? {}), foto_url: dataUrl }));
+    } catch (e: any) {
+      toast.error("Erro ao carregar foto");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function save() {
     if (!editing?.nome?.trim()) return toast.error("Nome obrigatório");
     const payload: any = {
       nome: editing.nome.trim(),
+      telefone: editing.telefone?.trim() || null,
       email: editing.email || null,
       funcao: editing.funcao || null,
       foto_url: editing.foto_url || null,
-      cor: editing.cor || "#6366f1",
+      cor: editing.cor || "#1f2937",
       ativo: editing.ativo ?? true,
     };
     if (editing.id) {
@@ -835,6 +868,7 @@ function MembersDialog({
     onChanged();
     toast.success("Salvo");
   }
+
 
   async function remove(id: string) {
     if (!confirm("Remover membro?")) return;
