@@ -861,6 +861,10 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled }: { msg: 
 
 function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; outgoing?: boolean }) {
   if (msg.msg_type === "text") return null;
+  if (msg.msg_type === "interactive" || msg.msg_type === "button") {
+    return <InteractiveContent msg={msg} outgoing={outgoing} />;
+  }
+
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
     return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
