@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -46,6 +47,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
+import { notifyTaskCreated } from "@/lib/task-notifications.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({
   component: TasksPage,
@@ -118,9 +120,22 @@ function normalizeChecklist(raw: unknown): ChecklistGroup[] {
 
 function normalizeLabels(raw: unknown): { texto: string; cor: string }[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((l: any) =>
-    typeof l === "string" ? { texto: l, cor: "#64748b" } : { texto: l.texto, cor: l.cor ?? "#64748b" },
-  );
+  return raw
+    .map((l: any) => {
+      if (typeof l === "string") {
+        try {
+          const parsed = JSON.parse(l);
+          if (parsed && typeof parsed === "object") {
+            return { texto: String(parsed.texto ?? parsed.label ?? ""), cor: String(parsed.cor ?? "#64748b") };
+          }
+        } catch {
+          // label antiga em texto puro
+        }
+        return { texto: l, cor: "#64748b" };
+      }
+      return { texto: String(l?.texto ?? ""), cor: String(l?.cor ?? "#64748b") };
+    })
+    .filter((l) => l.texto.trim().length > 0);
 }
 
 
@@ -654,6 +669,7 @@ function TaskDialog({
     task.checklist.length > 0 ? task.checklist : [],
   );
   const [saving, setSaving] = useState(false);
+  const notifyTaskCreatedFn = useServerFn(notifyTaskCreated);
 
   function addChecklist() {
     setChecklists([
@@ -677,10 +693,11 @@ function TaskDialog({
       prioridade,
       prazo: prazo ? prazo.toISOString() : null,
       assignee_ids: assignees,
-      labels,
+      labels: labels.map((l) => JSON.stringify({ texto: l.texto, cor: l.cor })),
       checklist: checklists,
       column_id: columnId,
     };
+    let alreadyToasted = false;
     if (isNew) {
       const { data: inserted, error } = await supabase
         .from("tasks" as any)
@@ -692,9 +709,19 @@ function TaskDialog({
         return toast.error(error.message);
       }
       if (inserted && assignees.length > 0) {
-        import("@/lib/task-notifications.functions")
-          .then(({ notifyTaskCreated }) => notifyTaskCreated({ data: { taskId: (inserted as any).id } }))
-          .catch(() => {});
+        try {
+          const result = await notifyTaskCreatedFn({ data: { taskId: (inserted as any).id } });
+          if ((result as any)?.sent > 0) {
+            toast.success(`Notificação enviada pra ${(result as any).sent} responsável(is)`);
+            alreadyToasted = true;
+          } else if ((result as any)?.reason) {
+            toast.warning(`Tarefa criada, mas sem disparo: ${(result as any).reason}`);
+            alreadyToasted = true;
+          }
+        } catch (e: any) {
+          toast.error(`Tarefa criada, mas o WhatsApp não disparou: ${e?.message ?? "erro"}`);
+          alreadyToasted = true;
+        }
       }
     } else {
       const { error } = await supabase.from("tasks" as any).update(payload).eq("id", task.id);
@@ -704,7 +731,7 @@ function TaskDialog({
       }
     }
     setSaving(false);
-    toast.success("Salvo");
+    if (!alreadyToasted) toast.success("Salvo");
     onSaved();
   }
 
