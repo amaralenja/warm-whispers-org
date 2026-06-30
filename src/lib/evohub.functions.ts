@@ -142,19 +142,33 @@ async function loadLocalChannels(supabase: any): Promise<any[]> {
   return data ?? [];
 }
 
-async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | null) {
+async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | null, kindOverride?: "chat" | "notification" | null) {
   const normalized = normalizeChannel(ch);
   const meta = normalizeMetadata(normalized.metadata) ?? {};
   const info = getPhoneInfo(normalized);
   const currentLocal = await supabase
     .from("wa_channels" as any)
-    .select("operacao_id")
+    .select("operacao_id, kind, metadata")
     .eq("id", String(normalized.id))
     .maybeSingle()
     .then(({ data }: any) => data)
     .catch(() => null);
 
-  const finalOperacao = operacaoId ?? currentLocal?.operacao_id ?? (typeof meta.operacao_id === "string" ? meta.operacao_id : null);
+  // Prefer explicit override, then current DB kind, then incoming meta.kind, else "chat".
+  const resolvedKind: "chat" | "notification" =
+    kindOverride === "notification" || kindOverride === "chat"
+      ? kindOverride
+      : currentLocal?.kind === "notification"
+      ? "notification"
+      : (ch as any)?.kind === "notification" || meta.kind === "notification"
+      ? "notification"
+      : "chat";
+
+  const finalOperacao =
+    operacaoId ??
+    currentLocal?.operacao_id ??
+    (typeof meta.operacao_id === "string" ? meta.operacao_id : null) ??
+    (resolvedKind === "notification" ? "__notificador__" : null);
 
   const { error } = await supabase.from("wa_channels" as any).upsert({
     id: String(normalized.id),
@@ -162,9 +176,9 @@ async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | 
     type: String(normalized.type ?? "whatsapp"),
     status: String(normalized.status ?? ""),
     token: String(normalized.token ?? ""),
-    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null, kind: meta.kind ?? "chat" },
+    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null, kind: resolvedKind },
     operacao_id: finalOperacao,
-    kind: (meta.kind === "notification" ? "notification" : "chat"),
+    kind: resolvedKind,
     phone_number_id: info.phoneNumberId,
     display_phone_number: info.displayPhoneNumber,
     verified_name: info.verifiedName,
@@ -178,19 +192,23 @@ async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | 
 
 
   if (error) console.warn("[wa_channels] upsert failed", error.message);
-  return { ...normalized, metadata: { ...meta, app_source: APP_SOURCE, operacao_id: finalOperacao, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null } };
+  return { ...normalized, kind: resolvedKind, metadata: { ...meta, app_source: APP_SOURCE, operacao_id: finalOperacao, kind: resolvedKind, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null } };
 }
 
 function mergeLocalIntoRemote(ch: any, local?: any) {
   if (!local) return ch;
   const normalized = normalizeChannel(ch);
   const meta = normalizeMetadata(normalized.metadata) ?? {};
+  const localMeta = normalizeMetadata(local.metadata) ?? {};
+  const kind = local.kind === "notification" || localMeta.kind === "notification" ? "notification" : meta.kind === "notification" ? "notification" : "chat";
   return {
     ...normalized,
+    kind,
     metadata: {
       ...meta,
-      ...(normalizeMetadata(local.metadata) ?? {}),
+      ...localMeta,
       app_source: APP_SOURCE,
+      kind,
       operacao_id: local.operacao_id ?? meta.operacao_id ?? null,
       meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? local.metadata?.meta_connection ?? null,
     },
@@ -300,8 +318,8 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
         metadata: { operacao_id: opId, app_source: APP_SOURCE, kind: data.kind },
       }),
     });
-    await upsertLocalChannel(context.supabase, { ...ch, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, opId);
-    return withConnectUrl({ ...ch, kind: data.kind });
+    await upsertLocalChannel(context.supabase, { ...ch, kind: data.kind, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, opId, data.kind);
+    return withConnectUrl({ ...ch, kind: data.kind, metadata: { ...(ch?.metadata ?? {}), kind: data.kind, operacao_id: opId } });
   });
 
 
