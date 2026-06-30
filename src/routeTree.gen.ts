@@ -33,6 +33,7 @@ import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenti
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 import { Route as ApiPublicHooksTaskDueCheckRouteImport } from './routes/api/public/hooks/task-due-check'
 import { Route as ApiPublicHooksSendCallAnalyticsRouteImport } from './routes/api/public/hooks/send-call-analytics'
+import { Route as ApiPublicHooksSendAdsAnalyticsRouteImport } from './routes/api/public/hooks/send-ads-analytics'
 
 const RankingTvRoute = RankingTvRouteImport.update({
   id: '/ranking-tv',
@@ -157,6 +158,12 @@ const ApiPublicHooksSendCallAnalyticsRoute =
     path: '/api/public/hooks/send-call-analytics',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSendAdsAnalyticsRoute =
+  ApiPublicHooksSendAdsAnalyticsRouteImport.update({
+    id: '/api/public/hooks/send-ads-analytics',
+    path: '/api/public/hooks/send-ads-analytics',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -204,6 +212,7 @@ export interface FileRoutesByTo {
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -231,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows/'
+    | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
     | '/api/public/whatsapp/webhook'
@@ -283,6 +294,7 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows'
+    | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
     | '/api/public/whatsapp/webhook'
@@ -309,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authenticated/flows/$flowId'
     | '/api/public/ig-image'
     | '/_authenticated/flows/'
+    | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
     | '/api/public/whatsapp/webhook'
@@ -320,6 +333,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   RankingTvRoute: typeof RankingTvRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
+  ApiPublicHooksSendAdsAnalyticsRoute: typeof ApiPublicHooksSendAdsAnalyticsRoute
   ApiPublicHooksSendCallAnalyticsRoute: typeof ApiPublicHooksSendCallAnalyticsRoute
   ApiPublicHooksTaskDueCheckRoute: typeof ApiPublicHooksTaskDueCheckRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
@@ -495,6 +509,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSendCallAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/send-ads-analytics': {
+      id: '/api/public/hooks/send-ads-analytics'
+      path: '/api/public/hooks/send-ads-analytics'
+      fullPath: '/api/public/hooks/send-ads-analytics'
+      preLoaderRoute: typeof ApiPublicHooksSendAdsAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -545,6 +566,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   RankingTvRoute: RankingTvRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
+  ApiPublicHooksSendAdsAnalyticsRoute: ApiPublicHooksSendAdsAnalyticsRoute,
   ApiPublicHooksSendCallAnalyticsRoute: ApiPublicHooksSendCallAnalyticsRoute,
   ApiPublicHooksTaskDueCheckRoute: ApiPublicHooksTaskDueCheckRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
