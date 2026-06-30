@@ -92,16 +92,38 @@ export function AppSidebar() {
   // Permissões do vendedor (admins: null = vê tudo)
   const [perm, setPerm] = useState<Permissoes | null>(null);
   useEffect(() => {
+    let cancelled = false;
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem("vendor_session") : null;
       if (!raw) return;
       const s = JSON.parse(raw);
       if (s?.permissoes && typeof s.permissoes === "object") setPerm(s.permissoes);
       else setPerm({});
+      // Re-sincroniza com o banco pra refletir mudanças do admin sem precisar deslogar
+      if (s?.id) {
+        supabase
+          .from("vendedores")
+          .select("permissoes, wa_channel_ids, ativo")
+          .eq("id", s.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (cancelled || !data) return;
+            const next = (data.permissoes ?? {}) as Permissoes;
+            setPerm(next);
+            try {
+              localStorage.setItem(
+                "vendor_session",
+                JSON.stringify({ ...s, permissoes: next, wa_channel_ids: data.wa_channel_ids ?? s.wa_channel_ids }),
+              );
+            } catch { /* noop */ }
+          });
+      }
     } catch {
       /* noop */
     }
+    return () => { cancelled = true; };
   }, []);
+
 
   const visibleMain = mainItems.filter((i) => canSee(perm, keyFromUrl(i.url)));
   const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
