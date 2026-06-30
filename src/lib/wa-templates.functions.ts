@@ -19,11 +19,16 @@ function buildBodyAndVars(text: string) {
     }
     return `{{${idx + 1}}}`;
   });
-  // Meta rule (subcode 2388299): variables cannot be at the very start or end.
-  // Pad with a zero-width-ish marker (a dot) if needed.
-  const trimmed = body.trim();
-  if (/^\{\{\d+\}\}/.test(trimmed)) body = `. ${body}`;
-  if (/\{\{\d+\}\}$/.test(trimmed)) body = `${body} .`;
+
+  // Meta rule (subcode 2388299): variables cannot be the first or last
+  // meaningful content in the BODY. Punctuation-only padding is rejected too,
+  // so use real words before/after the variable when needed.
+  const startsWithVariable = (value: string) => /^[\s*_~`]*\{\{\d+\}\}/.test(value.trimStart());
+  const endsWithVariable = (value: string) => /\{\{\d+\}\}[\s*_~`.,;:!?)]*$/.test(value.trimEnd());
+
+  if (startsWithVariable(body)) body = `Mensagem: ${body}`;
+  if (endsWithVariable(body)) body = `${body}\n\nFim do resumo.`;
+
   return { body, vars: order };
 }
 
