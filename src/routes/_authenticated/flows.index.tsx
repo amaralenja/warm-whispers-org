@@ -41,6 +41,7 @@ function FlowsListPage() {
   const duplicateFn = useServerFn(duplicateFlow);
   const exportFn = useServerFn(exportFlow);
   const importFn = useServerFn(importFlow);
+  const importZvFn = useServerFn(importZapVoiceBackup);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -51,6 +52,13 @@ function FlowsListPage() {
   const [importCode, setImportCode] = useState("");
   const [importName, setImportName] = useState("");
   const [importOp, setImportOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
+
+  // ZapVoice import
+  const [zvOpen, setZvOpen] = useState(false);
+  const [zvOp, setZvOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
+  const [zvReplace, setZvReplace] = useState(false);
+  const [zvFile, setZvFile] = useState<File | null>(null);
+  const [zvSummary, setZvSummary] = useState<any>(null);
 
   // Export
   const [exportOpen, setExportOpen] = useState(false);
