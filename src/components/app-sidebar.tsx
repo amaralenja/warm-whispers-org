@@ -220,7 +220,7 @@ export function AppSidebar() {
 
                 {!collapsed && operacaoX1Open && (
                   <SidebarMenuSub className="mt-1 gap-1">
-                    {operacaoX1Items.map((sub) => {
+                    {visibleOpX1.map((sub) => {
                       const subActive = pathname === sub.url;
                       return (
                         <SidebarMenuSubItem key={sub.title}>
