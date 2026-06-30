@@ -633,7 +633,22 @@ async function executeAiTool(supabase: any, name: string, args: any, contactWa: 
       };
       const { data, error } = await supabase.from("tasks").insert(row).select("id,titulo").maybeSingle();
       if (error) return JSON.stringify({ ok: false, error: error.message });
-      return JSON.stringify({ ok: true, id: data?.id, titulo: data?.titulo, assignee: args.assignee_nome ?? null, prazo: args.prazo ?? null });
+      // Dispara template task_created via hook público da app (com supabaseAdmin lá dentro).
+      let notified: any = null;
+      if (data?.id) {
+        try {
+          const appUrl = Deno.env.get("NOTIFICATION_AI_APP_URL") || "https://project--4860a253-8e14-4836-a639-c7fb96d53545-dev.lovable.app";
+          const r = await fetch(`${appUrl}/api/public/hooks/notify-task-created`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ taskId: data.id }),
+          });
+          notified = await r.json().catch(() => ({ ok: r.ok }));
+        } catch (e) {
+          notified = { ok: false, error: (e as any)?.message ?? String(e) };
+        }
+      }
+      return JSON.stringify({ ok: true, id: data?.id, titulo: data?.titulo, assignee: args.assignee_nome ?? null, prazo: args.prazo ?? null, notified });
     }
     return JSON.stringify({ ok: false, error: `tool desconhecida: ${name}` });
   } catch (e) {
