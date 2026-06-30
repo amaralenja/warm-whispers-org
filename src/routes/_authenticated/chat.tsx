@@ -633,6 +633,58 @@ function ChatPage() {
           )}
         </main>
       </div>
+
+      <Dialog open={!!preview} onOpenChange={(o) => { if (!o) cancelPreview(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {preview?.type === "image" ? "Enviar imagem" : preview?.type === "video" ? "Enviar vídeo" : "Enviar documento"}
+            </DialogTitle>
+          </DialogHeader>
+          {preview && (
+            <div className="space-y-3">
+              <div className="flex max-h-[50vh] items-center justify-center overflow-hidden rounded-xl bg-muted/40">
+                {preview.type === "image" ? (
+                  <img src={preview.url} alt="preview" className="max-h-[50vh] w-auto object-contain" />
+                ) : preview.type === "video" ? (
+                  <video src={preview.url} controls className="max-h-[50vh] w-full" />
+                ) : (
+                  <div className="flex w-full items-center gap-3 p-4">
+                    <FileText className="h-10 w-10 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{preview.file.name}</p>
+                      <p className="text-xs text-muted-foreground">{(preview.file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {preview.type !== "document" || true ? (
+                <Textarea
+                  value={previewCaption}
+                  onChange={(e) => setPreviewCaption(e.target.value)}
+                  placeholder="Adicionar legenda (opcional)"
+                  rows={2}
+                  className="resize-none"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      confirmPreviewSend();
+                    }
+                  }}
+                />
+              ) : null}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={cancelPreview}>Cancelar</Button>
+            <Button onClick={confirmPreviewSend} disabled={sendMut.isPending}>
+              {sendMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Enviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
