@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildWhatsAppTemplateMessage, renderTemplateText } from "@/lib/wa-template-message";
 
 function renderTemplate(tpl: string, vars: Record<string, string>) {
-  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
+  return renderTemplateText(tpl, vars);
 }
 
 function normalizeBrPhone(raw: string): string {
@@ -195,7 +196,7 @@ async function computeAndSend(db: any, dateStr?: string) {
   const channelId = active?.id;
   if (!channelId) throw new Error("Nenhum canal de notificações conectado");
 
-  const text = renderTemplate(String((tpl as any).conteudo ?? ""), {
+  const body = buildWhatsAppTemplateMessage(tpl as any, {
     data: label,
     show_ups: String(showUps),
     no_shows: String(noShows),
@@ -205,8 +206,6 @@ async function computeAndSend(db: any, dateStr?: string) {
     taxa_show: `${taxaShow.toFixed(1)}%`,
     diagnostico,
   });
-
-  const body = { type: "text", text: { body: text } };
   let sent = 0;
   const errors: string[] = [];
   for (const r of recipients as any[]) {
@@ -404,13 +403,13 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
     const db = context.supabase;
     const { sendWA } = await import("@/lib/flow-engine.server");
 
-    const renderTpl = (tpl: string, vars: Record<string, string>) =>
-      String(tpl ?? "").replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
-
     const loadTpl = async (slug: string) => {
       const { data } = await db.from("wa_templates" as any).select("*").eq("slug", slug).maybeSingle();
       return data as any;
     };
+
+    const isReengagementError = (message: string) =>
+      /131047|Re-engagement|24 hours|24 horas/i.test(String(message ?? ""));
 
     if (kind === "call") {
       const { data: row, error } = await db
@@ -428,11 +427,11 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
       const tpl = (await loadTpl(slug)) ?? (await loadTpl("lembrete_call"));
       if (!tpl) throw new Error(`Template ${slug} não encontrado`);
 
-      const text = renderTpl(String(tpl.conteudo ?? ""), {
+      const templateVars = {
         nome: r.lead_nome ?? "",
         hora: r.hora ?? "",
         convidados: r.convidados ?? "",
-      });
+      };
 
       let body: any;
       if (isAttendance) {
@@ -444,21 +443,11 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
                 { id: "noshow", label: "❌ No show" },
                 { id: "remarcada", label: "🔄 Call remarcada" },
               ];
-        body = {
-          type: "interactive",
-          interactive: {
-            type: "button",
-            body: { text },
-            action: {
-              buttons: tplButtons.slice(0, 3).map((b) => ({
-                type: "reply",
-                reply: { id: `callack:${rawId}:${b.id}`, title: b.label.slice(0, 20) },
-              })),
-            },
-          },
-        };
+        body = buildWhatsAppTemplateMessage(tpl, templateVars, {
+          buttonPayloads: Object.fromEntries(tplButtons.map((b) => [b.id, `callack:${rawId}:${b.id}`])),
+        });
       } else {
-        body = { type: "text", text: { body: text } };
+        body = buildWhatsAppTemplateMessage(tpl, templateVars);
       }
 
       await db
@@ -475,11 +464,14 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
         return { ok: true, waMsgId };
       } catch (e: any) {
         const msg = e?.message ?? "Falha ao reenviar";
+        const storedMsg = isReengagementError(msg)
+          ? `${msg} · Reenvio automático tentou template aprovado da Meta. Se continuar falhando, confira se o template "${slug}" está aprovado no número notificador.`
+          : msg;
         await db
           .from("wa_call_reminders" as any)
-          .update({ status: "failed", error_message: msg })
+          .update({ status: "failed", error_message: storedMsg })
           .eq("id", rawId);
-        throw new Error(msg);
+        throw new Error(storedMsg);
       }
     }
 
@@ -513,8 +505,7 @@ export const retryNotificationDispatch = createServerFn({ method: "POST" })
         criada: fmt((task as any)?.created_at),
         prazo: fmt((task as any)?.prazo),
       };
-      const text = renderTpl(String(tpl.conteudo ?? ""), vars);
-      const body = { type: "text", text: { body: text } };
+      const body = buildWhatsAppTemplateMessage(tpl, vars);
 
       await db
         .from("wa_task_notifications" as any)

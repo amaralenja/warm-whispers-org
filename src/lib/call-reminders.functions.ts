@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sendWA } from "@/lib/flow-engine.server";
+import { buildWhatsAppTemplateMessage, renderTemplateText } from "@/lib/wa-template-message";
 
 function renderTemplate(tpl: string, vars: Record<string, string>) {
-  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
+  return renderTemplateText(tpl, vars);
 }
 
 function normalizeBrPhone(raw: string): string {
@@ -39,6 +39,11 @@ async function loadTemplate(db: any, slug: string) {
     .maybeSingle();
   if (error || !tpl) throw new Error(`Template ${slug} não encontrado`);
   return tpl as any;
+}
+
+async function sendWhatsApp(channelId: string, to: string, body: any, db: any) {
+  const { sendWA } = await import("@/lib/flow-engine.server");
+  return sendWA(channelId, to, body, db);
 }
 
 type SharedInput = {
@@ -121,16 +126,16 @@ export const sendCallReminder = createServerFn({ method: "POST" })
     if (insErr || !ins) throw new Error(insErr?.message || "Falha ao criar lembrete");
     const reminderId = (ins as any).id as string;
 
-    const text = renderTemplate(String(tpl.conteudo ?? ""), {
+    const templateVars = {
       nome: data.nome || "",
       hora: data.hora || "",
       convidados: data.convidados || "",
-    });
+    };
 
-    const body = { type: "text", text: { body: text } };
+    const body = buildWhatsAppTemplateMessage(tpl, templateVars);
 
     try {
-      const { waMsgId } = await sendWA(channelId, contactWa, body, db);
+      const { waMsgId } = await sendWhatsApp(channelId, contactWa, body, db);
       await db
         .from("wa_call_reminders" as any)
         .update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" })
@@ -139,7 +144,7 @@ export const sendCallReminder = createServerFn({ method: "POST" })
     } catch (e: any) {
       await db
         .from("wa_call_reminders" as any)
-        .update({ status: "failed" })
+        .update({ status: "failed", error_message: e?.message ?? "Falha ao enviar lembrete" })
         .eq("id", reminderId);
       throw new Error(e?.message ?? "Falha ao enviar lembrete");
     }
@@ -199,11 +204,11 @@ export const sendCallAttendance = createServerFn({ method: "POST" })
     if (insErr || !ins) throw new Error(insErr?.message || "Falha ao criar comparecimento");
     const reminderId = (ins as any).id as string;
 
-    const text = renderTemplate(String(tpl.conteudo ?? ""), {
+    const templateVars = {
       nome: data.nome || "",
       hora: data.hora || "",
       convidados: data.convidados || "",
-    });
+    };
 
     const tplButtons: Array<{ id: string; label: string }> =
       Array.isArray(tpl.buttons) && tpl.buttons.length > 0
@@ -214,22 +219,12 @@ export const sendCallAttendance = createServerFn({ method: "POST" })
             { id: "remarcada", label: "🔄 Call remarcada" },
           ];
 
-    const replyButtons = tplButtons.slice(0, 3).map((b) => ({
-      type: "reply",
-      reply: { id: `callack:${reminderId}:${b.id}`, title: b.label.slice(0, 20) },
-    }));
-
-    const body = {
-      type: "interactive",
-      interactive: {
-        type: "button",
-        body: { text },
-        action: { buttons: replyButtons },
-      },
-    };
+    const body = buildWhatsAppTemplateMessage(tpl, templateVars, {
+      buttonPayloads: Object.fromEntries(tplButtons.map((b) => [b.id, `callack:${reminderId}:${b.id}`])),
+    });
 
     try {
-      const { waMsgId } = await sendWA(channelId, contactWa, body, db);
+      const { waMsgId } = await sendWhatsApp(channelId, contactWa, body, db);
       await db
         .from("wa_call_reminders" as any)
         .update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" })
@@ -238,7 +233,7 @@ export const sendCallAttendance = createServerFn({ method: "POST" })
     } catch (e: any) {
       await db
         .from("wa_call_reminders" as any)
-        .update({ status: "failed" })
+        .update({ status: "failed", error_message: e?.message ?? "Falha ao enviar comparecimento" })
         .eq("id", reminderId);
       throw new Error(e?.message ?? "Falha ao enviar comparecimento");
     }
@@ -288,19 +283,19 @@ export async function sendCallReminderInternal(db: any, raw: SharedInput) {
   if (insErr || !ins) throw new Error(insErr?.message || "Falha ao criar lembrete");
   const reminderId = (ins as any).id as string;
 
-  const text = renderTemplate(String(tpl.conteudo ?? ""), {
+  const templateVars = {
     nome: data.nome || "",
     hora: data.hora || "",
     convidados: data.convidados || "",
-  });
+  };
   try {
-    const { waMsgId } = await sendWA(channelId, contactWa, { type: "text", text: { body: text } }, db);
+    const { waMsgId } = await sendWhatsApp(channelId, contactWa, buildWhatsAppTemplateMessage(tpl, templateVars), db);
     await db.from("wa_call_reminders" as any)
       .update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" })
       .eq("id", reminderId);
     return { reminderId, waMsgId, channelId };
   } catch (e: any) {
-    await db.from("wa_call_reminders" as any).update({ status: "failed" }).eq("id", reminderId);
+    await db.from("wa_call_reminders" as any).update({ status: "failed", error_message: e?.message ?? "Falha ao enviar lembrete" }).eq("id", reminderId);
     throw new Error(e?.message ?? "Falha ao enviar lembrete");
   }
 }
@@ -347,11 +342,11 @@ export async function sendCallAttendanceInternal(db: any, raw: SharedInput) {
   if (insErr || !ins) throw new Error(insErr?.message || "Falha ao criar comparecimento");
   const reminderId = (ins as any).id as string;
 
-  const text = renderTemplate(String(tpl.conteudo ?? ""), {
+  const templateVars = {
     nome: data.nome || "",
     hora: data.hora || "",
     convidados: data.convidados || "",
-  });
+  };
 
   const tplButtons: Array<{ id: string; label: string }> =
     Array.isArray(tpl.buttons) && tpl.buttons.length > 0
@@ -361,23 +356,18 @@ export async function sendCallAttendanceInternal(db: any, raw: SharedInput) {
           { id: "noshow", label: "❌ No show" },
           { id: "remarcada", label: "🔄 Call remarcada" },
         ];
-  const replyButtons = tplButtons.slice(0, 3).map((b) => ({
-    type: "reply",
-    reply: { id: `callack:${reminderId}:${b.id}`, title: b.label.slice(0, 20) },
-  }));
-  const body = {
-    type: "interactive",
-    interactive: { type: "button", body: { text }, action: { buttons: replyButtons } },
-  };
+  const body = buildWhatsAppTemplateMessage(tpl, templateVars, {
+    buttonPayloads: Object.fromEntries(tplButtons.map((b) => [b.id, `callack:${reminderId}:${b.id}`])),
+  });
 
   try {
-    const { waMsgId } = await sendWA(channelId, contactWa, body, db);
+    const { waMsgId } = await sendWhatsApp(channelId, contactWa, body, db);
     await db.from("wa_call_reminders" as any)
       .update({ sent_at: new Date().toISOString(), wa_message_id: waMsgId, status: "sent" })
       .eq("id", reminderId);
     return { reminderId, waMsgId, channelId };
   } catch (e: any) {
-    await db.from("wa_call_reminders" as any).update({ status: "failed" }).eq("id", reminderId);
+    await db.from("wa_call_reminders" as any).update({ status: "failed", error_message: e?.message ?? "Falha ao enviar comparecimento" }).eq("id", reminderId);
     throw new Error(e?.message ?? "Falha ao enviar comparecimento");
   }
 }

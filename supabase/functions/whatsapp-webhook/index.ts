@@ -449,7 +449,7 @@ async function getGcalToken(): Promise<string | null> {
     const sa = JSON.parse(raw) as { client_email: string; private_key: string; token_uri?: string };
     const aud = sa.token_uri || "https://oauth2.googleapis.com/token";
     const header = { alg: "RS256", typ: "JWT" };
-    const payload = { iss: sa.client_email, scope: "https://www.googleapis.com/auth/calendar.readonly", aud, iat: now, exp: now + 3600 };
+    const payload = { iss: sa.client_email, scope: "https://www.googleapis.com/auth/calendar", aud, iat: now, exp: now + 3600 };
     const enc = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
     const key = await crypto.subtle.importKey("pkcs8", pemToAb(sa.private_key.replace(/\\n/g, "\n")), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
     const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(enc));
@@ -473,6 +473,118 @@ async function fetchGcalEventsRange(fromIso: string, toIso: string): Promise<any
   if (!res.ok) { console.warn("[gcal] list error", res.status); return []; }
   const json = await res.json();
   return (json.items || []) as any[];
+}
+
+async function patchGcalEvent(eventId: string, body: Record<string, unknown>) {
+  const calId = Deno.env.get("GOOGLE_CALENDAR_ID");
+  const token = await getGcalToken();
+  if (!calId || !token || !eventId) return false;
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) console.warn("[gcal] patch error", res.status, await res.text().catch(() => ""));
+  return res.ok;
+}
+
+async function getGcalEvent(eventId: string) {
+  const calId = Deno.env.get("GOOGLE_CALENDAR_ID");
+  const token = await getGcalToken();
+  if (!calId || !token || !eventId) return null;
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    console.warn("[gcal] get event error", res.status, await res.text().catch(() => ""));
+    return null;
+  }
+  return await res.json().catch(() => null);
+}
+
+async function markCalendarAttendance(eventId: string, action: { status: string; emoji: string; label: string }) {
+  const event = await getGcalEvent(eventId);
+  if (!event) return false;
+  const cleanSummary = String(event.summary ?? "Call")
+    .replace(/^(✅|❌|🔄)\s*/u, "")
+    .trim();
+  const stamp = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const previousDescription = String(event.description ?? "");
+  const note = `${action.emoji} ${action.label} registrado via WhatsApp em ${stamp}`;
+  return await patchGcalEvent(eventId, {
+    summary: `${action.emoji} ${cleanSummary}`,
+    description: previousDescription.includes(note) ? previousDescription : `${previousDescription}\n\n${note}`.trim(),
+    extendedProperties: {
+      private: {
+        ...(event.extendedProperties?.private ?? {}),
+        multium_attendance_status: action.status,
+        multium_attendance_updated_at: new Date().toISOString(),
+      },
+    },
+  });
+}
+
+async function sha256Hex(value: string) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function fireShowUpEdge(supabase: any, rem: any) {
+  const { data: cfg } = await supabase
+    .from("meta_ads_config")
+    .select("pixel_id, access_token, test_event_code, user_id")
+    .not("pixel_id", "is", null)
+    .not("access_token", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (!cfg?.pixel_id || !cfg?.access_token) return { ok: false, reason: "no_meta_config" };
+
+  const email = String(rem?.lead_email ?? "").trim().toLowerCase();
+  const phone = String(rem?.contact_wa ?? "").replace(/\D/g, "");
+  const [first, ...rest] = String(rem?.lead_nome ?? "").trim().split(/\s+/).filter(Boolean);
+  const last = rest.join(" ");
+  const externalId = String(rem?.lead_externalid || email || phone || "").trim();
+  const eventId = crypto.randomUUID();
+  const userData: Record<string, unknown> = {
+    ...(email ? { em: [await sha256Hex(email)] } : {}),
+    ...(phone ? { ph: [await sha256Hex(phone)] } : {}),
+    ...(first ? { fn: [await sha256Hex(first.toLowerCase())] } : {}),
+    ...(last ? { ln: [await sha256Hex(last.toLowerCase())] } : {}),
+    ...(externalId ? { external_id: [await sha256Hex(externalId)] } : {}),
+    ...(rem?.lead_fbp ? { fbp: rem.lead_fbp } : {}),
+    ...(rem?.lead_fbc ? { fbc: rem.lead_fbc } : {}),
+  };
+  const payload: any = {
+    data: [{
+      event_name: "ShowUp",
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: eventId,
+      action_source: "phone_call",
+      user_data: userData,
+      custom_data: { content_name: "ShowUp - call confirmed via WhatsApp button", status: "showed_up" },
+    }],
+  };
+  if (cfg.test_event_code) payload.test_event_code = cfg.test_event_code;
+  const res = await fetch(`https://graph.facebook.com/v19.0/${cfg.pixel_id}/events?access_token=${encodeURIComponent(cfg.access_token)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  const ok = res.ok && !json?.error;
+  await supabase.from("meta_ads_event_logs").insert({
+    user_id: cfg.user_id,
+    event_name: "ShowUp",
+    event_id: eventId,
+    status: ok ? "success" : "error",
+    events_received: json?.events_received ?? null,
+    fbtrace_id: json?.fbtrace_id ?? null,
+    error_message: ok ? null : (json?.error?.message ?? `HTTP ${res.status}`),
+    email_hash: email ? await sha256Hex(email) : null,
+    phone_hash: phone ? await sha256Hex(phone) : null,
+    external_id_hash: externalId ? await sha256Hex(externalId) : null,
+  });
+  return { ok, eventId };
 }
 
 async function getAiSnapshot(supabase: any, contactWa: string, userText: string): Promise<string> {
@@ -527,7 +639,13 @@ async function getAiSnapshot(supabase: any, contactWa: string, userText: string)
   const saidas = financeRows.filter((r) => normalizeText(r.tipo) === "saida" || normalizeText(r.tipo) === "despesa").reduce((a, r) => a + Number(r.valor || 0), 0);
   const callRowsToday = (callsToday.data ?? []) as any[];
   const callRowsMonth = (callsMonth.data ?? []) as any[];
-  const callCount = (rows: any[], status: string) => rows.filter((r) => normalizeText(r.status) === normalizeText(status)).length;
+  const callCount = (rows: any[], status: string) => rows.filter((r) => {
+    const s = normalizeText(r.status);
+    if (status === "show_up") return s === "showup" || s === "show_up";
+    if (status === "no_show") return s === "noshow" || s === "no_show";
+    if (status === "rescheduled") return s === "remarcada" || s === "rescheduled";
+    return s === normalizeText(status);
+  }).length;
   const tasksRows = (tasks.data ?? []) as any[];
   const adsRows = (capiToday.data ?? []) as any[];
 
@@ -1255,6 +1373,44 @@ Deno.serve(async (req) => {
         }, { onConflict: "channel_id,wa_message_id" });
 
         if (msgErr) console.error("[wa-webhook] upsert msg error", msgErr);
+
+        // Botões dos templates de comparecimento de call.
+        // O payload vem como callack:<wa_call_reminders.id>:showup|noshow|remarcada.
+        // Aqui marcamos o log, atualizamos o Google Calendar e disparamos ShowUp no Meta CAPI.
+        if (buttonId && String(buttonId).startsWith("callack:")) {
+          try {
+            const [, rawReminderId, rawAction] = String(buttonId).split(":");
+            const actionKey = normalizeText(rawAction);
+            const action =
+              actionKey === "showup" || actionKey === "show_up"
+                ? { status: "show_up", emoji: "✅", label: "Show up" }
+                : actionKey === "noshow" || actionKey === "no_show"
+                  ? { status: "no_show", emoji: "❌", label: "No show" }
+                  : actionKey === "remarcada" || actionKey === "rescheduled"
+                    ? { status: "rescheduled", emoji: "🔄", label: "Call remarcada" }
+                    : null;
+
+            if (rawReminderId && action) {
+              const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawReminderId);
+              const reminderQuery = isUuid
+                ? supabase.from("wa_call_reminders").select("*").eq("id", rawReminderId).limit(1).maybeSingle()
+                : supabase.from("wa_call_reminders").select("*").eq("event_id", rawReminderId).limit(1).maybeSingle();
+              const { data: rem, error: remErr } = await reminderQuery;
+              if (remErr) console.warn("[callack] lookup error", remErr.message);
+              if (rem) {
+                await supabase
+                  .from("wa_call_reminders")
+                  .update({ status: action.status, replied_at: new Date().toISOString(), error_message: null })
+                  .eq("id", rem.id);
+
+                if (rem.event_id) await markCalendarAttendance(rem.event_id, action);
+                if (action.status === "show_up") await fireShowUpEdge(supabase, rem);
+              }
+            }
+          } catch (e) {
+            console.warn("[callack] erro", (e as any)?.message ?? e);
+          }
+        }
 
         // IA do número de notificações: roda aqui dentro da Edge Function, com service role real.
         // Mantém o bridge TanStack só como fallback legado; o app publicado não tem service role.
