@@ -40,10 +40,12 @@ export type EvoChannel = {
   token: string;
   metadata: Record<string, any> | null;
   operacaoId: string | null;
+  kind: "chat" | "notification";
   created_at: string;
   updated_at: string;
   connectUrl: string;
 };
+
 
 const APP_SOURCE = "lovable-crm";
 const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
