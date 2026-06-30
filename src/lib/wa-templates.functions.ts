@@ -90,13 +90,22 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
 
     const buttons = Array.isArray(tpl.buttons) ? tpl.buttons : [];
     if (buttons.length > 0) {
-      components.push({
-        type: "BUTTONS",
-        buttons: buttons.slice(0, 3).map((b: any) => ({
-          type: "QUICK_REPLY",
-          text: String(b.label ?? "").slice(0, 20),
-        })),
-      });
+      const sanitizeBtn = (s: string) =>
+        String(s ?? "")
+          .replace(/\{\{[^}]*\}\}/g, "")           // sem variáveis
+          .replace(/[\r\n\t]+/g, " ")               // sem quebras
+          .replace(/[*_~`]/g, "")                   // sem markdown
+          .replace(/\p{Extended_Pictographic}/gu, "") // sem emojis
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 25);
+      const quickReplies = buttons
+        .slice(0, 3)
+        .map((b: any) => ({ type: "QUICK_REPLY", text: sanitizeBtn(b.label ?? b.text ?? "") }))
+        .filter((b: any) => b.text.length > 0);
+      if (quickReplies.length > 0) {
+        components.push({ type: "BUTTONS", buttons: quickReplies });
+      }
     }
 
     const name = String(tpl.slug ?? tpl.nome ?? "")
