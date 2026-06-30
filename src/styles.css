@@ -82,18 +82,18 @@
   --input: oklch(0.20 0.006 270);
   --ring: oklch(0.78 0.13 75);
 
-  /* WhatsApp live chat — premium command-center surface */
-  --chat-shell: oklch(0.115 0.006 255);
-  --chat-sidebar: oklch(0.145 0.008 255);
-  --chat-thread: oklch(0.105 0.006 255);
-  --chat-panel: oklch(0.175 0.01 255);
-  --chat-line: oklch(0.27 0.012 255);
-  --chat-soft: oklch(0.24 0.04 158 / 0.32);
-  --chat-message-in: oklch(0.18 0.009 255);
-  --chat-message-out: oklch(0.66 0.16 158);
-  --chat-message-out-foreground: oklch(0.10 0.02 158);
-  --chat-accent: oklch(0.74 0.16 158);
-  --chat-accent-foreground: oklch(0.10 0.02 158);
+  /* WhatsApp Web — dark mode parity (#111b21 / #202c33 / #0b141a / #005c4b) */
+  --chat-shell: #111b21;
+  --chat-sidebar: #111b21;
+  --chat-thread: #0b141a;
+  --chat-panel: #202c33;
+  --chat-line: #2a3942;
+  --chat-soft: #2a3942;
+  --chat-message-in: #202c33;
+  --chat-message-out: #005c4b;
+  --chat-message-out-foreground: #e9edef;
+  --chat-accent: #00a884;
+  --chat-accent-foreground: #ffffff;
 
   /* Premium FX */
   --gradient-radial: radial-gradient(ellipse at top, oklch(0.20 0.02 75 / 0.4), transparent 60%);
