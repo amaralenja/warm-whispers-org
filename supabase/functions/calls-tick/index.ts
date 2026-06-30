@@ -90,7 +90,7 @@ function normalizeBrPhone(raw: string): string {
   if (digits.startsWith("55") && digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
-    if (!rest.startsWith("9")) digits = `55${ddd}9${rest}`;
+    if (rest.length === 8) digits = `55${ddd}9${rest}`;
   }
   return digits;
 }

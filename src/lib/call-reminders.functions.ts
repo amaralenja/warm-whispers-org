@@ -7,10 +7,14 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 }
 
 function normalizeBrPhone(raw: string): string {
-  const digits = String(raw || "").replace(/\D/g, "");
+  let digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return "";
-  if (digits.startsWith("55")) return digits;
-  if (digits.length === 11 || digits.length === 10) return "55" + digits;
+  if (!digits.startsWith("55") && (digits.length === 11 || digits.length === 10)) digits = "55" + digits;
+  if (digits.startsWith("55") && digits.length === 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    if (rest.length === 8) digits = "55" + ddd + "9" + rest;
+  }
   return digits;
 }
 
