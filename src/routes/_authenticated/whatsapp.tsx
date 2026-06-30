@@ -1104,6 +1104,8 @@ function TemplatesPanel() {
 
 function DispatchLogsPanel() {
   const listLogsFn = useServerFn(listNotificationDispatchLogs);
+  const retryFn = useServerFn(retryNotificationDispatch);
+  const qc = useQueryClient();
   const { data: logs = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ["wa_notification_dispatch_logs"],
     queryFn: async () => {
@@ -1111,6 +1113,17 @@ function DispatchLogsPanel() {
     },
     refetchInterval: 10000,
   });
+
+  const retryMut = useMutation({
+    mutationFn: async (logId: string) => retryFn({ data: { logId } }),
+    onSuccess: () => {
+      toast.success("Disparo reenviado");
+      qc.invalidateQueries({ queryKey: ["wa_notification_dispatch_logs"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao reenviar"),
+  });
+
+
 
   const fmt = (iso: string | null | undefined) => {
     if (!iso) return "—";
