@@ -46,6 +46,7 @@ function FlowsListPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [op, setOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
+  const [folder, setFolder] = useState<string>("");
 
   // Import
   const [importOpen, setImportOpen] = useState(false);
