@@ -918,7 +918,7 @@ type IgProfile = {
   profile_url?: string | null;
 };
 type IgCacheEntry = { status: "real" | "fake"; profile?: IgProfile };
-const IG_CACHE_KEY = "quiz_ig_verify_v2";
+const IG_CACHE_KEY = "quiz_ig_verify_v3";
 
 function loadIgCache(): Record<string, IgCacheEntry> {
   if (typeof window === "undefined") return {};

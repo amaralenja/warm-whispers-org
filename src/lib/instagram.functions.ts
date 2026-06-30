@@ -55,7 +55,15 @@ export const fetchInstagramProfile = createServerFn({ method: "POST" })
       following: Number(row.following ?? row.following_count ?? 0) || 0,
       posts_count: Number(row.posts_count ?? row.posts ?? 0) || 0,
       is_verified: Boolean(row.is_verified ?? row.verified ?? false),
-      profile_pic_url: row.profile_image_link ?? row.profile_pic_url ?? row.avatar ?? null,
+      profile_pic_url:
+        row.profile_image_link ??
+        row.profile_pic_url ??
+        row.profile_pic_url_hd ??
+        row.profile_picture_url ??
+        row.profile_image ??
+        row.avatar ??
+        row.profilePicUrl ??
+        null,
       profile_url: row.url ?? url,
       raw: row,
       fetched_at: new Date().toISOString(),
