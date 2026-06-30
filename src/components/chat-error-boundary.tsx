@@ -1,16 +1,39 @@
 import { Component, type ReactNode } from "react";
 
 type Props = { children: ReactNode };
-type State = { error: Error | null };
+type State = { error: unknown | null };
+
+function safeErrorText(error: unknown, fallback: string) {
+  if (error == null) return fallback;
+  if (typeof error === "string") return error || fallback;
+  if (error instanceof Error) return error.message || fallback;
+  if (typeof error === "object") {
+    const value = error as Record<string, unknown>;
+    const message = value.message ?? value.error ?? value.reason;
+    if (typeof message === "string" && message.trim()) return message;
+    try {
+      const json = JSON.stringify(value);
+      return json && json !== "{}" ? json : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return String(error) || fallback;
+}
+
+function safeStackText(error: unknown) {
+  if (error instanceof Error && error.stack) return error.stack;
+  return safeErrorText(error, "Sem detalhes técnicos disponíveis.");
+}
 
 export class ChatErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: unknown): State {
     return { error };
   }
 
-  componentDidCatch(error: Error, info: { componentStack?: string }) {
+  componentDidCatch(error: unknown, info: { componentStack?: string }) {
     // Logamos com prefixo pra ficar fácil de achar no console em produção.
     console.error("[ChatErrorBoundary]", error, info?.componentStack);
   }
@@ -28,11 +51,11 @@ export class ChatErrorBoundary extends Component<Props, State> {
           <div>
             <h3 className="text-lg font-semibold">Algo travou no Chat ao Vivo</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {this.state.error.message || "Erro desconhecido"}
+              {safeErrorText(this.state.error, "Erro desconhecido")}
             </p>
           </div>
           <pre className="max-h-44 overflow-auto rounded-xl bg-background/40 p-3 text-left text-[11px] leading-relaxed text-muted-foreground">
-            {String(this.state.error.stack ?? this.state.error)}
+            {safeStackText(this.state.error)}
           </pre>
           <button
             type="button"
