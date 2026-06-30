@@ -46,7 +46,6 @@ import {
   ShieldAlert,
   Loader2,
   Clock,
-  Mail,
   Phone,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
