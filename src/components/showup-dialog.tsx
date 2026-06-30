@@ -96,6 +96,38 @@ export function getAllNoShows(): Record<string, { eventId: string; markedAt: str
   return loadNoShows();
 }
 
+// ---- Rescheduled marker (localStorage) ----
+const RESCHEDULED_KEY = "calendar_rescheduled_v1";
+
+function loadRescheduled(): Record<string, { eventId: string; markedAt: string }> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(RESCHEDULED_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function markRescheduled(eventId: string) {
+  const all = loadRescheduled();
+  all[eventId] = { eventId, markedAt: new Date().toISOString() };
+  localStorage.setItem(RESCHEDULED_KEY, JSON.stringify(all));
+}
+
+export function unmarkRescheduled(eventId: string) {
+  const all = loadRescheduled();
+  delete all[eventId];
+  localStorage.setItem(RESCHEDULED_KEY, JSON.stringify(all));
+}
+
+export function getRescheduled(eventId: string): boolean {
+  return !!loadRescheduled()[eventId];
+}
+
+export function getAllRescheduled(): Record<string, { eventId: string; markedAt: string }> {
+  return loadRescheduled();
+}
+
 
 export function ShowUpDialog({
   open,
