@@ -269,8 +269,6 @@ function FlowsListPage() {
           flows={filtered}
           showOp={workspace.id === "all"}
           workspaces={workspaces}
-          onMoveFolder={(id, f) => moveFolderMut.mutate({ id, folder: f })}
-          onEditCard={(f) => f}
           renderCard={(f: any) => {
             const triggers = f.wa_flow_triggers ?? [];
             return (
