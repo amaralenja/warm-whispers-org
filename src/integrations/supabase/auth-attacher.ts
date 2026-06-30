@@ -27,3 +27,8 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
   return fetch(input, { ...init, headers })
 }
 
+// Legacy no-op middleware. fetchWithSupabaseAuth (acima) já anexa o token via serverFns.fetch.
+// Mantido como passthrough porque o template do start.ts é regenerado com esse import.
+import { createMiddleware } from '@tanstack/react-start'
+export const attachSupabaseAuth = createMiddleware().client(async ({ next }) => next())
+
