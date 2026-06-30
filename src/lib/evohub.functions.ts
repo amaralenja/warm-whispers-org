@@ -209,6 +209,8 @@ function mergeLocalIntoRemote(ch: any, local?: any) {
   return {
     ...normalized,
     kind,
+    display_phone_number: (normalized as any).display_phone_number ?? local.display_phone_number ?? null,
+    verified_name: (normalized as any).verified_name ?? local.verified_name ?? null,
     metadata: {
       ...meta,
       ...localMeta,
