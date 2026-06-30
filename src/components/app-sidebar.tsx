@@ -20,6 +20,7 @@ import {
   Workflow,
   Briefcase,
   User,
+  BookOpenText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -50,7 +51,10 @@ const mainItems: Item[] = [
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
+  { title: "SOPs", url: "/sops", icon: BookOpenText },
 ];
+
+
 
 const operacaoX1Items: Item[] = [
   { title: "CRM Leads X1", url: "/crm", icon: Users },
@@ -64,6 +68,7 @@ const highTicketItems: Item[] = [
   { title: "Calendário Calls", url: "/calendar", icon: Calendar },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
+  { title: "SOPs / Processos", url: "/sops", icon: BookOpenText },
 ];
 
 const URL_TO_KEY: Record<string, string> = {
@@ -80,6 +85,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/calendar": "calendar",
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
+  "/sops": "sops",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 
