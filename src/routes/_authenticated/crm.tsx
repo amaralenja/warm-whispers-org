@@ -6,6 +6,7 @@ import {
   User, MoreVertical, KeyRound, RefreshCw, Tag as TagIcon,
 } from "lucide-react";
 import { TagsManagerDialog } from "@/components/tags-manager-dialog";
+import { InstagramLookup } from "@/components/instagram-lookup";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
@@ -373,6 +374,7 @@ function CRMPage() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
+      <InstagramLookup />
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
