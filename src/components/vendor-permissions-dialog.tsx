@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Settings2, Phone } from "lucide-react";
+import { Loader2, Settings2, Phone, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -13,7 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { MENU_TREE, defaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
+
 
 type Channel = {
   id: string;
