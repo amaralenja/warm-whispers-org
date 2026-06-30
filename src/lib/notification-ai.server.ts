@@ -8,6 +8,47 @@ const EVOHUB_BASE = "https://api.evohub.ai";
 
 type AnyDb = any;
 
+// ---- Phone normalization & allowlist ----
+// Gera variantes possíveis (com/sem 9º dígito, com/sem 55) pra um número BR.
+function brPhoneVariants(raw: string): string[] {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return [];
+  let local = digits.startsWith("55") ? digits.slice(2) : digits;
+  // remove zeros à esquerda de DDD se houver
+  local = local.replace(/^0+/, "");
+  if (local.length < 10 || local.length > 11) return [digits];
+  const ddd = local.slice(0, 2);
+  const rest = local.slice(2);
+  // versão sem 9 (10 dígitos) e com 9 (11 dígitos)
+  const sem9 = rest.length === 9 && rest.startsWith("9") ? rest.slice(1) : rest.length === 8 ? rest : null;
+  const com9 = rest.length === 8 ? "9" + rest : rest.length === 9 ? rest : null;
+  const out = new Set<string>();
+  if (sem9) {
+    out.add(`55${ddd}${sem9}`);
+    out.add(`${ddd}${sem9}`);
+  }
+  if (com9) {
+    out.add(`55${ddd}${com9}`);
+    out.add(`${ddd}${com9}`);
+  }
+  out.add(digits);
+  return Array.from(out);
+}
+
+async function isAllowedContact(db: AnyDb, contactWa: string): Promise<boolean> {
+  const variants = brPhoneVariants(contactWa);
+  if (!variants.length) return false;
+  const [{ data: vend }, { data: team }] = await Promise.all([
+    db.from("vendedores").select("id,telefone").not("telefone", "is", null),
+    db.from("team_members").select("id,telefone").not("telefone", "is", null),
+  ]);
+  const allPhones: string[] = [];
+  for (const r of (vend ?? []) as any[]) allPhones.push(...brPhoneVariants(r.telefone));
+  for (const r of (team ?? []) as any[]) allPhones.push(...brPhoneVariants(r.telefone));
+  const set = new Set(allPhones);
+  return variants.some((v) => set.has(v));
+}
+
 type SessionRow = {
   id: string;
   channel_id: string;
@@ -220,7 +261,11 @@ export async function startNotificationSession(opts: {
 }) {
   const { db, channelId, contactWa, contactName, reminderId, calendarEventId, buttonId, hora } = opts;
 
-  // close any previous active session for this contact
+  // Allowlist: só responde se o número for de vendedor ou membro da equipe
+  if (!(await isAllowedContact(db, contactWa))) {
+    console.log("[notif-ai] contato fora da allowlist, ignorando", contactWa);
+    return;
+  }
   await db
     .from("wa_ai_sessions")
     .update({ status: "closed" })
@@ -271,6 +316,12 @@ export async function continueNotificationSession(opts: {
 }) {
   const { db, channelId, contactWa, userText } = opts;
   if (!userText.trim()) return;
+
+  // Allowlist: só responde vendedores e team_members
+  if (!(await isAllowedContact(db, contactWa))) {
+    console.log("[notif-ai] contato fora da allowlist, ignorando", contactWa);
+    return;
+  }
 
   const { data: sessRow } = await db
     .from("wa_ai_sessions")
