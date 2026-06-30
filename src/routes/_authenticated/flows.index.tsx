@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   Workflow, Plus, Trash2, Power, PowerOff, Pencil,
-  Copy, Upload, Download, ClipboardCopy,
+  Copy, Upload, Download, ClipboardCopy, FileJson, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -22,6 +23,7 @@ import {
   listFlows, createFlow, deleteFlow, saveFlow,
   duplicateFlow, exportFlow, importFlow,
 } from "@/lib/flow-engine.functions";
+import { importZapVoiceBackup } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 
 export const Route = createFileRoute("/_authenticated/flows/")({
@@ -39,6 +41,7 @@ function FlowsListPage() {
   const duplicateFn = useServerFn(duplicateFlow);
   const exportFn = useServerFn(exportFlow);
   const importFn = useServerFn(importFlow);
+  const importZvFn = useServerFn(importZapVoiceBackup);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -49,6 +52,13 @@ function FlowsListPage() {
   const [importCode, setImportCode] = useState("");
   const [importName, setImportName] = useState("");
   const [importOp, setImportOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
+
+  // ZapVoice import
+  const [zvOpen, setZvOpen] = useState(false);
+  const [zvOp, setZvOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
+  const [zvReplace, setZvReplace] = useState(false);
+  const [zvFile, setZvFile] = useState<File | null>(null);
+  const [zvSummary, setZvSummary] = useState<any>(null);
 
   // Export
   const [exportOpen, setExportOpen] = useState(false);
@@ -119,6 +129,30 @@ function FlowsListPage() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao importar"),
   });
 
+  const zvMut = useMutation({
+    mutationFn: async (v: { backup: any; operacao_id: string | null; replace: boolean }) =>
+      importZvFn({ data: v }),
+    onSuccess: (r: any) => {
+      setZvSummary(r);
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+      toast.success(`Importado: ${r.funnels} funis · ${r.steps} etapas · ${r.uploads} arquivos`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao importar ZapVoice"),
+  });
+
+  async function runZvImport() {
+    if (!zvFile) return toast.error("Selecione o arquivo .json");
+    let parsed: any;
+    try {
+      parsed = JSON.parse(await zvFile.text());
+    } catch (e: any) {
+      return toast.error("JSON inválido: " + (e?.message ?? e));
+    }
+    if (!Array.isArray(parsed?.funnels)) return toast.error("JSON sem 'funnels[]'");
+    setZvSummary(null);
+    zvMut.mutate({ backup: parsed, operacao_id: zvOp || null, replace: zvReplace });
+  }
+
   const filtered = (flows as any[]).filter((f) =>
     workspace.id === "all" ? true : f.operacao_id === workspace.id
   );
@@ -144,6 +178,9 @@ function FlowsListPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setZvSummary(null); setZvOpen(true); }}>
+            <FileJson className="h-4 w-4 mr-2" /> Importar ZapVoice
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="h-4 w-4 mr-2" /> Importar código
           </Button>
@@ -298,6 +335,74 @@ function FlowsListPage() {
               })}
             >
               <Upload className="h-4 w-4 mr-2" /> Importar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ZapVoice Import Dialog */}
+      <Dialog open={zvOpen} onOpenChange={setZvOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileJson className="h-5 w-5 text-emerald-500" /> Importar backup do ZapVoice
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <Label>Arquivo .json do ZapVoice</Label>
+              <Input
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => setZvFile(e.target.files?.[0] ?? null)}
+              />
+              {zvFile && (
+                <p className="text-[11px] text-muted-foreground">
+                  {zvFile.name} · {(zvFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Operação (opcional)</Label>
+              <Select value={zvOp} onValueChange={setZvOp}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {workspaces.filter((o) => o.id !== "all").map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={zvReplace} onCheckedChange={(v) => setZvReplace(!!v)} />
+              Substituir importações anteriores do ZapVoice (apaga fluxos com prefixo [ZV])
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Cada funil vira um fluxo com gatilho manual. Mensagens viram nós de texto, mídias são enviadas para o Storage e linkadas no nó correspondente.
+            </p>
+
+            {zvSummary && (
+              <div className="border border-emerald-500/30 bg-emerald-500/5 rounded-md p-3 text-sm space-y-1">
+                <div>✅ <strong>{zvSummary.funnels}</strong> funis · <strong>{zvSummary.steps}</strong> etapas · <strong>{zvSummary.uploads}</strong> arquivos</div>
+                {zvSummary.errors?.length > 0 && (
+                  <details className="text-xs text-amber-600 mt-1">
+                    <summary>{zvSummary.errors.length} erro(s) — clique para ver</summary>
+                    <ul className="mt-1 max-h-40 overflow-auto space-y-0.5 pl-3 list-disc">
+                      {zvSummary.errors.slice(0, 30).map((e: any, i: number) => (
+                        <li key={i}>{e.funnel ? `[${e.funnel}] ` : ""}{e.item ? `${e.item}: ` : ""}{e.message}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setZvOpen(false)}>Fechar</Button>
+            <Button disabled={!zvFile || zvMut.isPending} onClick={runZvImport}>
+              {zvMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando…</>
+                : <><Upload className="h-4 w-4 mr-2" /> Importar</>}
             </Button>
           </DialogFooter>
         </DialogContent>
