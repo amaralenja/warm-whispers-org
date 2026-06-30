@@ -64,6 +64,23 @@ const highTicketItems: Item[] = [
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
 ];
 
+const URL_TO_KEY: Record<string, string> = {
+  "/dashboard": "dashboard",
+  "/relatorios": "relatorios",
+  "/ranking": "ranking",
+  "/ranking-tv": "ranking-tv",
+  "/financeiro": "financeiro",
+  "/crm": "crm",
+  "/vendedores": "vendedores",
+  "/whatsapp": "whatsapp",
+  "/chat": "chat",
+  "/flows": "flows",
+  "/calendar": "calendar",
+  "/quiz": "quiz",
+  "/meta-ads": "meta-ads",
+};
+const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
