@@ -96,25 +96,43 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "reschedule_call",
-      description:
-        "Remarca a call da pessoa no Google Calendar. Use quando ela informar uma nova data e horário em qualquer formato natural (ex: 'amanhã 15h', 'sexta às 10', '08/01 14:30'). Resolva pra ISO 8601 no timezone America/Sao_Paulo antes de chamar.",
+      name: "list_upcoming_calls",
+      description: "Lista próximas calls do Google Calendar. Use quando o usuário pedir agenda, 'minhas calls', 'o que tenho hoje'.",
+      parameters: {
+        type: "object",
+        properties: { days_ahead: { type: "number", description: "Janela em dias. Default 7." } },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_call",
+      description: "Cria nova call no Google Calendar. Resolva data/hora pra ISO 8601 com offset -03:00.",
       parameters: {
         type: "object",
         properties: {
-          start_iso: {
-            type: "string",
-            description:
-              "Novo horário de início no formato ISO 8601 com offset -03:00 (ex: 2026-07-02T15:00:00-03:00).",
-          },
-          duration_minutes: {
-            type: "number",
-            description: "Duração em minutos. Default 60 se a pessoa não falar.",
-          },
-          motivo: {
-            type: "string",
-            description: "Motivo curto da remarcação (opcional).",
-          },
+          titulo: { type: "string" },
+          start_iso: { type: "string", description: "Início ISO 8601 com -03:00." },
+          duration_minutes: { type: "number", description: "Default 60." },
+          descricao: { type: "string" },
+        },
+        required: ["titulo", "start_iso"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reschedule_call",
+      description: "Remarca call existente. Se não houver event_id na sessão, chame list_upcoming_calls antes.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "ID do evento (opcional se a sessão já tem calendar_event_id)." },
+          start_iso: { type: "string", description: "Novo início ISO 8601 com -03:00." },
+          duration_minutes: { type: "number", description: "Default 60." },
+          motivo: { type: "string" },
         },
         required: ["start_iso"],
       },
@@ -123,18 +141,22 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "end_session",
-      description:
-        "Encerra a conversa quando o assunto estiver resolvido. Use sempre que tudo já estiver fechado (presença confirmada, no-show anotado, remarcada concluída ou pessoa disse que já remarcou).",
+      name: "cancel_call",
+      description: "Cancela (deleta) uma call do Google Calendar.",
       parameters: {
         type: "object",
-        properties: {
-          resumo: {
-            type: "string",
-            description:
-              "Resumo de 1 linha do desfecho (ex: 'remarcada para 02/07 15h', 'no_show registrado', 'remarcou_sozinho').",
-          },
-        },
+        properties: { event_id: { type: "string" } },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "end_session",
+      description: "Encerra a conversa quando o assunto estiver resolvido.",
+      parameters: {
+        type: "object",
+        properties: { resumo: { type: "string" } },
         required: ["resumo"],
       },
     },
