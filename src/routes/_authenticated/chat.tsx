@@ -166,6 +166,8 @@ function ChatPage() {
   const [pendingType, setPendingType] = useState<"image" | "video" | "document" | "audio">("image");
   const [mediaCache, setMediaCache] = useState<Record<string, { url?: string; mime?: string; loading?: boolean; error?: string }>>({});
   const [sendError, setSendError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ file: File; url: string; type: "image" | "video" | "document" } | null>(null);
+  const [previewCaption, setPreviewCaption] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const opFilter = workspace.id === "all" ? undefined : workspace.id;
