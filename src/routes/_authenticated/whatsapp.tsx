@@ -507,7 +507,7 @@ function Banner({
 }
 
 function ChannelCard({
-  ch, opLabel, operacoes, onChangeOp, onRegen, regenPending, onDelete, deletePending,
+  ch, opLabel, operacoes, onChangeOp, onRegen, regenPending, onDelete, deletePending, onRename, renamePending,
 }: {
   ch: EvoChannel;
   opLabel: string;
@@ -517,6 +517,8 @@ function ChannelCard({
   regenPending: boolean;
   onDelete: () => void;
   deletePending: boolean;
+  onRename: (newName: string) => void;
+  renamePending: boolean;
 }) {
   const qualityFn = useServerFn(getWhatsappQuality);
   const status = (ch.status || "").toLowerCase();
