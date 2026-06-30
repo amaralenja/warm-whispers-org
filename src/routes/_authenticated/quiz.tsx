@@ -410,7 +410,11 @@ function QuizPage() {
   }, [filteredLeads, overrides]);
 
   const sortedLeads = useMemo(() => {
+    // Leads com caixa < R$1k (peso <= 1) vão sempre pro fim da lista
+    const isLow = (l: Lead) => caixaWeight(l) <= 1;
     return [...filteredLeads].sort((a, b) => {
+      const lowDiff = Number(isLow(a)) - Number(isLow(b));
+      if (lowDiff !== 0) return lowDiff;
       const wb = caixaWeight(b) - caixaWeight(a);
       if (wb !== 0) return wb;
       return (b.data_criacao || "").localeCompare(a.data_criacao || "");
@@ -843,7 +847,7 @@ function LeadCard({
       )}
 
       {/* INSTAGRAM verificado (card grande) */}
-      {cleanIg && <IgRow username={cleanIg} />}
+      {cleanIg && <IgRow username={cleanIg} autoVerify={weight >= 2} />}
 
       {/* CONTATO */}
       {(lead.email || lead.whatsapp) && (
@@ -1060,7 +1064,7 @@ async function igDrain() {
   }
 }
 
-function IgRow({ username }: { username: string }) {
+function IgRow({ username, autoVerify = true }: { username: string; autoVerify?: boolean }) {
   const key = (username || "").toLowerCase().trim().replace(/^@/, "").replace(/\/+$/, "");
   const isValidHandle = /^[a-z0-9._]+$/i.test(key);
   const { map, setLocal } = useContext(IgDbContext);
@@ -1117,11 +1121,12 @@ function IgRow({ username }: { username: string }) {
   useEffect(() => {
     if (status !== "unknown") return;
     if (!isValidHandle) return;
+    if (!autoVerify) return; // economiza Bright Data: não verifica caixa < R$1k
     let cancelled = false;
     igEnqueue(async () => { if (!cancelled) await runVerify(); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, status, isValidHandle]);
+  }, [key, status, isValidHandle, autoVerify]);
 
   async function verify(e: React.MouseEvent) {
     e.stopPropagation();
