@@ -1085,6 +1085,7 @@ export type Database = {
       }
       wa_conversations: {
         Row: {
+          assigned_vendor_id: number | null
           channel_id: string
           contact_name: string | null
           contact_wa_id: string
@@ -1099,6 +1100,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_vendor_id?: number | null
           channel_id: string
           contact_name?: string | null
           contact_wa_id: string
@@ -1113,6 +1115,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_vendor_id?: number | null
           channel_id?: string
           contact_name?: string | null
           contact_wa_id?: string
@@ -1400,6 +1403,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_vendor_for_channel: {
+        Args: { _channel_id: string }
+        Returns: number
+      }
       generate_vendedor_codigo: { Args: never; Returns: string }
       get_hall_of_fame_mes: { Args: never; Returns: Json }
       get_metas_coletivas_mes: { Args: never; Returns: Json }
