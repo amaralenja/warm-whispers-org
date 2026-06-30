@@ -551,13 +551,14 @@ function ChatPage() {
                   const isActive = String(c.id) === activeId;
                   const preview = toText(c.last_message_preview);
                   return (
-                    <button
+                    <div
                       key={String(c.id)}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setActiveId(String(c.id))}
-                      className={`group w-full border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
-                        isActive
-                          ? "bg-chat-soft"
-                          : "hover:bg-chat-panel"
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
+                      className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
+                        isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
                       }`}
                     >
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
@@ -590,7 +591,18 @@ function ChatPage() {
                           )}
                         </div>
                       </div>
-                    </button>
+                      <div
+                        className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <ConversationActionsMenu
+                          conversationId={String(c.id)}
+                          channelId={toText(c.channel_id)}
+                          currentVendorId={(c as any).assigned_vendor_id ?? null}
+                        />
+                      </div>
+                    </div>
                   );
                 })}
               </div>
