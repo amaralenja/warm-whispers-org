@@ -64,6 +64,29 @@ export const Route = createFileRoute("/api/public/hooks/calls-tick")({
               }
             }
 
+            // Sempre acrescenta os destinatários fixos dos templates de call
+            // (cadastrados em "Lembrete de Call" / "Comparecimento de Call").
+            try {
+              const { data: recips } = await supabaseAdmin
+                .from("wa_template_recipients" as any)
+                .select("telefone, nome, slug, ativo")
+                .in("slug", ["lembrete_call_v2", "lembrete_call", "comparecimento_call"])
+                .eq("ativo", true);
+              const extra = ((recips ?? []) as any[])
+                .filter((r) => r?.telefone)
+                .map((r) => ({ nome: r.nome ?? "", phone: String(r.telefone) }));
+              const seen = new Set(phones.map((p) => p.phone.replace(/\D/g, "")));
+              for (const e of extra) {
+                const k = e.phone.replace(/\D/g, "");
+                if (!seen.has(k)) {
+                  phones.push(e);
+                  seen.add(k);
+                }
+              }
+            } catch (e) {
+              console.error("[calls-tick] recipients lookup", e);
+            }
+
             if (!phones.length) continue;
 
             const hora = new Date(startMs).toLocaleTimeString("pt-BR", {
@@ -72,6 +95,7 @@ export const Route = createFileRoute("/api/public/hooks/calls-tick")({
               timeZone: "America/Sao_Paulo",
             });
             const convidados = attendees.join(", ");
+
 
             for (const p of phones) {
               const shared = {
