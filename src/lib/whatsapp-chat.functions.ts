@@ -112,6 +112,20 @@ async function findChannel(channelId: string, supabase?: any) {
   return { token: ch.token as string, phoneNumberId: phoneNumberId as string | undefined, raw: ch };
 }
 
+async function persistWorkingToken(supabase: any, phoneNumberId: string, token: string, channelId?: string) {
+  if (!supabase || !phoneNumberId || !token) return;
+  try {
+    await supabase.from("wa_channels" as any).update({ token, synced_at: new Date().toISOString() })
+      .eq("phone_number_id", phoneNumberId);
+    if (channelId) {
+      await supabase.from("wa_channels" as any).update({ token, synced_at: new Date().toISOString() })
+        .eq("id", channelId);
+    }
+  } catch (e) {
+    console.warn("[whatsapp-chat] persistWorkingToken failed", e);
+  }
+}
+
 async function findUsableMetaToken(phoneNumberId: string, preferredToken?: string) {
   if (preferredToken) {
     const probe = await rawMetaProxy(preferredToken, `/${phoneNumberId}?fields=id`).catch(() => null);
@@ -131,7 +145,12 @@ async function findUsableMetaToken(phoneNumberId: string, preferredToken?: strin
   return preferredToken ?? "";
 }
 
-async function metaProxyForChannel(ch: { token: string; phoneNumberId?: string }, path: string, init?: RequestInit) {
+async function metaProxyForChannel(
+  ch: { id?: string; token: string; phoneNumberId?: string },
+  path: string,
+  init?: RequestInit,
+  supabase?: any,
+) {
   try {
     return { body: await metaProxy(ch.token, path, init), token: ch.token };
   } catch (err: any) {
@@ -150,6 +169,8 @@ async function metaProxyForChannel(ch: { token: string; phoneNumberId?: string }
 
     const token = await findUsableMetaToken(ch.phoneNumberId, ch.token);
     if (!token || token === ch.token) throw err;
+    // Persiste o token vencedor pra não procurar de novo nas próximas chamadas.
+    await persistWorkingToken(supabase, ch.phoneNumberId, token, ch.id);
     return { body: await metaProxy(token, path, init), token };
   }
 }

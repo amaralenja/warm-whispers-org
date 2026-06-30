@@ -97,6 +97,22 @@ async function postMetaMessage(token: string, phoneNumberId: string, payload: an
   return { ok: res.ok, status: res.status, json };
 }
 
+async function persistWorkingToken(db: any, phoneNumberId: string, token: string, channelId?: string) {
+  if (!db || !phoneNumberId || !token) return;
+  try {
+    // Persist on every local channel that shares this phone_number_id so future
+    // sends use the verified token straight away (no probing).
+    await db.from("wa_channels" as any).update({ token, synced_at: new Date().toISOString() })
+      .eq("phone_number_id", phoneNumberId);
+    if (channelId) {
+      await db.from("wa_channels" as any).update({ token, synced_at: new Date().toISOString() })
+        .eq("id", channelId);
+    }
+  } catch (e) {
+    console.warn("[flow-engine] persistWorkingToken failed", e);
+  }
+}
+
 async function findUsableMetaToken(phoneNumberId: string, preferredToken: string): Promise<string> {
   const res = await fetchWithTimeout(`${EVOHUB_BASE}/api/v1/channels`, {
     headers: { Authorization: `Bearer ${process.env.EVOHUB_API_KEY}` },
@@ -121,6 +137,7 @@ async function sendWA(channelId: string, to: string, body: any, db: any) {
   const payload = { messaging_product: "whatsapp", to: toNormalized, ...body };
 
   let attempt = await postMetaMessage(token, phoneNumberId, payload);
+  let workingToken = token;
   if (!attempt.ok) {
     const msg = attempt.json?.error?.message ?? attempt.json?.message ?? `HTTP ${attempt.status}`;
     const msgStr = typeof msg === "string" ? msg : JSON.stringify(msg);
@@ -129,10 +146,16 @@ async function sendWA(channelId: string, to: string, body: any, db: any) {
       const altToken = await findUsableMetaToken(phoneNumberId, token);
       if (altToken && altToken !== token) {
         attempt = await postMetaMessage(altToken, phoneNumberId, payload);
+        if (attempt.ok) {
+          workingToken = altToken;
+          // Cacheia pra sempre: próximas mensagens já partem desse token.
+          await persistWorkingToken(db, phoneNumberId, altToken, channelId);
+        }
       }
     }
     if (!attempt.ok) throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
+  void workingToken;
   return { waMsgId: attempt.json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
 }
 
