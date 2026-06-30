@@ -659,9 +659,6 @@ function ChatPage() {
                       <DropdownMenuItem onClick={() => { setPendingType("video"); videoInputRef.current?.click(); }}>
                         <Video className="mr-2 h-4 w-4" /> Vídeo
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("audio"); audioInputRef.current?.click(); }}>
-                        <Mic className="mr-2 h-4 w-4" /> Áudio
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setPendingType("document"); docInputRef.current?.click(); }}>
                         <FileText className="mr-2 h-4 w-4" /> Documento
                       </DropdownMenuItem>
@@ -671,8 +668,6 @@ function ChatPage() {
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "image"); } e.target.value = ""; }} />
                   <input ref={videoInputRef} type="file" className="hidden" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/*"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "video"); } e.target.value = ""; }} />
-                  <input ref={audioInputRef} type="file" className="hidden" accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/*"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "audio"); } e.target.value = ""; }} />
                   <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "document"); } e.target.value = ""; }} />
                   <Textarea
