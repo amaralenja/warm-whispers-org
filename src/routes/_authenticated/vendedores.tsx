@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, Copy, KeyRound, RefreshCw, Search, Settings2, Target } from "lucide-react";
+import { Briefcase, Copy, KeyRound, Pencil, Plus, RefreshCw, Search, Settings2, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { VendorPermissionsDialog } from "@/components/vendor-permissions-dialog";
+import { VendorEditDialog } from "@/components/vendor-edit-dialog";
 
 
 export const Route = createFileRoute("/_authenticated/vendedores")({
@@ -43,6 +45,8 @@ function VendedoresPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
   const [permVendor, setPermVendor] = useState<Vendedor | null>(null);
+  const [editVendor, setEditVendor] = useState<Vendedor | null>(null);
+  const [creating, setCreating] = useState(false);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
