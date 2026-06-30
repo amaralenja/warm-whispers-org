@@ -78,6 +78,8 @@ function WhatsAppPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [newOp, setNewOp] = useState<string>(isGeral ? "" : workspace.id);
+  const [tab, setTab] = useState<"chat" | "notification">("chat");
+
   const [justCreated, setJustCreated] = useState<EvoChannel | null>(null);
   const [quotaError, setQuotaError] = useState(false);
 
