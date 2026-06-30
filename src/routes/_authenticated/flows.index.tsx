@@ -72,15 +72,25 @@ function FlowsListPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (v: { nome: string; operacao_id: string | null }) => createFn({ data: v }),
+    mutationFn: (v: { nome: string; operacao_id: string | null; folder: string | null }) => createFn({ data: v }),
     onSuccess: (r: any) => {
       toast.success("Fluxo criado");
       qc.invalidateQueries({ queryKey: ["wa-flows"] });
       setOpen(false);
       setName("");
+      setFolder("");
       navigate({ to: "/flows/$flowId", params: { flowId: r.id } });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao criar fluxo"),
+  });
+
+  const moveFolderMut = useMutation({
+    mutationFn: (v: { id: string; folder: string | null }) => saveFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Pasta atualizada");
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
   const delMut = useMutation({
