@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,7 +48,7 @@ import {
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useServerFn } from "@tanstack/react-start";
-import { fetchInstagramProfile } from "@/lib/instagram.functions";
+import { fetchInstagramProfile, listInstagramLeads } from "@/lib/instagram.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/quiz")({
@@ -428,8 +428,45 @@ function QuizPage() {
     qc.invalidateQueries({ queryKey: ["quiz-leads"] });
   }
 
+  // Batch: busca todos os @ do banco em uma chamada e compartilha via contexto
+  const allIgUsernames = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of leads) {
+      const u = (l.instagram ?? "").replace(/^@/, "").trim().toLowerCase();
+      if (u) set.add(u);
+    }
+    return Array.from(set);
+  }, [leads]);
+
+  const listIgFn = useServerFn(listInstagramLeads);
+  const { data: igDbRows = [] } = useQuery({
+    queryKey: ["ig-leads-batch", allIgUsernames.length, allIgUsernames.slice(0, 50).join(",")],
+    queryFn: () => listIgFn({ data: { usernames: allIgUsernames } }) as Promise<IgDbRow[]>,
+    enabled: allIgUsernames.length > 0,
+    staleTime: 60_000,
+  });
+
+  const [igLocalOverrides, setIgLocalOverrides] = useState<Record<string, IgDbRow>>({});
+  const igMap = useMemo(() => {
+    const m = new Map<string, IgDbRow>();
+    for (const r of igDbRows) m.set((r.username || "").toLowerCase(), r);
+    for (const [k, v] of Object.entries(igLocalOverrides)) m.set(k, v);
+    return m;
+  }, [igDbRows, igLocalOverrides]);
+
+  const igCtxValue = useMemo(
+    () => ({
+      map: igMap,
+      setLocal: (k: string, row: IgDbRow) =>
+        setIgLocalOverrides((p) => ({ ...p, [k]: row })),
+    }),
+    [igMap],
+  );
+
   return (
+    <IgDbContext.Provider value={igCtxValue}>
     <div className="p-6 space-y-6">
+
       {/* HERO HEADER */}
       <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent/10 via-card to-card p-6">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
@@ -674,6 +711,7 @@ function QuizPage() {
 
       <LeadDetailDialog lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
+    </IgDbContext.Provider>
   );
 }
 
@@ -940,7 +978,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
   );
 }
 
-// ----- Verificação de Instagram (Bright Data) -----
+// ----- Verificação de Instagram (Bright Data + cache em banco) -----
 type IgStatus = "unknown" | "checking" | "real" | "fake";
 type IgProfile = {
   username: string;
@@ -953,16 +991,13 @@ type IgProfile = {
   profile_pic_url?: string | null;
   profile_url?: string | null;
 };
-type IgCacheEntry = { status: "real" | "fake"; profile?: IgProfile };
-const IG_CACHE_KEY = "quiz_ig_verify_v3";
 
-function loadIgCache(): Record<string, IgCacheEntry> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(IG_CACHE_KEY) || "{}"); } catch { return {}; }
-}
-function saveIgCache(c: Record<string, IgCacheEntry>) {
-  localStorage.setItem(IG_CACHE_KEY, JSON.stringify(c));
-}
+// Contexto: mapa compartilhado de @username -> row do banco
+type IgDbRow = { username: string; verification_status?: string | null } & Partial<IgProfile>;
+const IgDbContext = createContext<{
+  map: Map<string, IgDbRow>;
+  setLocal: (key: string, row: IgDbRow) => void;
+}>({ map: new Map(), setLocal: () => {} });
 
 function fmtIg(n?: number) {
   if (!n) return "0";
@@ -994,43 +1029,64 @@ async function igDrain() {
 
 function IgRow({ username }: { username: string }) {
   const key = username.toLowerCase();
-  const initial = loadIgCache()[key];
-  const [status, setStatus] = useState<IgStatus>(initial?.status ?? "unknown");
-  const [profile, setProfile] = useState<IgProfile | null>(initial?.profile ?? null);
+  const { map, setLocal } = useContext(IgDbContext);
+  const dbRow = map.get(key);
+
+  function rowToProfile(r: IgDbRow | undefined): IgProfile | null {
+    if (!r) return null;
+    return {
+      username: r.username,
+      full_name: r.full_name ?? null,
+      biography: r.biography ?? null,
+      followers: Number(r.followers) || 0,
+      following: Number(r.following) || 0,
+      posts_count: Number(r.posts_count) || 0,
+      is_verified: !!r.is_verified,
+      profile_pic_url: r.profile_pic_url ?? null,
+      profile_url: r.profile_url ?? `https://instagram.com/${r.username}`,
+    };
+  }
+
+  const initialStatus: IgStatus = dbRow
+    ? (dbRow.verification_status === "fake" ? "fake" : "real")
+    : "unknown";
+
+  const [status, setStatus] = useState<IgStatus>(initialStatus);
+  const [profile, setProfile] = useState<IgProfile | null>(rowToProfile(dbRow));
   const fetchFn = useServerFn(fetchInstagramProfile);
+
+  // Sincroniza quando o batch do banco chega depois
+  useEffect(() => {
+    if (!dbRow) return;
+    setStatus(dbRow.verification_status === "fake" ? "fake" : "real");
+    setProfile(rowToProfile(dbRow));
+  }, [dbRow]);
 
   async function runVerify() {
     setStatus("checking");
     try {
       const p: any = await fetchFn({ data: { input: username } });
-      const prof: IgProfile = {
-        username: p?.username ?? username,
-        full_name: p?.full_name ?? null,
-        biography: p?.biography ?? null,
-        followers: Number(p?.followers) || 0,
-        following: Number(p?.following) || 0,
-        posts_count: Number(p?.posts_count) || 0,
-        is_verified: !!p?.is_verified,
-        profile_pic_url: p?.profile_pic_url ?? null,
-        profile_url: p?.profile_url ?? `https://instagram.com/${username}`,
+      const prof: IgProfile = rowToProfile(p as IgDbRow) ?? {
+        username,
+        profile_url: `https://instagram.com/${username}`,
       };
-      const c = loadIgCache(); c[key] = { status: "real", profile: prof }; saveIgCache(c);
+      setLocal(key, { ...(p as IgDbRow), verification_status: "real" });
       setProfile(prof);
       setStatus("real");
     } catch {
-      const c = loadIgCache(); c[key] = { status: "fake" }; saveIgCache(c);
+      setLocal(key, { username: key, verification_status: "fake" });
       setStatus("fake");
     }
   }
 
-  // Auto-verifica via fila global se ainda desconhecido (incluindo leads novos chegando do quiz)
+  // Auto-verifica via fila global se ainda desconhecido (lead novo do quiz)
   useEffect(() => {
     if (status !== "unknown") return;
     let cancelled = false;
     igEnqueue(async () => { if (!cancelled) await runVerify(); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, status]);
 
   async function verify(e: React.MouseEvent) {
     e.stopPropagation();
@@ -1038,6 +1094,7 @@ function IgRow({ username }: { username: string }) {
     await runVerify();
     if (status !== "fake") toast.success(`@${username} verificado ✓`);
   }
+
 
 
   if (status === "real" && profile) {

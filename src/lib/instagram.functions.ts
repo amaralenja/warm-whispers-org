@@ -19,32 +19,59 @@ export const fetchInstagramProfile = createServerFn({ method: "POST" })
     const username = extractUsername(data.input);
     if (!username) throw new Error("Informe um @usuario ou URL válida do Instagram");
 
+    // Já está salvo? Devolve sem chamar Bright Data de novo.
+    const { data: existing } = await context.supabase
+      .from("instagram_leads")
+      .select("*")
+      .eq("username", username)
+      .maybeSingle();
+    if (existing) return existing;
+
     const apiKey = process.env.BRIGHTDATA_API_KEY;
     if (!apiKey) throw new Error("BRIGHTDATA_API_KEY não configurada no servidor");
 
     const url = `https://www.instagram.com/${username}/`;
 
-    const res = await fetch(
-      "https://api.brightdata.com/datasets/v3/scrape?dataset_id=gd_l1vikfch901nx3by4&format=json",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify([{ url }]),
+    let row: any = null;
+    let failure: string | null = null;
+    try {
+      const res = await fetch(
+        "https://api.brightdata.com/datasets/v3/scrape?dataset_id=gd_l1vikfch901nx3by4&format=json",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify([{ url }]),
+        }
+      );
+      if (!res.ok) {
+        failure = `Bright Data ${res.status}`;
+      } else {
+        const json = await res.json();
+        row = Array.isArray(json) ? json[0] : json;
+        if (!row || row.error || row.warning) {
+          failure = row?.error || row?.warning || "not_found";
+          row = null;
+        }
       }
-    );
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Bright Data falhou (${res.status}): ${txt.slice(0, 200)}`);
+    } catch (e: any) {
+      failure = e?.message || "fetch_error";
     }
 
-    const json = await res.json();
-    const row = Array.isArray(json) ? json[0] : json;
-    if (!row || row.error || row.warning) {
-      throw new Error(row?.error || row?.warning || "Perfil não encontrado ou privado");
+    if (!row) {
+      // Marca como fake no banco pra não re-verificar.
+      const fakeRow = {
+        username,
+        verification_status: "fake",
+        profile_url: url,
+        raw: { failure } as any,
+        fetched_at: new Date().toISOString(),
+      };
+      const { data: savedFake } = await context.supabase
+        .from("instagram_leads")
+        .upsert(fakeRow, { onConflict: "username" })
+        .select()
+        .single();
+      throw new Error(failure || "Perfil não encontrado");
     }
 
     const profile = {
@@ -56,15 +83,10 @@ export const fetchInstagramProfile = createServerFn({ method: "POST" })
       posts_count: Number(row.posts_count ?? row.posts ?? 0) || 0,
       is_verified: Boolean(row.is_verified ?? row.verified ?? false),
       profile_pic_url:
-        row.profile_image_link ??
-        row.profile_pic_url ??
-        row.profile_pic_url_hd ??
-        row.profile_picture_url ??
-        row.profile_image ??
-        row.avatar ??
-        row.profilePicUrl ??
-        null,
+        row.profile_image_link ?? row.profile_pic_url ?? row.profile_pic_url_hd ??
+        row.profile_picture_url ?? row.profile_image ?? row.avatar ?? row.profilePicUrl ?? null,
       profile_url: row.url ?? url,
+      verification_status: "real",
       raw: row,
       fetched_at: new Date().toISOString(),
     };
@@ -89,4 +111,19 @@ export const getInstagramLead = createServerFn({ method: "GET" })
       .eq("username", data.username.replace(/^@/, ""))
       .maybeSingle();
     return row;
+  });
+
+export const listInstagramLeads = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { usernames: string[] }) => data)
+  .handler(async ({ data, context }) => {
+    const list = (data.usernames || [])
+      .map((u) => (u || "").replace(/^@/, "").toLowerCase())
+      .filter(Boolean);
+    if (list.length === 0) return [];
+    const { data: rows } = await context.supabase
+      .from("instagram_leads")
+      .select("*")
+      .in("username", list);
+    return rows ?? [];
   });
