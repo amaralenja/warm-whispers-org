@@ -48,12 +48,13 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     // 1. Load template
-    const { data: tpl, error: tplErr } = await context.supabase
-      .from("wa_templates" as any)
+    const tplRes: any = await (context.supabase as any)
+      .from("wa_templates")
       .select("*")
       .eq("id", data.templateId)
       .maybeSingle();
-    if (tplErr) throw new Error(tplErr.message);
+    const tpl = tplRes?.data;
+    if (tplRes?.error) throw new Error(tplRes.error.message);
     if (!tpl) throw new Error("Template não encontrado");
 
     // 2. Load channel + extract WABA id and token
