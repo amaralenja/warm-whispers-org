@@ -121,6 +121,8 @@ function withConnectUrl(ch: any): EvoChannel {
     token: normalized.token,
     metadata: meta,
     operacaoId: (meta && typeof meta.operacao_id === "string") ? meta.operacao_id : null,
+    kind: (ch?.kind === "notification" || (meta && meta.kind === "notification")) ? "notification" : "chat",
+
     created_at: normalized.created_at,
     updated_at: normalized.updated_at,
     connectUrl: normalized.token ? `${EVOHUB_CONNECT_BASE}/connect/${normalized.token}` : "",
