@@ -629,13 +629,13 @@ function ChatPage() {
                       <DropdownMenuItem onClick={() => { setPendingType("image"); fileInputRef.current?.click(); }}>
                         <ImageIcon className="mr-2 h-4 w-4" /> Imagem
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("video"); fileInputRef.current?.click(); }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("video"); if (fileInputRef.current) { fileInputRef.current.accept = "video/*"; fileInputRef.current.click(); } }}>
                         <Video className="mr-2 h-4 w-4" /> Vídeo
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("audio"); fileInputRef.current?.click(); }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("audio"); if (fileInputRef.current) { fileInputRef.current.accept = "audio/*"; fileInputRef.current.click(); } }}>
                         <Mic className="mr-2 h-4 w-4" /> Áudio
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("document"); fileInputRef.current?.click(); }}>
+                      <DropdownMenuItem onClick={() => { setPendingType("document"); if (fileInputRef.current) { fileInputRef.current.accept = "*"; fileInputRef.current.click(); } }}>
                         <FileText className="mr-2 h-4 w-4" /> Documento
                       </DropdownMenuItem>
                     </DropdownMenuContent>
