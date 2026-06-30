@@ -129,16 +129,7 @@ function FlowsListPage() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao importar"),
   });
 
-  const zvMut = useMutation({
-    mutationFn: async (v: { backup: any; operacao_id: string | null; replace: boolean }) =>
-      importZvFn({ data: v }),
-    onSuccess: (r: any) => {
-      setZvSummary(r);
-      qc.invalidateQueries({ queryKey: ["wa-flows"] });
-      toast.success(`Importado: ${r.funnels} funis · ${r.steps} etapas · ${r.uploads} arquivos`);
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao importar ZapVoice"),
-  });
+  const [zvProgress, setZvProgress] = useState<string>("");
 
   async function runZvImport() {
     if (!zvFile) return toast.error("Selecione o arquivo .json");
@@ -149,9 +140,45 @@ function FlowsListPage() {
       return toast.error("JSON inválido: " + (e?.message ?? e));
     }
     if (!Array.isArray(parsed?.funnels)) return toast.error("JSON sem 'funnels[]'");
+
     setZvSummary(null);
-    zvMut.mutate({ backup: parsed, operacao_id: zvOp || null, replace: zvReplace });
+    const allIds: string[] = parsed.funnels.map((f: any) => String(f?.id)).filter(Boolean);
+    const total = allIds.length;
+    // chunk pra evitar timeout do worker (cada chunk processa N funis com upload de mídia)
+    const CHUNK = 25;
+    const acc: any = { funnels: 0, steps: 0, uploads: 0, errors: [] };
+
+    const t = toast.loading(`Importando 0 / ${total} funis…`);
+    try {
+      for (let i = 0; i < allIds.length; i += CHUNK) {
+        const slice = allIds.slice(i, i + CHUNK);
+        const chunkIdx = Math.floor(i / CHUNK);
+        setZvProgress(`${i} / ${total}`);
+        toast.loading(`Importando ${i} / ${total} funis…`, { id: t });
+        const r: any = await importZvFn({
+          data: {
+            backup: parsed,
+            operacao_id: zvOp || null,
+            // só apaga existentes no PRIMEIRO chunk
+            replace: zvReplace && chunkIdx === 0,
+            funnelIds: slice,
+          },
+        });
+        acc.funnels += r?.funnels ?? 0;
+        acc.steps += r?.steps ?? 0;
+        acc.uploads += r?.uploads ?? 0;
+        if (Array.isArray(r?.errors)) acc.errors.push(...r.errors);
+      }
+      setZvSummary(acc);
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+      toast.success(`Importado: ${acc.funnels} funis · ${acc.steps} etapas · ${acc.uploads} arquivos`, { id: t });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao importar ZapVoice", { id: t });
+    } finally {
+      setZvProgress("");
+    }
   }
+
 
   const filtered = (flows as any[]).filter((f) =>
     workspace.id === "all" ? true : f.operacao_id === workspace.id
@@ -399,9 +426,9 @@ function FlowsListPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setZvOpen(false)}>Fechar</Button>
-            <Button disabled={!zvFile || zvMut.isPending} onClick={runZvImport}>
-              {zvMut.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando…</>
+            <Button disabled={!zvFile || !!zvProgress} onClick={runZvImport}>
+              {zvProgress
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando {zvProgress}…</>
                 : <><Upload className="h-4 w-4 mr-2" /> Importar</>}
             </Button>
           </DialogFooter>
