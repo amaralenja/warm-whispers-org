@@ -178,6 +178,9 @@ function FlowsListPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setZvSummary(null); setZvOpen(true); }}>
+            <FileJson className="h-4 w-4 mr-2" /> Importar ZapVoice
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="h-4 w-4 mr-2" /> Importar código
           </Button>
