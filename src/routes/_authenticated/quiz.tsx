@@ -42,8 +42,14 @@ import {
   DollarSign,
   Wallet,
   Eye,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace-context";
+import { useServerFn } from "@tanstack/react-start";
+import { fetchInstagramProfile } from "@/lib/instagram.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/quiz")({
   component: QuizPage,
@@ -193,7 +199,7 @@ function classifyLead(l: Lead): LeadOrigin {
   if (hasFbTracking) {
     if (isInstagram) {
       return {
-        key: "instagram", label: "Instagram Ads", icon: Instagram,
+        key: "instagram", label: "Instagram", icon: Instagram,
         ring: "ring-pink-500/40", bg: "bg-gradient-to-br from-pink-500/10 to-purple-500/10",
         text: "text-pink-300",
         glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
@@ -396,11 +402,19 @@ function QuizPage() {
     return { total, byOrigin, high, real, fake };
   }, [filteredLeads, overrides]);
 
+  const sortedLeads = useMemo(() => {
+    return [...filteredLeads].sort((a, b) => {
+      const wb = caixaWeight(b) - caixaWeight(a);
+      if (wb !== 0) return wb;
+      return (b.data_criacao || "").localeCompare(a.data_criacao || "");
+    });
+  }, [filteredLeads]);
+
   const grouped = useMemo(() => {
     const g: Record<OriginKey, Lead[]> = { facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
-    for (const l of filteredLeads) g[classifyLead(l).key].push(l);
+    for (const l of sortedLeads) g[classifyLead(l).key].push(l);
     return g;
-  }, [filteredLeads]);
+  }, [sortedLeads]);
 
   function refresh() {
     setLiveCount(0);
@@ -525,7 +539,7 @@ function QuizPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
         <StatPill active={originFilter === "all"} onClick={() => setOriginFilter("all")} icon={<Users className="h-4 w-4" />} label="Total" value={stats.total} accent="text-foreground" loading={isLoading} />
         <StatPill active={originFilter === "facebook"} onClick={() => setOriginFilter(originFilter === "facebook" ? "all" : "facebook")} icon={<Facebook className="h-4 w-4" />} label="Facebook" value={stats.byOrigin.facebook} accent="text-blue-300" loading={isLoading} />
-        <StatPill active={originFilter === "instagram"} onClick={() => setOriginFilter(originFilter === "instagram" ? "all" : "instagram")} icon={<Instagram className="h-4 w-4" />} label="Instagram Ads" value={stats.byOrigin.instagram} accent="text-pink-300" loading={isLoading} />
+        <StatPill active={originFilter === "instagram"} onClick={() => setOriginFilter(originFilter === "instagram" ? "all" : "instagram")} icon={<Instagram className="h-4 w-4" />} label="Instagram" value={stats.byOrigin.instagram} accent="text-pink-300" loading={isLoading} />
         <StatPill active={originFilter === "google"} onClick={() => setOriginFilter(originFilter === "google" ? "all" : "google")} icon={<Megaphone className="h-4 w-4" />} label="Google" value={stats.byOrigin.google} accent="text-amber-300" loading={isLoading} />
         <StatPill active={originFilter === "tiktok"} onClick={() => setOriginFilter(originFilter === "tiktok" ? "all" : "tiktok")} icon={<Flame className="h-4 w-4" />} label="TikTok" value={stats.byOrigin.tiktok} accent="text-pink-300" loading={isLoading} />
         <StatPill active={originFilter === "organic"} onClick={() => setOriginFilter(originFilter === "organic" ? "all" : "organic")} icon={<Leaf className="h-4 w-4" />} label="Orgânico" value={stats.byOrigin.organic} accent="text-emerald-300" loading={isLoading} />
@@ -582,7 +596,7 @@ function QuizPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredLeads.slice(0, 300).map((l) => {
+                {sortedLeads.slice(0, 300).map((l) => {
                   const o = classifyLead(l);
                   const Icon = o.icon;
                   const real = leadIsReal(l);
@@ -768,12 +782,7 @@ function LeadCard({
             <span className="truncate">{lead.whatsapp}</span>
           </div>
         )}
-        {cleanIg && (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Instagram className="h-3 w-3 shrink-0 text-pink-400" />
-            <span className="truncate">@{cleanIg}</span>
-          </div>
-        )}
+        {cleanIg && <IgRow username={cleanIg} />}
       </div>
 
       {lead.utm_campaign && (
@@ -892,5 +901,69 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ----- Verificação de Instagram (Bright Data) -----
+type IgStatus = "unknown" | "checking" | "real" | "fake";
+const IG_CACHE_KEY = "quiz_ig_verify_v1";
+
+function loadIgCache(): Record<string, "real" | "fake"> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(IG_CACHE_KEY) || "{}"); } catch { return {}; }
+}
+function saveIgCache(c: Record<string, "real" | "fake">) {
+  localStorage.setItem(IG_CACHE_KEY, JSON.stringify(c));
+}
+
+function IgRow({ username }: { username: string }) {
+  const key = username.toLowerCase();
+  const [status, setStatus] = useState<IgStatus>(() => loadIgCache()[key] ?? "unknown");
+  const fetchFn = useServerFn(fetchInstagramProfile);
+
+  async function verify(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (status === "checking") return;
+    setStatus("checking");
+    try {
+      await fetchFn({ data: { input: username } });
+      const c = loadIgCache(); c[key] = "real"; saveIgCache(c);
+      setStatus("real");
+      toast.success(`@${username} verificado ✓`);
+    } catch (err: any) {
+      const c = loadIgCache(); c[key] = "fake"; saveIgCache(c);
+      setStatus("fake");
+      toast.error(`@${username} não encontrado`);
+    }
+  }
+
+  const color =
+    status === "real" ? "text-emerald-400"
+    : status === "fake" ? "text-rose-400 line-through"
+    : "text-pink-400";
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Instagram className={`h-3 w-3 shrink-0 ${color}`} />
+      <span className={`truncate text-xs ${color}`}>@{username}</span>
+      {status === "fake" && (
+        <Badge className="h-4 px-1 text-[9px] bg-rose-500/20 text-rose-300 border-rose-500/40">
+          <ShieldAlert className="h-2.5 w-2.5 mr-0.5" /> fake
+        </Badge>
+      )}
+      {status === "real" && (
+        <ShieldCheck className="h-3 w-3 text-emerald-400" />
+      )}
+      {status !== "real" && status !== "fake" && (
+        <button
+          type="button"
+          onClick={verify}
+          className="ml-auto text-[9px] text-muted-foreground hover:text-accent transition flex items-center gap-0.5"
+          title="Verificar via Bright Data"
+        >
+          {status === "checking" ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : "checar"}
+        </button>
+      )}
+    </div>
   );
 }
