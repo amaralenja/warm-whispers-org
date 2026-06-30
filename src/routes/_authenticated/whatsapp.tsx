@@ -769,7 +769,7 @@ function TemplatesPanel() {
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  {(t.slug === "lembrete_call" || t.slug === "comparecimento_call") && (
+                  {(t.slug === "lembrete_call_v2" || t.slug === "comparecimento_call") && (
                     <Button size="sm" variant="outline" onClick={() => { setTestOpen(t); setTestForm({ to: "", nome: "", hora: "", convidados: "" }); }}>Testar envio</Button>
                   )}
                   <Button size="sm" variant="outline" className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" onClick={() => { setApprovalOpen(t); setApprovalChannelId(""); }}>Enviar p/ Meta</Button>
