@@ -52,6 +52,8 @@ export const Route = createFileRoute("/_authenticated/tasks")({
 
 type Board = { id: string; nome: string; cor: string };
 type Column = { id: string; board_id: string; nome: string; cor: string; ordem: number };
+type ChecklistItem = { id: string; texto: string; done: boolean };
+type ChecklistGroup = { id: string; titulo: string; items: ChecklistItem[] };
 type Task = {
   id: string;
   board_id: string;
@@ -61,8 +63,8 @@ type Task = {
   prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo: string | null;
   assignee_ids: string[];
-  labels: string[];
-  checklist: { id: string; texto: string; done: boolean }[];
+  labels: { texto: string; cor: string }[];
+  checklist: ChecklistGroup[];
   ordem: number;
   concluida: boolean;
 };
@@ -84,6 +86,42 @@ const PRIO_COLORS: Record<string, string> = {
   alta: "bg-orange-500/20 text-orange-300 border-orange-500/40",
   urgente: "bg-red-500/20 text-red-300 border-red-500/40",
 };
+
+const LABEL_COLORS = [
+  { name: "Vermelho", value: "#ef4444" },
+  { name: "Laranja", value: "#f97316" },
+  { name: "Âmbar", value: "#f59e0b" },
+  { name: "Verde", value: "#22c55e" },
+  { name: "Teal", value: "#14b8a6" },
+  { name: "Azul", value: "#3b82f6" },
+  { name: "Roxo", value: "#a855f7" },
+  { name: "Rosa", value: "#ec4899" },
+  { name: "Cinza", value: "#64748b" },
+];
+
+function normalizeChecklist(raw: unknown): ChecklistGroup[] {
+  if (!Array.isArray(raw)) return [];
+  if (raw.length === 0) return [];
+  // Legacy: array of {id, texto, done}
+  if ("texto" in (raw[0] as any) && !("items" in (raw[0] as any))) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        titulo: "Checklist",
+        items: raw as ChecklistItem[],
+      },
+    ];
+  }
+  return raw as ChecklistGroup[];
+}
+
+function normalizeLabels(raw: unknown): { texto: string; cor: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((l: any) =>
+    typeof l === "string" ? { texto: l, cor: "#64748b" } : { texto: l.texto, cor: l.cor ?? "#64748b" },
+  );
+}
+
 
 function initials(n: string) {
   return n
