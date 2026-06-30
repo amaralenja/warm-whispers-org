@@ -33,8 +33,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent(props: { error?: Error; reset?: () => void } | null = null) {
-  const { error, reset } = props ?? {};
+function ErrorComponent({ error, reset }: { error?: Error; reset?: () => void }) {
   const safeError = error ?? new Error("Erro desconhecido");
   console.error(error);
   const router = useRouter();
@@ -103,8 +102,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-function RootShell(props: { children?: ReactNode } | null = null) {
-  const children = props?.children;
+function RootShell(props: { children?: ReactNode } | null) {
+  const children = props?.children ?? null;
   return (
     <html lang="pt-BR">
       <head>

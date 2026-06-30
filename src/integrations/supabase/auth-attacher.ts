@@ -1,11 +1,18 @@
 import { supabase } from './client'
 import { encodeVendorSessionHeader, getVendorSession } from '@/lib/vendor-session'
 
+function buildAuthHeaders(existing?: HeadersInit): Headers {
+  const headers = new Headers(existing)
+  const vendorHeader = encodeVendorSessionHeader(getVendorSession())
+  if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
+  return headers
+}
+
 // Custom fetch used by TanStack Start server functions.
 // Keeping auth/header attachment here avoids the fragile global functionMiddleware path
 // that can be evaluated by React during HMR and crash with "undefined.map".
 export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: RequestInit) {
-  const headers = new Headers(
+  const headers = buildAuthHeaders(
     typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
   )
 
@@ -21,14 +28,7 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
     console.error('[fetchWithSupabaseAuth] getSession failed', err)
   }
 
-  const vendorHeader = encodeVendorSessionHeader(getVendorSession())
-  if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
-
   return fetch(input, { ...init, headers })
 }
-
-// Legacy export removido: fetchWithSupabaseAuth já anexa o token via serverFns.fetch.
-// Não recriar createMiddleware aqui — HMR trata o módulo como componente e quebra com
-// "Rendered more hooks than during the previous render".
 
 

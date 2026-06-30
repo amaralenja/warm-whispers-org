@@ -18,13 +18,7 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
-// Auth é anexada via serverFns.fetch (fetchWithSupabaseAuth) — NÃO usar
-// functionMiddleware com attachSupabaseAuth: o módulo não exporta mais essa fn
-// e o React quebra com "undefined.map" durante HMR.
 export const startInstance = createStart(() => ({
-  functionMiddleware: [],
+  serverFns: { fetch: fetchWithSupabaseAuth },
   requestMiddleware: [errorMiddleware],
-  serverFns: {
-    fetch: fetchWithSupabaseAuth,
-  },
 }));
