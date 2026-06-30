@@ -162,8 +162,9 @@ async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | 
     type: String(normalized.type ?? "whatsapp"),
     status: String(normalized.status ?? ""),
     token: String(normalized.token ?? ""),
-    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null },
+    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null, kind: meta.kind ?? "chat" },
     operacao_id: finalOperacao,
+    kind: (meta.kind === "notification" ? "notification" : "chat"),
     phone_number_id: info.phoneNumberId,
     display_phone_number: info.displayPhoneNumber,
     verified_name: info.verifiedName,
@@ -174,6 +175,7 @@ async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | 
     updated_at: normalized.updated_at ?? null,
     synced_at: new Date().toISOString(),
   }, { onConflict: "id" });
+
 
   if (error) console.warn("[wa_channels] upsert failed", error.message);
   return { ...normalized, metadata: { ...meta, app_source: APP_SOURCE, operacao_id: finalOperacao, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null } };
