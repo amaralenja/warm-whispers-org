@@ -199,6 +199,32 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                           .from("wa_call_reminders" as any)
                           .update({ status: action, replied_at: new Date().toISOString() })
                           .eq("id", reminderId);
+
+                        // Mark the Google Calendar event with the outcome
+                        const eventId = (rem as any).event_id as string | null;
+                        if (eventId) {
+                          try {
+                            const { gcal } = await import("@/lib/google-calendar.functions");
+                            const ev: any = await gcal(`/events/${encodeURIComponent(eventId)}`);
+                            const baseSummary = String(ev?.summary || "").replace(/^([✅❌🔄])\s+/, "");
+                            const prefix = action === "showup" ? "✅" : action === "noshow" ? "❌" : "🔄";
+                            await gcal(`/events/${encodeURIComponent(eventId)}`, {
+                              method: "PATCH",
+                              body: JSON.stringify({
+                                summary: `${prefix} ${baseSummary}`,
+                                extendedProperties: {
+                                  private: {
+                                    attendance_status: action,
+                                    attendance_at: new Date().toISOString(),
+                                  },
+                                },
+                              }),
+                            });
+                          } catch (e) {
+                            console.error("[wa-webhook] calendar mark failed", e);
+                          }
+                        }
+
                         if (action === "showup") {
                           try {
                             const { fireShowUpFromSnapshot } = await import("@/lib/meta-ads.server");
