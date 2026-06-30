@@ -599,7 +599,7 @@ function QuizPage() {
           </CardContent>
         </Card>
       ) : view === "kanban" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {ORIGIN_ORDER.map((key) => {
             const items = grouped[key] ?? [];
             if (items.length === 0) return null;
