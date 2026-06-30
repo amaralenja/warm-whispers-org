@@ -76,7 +76,7 @@ export const sendCallReminder = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin;
 
-    const tpl = await loadTemplate(db, "lembrete_call");
+    const tpl = await loadTemplate(db, "lembrete_call_v2");
     const channelId = data.channelId || (await findNotificationChannel(db));
     if (!channelId) throw new Error("Nenhum canal de notificações conectado");
 
