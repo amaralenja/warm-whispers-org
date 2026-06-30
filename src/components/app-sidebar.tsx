@@ -177,6 +177,7 @@ export function AppSidebar() {
               {visibleMain.map(renderMenuItem)}
 
               {/* Operação X1 — colapsável */}
+              {showOpX1Group && (
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Operação X1"
