@@ -46,8 +46,10 @@ import {
   downloadIncomingMediaBase64,
   transferConversation,
   listVendorsForChannel,
+  listWhatsappChannels,
+  uploadWhatsappMedia,
 } from "@/lib/whatsapp-chat.functions";
-import { listFlows, triggerFlowManually } from "@/lib/flow-engine.functions";
+import { listFlows, listActiveFlowRuns, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -143,6 +145,15 @@ function toText(v: unknown): string {
   return String(v);
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? "").split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler arquivo"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function initials(name: unknown, fallback: unknown) {
   const n = (toText(name) || toText(fallback) || "?").trim();
   return n
@@ -192,6 +203,8 @@ function ChatPage() {
   const markReadFn = useServerFn(markConversationRead);
   const sendFn = useServerFn(sendWhatsappMessage);
   const downloadMediaFn = useServerFn(downloadIncomingMediaBase64);
+  const listChannelsFn = useServerFn(listWhatsappChannels);
+  const uploadMediaFn = useServerFn(uploadWhatsappMedia);
   const listFlowsFn = useServerFn(listFlows);
   const triggerFlowFn = useServerFn(triggerFlowManually);
 
@@ -235,12 +248,7 @@ function ChatPage() {
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
   const { data: channels = [] } = useQuery({
     queryKey: ["wa-channels-display"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("wa_channels" as any)
-        .select("id,name,display_phone_number,verified_name");
-      return (data ?? []) as unknown as Array<{ id: string; name: string | null; display_phone_number: string | null; verified_name: string | null }>;
-    },
+    queryFn: () => listChannelsFn(),
     staleTime: 60_000,
   });
   const channelById = useMemo(() => {
@@ -401,29 +409,19 @@ function ChatPage() {
     const type = opts?.type ?? pendingType;
     const caption = opts?.caption ?? "";
     toast.loading("Enviando mídia…", { id: "wa-media-upload" });
-    const ext = file.name.split(".").pop() || "bin";
-    const path = `${active.channel_id}/${active.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const up = await supabase.storage.from("wa-media").upload(path, file, {
-      contentType: file.type,
-      upsert: false,
-    });
-    if (up.error) {
-      toast.dismiss("wa-media-upload");
-      toast.error("Upload falhou: " + up.error.message);
-      return;
-    }
-    const signed = await supabase.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24);
-    if (signed.error || !signed.data?.signedUrl) {
-      toast.dismiss("wa-media-upload");
-      toast.error("Erro ao gerar URL");
-      return;
-    }
+    const uploaded = await uploadMediaFn({ data: {
+      channelId: active.channel_id,
+      conversationId: active.id,
+      filename: file.name,
+      contentType: file.type || "application/octet-stream",
+      base64: await fileToBase64(file),
+    }});
     sendMut.mutate({
       channelId: active.channel_id,
       conversationId: active.id,
       to: active.contact_wa_id,
       type,
-      mediaUrl: signed.data.signedUrl,
+      mediaUrl: uploaded.signedUrl,
       filename: file.name,
       caption: caption.trim() || undefined,
     });
@@ -982,40 +980,12 @@ function RenderMedia({
 
 function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   const qc = useQueryClient();
+  const listActiveRunsFn = useServerFn(listActiveFlowRuns);
   const { data: runs = [] } = useQuery({
     queryKey: ["flow-runs-active", conversationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("wa_flow_runs" as any)
-        .select("id, flow_id, status, current_node_id, waiting_for, error, updated_at")
-        .eq("conversation_id", conversationId)
-        .in("status", ["queued", "running", "waiting"])
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return asArray<any>(data);
-    },
+    queryFn: () => listActiveRunsFn({ data: { conversationId } }),
     refetchInterval: 4000,
   });
-
-  const flowIds = useMemo(() => Array.from(new Set(asArray<any>(runs).map((r) => r.flow_id).filter(Boolean))), [runs]);
-  const { data: flowsInfo = [] } = useQuery({
-    queryKey: ["flow-runs-info", flowIds.join(",")],
-    queryFn: async () => {
-      if (!flowIds.length) return [];
-      const { data, error } = await supabase
-        .from("wa_flows" as any)
-        .select("id, nome")
-        .in("id", flowIds);
-      if (error) throw error;
-      return asArray<any>(data);
-    },
-    enabled: flowIds.length > 0,
-  });
-  const nameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const f of asArray<any>(flowsInfo)) m.set(String(f.id), String(f.nome ?? "Fluxo"));
-    return m;
-  }, [flowsInfo]);
 
   useEffect(() => {
     const ch = supabase
@@ -1039,7 +1009,7 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     <div className="shrink-0 border-b border-chat-line bg-chat-soft/40 px-6 py-2">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2">
         {asArray<any>(runs).map((r) => {
-          const name = nameById.get(String(r.flow_id)) ?? "Fluxo";
+          const name = String(r.flow_nome ?? "Fluxo");
           const step = r.current_node_id ? String(r.current_node_id).slice(0, 8) : "início";
           const statusLabel =
             r.status === "queued" ? "na fila" : r.status === "waiting" ? `aguardando ${r.waiting_for ?? ""}` : "executando";

@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { allowedWorkspaceIdsFromSession, getVendorSession, type VendorSession } from "@/lib/vendor-session";
 
 export type WorkspaceAccent = {
   ring: string;
@@ -75,6 +76,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [custom, setCustom] = useState<StoredCustom[]>([]);
   const [overrides, setOverrides] = useState<Overrides>({});
   const [activeId, setActiveId] = useState<string>("all");
+  const [vendorSession, setVendorSession] = useState<VendorSession | null>(null);
 
   useEffect(() => {
     try {
@@ -90,7 +92,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       const saved = localStorage.getItem(ACTIVE_KEY);
       if (saved) setActiveId(saved);
+      setVendorSession(getVendorSession());
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    const refreshVendor = () => setVendorSession(getVendorSession());
+    window.addEventListener("storage", refreshVendor);
+    window.addEventListener("vendor-session-updated", refreshVendor as EventListener);
+    return () => {
+      window.removeEventListener("storage", refreshVendor);
+      window.removeEventListener("vendor-session-updated", refreshVendor as EventListener);
+    };
   }, []);
 
   function applyOverride(base: Workspace): Workspace {
@@ -119,8 +132,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         custom: true,
       };
     });
-  const workspaces = [...baseWithOverrides, ...customResolved];
-  const workspace = workspaces.find((w) => w.id === activeId) ?? workspaces[0];
+  const allWorkspaces = useMemo(() => [...baseWithOverrides, ...customResolved], [baseWithOverrides, customResolved]);
+  const workspaces = useMemo(() => {
+    if (!vendorSession) return allWorkspaces;
+    const allowed = new Set(allowedWorkspaceIdsFromSession(vendorSession));
+    return allWorkspaces.filter((w) => w.id !== "all" && (allowed.has(w.id) || allowed.has(w.nome)));
+  }, [allWorkspaces, vendorSession]);
+  const fallbackWorkspace = allWorkspaces.find((w) => w.id !== "all") ?? allWorkspaces[0];
+  const workspace = workspaces.find((w) => w.id === activeId) ?? workspaces[0] ?? fallbackWorkspace;
+
+  useEffect(() => {
+    if (!workspace) return;
+    if (!workspaces.some((w) => w.id === activeId)) {
+      setActiveId(workspace.id);
+      try { localStorage.setItem(ACTIVE_KEY, workspace.id); } catch {}
+    }
+  }, [activeId, workspace?.id, workspaces]);
 
   function persistCustom(next: StoredCustom[]) {
     try { localStorage.setItem(LIST_KEY, JSON.stringify(next)); } catch {}
@@ -130,6 +157,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }
 
   function setWorkspaceId(next: string) {
+    const target = workspaces.find((w) => w.id === next);
+    if (vendorSession && !target) return;
     setActiveId(next);
     try { localStorage.setItem(ACTIVE_KEY, next); } catch {}
   }

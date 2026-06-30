@@ -177,6 +177,45 @@ async function metaProxyForChannel(
 
 // --- DB reads ---
 
+async function dbFor(context: any) {
+  if (context?.vendor) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin as any;
+  }
+  return context.supabase as any;
+}
+
+function vendorChannelIds(context: any): string[] {
+  const ids = context?.vendor?.wa_channel_ids;
+  return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+}
+
+function assertVendorChannel(context: any, channelId: string) {
+  if (!context?.vendor) return;
+  const allowed = vendorChannelIds(context);
+  if (!channelId || !allowed.includes(String(channelId))) {
+    throw new Error("Inautorizado: vendedor sem acesso a este número de WhatsApp");
+  }
+}
+
+async function assertConversationAccess(context: any, db: any, conversationId: string) {
+  if (!conversationId) throw new Error("conversationId obrigatório");
+  const { data: conv, error } = await db
+    .from("wa_conversations" as any)
+    .select("id,channel_id,assigned_vendor_id,contact_wa_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!conv) throw new Error("Conversa não encontrada");
+  if (context?.vendor) {
+    assertVendorChannel(context, String((conv as any).channel_id));
+    if (Number((conv as any).assigned_vendor_id) !== Number(context.vendor.id)) {
+      throw new Error("Inautorizado: este lead está com outro vendedor");
+    }
+  }
+  return conv as any;
+}
+
 export const listConversations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { operacaoId?: string; vendorId?: number | null } | undefined) => ({
@@ -184,13 +223,18 @@ export const listConversations = createServerFn({ method: "GET" })
     vendorId: d?.vendorId ?? null,
   }))
   .handler(async ({ context, data }) => {
-    let q = context.supabase
+    const db = await dbFor(context);
+    let q = db
       .from("wa_conversations" as any)
       .select("*")
       .order("last_message_at", { ascending: false })
       .limit(200);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
-    if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
+    if ((context as any).vendor) {
+      const allowed = vendorChannelIds(context);
+      if (allowed.length === 0) return [];
+      q = q.eq("assigned_vendor_id", (context as any).vendor.id).in("channel_id", allowed);
+    } else if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -201,7 +245,9 @@ export const listMessages = createServerFn({ method: "GET" })
   .inputValidator((d: { conversationId: string }) => ({ conversationId: String(d?.conversationId ?? "") }))
   .handler(async ({ context, data }) => {
     if (!data.conversationId) return [];
-    const { data: rows, error } = await context.supabase
+    const db = await dbFor(context);
+    await assertConversationAccess(context, db, data.conversationId);
+    const { data: rows, error } = await db
       .from("wa_messages" as any)
       .select("*")
       .eq("conversation_id", data.conversationId)
@@ -215,7 +261,9 @@ export const markConversationRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { conversationId: string }) => ({ conversationId: String(d?.conversationId ?? "") }))
   .handler(async ({ context, data }) => {
-    await context.supabase
+    const db = await dbFor(context);
+    await assertConversationAccess(context, db, data.conversationId);
+    await db
       .from("wa_conversations" as any)
       .update({ unread_count: 0 })
       .eq("id", data.conversationId);
@@ -230,7 +278,21 @@ export const transferConversation = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     if (!data.conversationId) throw new Error("conversationId obrigatório");
-    const { error } = await context.supabase
+    const db = await dbFor(context);
+    const conv = await assertConversationAccess(context, db, data.conversationId);
+    if ((context as any).vendor && data.vendorId != null) {
+      const { data: target, error: targetError } = await db
+        .from("vendedores" as any)
+        .select("id,wa_channel_ids,ativo")
+        .eq("id", data.vendorId)
+        .maybeSingle();
+      if (targetError) throw new Error(targetError.message);
+      const targetChannels = Array.isArray((target as any)?.wa_channel_ids) ? (target as any).wa_channel_ids.map(String) : [];
+      if (!target || !targetChannels.includes(String(conv.channel_id))) {
+        throw new Error("Inautorizado: vendedor destino não atende este número");
+      }
+    }
+    const { error } = await db
       .from("wa_conversations" as any)
       .update({ assigned_vendor_id: data.vendorId })
       .eq("id", data.conversationId);
@@ -242,7 +304,9 @@ export const listVendorsForChannel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { channelId: string }) => ({ channelId: String(d?.channelId ?? "") }))
   .handler(async ({ context, data }) => {
-    let q = context.supabase
+    const db = await dbFor(context);
+    if ((context as any).vendor) assertVendorChannel(context, data.channelId);
+    let q = db
       .from("vendedores" as any)
       .select("id,nome,foto_url,wa_channel_ids,ativo")
       .eq("ativo", true)
@@ -252,6 +316,54 @@ export const listVendorsForChannel = createServerFn({ method: "GET" })
     const all = ((rows ?? []) as unknown) as Array<{ id: number; nome: string; foto_url: string | null; wa_channel_ids: string[] | null }>;
     if (!data.channelId) return all;
     return all.filter((v) => Array.isArray(v.wa_channel_ids) && v.wa_channel_ids.includes(data.channelId));
+  });
+
+export const listWhatsappChannels = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await dbFor(context);
+    let q = db
+      .from("wa_channels" as any)
+      .select("id,name,display_phone_number,verified_name,operacao_id")
+      .order("name", { ascending: true });
+    if ((context as any).vendor) {
+      const allowed = vendorChannelIds(context);
+      if (allowed.length === 0) return [];
+      q = q.in("id", allowed);
+    }
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const uploadWhatsappMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { channelId: string; conversationId: string; filename: string; contentType?: string; base64: string }) => ({
+    channelId: String(d?.channelId ?? ""),
+    conversationId: String(d?.conversationId ?? ""),
+    filename: String(d?.filename ?? "arquivo.bin"),
+    contentType: d?.contentType ? String(d.contentType) : "application/octet-stream",
+    base64: String(d?.base64 ?? ""),
+  }))
+  .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    assertVendorChannel(context, data.channelId);
+    const conv = await assertConversationAccess(context, db, data.conversationId);
+    if (String(conv.channel_id) !== String(data.channelId)) throw new Error("Canal não pertence a esta conversa");
+    if (!data.base64) throw new Error("Arquivo vazio");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const safeName = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "arquivo.bin";
+    const ext = safeName.split(".").pop() || "bin";
+    const path = `${data.channelId}/${data.conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const buffer = Buffer.from(data.base64, "base64");
+    const { error } = await supabaseAdmin.storage.from("wa-media").upload(path, buffer, {
+      contentType: data.contentType,
+      upsert: false,
+    });
+    if (error) throw new Error("Upload falhou: " + error.message);
+    const signed = await supabaseAdmin.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24);
+    if (signed.error || !signed.data?.signedUrl) throw new Error("Erro ao gerar URL");
+    return { path, signedUrl: signed.data.signedUrl };
   });
 
 
@@ -298,7 +410,13 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     caption: d?.caption ?? "",
   }))
   .handler(async ({ context, data }) => {
-    const ch = await findChannel(data.channelId, context.supabase);
+    const db = await dbFor(context);
+    assertVendorChannel(context, data.channelId);
+    const conv = await assertConversationAccess(context, db, data.conversationId);
+    if (String(conv.channel_id) !== String(data.channelId)) {
+      throw new Error("Canal não pertence a esta conversa");
+    }
+    const ch = await findChannel(data.channelId, db);
     if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id (não conectado ainda)");
 
     const toNormalized = normalizeBrWhatsappNumber(data.to);
@@ -330,7 +448,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };
     }
 
-    const { data: inserted, error } = await context.supabase.from("wa_messages" as any).insert({
+    const { data: inserted, error } = await db.from("wa_messages" as any).insert({
       conversation_id: data.conversationId,
       channel_id: data.channelId,
       wa_message_id: null,
@@ -343,12 +461,12 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       from_wa_id: ch.phoneNumberId,
       to_wa_id: toNormalized,
       status: "pending",
-      sent_by: context.userId,
-      raw: { pending: true, request: body },
+      sent_by: (context as any).vendor ? null : context.userId,
+      raw: { pending: true, request: body, sent_by_vendor_id: (context as any).vendor?.id ?? null },
     }).select("id").single();
     if (error) throw new Error(`Falha ao salvar mensagem: ${error.message}`);
 
-    await context.supabase
+    await db
       .from("wa_conversations" as any)
       .update({
         last_message_at: new Date().toISOString(),
@@ -361,10 +479,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
         method: "POST",
         body: JSON.stringify(body),
-      }, context.supabase);
+      }, db);
 
       const waMsgId = resp?.messages?.[0]?.id ?? null;
-      await context.supabase
+      await db
         .from("wa_messages" as any)
         .update({ wa_message_id: waMsgId, status: "sent", raw: { request: body, response: resp } })
         .eq("id", (inserted as any).id);
@@ -372,7 +490,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       return { ok: true, waMsgId, messageId: (inserted as any).id };
     } catch (e: any) {
       const errorMessage = e?.message ? String(e.message) : "Falha ao enviar no WhatsApp";
-      await context.supabase
+      await db
         .from("wa_messages" as any)
         .update({ status: "failed", raw: { request: body, error: errorMessage } })
         .eq("id", (inserted as any).id);
@@ -399,8 +517,10 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
     channelId: String(d?.channelId ?? ""),
     mediaId: String(d?.mediaId ?? ""),
   }))
-  .handler(async ({ data }) => {
-    const ch = await findChannel(data.channelId);
+  .handler(async ({ context, data }) => {
+    assertVendorChannel(context, data.channelId);
+    const db = await dbFor(context);
+    const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
     return { url: resp?.url as string | undefined, mime: resp?.mime_type as string | undefined };
@@ -413,8 +533,10 @@ export const downloadIncomingMediaBase64 = createServerFn({ method: "POST" })
     channelId: String(d?.channelId ?? ""),
     mediaId: String(d?.mediaId ?? ""),
   }))
-  .handler(async ({ data }) => {
-    const ch = await findChannel(data.channelId);
+  .handler(async ({ context, data }) => {
+    assertVendorChannel(context, data.channelId);
+    const db = await dbFor(context);
+    const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: meta, token } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
     const url = meta?.url as string | undefined;

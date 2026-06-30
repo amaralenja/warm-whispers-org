@@ -10,6 +10,14 @@ import { InstagramLookup } from "@/components/instagram-lookup";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
+import {
+  deleteCrmLead,
+  listCrmExperts,
+  listCrmLeads,
+  syncInsertCrmLeads,
+  updateCrmLeadStage,
+  upsertCrmLead,
+} from "@/lib/crm.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -165,6 +173,12 @@ async function fetchCrmApiLeads(expert: ExpertApiKey) {
 function CRMPage() {
   const qc = useQueryClient();
   const fireNewLead = useServerFn(fireNewLeadTrigger);
+  const listExpertsFn = useServerFn(listCrmExperts);
+  const listLeadsFn = useServerFn(listCrmLeads);
+  const insertSyncedLeadsFn = useServerFn(syncInsertCrmLeads);
+  const upsertLeadFn = useServerFn(upsertCrmLead);
+  const deleteLeadFn = useServerFn(deleteCrmLead);
+  const updateStageFn = useServerFn(updateCrmLeadStage);
   const { workspace, workspaces } = useWorkspace();
   const isGeral = workspace?.id === "all";
 
@@ -183,14 +197,7 @@ function CRMPage() {
 
   const { data: expertsWithKeys = [], isLoading: loadingApiKeys } = useQuery({
     queryKey: ["experts-crm-keys"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("experts")
-        .select("id, nome, ativo, crm_api_key")
-        .order("nome");
-      if (error) throw error;
-      return (data ?? []) as ExpertApiKey[];
-    },
+    queryFn: async () => (await listExpertsFn()) as ExpertApiKey[],
   });
 
   const targetApiExperts = useMemo(() => {
@@ -201,15 +208,7 @@ function CRMPage() {
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["crm-leads"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_leads")
-        .select("*")
-        .order("ordem", { ascending: true })
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Lead[];
-    },
+    queryFn: async () => (await listLeadsFn()) as Lead[],
   });
 
   const syncLeads = useMutation({
@@ -224,10 +223,7 @@ function CRMPage() {
         return { fetched: 0, inserted: 0, skipped: 0 };
       }
 
-      const { data: existingRows, error: existingError } = await supabase
-        .from("crm_leads")
-        .select("id,nome,telefone,email,expert,dados");
-      if (existingError) throw existingError;
+      const existingRows = await listLeadsFn();
 
       const existingKeys = new Set<string>();
       for (const row of (existingRows ?? []) as any[]) {
@@ -249,8 +245,7 @@ function CRMPage() {
 
       let insertedIds: string[] = [];
       if (toInsert.length > 0) {
-        const { data: ins, error } = await supabase.from("crm_leads").insert(toInsert as any[]).select("id");
-        if (error) throw error;
+        const ins = await insertSyncedLeadsFn({ data: { leads: toInsert as any[] } });
         insertedIds = (ins ?? []).map((r: any) => r.id);
       }
       // Fire "new_lead" triggers (non-blocking)
@@ -301,14 +296,8 @@ function CRMPage() {
   // Mutations
   const upsert = useMutation({
     mutationFn: async (lead: Partial<Lead> & { id?: string }) => {
-      if (lead.id) {
-        const { error } = await supabase.from("crm_leads").update(lead as any).eq("id", lead.id);
-        if (error) throw error;
-      } else {
-        const { data: ins, error } = await supabase.from("crm_leads").insert(lead as any).select("id").single();
-        if (error) throw error;
-        if (ins?.id) fireNewLead({ data: { lead_id: ins.id } }).catch(() => {});
-      }
+      const ins = await upsertLeadFn({ data: lead as any });
+      if (!lead.id && (ins as any)?.id) fireNewLead({ data: { lead_id: (ins as any).id } }).catch(() => {});
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["crm-leads"] });
@@ -320,10 +309,7 @@ function CRMPage() {
   });
 
   const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("crm_leads").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: async (id: string) => deleteLeadFn({ data: { id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["crm-leads"] });
       toast.success("Lead removido");
@@ -331,10 +317,7 @@ function CRMPage() {
   });
 
   const moveStage = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: Stage }) => {
-      const { error } = await supabase.from("crm_leads").update({ status }).eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: async ({ id, status }: { id: string; status: Stage }) => updateStageFn({ data: { id, status } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crm-leads"] }),
   });
 
