@@ -1017,11 +1017,12 @@ function RenderMedia({
   type, url, mime, filename, outgoing, onMediaSettled,
 }: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void }) {
   const safeType = toText(type);
+  const safeUrl = toText(url);
   const safeFilename = toText(filename);
   if (safeType === "image" || safeType === "sticker") {
     return (
       <img
-        src={url}
+        src={safeUrl}
         alt={safeFilename || (safeType === "sticker" ? "Figurinha recebida" : "Imagem recebida")}
         loading="lazy"
         onLoad={onMediaSettled}
@@ -1030,14 +1031,14 @@ function RenderMedia({
     );
   }
   if (safeType === "video") {
-    return <video src={url} controls onLoadedMetadata={onMediaSettled} className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
+    return <video src={safeUrl} controls onLoadedMetadata={onMediaSettled} className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
   if (safeType === "audio") {
-    return <WhatsappAudioPlayer url={url} outgoing={outgoing} />;
+    return <WhatsappAudioPlayer url={safeUrl} outgoing={outgoing} />;
   }
   if (safeType === "document") {
     return (
-      <a href={url} download={safeFilename || "documento"} className="mb-1 flex min-w-72 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-semibold transition hover:bg-background/40">
+      <a href={safeUrl} download={safeFilename || "documento"} className="mb-1 flex min-w-72 items-center gap-3 rounded-2xl border border-chat-line bg-background/25 px-4 py-3 text-sm font-semibold transition hover:bg-background/40">
         <FileText className="h-5 w-5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{safeFilename || "Documento"}</span>
         <Download className="h-4 w-4 shrink-0" />

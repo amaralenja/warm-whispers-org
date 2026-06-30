@@ -214,6 +214,22 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                             console.error("[wa-webhook] showup meta fire failed", e);
                           }
                         }
+                        // Kick off AI assistant session for the notification number
+                        try {
+                          const { startNotificationSession } = await import("@/lib/notification-ai.server");
+                          await startNotificationSession({
+                            db: supabaseAdmin,
+                            channelId,
+                            contactWa: m.from,
+                            contactName: contactNameByWaId[m.from] ?? null,
+                            reminderId,
+                            calendarEventId: (rem as any).event_id ?? null,
+                            buttonId: action as any,
+                            hora: (rem as any).hora ?? null,
+                          });
+                        } catch (e) {
+                          console.error("[wa-webhook] start AI session failed", e);
+                        }
                       }
                     }
                   } catch (e) {
@@ -221,8 +237,42 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   }
                 }
 
-                // Dispatch to flow engine (fire and continue; await so errors are logged)
+                // Notification channel: route to AI agent (text + transcribed audio)
+                let handledByAI = false;
                 try {
+                  const { data: ch } = await supabaseAdmin
+                    .from("wa_channels" as any)
+                    .select("kind")
+                    .eq("id", channelId)
+                    .maybeSingle();
+                  const isNotif = (ch as any)?.kind === "notification";
+                  if (isNotif && !buttonId) {
+                    let userText = m.text?.body?.trim() || "";
+                    if (!userText && m.type === "audio" && m.audio?.id && phoneNumberId) {
+                      try {
+                        const { transcribeWaAudio } = await import("@/lib/notification-ai.server");
+                        userText = await transcribeWaAudio(m.audio.id, phoneNumberId);
+                      } catch (e) {
+                        console.error("[wa-webhook] transcribe failed", e);
+                      }
+                    }
+                    if (userText) {
+                      const { continueNotificationSession } = await import("@/lib/notification-ai.server");
+                      await continueNotificationSession({
+                        db: supabaseAdmin,
+                        channelId,
+                        contactWa: m.from,
+                        userText,
+                      });
+                      handledByAI = true;
+                    }
+                  }
+                } catch (e) {
+                  console.error("[wa-webhook] notif AI route error", e);
+                }
+
+                // Dispatch to flow engine (skip for AI-handled notifications)
+                if (!handledByAI) try {
                   const { count: priorCount } = await supabaseAdmin
                     .from("wa_messages" as any)
                     .select("id", { count: "exact", head: true })
