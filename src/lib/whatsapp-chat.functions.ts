@@ -174,6 +174,23 @@ type SendInput = {
   caption?: string;
 };
 
+// Brazilian numbers: WhatsApp Cloud API expects mobile as 55 + DDD + 9 + 8 digits.
+// Many contacts arrive without the "9" (legacy 10-digit format). Insert it when missing.
+function normalizeBrWhatsappNumber(raw: string): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits.startsWith("55")) return digits;
+  // 55 + DDD(2) + number(8 or 9)
+  if (digits.length === 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    // Only add 9 if it looks like a mobile (first digit >= 6 in old plans, but safest: always)
+    if (rest.length === 8 && !rest.startsWith("9")) {
+      return `55${ddd}9${rest}`;
+    }
+  }
+  return digits;
+}
+
 export const sendWhatsappMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: SendInput) => ({
@@ -190,9 +207,11 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     const ch = await findChannel(data.channelId);
     if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id (não conectado ainda)");
 
+    const toNormalized = normalizeBrWhatsappNumber(data.to);
+
     const body: any = {
       messaging_product: "whatsapp",
-      to: data.to,
+      to: toNormalized,
       type: data.type,
     };
     if (data.type === "text") {
@@ -235,7 +254,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       media_filename: data.filename || null,
       caption: data.caption || null,
       from_wa_id: ch.phoneNumberId,
-      to_wa_id: data.to,
+      to_wa_id: toNormalized,
       status: "sent",
       sent_by: context.userId,
     });
