@@ -179,8 +179,9 @@ async function metaProxyForChannel(
 
 export const listConversations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { operacaoId?: string } | undefined) => ({
+  .inputValidator((d: { operacaoId?: string; vendorId?: number | null } | undefined) => ({
     operacaoId: d?.operacaoId ?? null,
+    vendorId: d?.vendorId ?? null,
   }))
   .handler(async ({ context, data }) => {
     let q = context.supabase
@@ -189,6 +190,7 @@ export const listConversations = createServerFn({ method: "GET" })
       .order("last_message_at", { ascending: false })
       .limit(200);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
+    if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];
