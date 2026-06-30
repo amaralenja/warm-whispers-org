@@ -277,7 +277,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         const { error: insErr } = await db.from("wa_flows").insert({
           nome,
           operacao_id: data.operacao_id,
-          ativo: false,
+          ativo: true,
           entry_node_id: triggerId,
           nodes,
           edges,
