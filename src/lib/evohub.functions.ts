@@ -359,6 +359,9 @@ export const deleteWhatsappChannel = createServerFn({ method: "POST" })
     if (!data.id) throw new Error("ID obrigatório");
     await evoFetch(`/api/v1/channels/${data.id}`, { method: "DELETE" });
     return { ok: true };
+  });
+
+
 
 export const renameWhatsappChannel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
