@@ -792,48 +792,48 @@ function LeadCard({
   return (
     <div
       className={[
-        "group relative flex flex-col gap-3 rounded-xl border bg-card/60 backdrop-blur-sm p-4 transition-all",
+        "group relative flex flex-col gap-3.5 rounded-2xl border bg-card/70 backdrop-blur-sm p-5 transition-all",
         real ? "" : "opacity-60",
         isHigh
-          ? "border-yellow-500/30 shadow-[0_0_30px_-12px_rgba(234,179,8,0.4)]"
-          : "border-border/60 hover:border-border",
-        onOpen ? "cursor-pointer hover:bg-card/80" : "",
+          ? "border-yellow-500/40 shadow-[0_0_40px_-12px_rgba(234,179,8,0.5)]"
+          : "border-border/60 hover:border-border hover:shadow-lg",
+        onOpen ? "cursor-pointer hover:bg-card/90" : "",
       ].join(" ")}
       onClick={onOpen}
     >
       {/* HEADER: nome + origem */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={`truncate text-[15px] font-semibold leading-tight ${lead.nome ? "" : "italic text-muted-foreground text-sm"}`}>
+          <h3 className={`truncate text-base font-bold leading-tight ${lead.nome ? "" : "italic text-muted-foreground"}`}>
             {lead.nome || "sem nome"}
           </h3>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Icon className={`h-3 w-3 ${origin.text}`} />
-            <span>{origin.label}</span>
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Icon className={`h-3.5 w-3.5 ${origin.text}`} />
+            <span className="font-medium">{origin.label}</span>
             <span className="opacity-40">·</span>
             <span>{timeAgo(lead.data_criacao)}</span>
           </div>
         </div>
         {isHigh && (
-          <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-md bg-yellow-500/15 border border-yellow-500/30">
-            <Crown className="h-3.5 w-3.5 text-yellow-400" />
+          <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/40">
+            <Crown className="h-4.5 w-4.5 text-yellow-400" />
           </div>
         )}
       </div>
 
       {/* TICKET / CAIXA */}
       {ticket !== "—" && (
-        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${tier?.cls ?? "bg-muted/30 border-border text-foreground"}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <Wallet className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <div className={`flex items-center justify-between rounded-xl border px-4 py-2.5 ${tier?.cls ?? "bg-muted/30 border-border text-foreground"}`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Wallet className="h-4 w-4 shrink-0 opacity-70" />
             <div className="min-w-0">
-              <div className="text-[9px] uppercase tracking-wider opacity-60 leading-none">Caixa</div>
-              <div className="text-[13px] font-bold leading-tight mt-0.5 truncate">{ticket}</div>
+              <div className="text-[10px] uppercase tracking-wider opacity-60 leading-none">Caixa</div>
+              <div className="text-sm font-bold leading-tight mt-1 truncate">{ticket}</div>
             </div>
           </div>
-          {weight >= 5 && <span className="text-base">🔥</span>}
+          {weight >= 5 && <span className="text-xl">🔥</span>}
           {letter && weight < 5 && (
-            <span className="text-[10px] font-mono font-bold opacity-70">{letter}</span>
+            <span className="text-xs font-mono font-bold opacity-70">{letter}</span>
           )}
         </div>
       )}
@@ -843,16 +843,16 @@ function LeadCard({
 
       {/* CONTATO */}
       {(lead.email || lead.whatsapp) && (
-        <div className="space-y-1 text-xs">
+        <div className="space-y-1.5 text-xs">
           {lead.whatsapp && (
-            <div className="flex items-center gap-2 text-foreground/80">
-              <MessageCircle className="h-3 w-3 shrink-0 text-emerald-400" />
-              <span className="truncate">{lead.whatsapp}</span>
+            <div className="flex items-center gap-2 text-foreground/85">
+              <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              <span className="truncate font-medium">{lead.whatsapp}</span>
             </div>
           )}
           {lead.email && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="h-3 w-3 shrink-0" />
+              <Mail className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{lead.email}</span>
             </div>
           )}
@@ -861,8 +861,8 @@ function LeadCard({
 
       {/* UTM */}
       {lead.utm_campaign && (
-        <div className="text-[10px] text-muted-foreground truncate border-t border-border/40 pt-2">
-          <TrendingUp className="inline h-2.5 w-2.5 mr-1 opacity-60" />
+        <div className="text-[11px] text-muted-foreground truncate border-t border-border/40 pt-2.5">
+          <TrendingUp className="inline h-3 w-3 mr-1 opacity-60" />
           {String(lead.utm_campaign)}
         </div>
       )}
@@ -870,8 +870,8 @@ function LeadCard({
       {/* FOOTER ações */}
       <div className="mt-auto flex items-center justify-between gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
         {onOpen && (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1 -ml-2" onClick={onOpen}>
-            <Eye className="h-3 w-3" /> Respostas
+          <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs gap-1.5 -ml-2" onClick={onOpen}>
+            <Eye className="h-3.5 w-3.5" /> Respostas
           </Button>
         )}
         <RealityToggle real={real} onChange={onToggle} />
@@ -879,6 +879,7 @@ function LeadCard({
     </div>
   );
 }
+
 
 
 const ANSWER_LABELS: Record<string, string> = {
