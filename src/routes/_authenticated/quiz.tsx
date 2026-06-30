@@ -713,7 +713,7 @@ function RealityToggle({ real, onChange }: { real: boolean; onChange: (r: Realit
 }
 
 function LeadCard({
-  lead, real, onToggle, onOpen, compact,
+  lead, real, onToggle, onOpen,
 }: {
   lead: Lead;
   real: boolean;
@@ -722,83 +722,96 @@ function LeadCard({
   compact?: boolean;
 }) {
   const origin = classifyLead(lead);
+  const Icon = origin.icon;
   const letter = (lead.caixa_letra ?? "").toUpperCase();
   const isHigh = HIGH_SCORE.has(letter);
-  const isMid = MID_SCORE.has(letter);
   const cleanIg = lead.instagram?.replace(/^@/, "");
-  const ticket = ticketLabel(lead);
+  const ticket = String(ticketLabel(lead));
   const tier = TICKET_TIERS[letter];
+  const weight = caixaWeight(lead);
 
   return (
     <div
       className={[
-        "relative overflow-hidden rounded-lg border bg-card p-3 transition-all",
-        real ? "" : "opacity-70",
-        isHigh ? "border-yellow-500/40" : "border-border",
-        compact ? "" : "hover:-translate-y-0.5",
-        onOpen ? "cursor-pointer hover:border-accent/50" : "",
+        "group relative flex flex-col gap-3 rounded-xl border bg-card/60 backdrop-blur-sm p-4 transition-all",
+        real ? "" : "opacity-60",
+        isHigh
+          ? "border-yellow-500/30 shadow-[0_0_30px_-12px_rgba(234,179,8,0.4)]"
+          : "border-border/60 hover:border-border",
+        onOpen ? "cursor-pointer hover:bg-card/80" : "",
       ].join(" ")}
       onClick={onOpen}
     >
-      <div className={`absolute left-0 top-0 h-full w-1 ${origin.bg}`} />
-
-      <div className="flex items-start justify-between gap-2">
+      {/* HEADER: nome + origem */}
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {lead.nome ? (
-              <h3 className="truncate text-sm font-semibold">{lead.nome}</h3>
-            ) : (
-              <h3 className="truncate text-xs italic text-muted-foreground">sem nome</h3>
-            )}
-            {isHigh && (
-              <Badge className="gap-1 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20 text-[10px]">
-                <Crown className="h-3 w-3" /> {letter}
-              </Badge>
-            )}
-            {isMid && (
-              <Badge variant="outline" className="font-mono text-muted-foreground text-[10px]">{letter}</Badge>
-            )}
+          <h3 className={`truncate text-[15px] font-semibold leading-tight ${lead.nome ? "" : "italic text-muted-foreground text-sm"}`}>
+            {lead.nome || "sem nome"}
+          </h3>
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Icon className={`h-3 w-3 ${origin.text}`} />
+            <span>{origin.label}</span>
+            <span className="opacity-40">·</span>
+            <span>{timeAgo(lead.data_criacao)}</span>
           </div>
-          <div className="mt-0.5 text-[10px] text-muted-foreground">{timeAgo(lead.data_criacao)}</div>
         </div>
+        {isHigh && (
+          <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-md bg-yellow-500/15 border border-yellow-500/30">
+            <Crown className="h-3.5 w-3.5 text-yellow-400" />
+          </div>
+        )}
       </div>
 
+      {/* TICKET / CAIXA */}
       {ticket !== "—" && (
-        <div className={`mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold ${tier?.cls ?? "bg-accent/10 text-accent border-accent/30"}`}>
-          <Wallet className="h-3 w-3" />
-          <span className="opacity-70">Caixa:</span> {ticket}
-          {caixaWeight(lead) >= 4 && <span className="ml-1">🔥</span>}
+        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${tier?.cls ?? "bg-muted/30 border-border text-foreground"}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Wallet className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            <div className="min-w-0">
+              <div className="text-[9px] uppercase tracking-wider opacity-60 leading-none">Caixa</div>
+              <div className="text-[13px] font-bold leading-tight mt-0.5 truncate">{ticket}</div>
+            </div>
+          </div>
+          {weight >= 5 && <span className="text-base">🔥</span>}
+          {letter && weight < 5 && (
+            <span className="text-[10px] font-mono font-bold opacity-70">{letter}</span>
+          )}
         </div>
       )}
 
+      {/* INSTAGRAM verificado (card grande) */}
+      {cleanIg && <IgRow username={cleanIg} />}
 
-      <div className="mt-2 space-y-0.5 text-xs">
-        {lead.email && (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Mail className="h-3 w-3 shrink-0" />
-            <span className="truncate">{lead.email}</span>
-          </div>
-        )}
-        {lead.whatsapp && (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <MessageCircle className="h-3 w-3 shrink-0 text-emerald-400" />
-            <span className="truncate">{lead.whatsapp}</span>
-          </div>
-        )}
-        {cleanIg && <IgRow username={cleanIg} />}
-      </div>
+      {/* CONTATO */}
+      {(lead.email || lead.whatsapp) && (
+        <div className="space-y-1 text-xs">
+          {lead.whatsapp && (
+            <div className="flex items-center gap-2 text-foreground/80">
+              <MessageCircle className="h-3 w-3 shrink-0 text-emerald-400" />
+              <span className="truncate">{lead.whatsapp}</span>
+            </div>
+          )}
+          {lead.email && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="h-3 w-3 shrink-0" />
+              <span className="truncate">{lead.email}</span>
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* UTM */}
       {lead.utm_campaign && (
-        <div className="mt-2 pt-2 border-t border-border/50">
-          <Badge variant="outline" className="max-w-full truncate text-[9px]">
-            <TrendingUp className="mr-1 h-2.5 w-2.5" /> {lead.utm_campaign}
-          </Badge>
+        <div className="text-[10px] text-muted-foreground truncate border-t border-border/40 pt-2">
+          <TrendingUp className="inline h-2.5 w-2.5 mr-1 opacity-60" />
+          {String(lead.utm_campaign)}
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+      {/* FOOTER ações */}
+      <div className="mt-auto flex items-center justify-between gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
         {onOpen && (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] gap-1" onClick={onOpen}>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1 -ml-2" onClick={onOpen}>
             <Eye className="h-3 w-3" /> Respostas
           </Button>
         )}
@@ -807,6 +820,7 @@ function LeadCard({
     </div>
   );
 }
+
 
 const ANSWER_LABELS: Record<string, string> = {
   nome: "Nome",
