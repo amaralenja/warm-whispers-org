@@ -340,6 +340,14 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   .from("wa_messages" as any)
                   .update({ status: s.status })
                   .eq("wa_message_id", s.id);
+                await supabaseAdmin
+                  .from("wa_call_reminders" as any)
+                  .update({ status: s.status })
+                  .eq("wa_message_id", s.id);
+                await supabaseAdmin
+                  .from("wa_task_notifications" as any)
+                  .update({ status: s.status })
+                  .eq("wa_message_id", s.id);
               }
             }
           }

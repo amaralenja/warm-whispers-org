@@ -367,7 +367,12 @@ function WhatsAppPage() {
           ))}
         </div>
 
-        {tab === "notification" && <TemplatesPanel />}
+        {tab === "notification" && (
+          <div className="space-y-4">
+            <TemplatesPanel />
+            <DispatchLogsPanel />
+          </div>
+        )}
 
 
 
@@ -1095,6 +1100,97 @@ function TemplatesPanel() {
         </DialogContent>
       </Dialog>
 
+    </div>
+  );
+}
+
+function DispatchLogsPanel() {
+  const { data: logs = [], isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["wa_notification_dispatch_logs"],
+    queryFn: async () => {
+      const { listNotificationDispatchLogs } = await import("@/lib/call-analytics.functions");
+      return await listNotificationDispatchLogs({ data: { limit: 120 } });
+    },
+    refetchInterval: 10000,
+  });
+
+  const fmt = (iso: string | null | undefined) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+    } catch {
+      return String(iso);
+    }
+  };
+
+  const statusInfo = (status: string | null | undefined) => {
+    const s = String(status ?? "pending").toLowerCase();
+    if (["read", "delivered", "showup", "noshow", "remarcada"].includes(s)) {
+      return { label: s === "read" ? "Lido" : s === "delivered" ? "Entregue" : s === "showup" ? "Show up" : s === "noshow" ? "No show" : "Remarcada", cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" };
+    }
+    if (s === "sent") return { label: "Enviado", cls: "border-blue-500/40 bg-blue-500/10 text-blue-300" };
+    if (s === "failed" || s === "undelivered") return { label: "Falhou", cls: "border-red-500/40 bg-red-500/10 text-red-300" };
+    return { label: "Pendente", cls: "border-amber-500/40 bg-amber-500/10 text-amber-300" };
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card/40 p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-400" /> Logs de disparo
+          </h3>
+          <p className="text-xs text-muted-foreground">Acompanhamento dos lembretes, comparecimentos e tarefas enviados pelo número notificador.</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Atualizar
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground"><Loader2 className="h-4 w-4 inline animate-spin mr-2" /> Carregando logs…</div>
+      ) : logs.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">Nenhum disparo registrado ainda.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-background/70 text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Quando</th>
+                <th className="px-3 py-2 text-left font-medium">Tipo</th>
+                <th className="px-3 py-2 text-left font-medium">Destinatário</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-left font-medium">ID WhatsApp</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background/30">
+              {logs.map((log: any) => {
+                const st = statusInfo(log.status);
+                return (
+                  <tr key={log.id} className="align-top">
+                    <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">{fmt(log.sentAt ?? log.createdAt)}</td>
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-foreground">{log.type}</div>
+                      {log.details && <div className="text-xs text-muted-foreground mt-0.5">{log.details}</div>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-foreground">{log.recipientName || "Sem nome"}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{log.phone ? `+${log.phone}` : "—"}</div>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                    </td>
+                    <td className="px-3 py-3 max-w-[260px]">
+                      <div className="truncate font-mono text-xs text-muted-foreground" title={log.waMessageId || ""}>{log.waMessageId || "—"}</div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,6 +19,10 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 export const startInstance = createStart(() => ({
+  // Auth is attached by the custom serverFns.fetch below. Keeping the old
+  // function middleware here makes TanStack evaluate a client middleware during
+  // React render/HMR and causes fake component crashes like
+  // "Cannot destructure property 'data' of undefined" in *.functions.ts files.
   functionMiddleware: [],
   requestMiddleware: [errorMiddleware],
   serverFns: {
