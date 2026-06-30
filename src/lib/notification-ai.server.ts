@@ -475,21 +475,60 @@ export async function continueNotificationSession(opts: {
       } catch {}
       let toolOut = "";
       try {
-        if (name === "reschedule_call") {
-          if (!sess.calendar_event_id) {
-            toolOut = JSON.stringify({ ok: false, error: "sem calendar_event_id na sessão" });
+        if (name === "list_upcoming_calls") {
+          const { gcal } = await import("@/lib/google-calendar.functions");
+          const days = Math.max(1, Math.min(60, Number(args.days_ahead || 7)));
+          const timeMin = new Date().toISOString();
+          const timeMax = new Date(Date.now() + days * 86400_000).toISOString();
+          const params = new URLSearchParams({
+            timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "20",
+          });
+          const r: any = await gcal(`/events?${params.toString()}`);
+          const items = (r?.items ?? []).map((ev: any) => ({
+            event_id: ev.id,
+            titulo: ev.summary,
+            inicio: ev.start?.dateTime || ev.start?.date,
+            fim: ev.end?.dateTime || ev.end?.date,
+          }));
+          toolOut = JSON.stringify({ ok: true, calls: items });
+        } else if (name === "create_call") {
+          const { gcal } = await import("@/lib/google-calendar.functions");
+          const startISO = String(args.start_iso || "");
+          const dur = Number(args.duration_minutes || 60);
+          const endISO = new Date(new Date(startISO).getTime() + dur * 60_000).toISOString();
+          const created: any = await gcal(`/events`, {
+            method: "POST",
+            body: JSON.stringify({
+              summary: String(args.titulo || "Call"),
+              description: args.descricao || "",
+              start: { dateTime: startISO, timeZone: "America/Sao_Paulo" },
+              end: { dateTime: endISO, timeZone: "America/Sao_Paulo" },
+            }),
+          });
+          toolOut = JSON.stringify({ ok: true, event_id: created?.id, inicio: startISO });
+        } else if (name === "reschedule_call") {
+          const eventId = String(args.event_id || sess.calendar_event_id || "");
+          if (!eventId) {
+            toolOut = JSON.stringify({ ok: false, error: "sem event_id; chame list_upcoming_calls antes" });
           } else {
             const startISO = String(args.start_iso || "");
             const dur = Number(args.duration_minutes || 60);
-            await rescheduleCalendarEvent(sess.calendar_event_id, startISO, dur);
-            // update reminder status
+            await rescheduleCalendarEvent(eventId, startISO, dur);
             if (sess.reminder_id) {
-              await db
-                .from("wa_call_reminders")
+              await db.from("wa_call_reminders")
                 .update({ status: "remarcada", replied_at: await nowISO() })
                 .eq("id", sess.reminder_id);
             }
             toolOut = JSON.stringify({ ok: true, novo_inicio: startISO, duracao: dur });
+          }
+        } else if (name === "cancel_call") {
+          const { gcal } = await import("@/lib/google-calendar.functions");
+          const eventId = String(args.event_id || sess.calendar_event_id || "");
+          if (!eventId) {
+            toolOut = JSON.stringify({ ok: false, error: "sem event_id; chame list_upcoming_calls antes" });
+          } else {
+            await gcal(`/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+            toolOut = JSON.stringify({ ok: true, cancelada: true });
           }
         } else if (name === "end_session") {
           sess.status = "closed";
@@ -505,7 +544,6 @@ export async function continueNotificationSession(opts: {
     }
 
     if (sess.status === "closed") {
-      // give the model one more pass to send a closing line, then break
       const wrap = await callOpenAI(sess.messages);
       const last = wrap?.choices?.[0]?.message?.content;
       if (last) {
