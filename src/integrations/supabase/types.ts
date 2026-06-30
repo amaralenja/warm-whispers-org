@@ -1468,6 +1468,10 @@ export type Database = {
         Args: { _from?: string; _to?: string }
         Returns: Json
       }
+      get_vendor_stats: {
+        Args: { _from?: string; _to?: string; _utm: string }
+        Returns: Json
+      }
       login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
     }
     Enums: {
