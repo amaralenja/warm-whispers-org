@@ -750,6 +750,24 @@ export async function continueNotificationSession(opts: {
             await gcal(`/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
             toolOut = JSON.stringify({ ok: true, cancelada: true });
           }
+        } else if (name === "get_dashboard_snapshot") {
+          const me = await identifyContact(db, contactWa);
+          toolOut = JSON.stringify({ ok: true, ...(await snapshot(db, me)) });
+        } else if (name === "get_sales_today") {
+          toolOut = JSON.stringify({ ok: true, ...(await reportSalesToday(db)) });
+        } else if (name === "get_leads_summary") {
+          toolOut = JSON.stringify({ ok: true, ...(await reportLeads(db)) });
+        } else if (name === "get_my_tasks") {
+          const me = await identifyContact(db, contactWa);
+          toolOut = JSON.stringify({ ok: true, ...(await reportMyTasks(db, me)) });
+        } else if (name === "get_calls_summary") {
+          toolOut = JSON.stringify({ ok: true, ...(await reportCalls()) });
+        } else if (name === "get_ads_summary") {
+          toolOut = JSON.stringify({ ok: true, ...(await reportAdsMonth()) });
+        } else if (name === "get_quiz_summary") {
+          toolOut = JSON.stringify({ ok: true, ...(await reportQuiz(db)) });
+        } else if (name === "get_financial_summary") {
+          toolOut = JSON.stringify({ ok: true, ...(await reportFinancial(db)) });
         } else if (name === "end_session") {
           sess.status = "closed";
           sess.context = { ...sess.context, resumo: args.resumo || "" };
