@@ -24,7 +24,7 @@ const NUM = "font-sans tabular-nums tracking-tight font-semibold";
 function Ranking() {
   const { workspace, workspaces } = useWorkspace();
   const fetchStats = useServerFn(getRankingStats);
-  const [range, setRange] = useState<DateRangeValue>(() => computeRange("semana"));
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("7d"));
   const [opFilter, setOpFilter] = useState<string>("all"); // só usado quando workspace="all"
   const expertFilter =
     workspace.id === "all" ? (opFilter === "all" ? null : opFilter) : workspace.id;

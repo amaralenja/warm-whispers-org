@@ -91,7 +91,7 @@ function VendorPortal() {
   const metaPct = metaPeriodo > 0 ? Math.min(100, ((stats?.faturamento ?? 0) / metaPeriodo) * 100) : 0;
   const faltaPeriodo = Math.max(0, metaPeriodo - (stats?.faturamento ?? 0));
   const labelMeta =
-    preset === "hoje" ? "Meta do dia" : preset === "7d" ? "Meta da semana" : preset === "30d" ? "Meta dos 30 dias" : "Meta do mês";
+    preset === "hoje" ? "Meta do dia" : preset === "7d" ? "Meta dos 7 dias" : preset === "30d" ? "Meta dos 30 dias" : "Meta do mês";
 
   return (
     <main className="min-h-screen bg-background text-foreground">
