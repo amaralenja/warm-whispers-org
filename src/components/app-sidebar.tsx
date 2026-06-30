@@ -293,7 +293,7 @@ export function AppSidebar() {
 
                 {!collapsed && highTicketOpen && (
                   <SidebarMenuSub className="mt-1 gap-1">
-                    {highTicketItems.map((sub) => {
+                    {visibleHT.map((sub) => {
                       const subActive = pathname === sub.url;
                       return (
                         <SidebarMenuSubItem key={sub.title}>
@@ -318,6 +318,7 @@ export function AppSidebar() {
                   </SidebarMenuSub>
                 )}
               </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
