@@ -610,7 +610,66 @@ const AI_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delete_task",
+      description: "Exclui/apaga/remove uma tarefa existente do quadro de tarefas da Multum. Use quando o usuário pedir para excluir, apagar, deletar ou remover uma tarefa. Se ele falar 'essa tarefa' ou 'a última', use o histórico da conversa para preencher o título; se não tiver título mas estiver claro que é a última tarefa criada, marque delete_latest=true.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: { type: "string", description: "Título ou trecho do título da tarefa a excluir" },
+          assignee_nome: { type: "string", description: "Nome do responsável, se o usuário citar. Ex: Amaral" },
+          delete_latest: { type: "boolean", description: "Use true apenas quando o pedido for claramente para apagar a última tarefa citada/criada na conversa e não houver título explícito" },
+        },
+      },
+    },
+  },
 ];
+
+async function loadRecentAiMessages(supabase: any, contactWa: string): Promise<any[]> {
+  const { data } = await supabase
+    .from("wa_ai_sessions")
+    .select("messages")
+    .eq("contact_wa", contactWa)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const rows = Array.isArray(data?.messages) ? data.messages : [];
+  return rows
+    .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string" && m.content.trim())
+    .slice(-10)
+    .map((m: any) => ({ role: m.role, content: m.content.slice(0, 1200) }));
+}
+
+function taskMatchScore(task: any, rawTitle: string) {
+  const a = normalizeText(String(task?.titulo ?? ""));
+  const b = normalizeText(rawTitle);
+  if (!b) return 0;
+  if (a === b) return 100;
+  if (a.includes(b) || b.includes(a)) return 80;
+  const terms = b.split(/\s+/).filter((x) => x.length > 2);
+  return terms.reduce((score, term) => score + (a.includes(term) ? 8 : 0), 0);
+}
+
+async function inferRecentTaskTitleFromHistory(supabase: any, contactWa: string): Promise<string> {
+  const history = await loadRecentAiMessages(supabase, contactWa).catch(() => []);
+  const text = history
+    .map((m) => String(m.content ?? ""))
+    .reverse()
+    .join("\n");
+  const patterns = [
+    /tarefa\s+["“']([^"”']{3,160})["”']/i,
+    /(?:criei|anotei|salvei|adicionei).*?["“']([^"”']{3,160})["”']/i,
+    /(?:t[íi]tulo|tarefa)\s*:\s*([^\n.]{3,160})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+  return "";
+}
 
 async function executeAiTool(supabase: any, name: string, args: any, contactWa: string): Promise<string> {
   try {
@@ -650,6 +709,59 @@ async function executeAiTool(supabase: any, name: string, args: any, contactWa: 
       }
       return JSON.stringify({ ok: true, id: data?.id, titulo: data?.titulo, assignee: args.assignee_nome ?? null, prazo: args.prazo ?? null, notified });
     }
+    if (name === "delete_task") {
+      let titulo = String(args?.titulo ?? "").trim();
+      const deleteLatest = args?.delete_latest === true;
+      const assigneeNome = String(args?.assignee_nome ?? "").trim();
+      if (!titulo && deleteLatest) titulo = await inferRecentTaskTitleFromHistory(supabase, contactWa);
+      if (!titulo) {
+        return JSON.stringify({ ok: false, error: "Preciso do título da tarefa pra excluir com segurança." });
+      }
+
+      let assigneeIds: string[] = [];
+      if (assigneeNome) {
+        const { data: members } = await supabase
+          .from("team_members")
+          .select("id,nome")
+          .ilike("nome", `%${assigneeNome}%`)
+          .limit(5);
+        assigneeIds = ((members ?? []) as any[]).map((m) => String(m.id));
+      }
+
+      let query = supabase
+        .from("tasks")
+        .select("id,titulo,prazo,created_at,assignee_ids,concluida")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (titulo) query = query.ilike("titulo", `%${titulo}%`);
+      const { data: directRows, error: directError } = await query;
+      if (directError) return JSON.stringify({ ok: false, error: directError.message });
+
+      let rows = ((directRows ?? []) as any[]).filter((t) =>
+        !assigneeIds.length || assigneeIds.some((id) => Array.isArray(t.assignee_ids) && t.assignee_ids.includes(id)),
+      );
+
+      if (titulo && !rows.length) {
+        const { data: broadRows, error: broadError } = await supabase
+          .from("tasks")
+          .select("id,titulo,prazo,created_at,assignee_ids,concluida")
+          .order("created_at", { ascending: false })
+          .limit(80);
+        if (broadError) return JSON.stringify({ ok: false, error: broadError.message });
+        rows = ((broadRows ?? []) as any[])
+          .filter((t) => taskMatchScore(t, titulo) >= 16)
+          .filter((t) => !assigneeIds.length || assigneeIds.some((id) => Array.isArray(t.assignee_ids) && t.assignee_ids.includes(id)))
+          .sort((a, b) => taskMatchScore(b, titulo) - taskMatchScore(a, titulo));
+      }
+
+      if (!rows.length) return JSON.stringify({ ok: false, error: "Não encontrei essa tarefa no sistema." });
+      const target = rows[0];
+
+      await supabase.from("wa_task_notifications").delete().eq("task_id", target.id);
+      const { error: delError } = await supabase.from("tasks").delete().eq("id", target.id);
+      if (delError) return JSON.stringify({ ok: false, error: delError.message });
+      return JSON.stringify({ ok: true, deleted_id: target.id, titulo: target.titulo });
+    }
     return JSON.stringify({ ok: false, error: `tool desconhecida: ${name}` });
   } catch (e) {
     return JSON.stringify({ ok: false, error: (e as any)?.message ?? String(e) });
@@ -660,9 +772,10 @@ async function composeAiReply(supabase: any, contactWa: string, userText: string
   const clean = userText.trim();
   const norm = normalizeText(clean);
   if (/^(opa|oi|ol[áa]|bom dia|boa tarde|boa noite|e ai|e aí|\.)\W*$/.test(norm)) {
-    return "Opa, tudo bem? Como posso te ajudar hoje? Pode pedir relatório, vendas, leads, tarefas, calls, financeiro, quiz ou Ads. Posso também criar tarefas pra você.";
+    return "Opa, tudo bem? Como posso te ajudar hoje? Pode pedir relatório, vendas, leads, tarefas, calls, financeiro, quiz ou Ads. Posso também criar e excluir tarefas pra você.";
   }
   const snapshot = await getAiSnapshot(supabase, contactWa, clean);
+  const history = await loadRecentAiMessages(supabase, contactWa).catch(() => []);
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) {
     const appReply = await composeAiReplyViaApp(clean, snapshot).catch((e) => {
@@ -675,8 +788,9 @@ async function composeAiReply(supabase: any, contactWa: string, userText: string
   }
   try {
     const messages: any[] = [
-      { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e informal profissional. Nunca invente número: use só contexto real. Quando o usuário pedir pra criar/anotar/adicionar uma tarefa, USE A TOOL create_task — não apenas diga que vai anotar. Confirme depois de executar." },
+      { role: "system", content: "Você é a IA da Multum no WhatsApp do número de notificações. Responda em PT-BR natural, curto e informal profissional. Nunca invente número: use só contexto real. Quando o usuário pedir pra criar/anotar/adicionar uma tarefa, USE A TOOL create_task — não apenas diga que vai anotar. Quando pedir pra excluir/apagar/deletar/remover tarefa, USE A TOOL delete_task. Se ele falar 'essa tarefa' ou 'a última tarefa', use o histórico recente para identificar o título; se estiver claro que é a última tarefa criada e não houver título, use delete_latest=true. Confirme depois de executar." },
       ...(snapshot ? [{ role: "system", content: snapshot }] : []),
+      ...history,
       { role: "user", content: clean },
     ];
     for (let i = 0; i < 3; i++) {
