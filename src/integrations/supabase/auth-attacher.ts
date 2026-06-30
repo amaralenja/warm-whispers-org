@@ -27,10 +27,8 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
   return fetch(input, { ...init, headers })
 }
 
-// Legacy no-op middleware. fetchWithSupabaseAuth (acima) já anexa o token via serverFns.fetch.
-// Mantido como passthrough porque o template do start.ts é regenerado com esse import.
-import { createMiddleware } from '@tanstack/react-start'
-export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
-  async ({ next }: { next: () => Promise<unknown> }) => next() as Promise<any>,
-) as any
+// Legacy export removido: fetchWithSupabaseAuth já anexa o token via serverFns.fetch.
+// Não recriar createMiddleware aqui — HMR trata o módulo como componente e quebra com
+// "Rendered more hooks than during the previous render".
+
 
