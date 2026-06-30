@@ -81,6 +81,7 @@ function WhatsAppPage() {
   const deleteFn = useServerFn(deleteWhatsappChannel);
   const regenFn = useServerFn(regenerateWhatsappToken);
   const setOpFn = useServerFn(setChannelOperacao);
+  const renameFn = useServerFn(renameWhatsappChannel);
   const registerWebhookFn = useServerFn(registerWhatsappWebhook);
 
   const isGeral = workspace.id === "all";
