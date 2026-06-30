@@ -77,6 +77,22 @@ function VendorPortal() {
   const stats = data;
   const maxSerie = Math.max(1, ...(stats?.serieDiaria?.map((d) => d.total) ?? [0]));
 
+  // meta no banco = meta DIÁRIA. Multiplica pelos dias do período.
+  const diasPeriodo = Math.max(
+    1,
+    Math.round(
+      (Date.UTC(+range.to.slice(0, 4), +range.to.slice(5, 7) - 1, +range.to.slice(8, 10)) -
+        Date.UTC(+range.from.slice(0, 4), +range.from.slice(5, 7) - 1, +range.from.slice(8, 10))) /
+        86400000,
+    ) + 1,
+  );
+  const metaDiaria = Number(stats?.meta ?? 0);
+  const metaPeriodo = metaDiaria * diasPeriodo;
+  const metaPct = metaPeriodo > 0 ? Math.min(100, ((stats?.faturamento ?? 0) / metaPeriodo) * 100) : 0;
+  const faltaPeriodo = Math.max(0, metaPeriodo - (stats?.faturamento ?? 0));
+  const labelMeta =
+    preset === "hoje" ? "Meta do dia" : preset === "7d" ? "Meta da semana" : preset === "30d" ? "Meta dos 30 dias" : "Meta do mês";
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card/40 px-6 py-4 backdrop-blur sticky top-0 z-10">
@@ -149,29 +165,32 @@ function VendorPortal() {
         </div>
 
         {/* Meta */}
-        {stats && stats.meta > 0 && (
+        {metaDiaria > 0 && (
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-400"><Target className="h-4 w-4" /></div>
-                <h3 className="text-sm font-semibold uppercase tracking-wider">Meta do mês</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wider">{labelMeta}</h3>
               </div>
               <div className="text-right">
-                <div className="font-display text-2xl font-bold tabular-nums">{stats.metaPct.toFixed(0)}%</div>
+                <div className="font-display text-2xl font-bold tabular-nums">{metaPct.toFixed(0)}%</div>
                 <div className="text-[0.65rem] text-muted-foreground">
-                  {BRL(stats.faturamento)} / {BRL(stats.meta)}
+                  {BRL(stats?.faturamento ?? 0)} / {BRL(metaPeriodo)}
+                </div>
+                <div className="text-[0.6rem] text-muted-foreground">
+                  {BRL(metaDiaria)}/dia × {diasPeriodo} {diasPeriodo === 1 ? "dia" : "dias"}
                 </div>
               </div>
             </div>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-secondary/40">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all"
-                style={{ width: `${Math.min(100, stats.metaPct)}%` }}
+                style={{ width: `${metaPct}%` }}
               />
             </div>
             <div className="mt-2 text-xs text-muted-foreground">
-              {stats.faltaMeta > 0
-                ? <>Faltam <span className="font-semibold text-emerald-400">{BRL(stats.faltaMeta)}</span> pra bater a meta. Bora!</>
+              {faltaPeriodo > 0
+                ? <>Faltam <span className="font-semibold text-emerald-400">{BRL(faltaPeriodo)}</span> pra bater a meta. Bora!</>
                 : <span className="font-semibold text-emerald-400">Meta batida! 🎉</span>}
             </div>
           </div>
