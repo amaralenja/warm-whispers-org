@@ -40,10 +40,12 @@ export type EvoChannel = {
   token: string;
   metadata: Record<string, any> | null;
   operacaoId: string | null;
+  kind: "chat" | "notification";
   created_at: string;
   updated_at: string;
   connectUrl: string;
 };
+
 
 const APP_SOURCE = "lovable-crm";
 const AUTO_IMPORT_WHATSAPP_NAMES = ["amaral"];
@@ -119,6 +121,8 @@ function withConnectUrl(ch: any): EvoChannel {
     token: normalized.token,
     metadata: meta,
     operacaoId: (meta && typeof meta.operacao_id === "string") ? meta.operacao_id : null,
+    kind: (ch?.kind === "notification" || (meta && meta.kind === "notification")) ? "notification" : "chat",
+
     created_at: normalized.created_at,
     updated_at: normalized.updated_at,
     connectUrl: normalized.token ? `${EVOHUB_CONNECT_BASE}/connect/${normalized.token}` : "",
@@ -158,8 +162,9 @@ async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | 
     type: String(normalized.type ?? "whatsapp"),
     status: String(normalized.status ?? ""),
     token: String(normalized.token ?? ""),
-    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null },
+    metadata: { ...meta, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null, kind: meta.kind ?? "chat" },
     operacao_id: finalOperacao,
+    kind: (meta.kind === "notification" ? "notification" : "chat"),
     phone_number_id: info.phoneNumberId,
     display_phone_number: info.displayPhoneNumber,
     verified_name: info.verifiedName,
@@ -170,6 +175,7 @@ async function upsertLocalChannel(supabase: any, ch: any, operacaoId?: string | 
     updated_at: normalized.updated_at ?? null,
     synced_at: new Date().toISOString(),
   }, { onConflict: "id" });
+
 
   if (error) console.warn("[wa_channels] upsert failed", error.message);
   return { ...normalized, metadata: { ...meta, app_source: APP_SOURCE, operacao_id: finalOperacao, meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? null } };
@@ -277,9 +283,10 @@ export const syncWhatsappChannelByName = createServerFn({ method: "POST" })
 
 export const createWhatsappChannel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { name: string; operacaoId: string }) => ({
+  .inputValidator((d: { name: string; operacaoId: string; kind?: "chat" | "notification" }) => ({
     name: String(d?.name ?? "").trim(),
     operacaoId: String(d?.operacaoId ?? "").trim(),
+    kind: d?.kind === "notification" ? "notification" : "chat" as "chat" | "notification",
   }))
   .handler(async ({ context, data }) => {
     if (!data.name) throw new Error("Nome obrigatório");
@@ -289,12 +296,13 @@ export const createWhatsappChannel = createServerFn({ method: "POST" })
       body: JSON.stringify({
         name: data.name,
         type: "whatsapp",
-        metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE },
+        metadata: { operacao_id: data.operacaoId, app_source: APP_SOURCE, kind: data.kind },
       }),
     });
-    await upsertLocalChannel(context.supabase, ch, data.operacaoId);
-    return withConnectUrl(ch);
+    await upsertLocalChannel(context.supabase, { ...ch, metadata: { ...(ch?.metadata ?? {}), kind: data.kind } }, data.operacaoId);
+    return withConnectUrl({ ...ch, kind: data.kind });
   });
+
 
 
 export const setChannelOperacao = createServerFn({ method: "POST" })

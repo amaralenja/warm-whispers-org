@@ -78,6 +78,8 @@ function WhatsAppPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [newOp, setNewOp] = useState<string>(isGeral ? "" : workspace.id);
+  const [tab, setTab] = useState<"chat" | "notification">("chat");
+
   const [justCreated, setJustCreated] = useState<EvoChannel | null>(null);
   const [quotaError, setQuotaError] = useState(false);
 
@@ -88,7 +90,8 @@ function WhatsAppPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (vars: { name: string; operacaoId: string }) => createFn({ data: vars }),
+    mutationFn: (vars: { name: string; operacaoId: string; kind: "chat" | "notification" }) => createFn({ data: vars }),
+
     onSuccess: (ch) => {
       toast.success("Conexão criada!");
       setName("");
@@ -146,9 +149,11 @@ function WhatsAppPage() {
   });
 
   const allChannels = (data ?? []) as EvoChannel[];
-  const channels = isGeral
+  const scoped = isGeral
     ? allChannels
     : allChannels.filter((c) => c.operacaoId === workspace.id);
+  const channels = scoped.filter((c) => (c.kind ?? "chat") === tab);
+
 
   const connectedCount = channels.filter((c) => (c.status || "").toLowerCase() === "active").length;
   const pendingCount = channels.filter((c) => {
@@ -273,7 +278,7 @@ function WhatsAppPage() {
                       onClick={() => {
                         if (!name.trim()) return toast.error("Informe o nome da conexão");
                         if (!newOp) return toast.error("Selecione uma operação");
-                        createMut.mutate({ name: name.trim(), operacaoId: newOp });
+                        createMut.mutate({ name: name.trim(), operacaoId: newOp, kind: tab });
                       }}
                       disabled={createMut.isPending}
                       className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
@@ -325,6 +330,30 @@ function WhatsAppPage() {
             }
           />
         )}
+
+        {/* Tabs: Atendimento vs Notificações */}
+        <div className="flex items-center gap-2 border-b border-border">
+          {([
+            { id: "chat" as const, label: "Atendimento" },
+            { id: "notification" as const, label: "Notificações" },
+          ]).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                tab === t.id
+                  ? "border-emerald-500 text-emerald-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "notification" && <TemplatesPanel />}
+
+
 
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -594,6 +623,97 @@ function ChannelCard({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TemplatesPanel() {
+  const qc = useQueryClient();
+  const { data: templates = [], isLoading } = useQuery({
+    queryKey: ["wa_templates"],
+    queryFn: async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase.from("wa_templates" as any).select("*").order("created_at");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const [editing, setEditing] = useState<any | null>(null);
+  const [conteudo, setConteudo] = useState("");
+
+  const saveMut = useMutation({
+    mutationFn: async (vars: { id: string; conteudo: string }) => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await supabase.from("wa_templates" as any).update({ conteudo: vars.conteudo }).eq("id", vars.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Template salvo");
+      qc.invalidateQueries({ queryKey: ["wa_templates"] });
+      setEditing(null);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
+  });
+
+  return (
+    <div className="rounded-2xl border border-border bg-card/40 p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Templates de notificação</h3>
+          <p className="text-xs text-muted-foreground">Mensagens pré-aprovadas usadas pelos gatilhos automáticos.</p>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground"><Loader2 className="h-4 w-4 inline animate-spin mr-2" /> Carregando…</div>
+      ) : templates.length === 0 ? (
+        <div className="text-sm text-muted-foreground">Nenhum template ainda.</div>
+      ) : (
+        <div className="grid gap-3">
+          {templates.map((t) => (
+            <div key={t.id} className="rounded-xl border border-border bg-background/40 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground">{t.nome}</div>
+                  {t.descricao && <div className="text-xs text-muted-foreground mt-0.5">{t.descricao}</div>}
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">{t.slug}</span>
+                    {(t.vars ?? []).map((v: string) => (
+                      <span key={v} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono">{`{{${v}}}`}</span>
+                    ))}
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => { setEditing(t); setConteudo(t.conteudo); }}>Editar</Button>
+              </div>
+              <pre className="mt-3 whitespace-pre-wrap text-sm text-foreground/90 bg-background/60 rounded-lg p-3 border border-border">{t.conteudo}</pre>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar template {editing?.nome}</DialogTitle>
+          </DialogHeader>
+          <textarea
+            className="w-full min-h-[180px] rounded-lg border border-border bg-background p-3 text-sm font-mono"
+            value={conteudo}
+            onChange={(e) => setConteudo(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Use {`{{nome}}`} e {`{{hora}}`} para inserir as variáveis disponíveis.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button
+              className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-semibold"
+              onClick={() => editing && saveMut.mutate({ id: editing.id, conteudo })}
+              disabled={saveMut.isPending}
+            >
+              {saveMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
