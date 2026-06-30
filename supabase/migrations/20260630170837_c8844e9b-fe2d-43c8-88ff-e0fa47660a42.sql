@@ -1,0 +1,1 @@
+UPDATE public.experts SET meta_nivel1 = 50000, meta_nivel2 = 60000, meta_nivel3 = 70000 WHERE nome = 'Jessica';
