@@ -267,10 +267,11 @@ export function VendorPermissionsDialog({
                       <div className="space-y-2">
                         {list.map((c) => {
                           const checked = channelIds.includes(c.id);
+                          const s = shareForChannel(c.id);
                           return (
-                            <label
+                            <div
                               key={c.id}
-                              className="flex cursor-pointer items-center gap-3 rounded-md p-1 hover:bg-accent/5"
+                              className="flex items-center gap-3 rounded-md p-1 hover:bg-accent/5"
                             >
                               <Checkbox
                                 checked={checked}
@@ -288,9 +289,57 @@ export function VendorPermissionsDialog({
                                   {c.display_phone_number ?? "—"}
                                 </div>
                               </div>
-                            </label>
+                              {checked && (
+                                <>
+                                  <span
+                                    className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[0.65rem] font-bold tabular-nums text-emerald-400"
+                                    title={`Você recebe ${s.pct.toFixed(1)}% dos leads deste canal (${s.total} vendedores no pool)`}
+                                  >
+                                    {s.pct.toFixed(0)}%
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => balanceChannel(c.id)}
+                                    title="Distribuir igualmente entre todos os vendedores deste canal"
+                                    className="rounded p-1 text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                                  >
+                                    <Scale className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Peso de distribuição */}
+            <section className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Scale className="h-4 w-4 text-emerald-400" />
+                    Peso na randomização
+                  </h4>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Quanto maior o peso, mais leads novos caem nesse vendedor. Todos iguais (1) = divisão igual entre os do canal.
+                  </p>
+                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={leadWeight}
+                  onChange={(e) => setLeadWeight(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-24 text-center font-bold tabular-nums"
+                />
+              </div>
+            </section>
+
                       </div>
                     </div>
                   ))}
