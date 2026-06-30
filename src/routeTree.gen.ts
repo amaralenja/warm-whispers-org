@@ -34,6 +34,7 @@ import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicHooksTaskDueCheckRouteImport } from './routes/api/public/hooks/task-due-check'
 import { Route as ApiPublicHooksSendCallAnalyticsRouteImport } from './routes/api/public/hooks/send-call-analytics'
 import { Route as ApiPublicHooksSendAdsAnalyticsRouteImport } from './routes/api/public/hooks/send-ads-analytics'
+import { Route as ApiPublicHooksCallsTickRouteImport } from './routes/api/public/hooks/calls-tick'
 
 const RankingTvRoute = RankingTvRouteImport.update({
   id: '/ranking-tv',
@@ -164,6 +165,11 @@ const ApiPublicHooksSendAdsAnalyticsRoute =
     path: '/api/public/hooks/send-ads-analytics',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCallsTickRoute = ApiPublicHooksCallsTickRouteImport.update({
+  id: '/api/public/hooks/calls-tick',
+  path: '/api/public/hooks/calls-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
@@ -268,6 +277,7 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows/'
+    | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows'
+    | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/_authenticated/flows/$flowId'
     | '/api/public/ig-image'
     | '/_authenticated/flows/'
+    | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
@@ -333,6 +345,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   RankingTvRoute: typeof RankingTvRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
+  ApiPublicHooksCallsTickRoute: typeof ApiPublicHooksCallsTickRoute
   ApiPublicHooksSendAdsAnalyticsRoute: typeof ApiPublicHooksSendAdsAnalyticsRoute
   ApiPublicHooksSendCallAnalyticsRoute: typeof ApiPublicHooksSendCallAnalyticsRoute
   ApiPublicHooksTaskDueCheckRoute: typeof ApiPublicHooksTaskDueCheckRoute
@@ -516,6 +529,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSendAdsAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/calls-tick': {
+      id: '/api/public/hooks/calls-tick'
+      path: '/api/public/hooks/calls-tick'
+      fullPath: '/api/public/hooks/calls-tick'
+      preLoaderRoute: typeof ApiPublicHooksCallsTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -566,6 +586,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   RankingTvRoute: RankingTvRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
+  ApiPublicHooksCallsTickRoute: ApiPublicHooksCallsTickRoute,
   ApiPublicHooksSendAdsAnalyticsRoute: ApiPublicHooksSendAdsAnalyticsRoute,
   ApiPublicHooksSendCallAnalyticsRoute: ApiPublicHooksSendCallAnalyticsRoute,
   ApiPublicHooksTaskDueCheckRoute: ApiPublicHooksTaskDueCheckRoute,
