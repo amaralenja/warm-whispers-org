@@ -1088,11 +1088,12 @@ function IgRow({ username }: { username: string }) {
   // Auto-verifica via fila global se ainda desconhecido (lead novo do quiz)
   useEffect(() => {
     if (status !== "unknown") return;
+    if (!isValidHandle) return;
     let cancelled = false;
     igEnqueue(async () => { if (!cancelled) await runVerify(); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, status]);
+  }, [key, status, isValidHandle]);
 
   async function verify(e: React.MouseEvent) {
     e.stopPropagation();
