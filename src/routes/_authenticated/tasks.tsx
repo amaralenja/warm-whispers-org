@@ -182,7 +182,11 @@ function TasksPage() {
         .eq("board_id", activeBoardId!)
         .order("ordem");
       if (error) throw error;
-      return (data ?? []) as unknown as Task[];
+      return ((data ?? []) as any[]).map((t) => ({
+        ...t,
+        labels: normalizeLabels(t.labels),
+        checklist: normalizeChecklist(t.checklist),
+      })) as Task[];
     },
   });
 
