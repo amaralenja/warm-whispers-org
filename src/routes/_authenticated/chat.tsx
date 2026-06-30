@@ -674,9 +674,6 @@ function ChatPage() {
                       {sendError}
                     </div>
                   )}
-                  <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
-                    <Smile className="h-5 w-5" />
-                  </Button>
                   {draft.trim() ? (
                     <Button
                       size="icon"
