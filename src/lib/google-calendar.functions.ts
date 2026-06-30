@@ -79,7 +79,7 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function gcal(path: string, init?: RequestInit) {
+export async function gcal(path: string, init?: RequestInit) {
   const calId = process.env.GOOGLE_CALENDAR_ID;
   if (!calId) throw new Error("GOOGLE_CALENDAR_ID missing");
   const token = await getAccessToken();
