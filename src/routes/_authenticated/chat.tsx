@@ -217,11 +217,17 @@ function ChatPage() {
     refetchOnWindowFocus: true,
   });
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change or conversation opens
+  const messagesLen = ((messages as unknown as Msg[]) ?? []).length;
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, activeId]);
+    if (!el) return;
+    // Use rAF para garantir que rodou depois do paint (senão scrollHeight ainda é antigo)
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [messagesLen, activeId]);
 
   // Mark read when opening a conv (depend só em activeId + unread_count pra não loopar com a referência recalculada de `active`)
   const unreadForActive = active?.unread_count ?? 0;
