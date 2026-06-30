@@ -697,6 +697,7 @@ function TaskDialog({
       checklist: checklists,
       column_id: columnId,
     };
+    let alreadyToasted = false;
     if (isNew) {
       const { data: inserted, error } = await supabase
         .from("tasks" as any)
@@ -712,11 +713,14 @@ function TaskDialog({
           const result = await notifyTaskCreatedFn({ data: { taskId: (inserted as any).id } });
           if ((result as any)?.sent > 0) {
             toast.success(`Notificação enviada pra ${(result as any).sent} responsável(is)`);
+            alreadyToasted = true;
           } else if ((result as any)?.reason) {
             toast.warning(`Tarefa criada, mas sem disparo: ${(result as any).reason}`);
+            alreadyToasted = true;
           }
         } catch (e: any) {
           toast.error(`Tarefa criada, mas o WhatsApp não disparou: ${e?.message ?? "erro"}`);
+          alreadyToasted = true;
         }
       }
     } else {
@@ -727,7 +731,7 @@ function TaskDialog({
       }
     }
     setSaving(false);
-    toast.success("Salvo");
+    if (!alreadyToasted) toast.success("Salvo");
     onSaved();
   }
 
