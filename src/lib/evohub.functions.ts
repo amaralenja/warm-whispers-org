@@ -386,7 +386,7 @@ export const getWhatsappQuality = createServerFn({ method: "POST" })
       "throughput",
     ].join(",");
     const res = await fetch(
-      `${EVOHUB_BASE}/meta/v23.0/${pnid}?fields=${fields}`,
+      `${EVOHUB_BASE}/meta/${pnid}?fields=${fields}`,
       { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
     );
     const text = await res.text();
