@@ -629,14 +629,29 @@ function TaskDialog({
   const [titulo, setTitulo] = useState(task.titulo);
   const [descricao, setDescricao] = useState(task.descricao ?? "");
   const [prioridade, setPrioridade] = useState(task.prioridade);
-  const [prazo, setPrazo] = useState(task.prazo ? task.prazo.slice(0, 10) : "");
+  const [prazo, setPrazo] = useState<Date | undefined>(task.prazo ? new Date(task.prazo) : undefined);
   const [assignees, setAssignees] = useState<string[]>(task.assignee_ids);
-  const [labels, setLabels] = useState<string[]>(task.labels);
+  const [labels, setLabels] = useState<{ texto: string; cor: string }[]>(task.labels);
   const [labelInput, setLabelInput] = useState("");
+  const [labelColor, setLabelColor] = useState(LABEL_COLORS[5].value);
   const [columnId, setColumnId] = useState(task.column_id);
-  const [checklist, setChecklist] = useState(task.checklist);
-  const [newItem, setNewItem] = useState("");
+  const [checklists, setChecklists] = useState<ChecklistGroup[]>(
+    task.checklist.length > 0 ? task.checklist : [],
+  );
   const [saving, setSaving] = useState(false);
+
+  function addChecklist() {
+    setChecklists([
+      ...checklists,
+      { id: crypto.randomUUID(), titulo: `Checklist ${checklists.length + 1}`, items: [] },
+    ]);
+  }
+  function updateChecklist(id: string, patch: Partial<ChecklistGroup>) {
+    setChecklists(checklists.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+  function removeChecklist(id: string) {
+    setChecklists(checklists.filter((c) => c.id !== id));
+  }
 
   async function save() {
     if (!titulo.trim()) return toast.error("Título obrigatório");
@@ -645,10 +660,10 @@ function TaskDialog({
       titulo: titulo.trim(),
       descricao,
       prioridade,
-      prazo: prazo ? new Date(prazo + "T12:00:00").toISOString() : null,
+      prazo: prazo ? prazo.toISOString() : null,
       assignee_ids: assignees,
       labels,
-      checklist,
+      checklist: checklists,
       column_id: columnId,
     };
     if (isNew) {
@@ -661,13 +676,11 @@ function TaskDialog({
         setSaving(false);
         return toast.error(error.message);
       }
-      // Dispara notificação WhatsApp pros assignees (fire & forget)
       if (inserted && assignees.length > 0) {
         import("@/lib/task-notifications.functions")
           .then(({ notifyTaskCreated }) => notifyTaskCreated({ data: { taskId: (inserted as any).id } }))
           .catch(() => {});
       }
-
     } else {
       const { error } = await supabase.from("tasks" as any).update(payload).eq("id", task.id);
       if (error) {
@@ -691,20 +704,39 @@ function TaskDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto scrollbar-fancy">
         <DialogHeader>
-          <DialogTitle>{isNew ? "Nova Tarefa" : "Editar Tarefa"}</DialogTitle>
+          <DialogTitle className="text-xl">{isNew ? "✨ Nova Tarefa" : "Editar Tarefa"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <Label>Título</Label>
-            <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} autoFocus />
+            <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+              Título da tarefa
+            </Label>
+            <Input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              autoFocus
+              placeholder="Ex.: Gravar vídeo de apresentação"
+              className="text-base"
+            />
           </div>
+
           <div>
-            <Label>Descrição</Label>
-            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
+            <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+              Descrição
+            </Label>
+            <Textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              rows={3}
+              placeholder="Detalhe o que precisa ser feito, links úteis, contexto, critérios de aceite…"
+            />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <Label>Coluna</Label>
+              <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+                Coluna
+              </Label>
               <Select value={columnId} onValueChange={setColumnId}>
                 <SelectTrigger>
                   <SelectValue />
@@ -719,27 +751,60 @@ function TaskDialog({
               </Select>
             </div>
             <div>
-              <Label>Prioridade</Label>
+              <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+                Prioridade
+              </Label>
               <Select value={prioridade} onValueChange={(v) => setPrioridade(v as any)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="baixa">Baixa</SelectItem>
-                  <SelectItem value="media">Média</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem>
-                  <SelectItem value="urgente">Urgente</SelectItem>
+                  <SelectItem value="baixa">🟢 Baixa</SelectItem>
+                  <SelectItem value="media">🔵 Média</SelectItem>
+                  <SelectItem value="alta">🟠 Alta</SelectItem>
+                  <SelectItem value="urgente">🔴 Urgente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Prazo</Label>
-              <Input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
+              <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+                Prazo
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`w-full justify-start text-left font-normal ${!prazo && "text-muted-foreground"}`}
+                  >
+                    <CalIcon className="mr-2 h-4 w-4" />
+                    {prazo
+                      ? prazo.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+                      : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={prazo} onSelect={setPrazo} initialFocus />
+                  {prazo && (
+                    <div className="border-t border-border p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setPrazo(undefined)}
+                      >
+                        Limpar data
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
           <div>
-            <Label className="mb-2 block">Responsáveis</Label>
+            <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">
+              Responsáveis
+            </Label>
             <div className="flex flex-wrap gap-2">
               {members.map((m) => {
                 const sel = assignees.includes(m.id);
@@ -773,70 +838,160 @@ function TaskDialog({
           </div>
 
           <div>
-            <Label className="mb-2 block">Labels</Label>
+            <Label className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+              Labels
+            </Label>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Use labels coloridas pra categorizar (ex.: <em>Marketing</em>, <em>Bug</em>, <em>Urgente</em>)
+              e filtrar rapidamente no quadro.
+            </p>
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {labels.map((l) => (
-                <Badge key={l} variant="secondary" className="gap-1">
-                  {l}
-                  <button onClick={() => setLabels(labels.filter((x) => x !== l))}>
+              {labels.map((l, i) => (
+                <span
+                  key={`${l.texto}-${i}`}
+                  className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
+                  style={{ background: `${l.cor}33`, color: l.cor, border: `1px solid ${l.cor}66` }}
+                >
+                  {l.texto}
+                  <button onClick={() => setLabels(labels.filter((_, idx) => idx !== i))}>
                     <X className="h-3 w-3" />
                   </button>
-                </Badge>
+                </span>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1">
+                {LABEL_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setLabelColor(c.value)}
+                    title={c.name}
+                    className={`h-5 w-5 rounded-full transition ${
+                      labelColor === c.value ? "ring-2 ring-offset-2 ring-offset-background ring-foreground" : ""
+                    }`}
+                    style={{ background: c.value }}
+                  />
+                ))}
+              </div>
               <Input
-                placeholder="Adicionar label..."
+                placeholder="Nome da label e Enter…"
                 value={labelInput}
                 onChange={(e) => setLabelInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && labelInput.trim()) {
-                    setLabels([...labels, labelInput.trim()]);
+                    e.preventDefault();
+                    setLabels([...labels, { texto: labelInput.trim(), cor: labelColor }]);
                     setLabelInput("");
                   }
                 }}
+                className="flex-1 min-w-[180px]"
               />
             </div>
           </div>
 
           <div>
-            <Label className="mb-2 block">Checklist</Label>
-            <div className="space-y-1.5">
-              {checklist.map((c) => (
-                <div key={c.id} className="flex items-center gap-2 rounded bg-muted/40 px-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={c.done}
-                    onChange={(e) =>
-                      setChecklist(
-                        checklist.map((x) => (x.id === c.id ? { ...x, done: e.target.checked } : x)),
-                      )
-                    }
-                  />
-                  <span className={`flex-1 text-sm ${c.done ? "line-through text-muted-foreground" : ""}`}>
-                    {c.texto}
-                  </span>
-                  <button onClick={() => setChecklist(checklist.filter((x) => x.id !== c.id))}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <Label className="block text-xs uppercase tracking-wide text-muted-foreground">
+                  Checklists
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Quebre a tarefa em sub-itens. Pode criar múltiplos checklists (ex.: <em>Pré-produção</em>,{" "}
+                  <em>Edição</em>).
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addChecklist}>
+                <Plus className="mr-1 h-4 w-4" /> Checklist
+              </Button>
             </div>
-            <div className="mt-2 flex gap-2">
-              <Input
-                placeholder="Novo item..."
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newItem.trim()) {
-                    setChecklist([
-                      ...checklist,
-                      { id: crypto.randomUUID(), texto: newItem.trim(), done: false },
-                    ]);
-                    setNewItem("");
-                  }
-                }}
-              />
+            <div className="space-y-3">
+              {checklists.map((group) => {
+                const done = group.items.filter((i) => i.done).length;
+                const pct = group.items.length ? Math.round((done / group.items.length) * 100) : 0;
+                return (
+                  <div key={group.id} className="rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-accent" />
+                      <Input
+                        value={group.titulo}
+                        onChange={(e) => updateChecklist(group.id, { titulo: e.target.value })}
+                        className="h-7 flex-1 border-0 bg-transparent px-1 text-sm font-semibold focus-visible:ring-1"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {done}/{group.items.length}
+                      </span>
+                      <button onClick={() => removeChecklist(group.id)} title="Remover checklist">
+                        <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                    {group.items.length > 0 && (
+                      <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-accent transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      {group.items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2 rounded px-1 py-0.5">
+                          <input
+                            type="checkbox"
+                            checked={item.done}
+                            onChange={(e) =>
+                              updateChecklist(group.id, {
+                                items: group.items.map((x) =>
+                                  x.id === item.id ? { ...x, done: e.target.checked } : x,
+                                ),
+                              })
+                            }
+                          />
+                          <span
+                            className={`flex-1 text-sm ${
+                              item.done ? "line-through text-muted-foreground" : ""
+                            }`}
+                          >
+                            {item.texto}
+                          </span>
+                          <button
+                            onClick={() =>
+                              updateChecklist(group.id, {
+                                items: group.items.filter((x) => x.id !== item.id),
+                              })
+                            }
+                          >
+                            <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <Input
+                      placeholder="Adicionar item e Enter…"
+                      className="mt-2 h-8 text-sm"
+                      onKeyDown={(e) => {
+                        const v = (e.target as HTMLInputElement).value.trim();
+                        if (e.key === "Enter" && v) {
+                          e.preventDefault();
+                          updateChecklist(group.id, {
+                            items: [...group.items, { id: crypto.randomUUID(), texto: v, done: false }],
+                          });
+                          (e.target as HTMLInputElement).value = "";
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              })}
+              {checklists.length === 0 && (
+                <button
+                  type="button"
+                  onClick={addChecklist}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition hover:border-accent hover:text-accent"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar primeiro checklist
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -854,7 +1009,7 @@ function TaskDialog({
             </Button>
             <Button onClick={save} disabled={saving}>
               <Check className="mr-1 h-4 w-4" />
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : isNew ? "Criar tarefa" : "Salvar"}
             </Button>
           </div>
         </DialogFooter>
@@ -862,6 +1017,7 @@ function TaskDialog({
     </Dialog>
   );
 }
+
 
 function MembersDialog({
   members,
