@@ -149,9 +149,11 @@ function WhatsAppPage() {
   });
 
   const allChannels = (data ?? []) as EvoChannel[];
-  const channels = isGeral
+  const scoped = isGeral
     ? allChannels
     : allChannels.filter((c) => c.operacaoId === workspace.id);
+  const channels = scoped.filter((c) => (c.kind ?? "chat") === tab);
+
 
   const connectedCount = channels.filter((c) => (c.status || "").toLowerCase() === "active").length;
   const pendingCount = channels.filter((c) => {
