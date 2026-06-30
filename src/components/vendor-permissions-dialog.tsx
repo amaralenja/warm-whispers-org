@@ -113,16 +113,31 @@ export function VendorPermissionsDialog({
     };
   }, [open, vendorId]);
 
+  const visibleChannels = useMemo(
+    () => channels.filter((c) => c.operacao_id && workspaceIds.includes(c.operacao_id)),
+    [channels, workspaceIds],
+  );
+
   const groupedChannels = useMemo(() => {
     const m = new Map<string, Channel[]>();
-    for (const c of channels) {
+    for (const c of visibleChannels) {
       const k = c.operacao_id || "Outros";
       const arr = m.get(k) ?? [];
       arr.push(c);
       m.set(k, arr);
     }
     return Array.from(m.entries());
-  }, [channels]);
+  }, [visibleChannels]);
+
+  // Sempre que um workspace é desmarcado, remove canais daquele workspace da seleção
+  useEffect(() => {
+    const allowed = new Set(visibleChannels.map((c) => c.id));
+    setChannelIds((prev) => {
+      const next = prev.filter((id) => allowed.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [visibleChannels]);
+
 
   function setLeaf(groupKey: string, leafKey: string, v: boolean) {
     setPermissoes((prev) => {
