@@ -96,7 +96,7 @@ async function findChannel(channelId: string, supabase?: any) {
         ? String(local.metadata.meta_connection.phone_number_id)
         : undefined;
     if (localToken && localPhoneNumberId) {
-      return { token: localToken, phoneNumberId: localPhoneNumberId, raw: local };
+      return { id: channelId, token: localToken, phoneNumberId: localPhoneNumberId, raw: local };
     }
   }
 
@@ -109,7 +109,7 @@ async function findChannel(channelId: string, supabase?: any) {
   if (!ch) throw new Error("Canal não encontrado");
   const metaConnection = ch?.meta_connection ?? ch?.metadata?.meta_connection ?? null;
   const phoneNumberId = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id ?? ch?.phone_number_id;
-  return { token: ch.token as string, phoneNumberId: phoneNumberId as string | undefined, raw: ch };
+  return { id: channelId, token: ch.token as string, phoneNumberId: phoneNumberId as string | undefined, raw: ch };
 }
 
 async function persistWorkingToken(supabase: any, phoneNumberId: string, token: string, channelId?: string) {
@@ -326,7 +326,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
         method: "POST",
         body: JSON.stringify(body),
-      });
+      }, context.supabase);
 
       const waMsgId = resp?.messages?.[0]?.id ?? null;
       await context.supabase
