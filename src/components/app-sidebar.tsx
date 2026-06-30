@@ -50,14 +50,11 @@ const mainItems: Item[] = [
   { title: "Relatórios", url: "/relatorios", icon: LineChart },
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
-const mainItems: Item[] = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Relatórios", url: "/relatorios", icon: LineChart },
-  { title: "Ranking", url: "/ranking", icon: Trophy },
-  { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
   { title: "SOPs", url: "/sops", icon: BookOpenText },
 ];
+
+const highTicketItems_unused_placeholder: Item[] = [];
 
 const operacaoX1Items: Item[] = [
   { title: "CRM Leads X1", url: "/crm", icon: Users },
