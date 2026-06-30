@@ -199,12 +199,16 @@ function mergeLocalIntoRemote(ch: any, local?: any) {
   if (!local) return ch;
   const normalized = normalizeChannel(ch);
   const meta = normalizeMetadata(normalized.metadata) ?? {};
+  const localMeta = normalizeMetadata(local.metadata) ?? {};
+  const kind = local.kind === "notification" || localMeta.kind === "notification" ? "notification" : meta.kind === "notification" ? "notification" : "chat";
   return {
     ...normalized,
+    kind,
     metadata: {
       ...meta,
-      ...(normalizeMetadata(local.metadata) ?? {}),
+      ...localMeta,
       app_source: APP_SOURCE,
+      kind,
       operacao_id: local.operacao_id ?? meta.operacao_id ?? null,
       meta_connection: getMetaConnection(normalized) ?? meta.meta_connection ?? local.metadata?.meta_connection ?? null,
     },
