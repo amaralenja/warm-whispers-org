@@ -171,6 +171,9 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
       }
       return null;
     }
+    function isMetaValidationError(msg: string): boolean {
+      return /OAuthException|Invalid parameter|error_subcode|2388299|vari[áa]veis n[ãa]o podem estar no in[íi]cio|par[âa]metros iniciais/i.test(msg);
+    }
 
     let result = await submit("UTILITY");
     let usedCategory = "UTILITY";
@@ -181,7 +184,7 @@ export const submitWhatsappTemplate = createServerFn({ method: "POST" })
       // Template já existe no Meta com outra categoria, reenviar com a mesma
       result = await submit(existingCat);
       usedCategory = existingCat;
-    } else if (!result.ok && (/INTERNAL/i.test(errMsg) || result.status >= 500) && !existingCat) {
+    } else if (!result.ok && (/INTERNAL/i.test(errMsg) || result.status >= 500) && !existingCat && !isMetaValidationError(errMsg)) {
       // Falha genérica do provider, tenta MARKETING como fallback
       result = await submit("MARKETING");
       usedCategory = "MARKETING";
