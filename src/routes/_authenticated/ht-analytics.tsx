@@ -89,6 +89,15 @@ function HTAnalytics() {
   const [htLeads, setHtLeads] = useState<any[]>([]);
   const [reunioes, setReunioes] = useState<any[]>([]);
 
+  // Filtros da lista de leads
+  const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
+  const [flScore, setFlScore] = useState<Set<string>>(new Set());
+  const [flCaixa, setFlCaixa] = useState<Set<string>>(new Set());
+  const [flUtm, setFlUtm] = useState<Set<string>>(new Set());
+  const [flSearch, setFlSearch] = useState("");
+  const [listLimit, setListLimit] = useState(50);
+
+
   useEffect(() => {
     let cancel = false;
     (async () => {
