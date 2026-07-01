@@ -468,7 +468,7 @@ function TasksPage() {
         <MembersDialog
           members={members}
           onClose={() => setShowMembers(false)}
-          onChanged={() => qc.invalidateQueries({ queryKey: ["team_members"] })}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["team_members_and_vendors"] })}
         />
       )}
     </div>
