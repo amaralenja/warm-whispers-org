@@ -641,3 +641,237 @@ function EmptyState({ label }: { label: string }) {
     </div>
   );
 }
+
+type LeadsListProps = {
+  leads: QLead[];
+  flStatus: Set<"finalizado" | "abandono">;
+  setFlStatus: React.Dispatch<React.SetStateAction<Set<"finalizado" | "abandono">>>;
+  flScore: Set<string>;
+  setFlScore: React.Dispatch<React.SetStateAction<Set<string>>>;
+  flCaixa: Set<string>;
+  setFlCaixa: React.Dispatch<React.SetStateAction<Set<string>>>;
+  flUtm: Set<string>;
+  setFlUtm: React.Dispatch<React.SetStateAction<Set<string>>>;
+  flSearch: string;
+  setFlSearch: (v: string) => void;
+  listLimit: number;
+  setListLimit: React.Dispatch<React.SetStateAction<number>>;
+};
+
+function toggleInSet<T>(set: Set<T>, val: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(val)) next.delete(val); else next.add(val);
+  return next;
+}
+
+function LeadsListSection(props: LeadsListProps) {
+  const { leads, flStatus, setFlStatus, flScore, setFlScore, flCaixa, setFlCaixa,
+    flUtm, setFlUtm, flSearch, setFlSearch, listLimit, setListLimit } = props;
+
+  const utmOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of leads) {
+      const u = (l.utm_source ?? "").trim();
+      if (u) s.add(u);
+    }
+    return Array.from(s).sort();
+  }, [leads]);
+
+  const filtered = useMemo(() => {
+    const scoreLetras = new Set<string>();
+    for (const g of SCORE_GROUPS) if (flScore.has(g.id)) g.letras.forEach((x) => scoreLetras.add(x));
+    const q = flSearch.trim().toLowerCase();
+
+    return leads.filter((l) => {
+      const fin = isFinalizado(l);
+      if (flStatus.size > 0) {
+        const key: "finalizado" | "abandono" = fin ? "finalizado" : "abandono";
+        if (!flStatus.has(key)) return false;
+      }
+      const letra = (l.caixa_letra ?? "").toUpperCase();
+      if (scoreLetras.size > 0 && !scoreLetras.has(letra)) return false;
+      if (flCaixa.size > 0 && !flCaixa.has(letra)) return false;
+      if (flUtm.size > 0) {
+        const u = (l.utm_source ?? "").trim();
+        if (!flUtm.has(u)) return false;
+      }
+      if (q) {
+        const hay = `${l.nome ?? ""} ${l.email ?? ""} ${l.whatsapp ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    }).sort((a, b) => (b.data_criacao ?? "").localeCompare(a.data_criacao ?? ""));
+  }, [leads, flStatus, flScore, flCaixa, flUtm, flSearch]);
+
+  const total = filtered.length;
+  const shown = filtered.slice(0, listLimit);
+  const activeCount = flStatus.size + flScore.size + flCaixa.size + flUtm.size + (flSearch ? 1 : 0);
+
+  return (
+    <section>
+      <SectionTitle overline="Bloco 05" title="Lista de Leads" />
+      <Card className="border-border/50 bg-card/50 backdrop-blur">
+        <CardContent className="p-5 space-y-5">
+          {/* Filtros */}
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <FilterGroup label="Status">
+                <Chip active={flStatus.has("finalizado")} onClick={() => setFlStatus((s) => toggleInSet(s, "finalizado"))}>Finalizados</Chip>
+                <Chip active={flStatus.has("abandono")} onClick={() => setFlStatus((s) => toggleInSet(s, "abandono"))}>Abandonaram</Chip>
+              </FilterGroup>
+              <FilterGroup label="Score">
+                {SCORE_GROUPS.map((g) => (
+                  <Chip key={g.id} active={flScore.has(g.id)} onClick={() => setFlScore((s) => toggleInSet(s, g.id))}>
+                    {g.label}
+                  </Chip>
+                ))}
+              </FilterGroup>
+            </div>
+
+            <FilterGroup label="Caixa (bolso)">
+              {CAIXA_LETRAS.map((c) => (
+                <Chip key={c.letra} active={flCaixa.has(c.letra)} onClick={() => setFlCaixa((s) => toggleInSet(s, c.letra))}>
+                  <span className="font-mono text-accent mr-1.5">{c.letra}</span>{c.label}
+                </Chip>
+              ))}
+            </FilterGroup>
+
+            {utmOptions.length > 0 && (
+              <FilterGroup label="Origem (UTM Source)">
+                {utmOptions.map((u) => (
+                  <Chip key={u} active={flUtm.has(u)} onClick={() => setFlUtm((s) => toggleInSet(s, u))}>{u}</Chip>
+                ))}
+              </FilterGroup>
+            )}
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                type="text"
+                value={flSearch}
+                onChange={(e) => setFlSearch(e.target.value)}
+                placeholder="Buscar por nome, email ou WhatsApp…"
+                className="flex-1 min-w-64 h-9 px-3 rounded-md bg-card/60 border border-border/60 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-accent/50"
+              />
+              {activeCount > 0 && (
+                <Button variant="ghost" size="sm" className="text-xs h-8"
+                  onClick={() => {
+                    setFlStatus(new Set()); setFlScore(new Set());
+                    setFlCaixa(new Set()); setFlUtm(new Set()); setFlSearch("");
+                  }}>
+                  Limpar {activeCount} filtro{activeCount > 1 ? "s" : ""}
+                </Button>
+              )}
+              <div className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                {fmtInt(total)} lead{total !== 1 ? "s" : ""}
+              </div>
+            </div>
+          </div>
+
+          {/* Tabela */}
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-y border-border/50">
+                  <th className="px-5 py-2.5">Data</th>
+                  <th className="py-2.5">Lead</th>
+                  <th className="py-2.5">Contato</th>
+                  <th className="py-2.5">Score</th>
+                  <th className="py-2.5">Caixa</th>
+                  <th className="py-2.5">UTM</th>
+                  <th className="px-5 py-2.5 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.length === 0 && (
+                  <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground text-xs">
+                    Nenhum lead encontrado com esses filtros.
+                  </td></tr>
+                )}
+                {shown.map((l) => {
+                  const fin = isFinalizado(l);
+                  const letra = (l.caixa_letra ?? "").toUpperCase();
+                  const scoreLabel = "DEFG".includes(letra) ? "Call agendada"
+                    : "BC".includes(letra) ? "Análise equipe"
+                    : letra === "A" ? "Minicurso" : "—";
+                  return (
+                    <tr key={l.id} className="border-b border-border/30 last:border-0 hover:bg-accent/5 transition-colors">
+                      <td className="px-5 py-2.5 text-muted-foreground tabular-nums text-xs">
+                        {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
+                      </td>
+                      <td className="py-2.5">
+                        <div className="font-medium truncate max-w-40">{l.nome || "—"}</div>
+                      </td>
+                      <td className="py-2.5 text-xs text-muted-foreground">
+                        <div className="truncate max-w-48">{l.email || "—"}</div>
+                        <div className="tabular-nums">{l.whatsapp || ""}</div>
+                      </td>
+                      <td className="py-2.5">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">
+                          {scoreLabel}
+                        </span>
+                      </td>
+                      <td className="py-2.5">
+                        {letra ? (
+                          <span className="text-xs font-mono">
+                            <span className="text-accent font-bold">{letra}</span>
+                            <span className="text-muted-foreground ml-1.5">
+                              {CAIXA_LETRAS.find((c) => c.letra === letra)?.label ?? l.caixa_label ?? ""}
+                            </span>
+                          </span>
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
+                      </td>
+                      <td className="py-2.5 text-xs text-muted-foreground truncate max-w-32">
+                        {l.utm_source || "—"}
+                      </td>
+                      <td className="px-5 py-2.5 text-right">
+                        <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded ${
+                          fin ? "bg-accent/20 text-accent" : "bg-muted/30 text-muted-foreground"
+                        }`}>
+                          {fin ? "Finalizado" : "Abandono"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {shown.length < total && (
+            <div className="flex justify-center">
+              <Button variant="outline" size="sm" onClick={() => setListLimit((n) => n + 50)}>
+                Ver mais ({fmtInt(total - shown.length)} restantes)
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">{label}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+        active
+          ? "bg-accent text-accent-foreground border-accent shadow-[0_0_20px_-6px_oklch(0.78_0.13_75_/_0.5)]"
+          : "bg-card/40 border-border/50 text-muted-foreground hover:border-accent/40 hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
