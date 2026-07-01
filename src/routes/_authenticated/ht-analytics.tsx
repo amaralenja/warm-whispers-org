@@ -90,7 +90,7 @@ function HTAnalytics() {
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
-  const [tab, setTab] = useState<"dashboard" | "kanban">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "kanban" | "closer">("dashboard");
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -331,6 +331,7 @@ function HTAnalytics() {
           {([
             { id: "dashboard", label: "Dashboard" },
             { id: "kanban", label: "Kanban SDR" },
+            { id: "closer", label: "Kanban Closer" },
           ] as const).map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
@@ -344,6 +345,7 @@ function HTAnalytics() {
       </div>
 
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
+      {tab === "closer" && <KanbanCloser htLeads={htLeads} vendas={vendas} loading={loading} />}
 
       {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
@@ -1254,5 +1256,212 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
     </div>
   );
 }
+
+// ============================================================
+// Kanban Closer
+// ============================================================
+const CLOSER_STAGES: { id: string; label: string; accent?: string }[] = [
+  { id: "agendado", label: "Agendado" },
+  { id: "followup", label: "Follow Up", accent: "text-sky-400" },
+  { id: "remarcada", label: "Remarcada", accent: "text-amber-400" },
+  { id: "sinal", label: "Sinal Recebido", accent: "text-violet-400" },
+  { id: "fechado", label: "Fechado (Ganho)", accent: "text-emerald-400" },
+  { id: "descartado", label: "Descartado", accent: "text-red-400" },
+];
+
+const CLOSER_LS_KEY = "ht_kanban_closer_v1";
+
+function loadCloserMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(CLOSER_LS_KEY) || "{}"); } catch { return {}; }
+}
+function saveCloserMap(m: Record<string, string>) {
+  try { localStorage.setItem(CLOSER_LS_KEY, JSON.stringify(m)); } catch {}
+}
+
+type CloserCard = {
+  id: string; nome: string; valor: number; created_at: string;
+  closer?: string | null; source: "lead" | "venda"; defaultStage: string;
+};
+
+function KanbanCloser({ htLeads, vendas, loading }: { htLeads: any[]; vendas: any[]; loading: boolean }) {
+  const [stageMap, setStageMap] = useState<Record<string, string>>({});
+  const [closerFilter, setCloserFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  useEffect(() => { setStageMap(loadCloserMap()); }, []);
+
+  const cards: CloserCard[] = useMemo(() => {
+    const list: CloserCard[] = [];
+    for (const l of htLeads || []) {
+      const st = (l.status ?? "").toLowerCase();
+      const defaultStage = st === "fechado" ? "fechado"
+        : st === "followup" || st === "follow_up" || st === "follow up" ? "followup"
+        : st === "descartado" ? "descartado"
+        : "agendado";
+      list.push({
+        id: `lead-${l.id}`,
+        nome: l.nome || "Sem nome",
+        valor: Number(l.valor || 0),
+        created_at: l.data_agendamento || l.created_at,
+        closer: l.closer,
+        source: "lead",
+        defaultStage,
+      });
+    }
+    for (const v of vendas || []) {
+      list.push({
+        id: `venda-${v.id}`,
+        nome: v.cliente || "Sem nome",
+        valor: Number(v.valor_total || 0),
+        created_at: v.data || v.created_at,
+        closer: v.closer,
+        source: "venda",
+        defaultStage: "fechado",
+      });
+    }
+    return list;
+  }, [htLeads, vendas]);
+
+  const closerOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of cards) if (c.closer) s.add(c.closer);
+    return Array.from(s).sort();
+  }, [cards]);
+
+  const filtered = useMemo(() => cards.filter((c) => {
+    if (closerFilter !== "all" && c.closer !== closerFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!`${c.nome} ${c.closer ?? ""}`.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }), [cards, closerFilter, search]);
+
+  const byStage = useMemo(() => {
+    const m: Record<string, CloserCard[]> = {};
+    for (const s of CLOSER_STAGES) m[s.id] = [];
+    for (const c of filtered) {
+      const st = stageMap[c.id] || c.defaultStage;
+      (m[st] || m.agendado).push(c);
+    }
+    for (const s of CLOSER_STAGES) {
+      m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    }
+    return m;
+  }, [filtered, stageMap]);
+
+  function moveTo(id: string, stage: string) {
+    setStageMap((prev) => {
+      const next = { ...prev, [id]: stage };
+      saveCloserMap(next);
+      return next;
+    });
+  }
+
+  return (
+    <div className="px-6 md:px-10 py-6 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black tracking-tight">
+            Kanban <span className="text-accent italic font-serif">Closer</span>
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Gestão de agendamentos e fechamento · {loading ? "carregando…" : `${fmtInt(filtered.length)} cards`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={closerFilter} onValueChange={setCloserFilter}>
+            <SelectTrigger className="h-9 w-48 bg-card/60"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os closers</SelectItem>
+              {closerOptions.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar lead…"
+            className="h-9 px-3 rounded-md bg-card/60 border border-border/60 text-xs w-52 focus:outline-none focus:border-accent/60" />
+        </div>
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10">
+        {CLOSER_STAGES.map((s) => {
+          const items = byStage[s.id];
+          const total = items.reduce((a, c) => a + (c.valor || 0), 0);
+          return (
+            <div key={s.id}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData("text/x-closer-id");
+                if (id) moveTo(id, s.id);
+                setDraggingId(null);
+              }}
+              className="shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh]">
+              <div className="px-3 py-3 border-b border-border/40 sticky top-0 bg-card/60 rounded-t-xl">
+                <div className="flex items-center justify-between">
+                  <div className={`text-xs font-semibold tracking-tight ${s.accent ?? ""}`}>{s.label}</div>
+                  <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground">
+                    {items.length}
+                  </span>
+                </div>
+                <div className="text-[10px] font-mono tabular-nums text-accent mt-1">{fmtBRL(total)}</div>
+              </div>
+              <div className="p-2 space-y-2 overflow-y-auto flex-1">
+                {items.length === 0 && (
+                  <div className="text-[11px] text-muted-foreground text-center py-6 opacity-60">Vazio</div>
+                )}
+                {items.slice(0, 60).map((c) => (
+                  <div key={c.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/x-closer-id", c.id);
+                      setDraggingId(c.id);
+                    }}
+                    onDragEnd={() => setDraggingId(null)}
+                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-grab active:cursor-grabbing ${
+                      draggingId === c.id ? "opacity-40" : ""
+                    }`}>
+                    <div className="text-xs font-semibold truncate">{c.nome}</div>
+                    {c.valor > 0 && (
+                      <div className="text-[11px] font-mono tabular-nums text-emerald-400 mt-1">{fmtBRL(c.valor)}</div>
+                    )}
+                    <div className="flex items-center justify-between mt-1.5">
+                      <div className="text-[10px] text-muted-foreground tabular-nums">
+                        {c.created_at ? new Date(c.created_at).toLocaleDateString("pt-BR") : "—"}
+                      </div>
+                      {c.closer && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate max-w-[100px]">
+                          {c.closer}
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      value={stageMap[c.id] || c.defaultStage}
+                      onChange={(e) => moveTo(c.id, e.target.value)}
+                      className="w-full mt-2 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
+                      {CLOSER_STAGES.map((ks) => (
+                        <option key={ks.id} value={ks.id}>{ks.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {items.length > 60 && (
+                  <div className="text-[10px] text-center text-muted-foreground py-2">
+                    + {items.length - 60} ocultos
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 
 
