@@ -1319,7 +1319,19 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
 
   const cards: CloserCard[] = useMemo(() => {
     const list: CloserCard[] = [];
-    // Leads quentes do quiz (caixa D+ e comprometidos) = agendados
+    // Leads quentes do quiz — usa crm_status como stage padrão
+    const mapCloserStage = (s: string | null | undefined): string => {
+      switch ((s ?? "").toLowerCase()) {
+        case "fechado": return "fechado";
+        case "followup": return "followup";
+        case "reagendamento": return "remarcada";
+        case "noshow": return "descartado";
+        case "descartado_sdr":
+        case "descartado_closer":
+        case "descartado": return "descartado";
+        default: return "agendado";
+      }
+    };
     for (const l of leads || []) {
       if (!isFinalizado(l)) continue;
       const caixa = (l.caixa_letra ?? "").toUpperCase();
@@ -1327,11 +1339,11 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
       list.push({
         id: `qlead-${l.id}`,
         nome: l.nome || l.whatsapp || "Sem nome",
-        valor: CAIXA_VALOR[caixa] ?? 0,
-        created_at: l.data_criacao,
+        valor: Number(l.crm_valor || CAIXA_VALOR[caixa] || 0),
+        created_at: l.crm_data_agendamento || l.data_criacao,
         closer: null,
         source: "lead",
-        defaultStage: "agendado",
+        defaultStage: mapCloserStage(l.crm_status),
         caixa: l.caixa_label,
         utm: l.utm_source,
       });
