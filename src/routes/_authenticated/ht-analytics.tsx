@@ -1126,8 +1126,8 @@ function FunilSection({
       <SectionTitle overline="Bloco 04" title="Métricas do Funil" />
       <Card className="border-border/50 bg-card/50 backdrop-blur overflow-hidden">
         <CardContent className="p-6">
-          <div className="grid gap-6 lg:grid-cols-[220px_1fr_240px]">
-            {/* Coluna esquerda: seletor de grupos */}
+          <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+            {/* Coluna esquerda: seletor de grupos + perdas */}
             <div className="space-y-2">
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Grupo de leads</div>
               {metricasPorGrupo.map((m) => {
@@ -1152,41 +1152,40 @@ function FunilSection({
                   </button>
                 );
               })}
+
+              <div className="pt-4 mt-4 border-t border-border/40 space-y-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Perdas do funil</div>
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <XCircle className="h-3 w-3 text-red-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-red-400 font-semibold">No-show</span>
+                  </div>
+                  <div className="text-2xl font-mono tabular-nums font-bold text-red-400">{fmtInt(atual.noShow)}</div>
+                  <div className="text-[10px] text-muted-foreground">{fmtPct(atual.taxaNoShow)} dos agendados</div>
+                </div>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Activity className="h-3 w-3 text-amber-400" />
+                    <span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Call · não fechou</span>
+                  </div>
+                  <div className="text-2xl font-mono tabular-nums font-bold text-amber-400">{fmtInt(atual.naoFechou)}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {atual.realizadas > 0 ? fmtPct((atual.naoFechou / atual.realizadas) * 100) : "0,0%"} das calls
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Coluna central: funil visual (cone) */}
-            <div className="flex items-center justify-center">
+            {/* Coluna central: funil visual (cone) — grande */}
+            <div className="flex items-center justify-center min-h-[620px]">
               <FunilVisual
                 stages={[
-                  { label: "Formulários Finalizados", value: atual.finalizados, sub: atual.g.sub },
-                  { label: "Agendados p/ Call", value: atual.agendados, sub: `Taxa: ${fmtPct(atual.taxaAgend)}` },
-                  { label: "Calls Realizadas", value: atual.realizadas, sub: `Show-up: ${fmtPct(atual.showUp)}` },
-                  { label: "Fechamentos (Ganhos)", value: atual.fechamentos, sub: `Conversão: ${fmtPct(atual.taxaFech)}` },
+                  { label: "Formulários Finalizados", value: atual.finalizados, sub: `${atual.g.label} · ${atual.g.sub}`, prev: null },
+                  { label: "Agendados p/ Call", value: atual.agendados, sub: `Taxa de agendamento: ${fmtPct(atual.taxaAgend)}`, prev: atual.finalizados },
+                  { label: "Calls Realizadas", value: atual.realizadas, sub: `Show-up: ${fmtPct(atual.showUp)}`, prev: atual.agendados },
+                  { label: "Fechamentos (Ganhos)", value: atual.fechamentos, sub: `Conversão da call: ${fmtPct(atual.taxaFech)}`, prev: atual.realizadas },
                 ]}
               />
-            </div>
-
-            {/* Coluna direita: perdas */}
-            <div className="space-y-3">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Perdas do funil</div>
-              <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <XCircle className="h-3.5 w-3.5 text-red-400" />
-                  <span className="text-[10px] uppercase tracking-wider text-red-400 font-semibold">No-show</span>
-                </div>
-                <div className="text-3xl font-mono tabular-nums font-bold text-red-400">{fmtInt(atual.noShow)}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">{fmtPct(atual.taxaNoShow)} dos agendados</div>
-              </div>
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="h-3.5 w-3.5 text-amber-400" />
-                  <span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Call feita · não fechou</span>
-                </div>
-                <div className="text-3xl font-mono tabular-nums font-bold text-amber-400">{fmtInt(atual.naoFechou)}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  {atual.realizadas > 0 ? fmtPct((atual.naoFechou / atual.realizadas) * 100) : "0,0%"} das calls
-                </div>
-              </div>
             </div>
           </div>
         </CardContent>
@@ -1195,27 +1194,26 @@ function FunilSection({
   );
 }
 
-// Cone SVG — 4 estágios com largura decrescente
+// Cone SVG — grande, dados destacados + conversão entre estágios
 function FunilVisual({ stages }: {
-  stages: { label: string; value: number; sub: string }[];
+  stages: { label: string; value: number; sub: string; prev: number | null }[];
 }) {
-  const W = 460;
-  const H = 420;
-  const topW = 440;   // largura no topo
-  const botW = 90;    // largura na base
+  const W = 780;
+  const H = 620;
+  const topW = 760;
+  const botW = 160;
   const bandH = H / stages.length;
-
   const widthAt = (y: number) => topW - ((topW - botW) * (y / H));
 
   const COLORS = [
-    { fill: "#3B82F6", stroke: "#60A5FA" },   // azul
-    { fill: "#F59E0B", stroke: "#FBBF24" },   // âmbar
-    { fill: "#8B5CF6", stroke: "#A78BFA" },   // violeta
-    { fill: "#10B981", stroke: "#34D399" },   // verde
+    { fill: "#3B82F6", stroke: "#60A5FA" },
+    { fill: "#F59E0B", stroke: "#FBBF24" },
+    { fill: "#8B5CF6", stroke: "#A78BFA" },
+    { fill: "#10B981", stroke: "#34D399" },
   ];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H + 10}`} className="w-full max-w-[460px]" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full max-w-[820px]" xmlns="http://www.w3.org/2000/svg">
       <defs>
         {COLORS.map((c, i) => (
           <linearGradient key={i} id={`fg${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -1224,7 +1222,7 @@ function FunilVisual({ stages }: {
           </linearGradient>
         ))}
         <filter id="funilShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="6" />
+          <feGaussianBlur stdDeviation="8" />
         </filter>
       </defs>
 
@@ -1238,28 +1236,43 @@ function FunilVisual({ stages }: {
         const x2L = cx - w2 / 2, x2R = cx + w2 / 2;
         const path = `M ${x1L} ${y1} L ${x1R} ${y1} L ${x2R} ${y2} L ${x2L} ${y2} Z`;
         const cy = (y1 + y2) / 2;
+        const conv = s.prev && s.prev > 0 ? (s.value / s.prev) * 100 : null;
 
         return (
           <g key={s.label}>
             {i === 0 && (
-              <ellipse cx={cx} cy={y1 + 4} rx={w1 / 2} ry={8}
+              <ellipse cx={cx} cy={y1 + 4} rx={w1 / 2} ry={10}
                 fill="rgba(0,0,0,0.25)" filter="url(#funilShadow)" />
             )}
-            <path d={path} fill={`url(#fg${i})`} stroke={COLORS[i].stroke} strokeWidth="1" opacity="0.95" />
-            {/* leve highlight elíptico */}
-            <ellipse cx={cx} cy={y1 + 6} rx={(w1 / 2) - 4} ry={4} fill="rgba(255,255,255,0.18)" />
-            <text x={cx} y={cy - 14} textAnchor="middle"
-              fontSize="11" fontWeight="700" fill="#fff" style={{ letterSpacing: 0.5 }}>
+            <path d={path} fill={`url(#fg${i})`} stroke={COLORS[i].stroke} strokeWidth="1.5" opacity="0.96" />
+            <ellipse cx={cx} cy={y1 + 8} rx={(w1 / 2) - 6} ry={5} fill="rgba(255,255,255,0.18)" />
+
+            <text x={cx} y={cy - 34} textAnchor="middle"
+              fontSize="14" fontWeight="700" fill="#fff" style={{ letterSpacing: 1 }}>
               {s.label.toUpperCase()}
             </text>
-            <text x={cx} y={cy + 10} textAnchor="middle"
-              fontSize="26" fontWeight="900" fill="#fff" style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace" }}>
+
+            <text x={cx} y={cy + 12} textAnchor="middle"
+              fontSize="52" fontWeight="900" fill="#fff"
+              style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace", letterSpacing: -1 }}>
               {fmtInt(s.value)}
             </text>
-            <text x={cx} y={cy + 26} textAnchor="middle"
-              fontSize="10" fill="rgba(255,255,255,0.85)">
+
+            <text x={cx} y={cy + 34} textAnchor="middle"
+              fontSize="12" fill="rgba(255,255,255,0.92)" fontWeight="500">
               {s.sub}
             </text>
+
+            {conv !== null && (
+              <g>
+                <rect x={W - 140} y={y1 - 14} width="130" height="28" rx="14"
+                  fill="rgba(15,23,42,0.9)" stroke={COLORS[i].stroke} strokeWidth="1" />
+                <text x={W - 75} y={y1 + 5} textAnchor="middle"
+                  fontSize="12" fontWeight="700" fill={COLORS[i].stroke}>
+                  ↓ {fmtPct(conv)}
+                </text>
+              </g>
+            )}
           </g>
         );
       })}
