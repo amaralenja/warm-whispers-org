@@ -88,6 +88,8 @@ function HTAnalytics() {
   const [vendas, setVendas] = useState<any[]>([]);
   const [htLeads, setHtLeads] = useState<any[]>([]);
   const [reunioes, setReunioes] = useState<any[]>([]);
+  const [agenda, setAgenda] = useState<any[]>([]);
+  const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -122,7 +124,7 @@ function HTAnalytics() {
       }
 
       // HT tables in parallel
-      const [v, hl, r] = await Promise.all([
+      const [v, hl, r, ag] = await Promise.all([
         (() => {
           let q = supabase.from("ht_vendas").select("*").limit(5000);
           if (startIso) q = q.gte("data", startIso);
@@ -141,6 +143,12 @@ function HTAnalytics() {
           if (endIso) q = q.lt("data", endIso);
           return q;
         })(),
+        (() => {
+          let q = supabase.from("agenda_leads").select("*").limit(5000);
+          if (startIso) q = q.gte("data_agendada", startIso);
+          if (endIso) q = q.lt("data_agendada", endIso);
+          return q;
+        })(),
       ]);
 
       if (cancel) return;
@@ -148,6 +156,7 @@ function HTAnalytics() {
       setVendas(v.data ?? []);
       setHtLeads(hl.data ?? []);
       setReunioes(r.data ?? []);
+      setAgenda(ag.data ?? []);
       setLoading(false);
     })();
     return () => { cancel = true; };
@@ -442,33 +451,27 @@ function HTAnalytics() {
           </ChartCard>
         </section>
 
-        {/* Closers + Funil */}
-        <section className="grid gap-6 lg:grid-cols-2">
-          <ChartCard title="Ranking de Closers" subtitle="Por receita no período">
-            {porCloser.length === 0 ? (
-              <EmptyState label="Sem vendas registradas." />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={porCloser} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} horizontal={false} />
-                  <XAxis type="number" fontSize={10} stroke={MUTED} tickLine={false} axisLine={false}
-                    tickFormatter={(v) => `R$${Math.round(v / 1000)}k`} />
-                  <YAxis type="category" dataKey="closer" fontSize={11} stroke={MUTED} tickLine={false} axisLine={false} width={110} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtBRL(v)} />
-                  <Bar dataKey="receita" fill={ACCENT} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
+        {/* Métricas do Funil */}
+        <FunilSection
+          leads={leads}
+          agenda={agenda}
+          reunioes={reunioes}
+          vendas={vendas}
+          grupo={funilGrupo}
+          setGrupo={setFunilGrupo}
+        />
 
-          <ChartCard title="Onde os leads abandonam" subtitle="Últimos passos antes de sair">
+        {/* Onde os leads abandonam */}
+        <section>
+          <SectionTitle overline="Bloco 05" title="Onde os leads abandonam" />
+          <ChartCard title="Últimos passos antes de sair" subtitle="Ranking de etapas de abandono">
             {funilAbandono.length === 0 ? (
               <EmptyState label="Sem abandonos no período." />
             ) : (
               <div className="space-y-2 overflow-auto h-full pr-1">
                 {funilAbandono.map((f) => (
                   <div key={f.label} className="flex items-center gap-3">
-                    <div className="w-32 shrink-0 text-[11px] truncate text-muted-foreground" title={f.label}>{f.label}</div>
+                    <div className="w-40 shrink-0 text-[11px] truncate text-muted-foreground" title={f.label}>{f.label}</div>
                     <div className="flex-1 h-6 rounded bg-muted/30 overflow-hidden relative">
                       <div className="h-full rounded"
                         style={{ width: `${(f.value / maxFunil) * 100}%`, background: `linear-gradient(90deg, ${ACCENT_SOFT}, ${ACCENT})` }} />
@@ -872,6 +875,164 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     >
       {children}
     </button>
+  );
+}
+
+// ================= Métricas do Funil =================
+type FunilGrupo = "consultoria" | "grupo" | "minicurso";
+const FUNIL_GRUPOS: { id: FunilGrupo; label: string; sub: string; letras: string[] }[] = [
+  { id: "consultoria", label: "Consultoria", sub: "> R$ 3k · Caixa D+", letras: ["D", "E", "F", "G"] },
+  { id: "grupo", label: "Grupo", sub: "R$ 1k – 3k · Caixa B/C", letras: ["B", "C"] },
+  { id: "minicurso", label: "Minicurso", sub: "< R$ 1k · Caixa A", letras: ["A"] },
+];
+
+function FunilSection({
+  leads, agenda, reunioes, vendas, grupo, setGrupo,
+}: {
+  leads: QLead[]; agenda: any[]; reunioes: any[]; vendas: any[];
+  grupo: FunilGrupo; setGrupo: (g: FunilGrupo) => void;
+}) {
+  const ACCENT = "oklch(0.78 0.13 75)";
+  const now = Date.now();
+
+  const metricasPorGrupo = useMemo(() => {
+    return FUNIL_GRUPOS.map((g) => {
+      const set = new Set(g.letras);
+      const finalizados = leads.filter((l) => {
+        const c = (l.caixa_letra ?? "").toUpperCase();
+        return set.has(c) && !!(l.whatsapp && (l.comprometimento || l.momento));
+      }).length;
+
+      // Fatia proporcional de agenda/reunioes/vendas para o grupo
+      // (não temos caixa nas outras tabelas, aplicamos peso do grupo sobre o total de leads finalizados)
+      const totalFin = leads.filter((l) => !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento))).length;
+      const peso = totalFin > 0 ? finalizados / totalFin : 0;
+
+      const agendados = Math.round(agenda.length * peso);
+      const noShow = Math.round(agenda.filter((a) => !a.concluido && a.data_agendada && new Date(a.data_agendada).getTime() < now).length * peso);
+      const realizadas = Math.round((agenda.filter((a) => a.concluido).length + reunioes.length) * peso);
+      const fechamentos = Math.round(vendas.length * peso);
+      const naoFechou = Math.max(0, realizadas - fechamentos);
+
+      const taxaAgend = finalizados > 0 ? (agendados / finalizados) * 100 : 0;
+      const showUp = agendados > 0 ? (realizadas / agendados) * 100 : 0;
+      const taxaFech = realizadas > 0 ? (fechamentos / realizadas) * 100 : 0;
+      const taxaNoShow = agendados > 0 ? (noShow / agendados) * 100 : 0;
+
+      return { g, finalizados, agendados, realizadas, fechamentos, noShow, naoFechou,
+        taxaAgend, showUp, taxaFech, taxaNoShow };
+    });
+  }, [leads, agenda, reunioes, vendas, now]);
+
+  const atual = metricasPorGrupo.find((m) => m.g.id === grupo)!;
+
+  return (
+    <section>
+      <SectionTitle overline="Bloco 04" title="Métricas do Funil" />
+      <Card className="border-border/50 bg-card/50 backdrop-blur overflow-hidden">
+        <CardContent className="p-6">
+          <div className="grid gap-6 lg:grid-cols-[220px_1fr_240px]">
+            {/* Coluna esquerda: seletor de grupos */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Grupo de leads</div>
+              {metricasPorGrupo.map((m) => {
+                const active = m.g.id === grupo;
+                return (
+                  <button
+                    key={m.g.id}
+                    type="button"
+                    onClick={() => setGrupo(m.g.id)}
+                    className={`w-full text-left rounded-lg border p-3 transition-all ${
+                      active
+                        ? "border-accent bg-accent/10 shadow-[0_0_24px_-8px_oklch(0.78_0.13_75_/_0.5)]"
+                        : "border-border/50 bg-card/40 hover:border-accent/40"
+                    }`}
+                  >
+                    <div className={`text-sm font-semibold ${active ? "text-accent" : ""}`}>{m.g.label}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{m.g.sub}</div>
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="text-xl font-mono tabular-nums font-bold">{fmtInt(m.finalizados)}</span>
+                      <span className="text-[10px] text-muted-foreground">finalizados</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Coluna central: funil visual */}
+            <div className="flex items-center justify-center">
+              <FunilVisual
+                stages={[
+                  { label: "Formulários finalizados", value: atual.finalizados, sub: atual.g.label, pct: null },
+                  { label: "Agendados p/ call", value: atual.agendados, sub: `Taxa: ${fmtPct(atual.taxaAgend)}`, pct: atual.taxaAgend },
+                  { label: "Calls realizadas", value: atual.realizadas, sub: `Show-up: ${fmtPct(atual.showUp)}`, pct: atual.showUp },
+                  { label: "Fechamentos", value: atual.fechamentos, sub: `Conversão: ${fmtPct(atual.taxaFech)}`, pct: atual.taxaFech },
+                ]}
+                accent={ACCENT}
+              />
+            </div>
+
+            {/* Coluna direita: perdas */}
+            <div className="space-y-3">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Perdas do funil</div>
+              <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <XCircle className="h-3.5 w-3.5 text-red-400" />
+                  <span className="text-[10px] uppercase tracking-wider text-red-400 font-semibold">No-show</span>
+                </div>
+                <div className="text-3xl font-mono tabular-nums font-bold text-red-400">{fmtInt(atual.noShow)}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">{fmtPct(atual.taxaNoShow)} dos agendados</div>
+              </div>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Call feita · não fechou</span>
+                </div>
+                <div className="text-3xl font-mono tabular-nums font-bold text-amber-400">{fmtInt(atual.naoFechou)}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {atual.realizadas > 0 ? fmtPct((atual.naoFechou / atual.realizadas) * 100) : "0,0%"} das calls
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function FunilVisual({ stages, accent }: {
+  stages: { label: string; value: number; sub: string; pct: number | null }[];
+  accent: string;
+}) {
+  const max = Math.max(1, ...stages.map((s) => s.value));
+  return (
+    <div className="w-full max-w-md space-y-1.5 py-2">
+      {stages.map((s, i) => {
+        const w = 30 + (s.value / max) * 70; // 30% → 100%
+        const opacity = 1 - i * 0.15;
+        return (
+          <div key={s.label} className="flex flex-col items-center">
+            <div
+              className="relative flex flex-col items-center justify-center px-4 py-3 text-center transition-all"
+              style={{
+                width: `${w}%`,
+                minWidth: 200,
+                clipPath: i === stages.length - 1
+                  ? "polygon(8% 0, 92% 0, 82% 100%, 18% 100%)"
+                  : "polygon(0 0, 100% 0, 92% 100%, 8% 100%)",
+                background: `linear-gradient(180deg, ${accent} 0%, oklch(0.68 0.15 65) 100%)`,
+                opacity,
+              }}
+            >
+              <div className="text-[9px] uppercase tracking-[0.15em] font-bold text-black/70">{s.label}</div>
+              <div className="text-2xl font-mono tabular-nums font-black text-black leading-none my-0.5">{fmtInt(s.value)}</div>
+              <div className="text-[10px] text-black/70 font-medium">{s.sub}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
