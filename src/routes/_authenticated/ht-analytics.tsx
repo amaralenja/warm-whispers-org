@@ -590,17 +590,6 @@ function HTAnalytics() {
           </div>
         </section>
 
-        {/* Lista de Leads */}
-        <LeadsListSection
-          leads={leads}
-          flStatus={flStatus} setFlStatus={setFlStatus}
-          flScore={flScore} setFlScore={setFlScore}
-          flCaixa={flCaixa} setFlCaixa={setFlCaixa}
-          flUtm={flUtm} setFlUtm={setFlUtm}
-          flSearch={flSearch} setFlSearch={setFlSearch}
-          listLimit={listLimit} setListLimit={setListLimit}
-        />
-
         {/* Últimas vendas */}
         <section>
           <SectionTitle overline="Bloco 06" title="Últimas vendas" />
