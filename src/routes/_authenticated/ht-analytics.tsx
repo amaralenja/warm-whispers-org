@@ -325,7 +325,29 @@ function HTAnalytics() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-border/50 bg-background/60 backdrop-blur sticky top-0 z-10">
+        <div className="px-6 md:px-10 flex items-center gap-1">
+          {([
+            { id: "dashboard", label: "Dashboard" },
+            { id: "kanban", label: "Kanban SDR" },
+          ] as const).map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
+                tab === t.id ? "text-accent" : "text-muted-foreground hover:text-foreground"
+              }`}>
+              {t.label}
+              {tab === t.id && <span className="absolute bottom-0 left-0 right-0 h-px bg-accent" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
+
+      {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
+
         {/* KPIs — Receita */}
         <section>
           <SectionTitle overline="Bloco 01" title="Receita & Vendas" />
@@ -582,9 +604,11 @@ function HTAnalytics() {
           </Card>
         </section>
       </div>
+      )}
     </div>
   );
 }
+
 
 function SectionTitle({ overline, title }: { overline: string; title: string }) {
   return (
