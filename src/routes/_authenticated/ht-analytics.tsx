@@ -90,6 +90,7 @@ function HTAnalytics() {
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
+  const [tab, setTab] = useState<"dashboard" | "kanban">("dashboard");
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
