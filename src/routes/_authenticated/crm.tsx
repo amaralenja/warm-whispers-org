@@ -299,16 +299,21 @@ function Kanban({
 
 
   function onDragStart(e: DragEvent<HTMLDivElement>, lead: Lead) {
+    e.dataTransfer.setData("application/x-lead-id", lead.id);
     e.dataTransfer.setData("text/plain", lead.id);
     e.dataTransfer.effectAllowed = "move";
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function onDrop(e: DragEvent<HTMLDivElement>, status: string) {
     e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain");
+    const id =
+      e.dataTransfer.getData("application/x-lead-id") ||
+      e.dataTransfer.getData("text/plain");
     setDragOver(null);
-    if (id) onMove(id, status);
+    if (id && UUID_RE.test(id.trim())) onMove(id.trim(), status);
   }
+
 
   const [visible, setVisible] = useState<Record<string, number>>({});
   const PAGE = 15;
