@@ -148,17 +148,43 @@ async function sendToMember(
 
 async function loadAssigneePhones(db: any, ids: string[]): Promise<Array<{ id: string; phone: string; nome: string }>> {
   if (!ids.length) return [];
-  const res = await db
-    .from("team_members" as any)
-    .select("id,nome,telefone,ativo")
-    .in("id", ids);
-  if (res?.error) throw new Error(res.error.message);
-  const data = res?.data;
-  return ((data ?? []) as any[])
-    .filter((m) => m.telefone && m.ativo !== false)
-    .map((m) => ({ id: m.id, phone: normalizeBrPhone(m.telefone), nome: String(m.nome ?? "") }))
-    .filter((m) => m.phone.length >= 12);
+  const teamIds = ids.filter((i) => !i.startsWith("v:"));
+  const vendorIds = ids
+    .filter((i) => i.startsWith("v:"))
+    .map((i) => Number(i.slice(2)))
+    .filter((n) => Number.isFinite(n));
+
+  const out: Array<{ id: string; phone: string; nome: string }> = [];
+
+  if (teamIds.length) {
+    const res = await db
+      .from("team_members" as any)
+      .select("id,nome,telefone,ativo")
+      .in("id", teamIds);
+    if (res?.error) throw new Error(res.error.message);
+    for (const m of ((res?.data ?? []) as any[])) {
+      if (!m.telefone || m.ativo === false) continue;
+      const phone = normalizeBrPhone(m.telefone);
+      if (phone.length >= 12) out.push({ id: m.id, phone, nome: String(m.nome ?? "") });
+    }
+  }
+
+  if (vendorIds.length) {
+    const res = await db
+      .from("vendedores" as any)
+      .select("id,nome,telefone,ativo")
+      .in("id", vendorIds);
+    if (res?.error) throw new Error(res.error.message);
+    for (const m of ((res?.data ?? []) as any[])) {
+      if (!m.telefone || m.ativo === false) continue;
+      const phone = normalizeBrPhone(m.telefone);
+      if (phone.length >= 12) out.push({ id: `v:${m.id}`, phone, nome: String(m.nome ?? "") });
+    }
+  }
+
+  return out;
 }
+
 
 /**
  * Lógica pura de disparo do task_created — utilizável sem auth (cron, webhook, IA).
