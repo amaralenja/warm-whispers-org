@@ -65,6 +65,21 @@ const isQuente = (l: QLead) => {
   return "DEFG".includes(c) && /(sim|compromet)/i.test(l.comprometimento ?? "");
 };
 
+const CAIXA_LETRAS: { letra: string; label: string }[] = [
+  { letra: "A", label: "Menos de R$ 1.000" },
+  { letra: "B", label: "R$ 1.000 – 5.000" },
+  { letra: "C", label: "R$ 5.000 – 10.000" },
+  { letra: "D", label: "R$ 10.000 – 25.000" },
+  { letra: "E", label: "R$ 25.000 – 50.000" },
+  { letra: "F", label: "R$ 50.000 – 100.000" },
+  { letra: "G", label: "Caixa Ilimitado" },
+];
+const SCORE_GROUPS: { id: string; label: string; letras: string[] }[] = [
+  { id: "call", label: "Call agendada (D+)", letras: ["D", "E", "F", "G"] },
+  { id: "equipe", label: "Análise de equipe (B, C)", letras: ["B", "C"] },
+  { id: "minicurso", label: "Minicurso (A)", letras: ["A"] },
+];
+
 function HTAnalytics() {
   const [period, setPeriod] = useState<Period>("30d");
   const [nonce, setNonce] = useState(0);
