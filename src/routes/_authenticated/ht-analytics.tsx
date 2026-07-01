@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, TrendingUp, Users, Calendar as CalIcon, Target, Award } from "lucide-react";
+import { HTInteligencia } from "@/components/ht-inteligencia";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: HTAnalytics,
@@ -135,12 +136,18 @@ function HTAnalytics() {
         <KPI icon={<Users className="h-5 w-5" />} label="Leads" value={fmtInt(kpis.qtdLeads)} sub={`${fmtInt(kpis.qtdReunioes)} reuniões · ${fmtInt(kpis.qtdAlunos)} alunos`} />
       </div>
 
-      <Tabs defaultValue="funil">
+      <Tabs defaultValue="inteligencia">
         <TabsList>
+          <TabsTrigger value="inteligencia">Inteligência</TabsTrigger>
           <TabsTrigger value="funil">Funil</TabsTrigger>
           <TabsTrigger value="closers">Closers</TabsTrigger>
           <TabsTrigger value="vendas">Últimas vendas</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="inteligencia" className="mt-4">
+          <HTInteligencia />
+        </TabsContent>
+
 
         <TabsContent value="funil" className="mt-4">
           <Card>
