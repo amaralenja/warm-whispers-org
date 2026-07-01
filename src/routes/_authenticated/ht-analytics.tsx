@@ -428,56 +428,65 @@ function HTAnalytics() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Divisão por caixa (bolso)" full>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={divisaoCaixa} dataKey="value" nameKey="name"
-                  innerRadius={55} outerRadius={95} paddingAngle={2} stroke="none">
-                  {divisaoCaixa.map((_, i) => <Cell key={i} fill={CAIXA_COLORS[i % CAIXA_COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-2 space-y-1 max-h-32 overflow-auto pr-2">
-              {divisaoCaixa.slice(0, 7).map((d, i) => (
-                <div key={d.name} className="flex items-center justify-between text-[11px]">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: CAIXA_COLORS[i % CAIXA_COLORS.length] }} />
-                    <span className="truncate text-muted-foreground">{d.name}</span>
+          <ChartCard title="Divisão por caixa (bolso)">
+            <div className="flex flex-col h-full">
+              <div className="h-36 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={divisaoCaixa} dataKey="value" nameKey="name"
+                      innerRadius={40} outerRadius={70} paddingAngle={2} stroke="none">
+                      {divisaoCaixa.map((_, i) => <Cell key={i} fill={CAIXA_COLORS[i % CAIXA_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-2 space-y-1 flex-1 min-h-0 overflow-y-auto pr-1">
+                {divisaoCaixa.map((d, i) => (
+                  <div key={d.name} className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: CAIXA_COLORS[i % CAIXA_COLORS.length] }} />
+                      <span className="truncate text-muted-foreground">{d.name}</span>
+                    </div>
+                    <span className="font-mono tabular-nums">{fmtInt(d.value)}</span>
                   </div>
-                  <span className="font-mono tabular-nums">{fmtInt(d.value)}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </ChartCard>
 
-          <ChartCard title="Status geral" full>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={[
-                  { name: "Finalizados", value: kpis.finalizados },
-                  { name: "Abandonos", value: kpis.abandonos },
-                ]} dataKey="value" nameKey="name"
-                  innerRadius={55} outerRadius={95} paddingAngle={2} stroke="none">
-                  <Cell fill={ACCENT} />
-                  <Cell fill="oklch(0.30 0.02 270)" />
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-2 flex items-center justify-center gap-6 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: ACCENT }} />
-                <span className="text-muted-foreground">Finalizados</span>
-                <span className="font-mono">{fmtInt(kpis.finalizados)}</span>
+          <ChartCard title="Status geral">
+            <div className="flex flex-col h-full">
+              <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={[
+                      { name: "Finalizados", value: kpis.finalizados },
+                      { name: "Abandonos", value: kpis.abandonos },
+                    ]} dataKey="value" nameKey="name"
+                      innerRadius={45} outerRadius={75} paddingAngle={2} stroke="none">
+                      <Cell fill={ACCENT} />
+                      <Cell fill="oklch(0.30 0.02 270)" />
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                <span className="text-muted-foreground">Abandonos</span>
-                <span className="font-mono">{fmtInt(kpis.abandonos)}</span>
+              <div className="mt-2 flex items-center justify-center gap-6 text-xs shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full" style={{ background: ACCENT }} />
+                  <span className="text-muted-foreground">Finalizados</span>
+                  <span className="font-mono">{fmtInt(kpis.finalizados)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                  <span className="text-muted-foreground">Abandonos</span>
+                  <span className="font-mono">{fmtInt(kpis.abandonos)}</span>
+                </div>
               </div>
             </div>
           </ChartCard>
+
         </section>
 
         {/* Métricas do Funil */}
@@ -655,15 +664,16 @@ function ChartCard({
   title, subtitle, children, full,
 }: { title: string; subtitle?: string; children: React.ReactNode; full?: boolean }) {
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur">
-      <CardContent className="p-6">
-        <div className="mb-4">
+    <Card className="border-border/50 bg-card/50 backdrop-blur flex flex-col">
+      <CardContent className="p-6 flex-1 flex flex-col min-h-0">
+        <div className="mb-4 shrink-0">
           <div className="text-sm font-semibold tracking-tight">{title}</div>
           {subtitle && <div className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</div>}
         </div>
-        <div className={full ? "h-56" : "h-64"}>{children}</div>
+        <div className={`${full ? "h-56" : "h-72"} flex-1 min-h-0`}>{children}</div>
       </CardContent>
     </Card>
+
   );
 }
 
