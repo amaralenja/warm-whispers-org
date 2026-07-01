@@ -92,7 +92,7 @@ function HTAnalytics() {
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
-  const [tab, setTab] = useState<"dashboard" | "kanban" | "closer" | "receber">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "kanban" | "closer" | "receber" | "leads">("dashboard");
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -349,6 +349,7 @@ function HTAnalytics() {
             { id: "kanban", label: "Kanban SDR" },
             { id: "closer", label: "Kanban Closer" },
             { id: "receber", label: "Contas a Receber" },
+            { id: "leads", label: "Lista de Leads" },
           ] as const).map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
@@ -364,6 +365,19 @@ function HTAnalytics() {
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
       {tab === "closer" && <KanbanCloser leads={leads} vendas={vendas} loading={loading} />}
       {tab === "receber" && <HTContasReceber />}
+      {tab === "leads" && (
+        <div className="px-6 md:px-10 py-8">
+          <LeadsListSection
+            leads={leads}
+            flStatus={flStatus} setFlStatus={setFlStatus}
+            flScore={flScore} setFlScore={setFlScore}
+            flCaixa={flCaixa} setFlCaixa={setFlCaixa}
+            flUtm={flUtm} setFlUtm={setFlUtm}
+            flSearch={flSearch} setFlSearch={setFlSearch}
+            listLimit={listLimit} setListLimit={setListLimit}
+          />
+        </div>
+      )}
 
       {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
@@ -575,17 +589,6 @@ function HTAnalytics() {
             })}
           </div>
         </section>
-
-        {/* Lista de Leads */}
-        <LeadsListSection
-          leads={leads}
-          flStatus={flStatus} setFlStatus={setFlStatus}
-          flScore={flScore} setFlScore={setFlScore}
-          flCaixa={flCaixa} setFlCaixa={setFlCaixa}
-          flUtm={flUtm} setFlUtm={setFlUtm}
-          flSearch={flSearch} setFlSearch={setFlSearch}
-          listLimit={listLimit} setListLimit={setListLimit}
-        />
 
         {/* Últimas vendas */}
         <section>
