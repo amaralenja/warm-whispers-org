@@ -310,11 +310,14 @@ function Kanban({
     if (id) onMove(id, status);
   }
 
-  return (
-    <div className="flex flex-1 gap-3 overflow-x-auto pb-2">
-      {stages.map((s) => {
+  const [visible, setVisible] = useState<Record<string, number>>({});
+  const PAGE = 15;
 
+  return (
+    <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">
+      {stages.map((s) => {
         const items = grouped.get(s.id) ?? [];
+        const shown = visible[s.id] ?? PAGE;
         const totalValor = items.reduce((a, b) => a + (b.valor_estimado ?? 0), 0);
         const isOver = dragOver === s.id;
         return (
@@ -323,7 +326,7 @@ function Kanban({
             onDragOver={(e) => { e.preventDefault(); setDragOver(s.id); }}
             onDragLeave={() => setDragOver((p) => (p === s.id ? null : p))}
             onDrop={(e) => onDrop(e, s.id)}
-            className={`flex w-72 shrink-0 flex-col rounded-xl border ${s.border} ${isOver ? "bg-card" : "bg-card/40"} transition-colors`}
+            className={`flex min-h-0 w-72 shrink-0 flex-col rounded-xl border ${s.border} ${isOver ? "bg-card" : "bg-card/40"} transition-colors`}
           >
             <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
               <div className="flex items-center gap-2">
@@ -337,15 +340,24 @@ function Kanban({
                 <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
               )}
             </div>
-            <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
               {items.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border/40 py-6 text-center text-[11px] text-muted-foreground">
                   Arraste leads aqui
                 </div>
               )}
-              {items.map((lead) => (
+              {items.slice(0, shown).map((lead) => (
                 <KanbanCard key={lead.id} lead={lead} onClick={() => onEdit(lead)} onDragStart={onDragStart} />
               ))}
+              {items.length > shown && (
+                <button
+                  type="button"
+                  onClick={() => setVisible((v) => ({ ...v, [s.id]: shown + PAGE }))}
+                  className="mt-1 rounded-lg border border-dashed border-border/50 py-2 text-[11px] font-medium text-muted-foreground hover:bg-muted/40"
+                >
+                  Ver mais ({items.length - shown})
+                </button>
+              )}
             </div>
           </div>
         );
@@ -353,6 +365,7 @@ function Kanban({
     </div>
   );
 }
+
 
 function KanbanCard({
   lead, onClick, onDragStart,
