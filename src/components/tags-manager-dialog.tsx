@@ -226,12 +226,17 @@ export function StagesManagerDialog({
   const upsertFn = useServerFn(upsertCrmStage);
   const deleteFn = useServerFn(deleteCrmStage);
   const { data: stages = [], isLoading } = useCrmStages(operacao);
+  const [hidden, setHidden] = useHiddenDefaultStages(operacao);
   const [nome, setNome] = useState("");
   const [cor, setCor] = useState(PRESET_COLORS[0]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState("");
 
   useEffect(() => { if (!open) { setNome(""); setCor(PRESET_COLORS[0]); setEditingId(null); } }, [open]);
+
+  const toggleHidden = (id: string) => {
+    setHidden(hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]);
+  };
 
   const create = useMutation({
     mutationFn: async () => {
@@ -240,7 +245,7 @@ export function StagesManagerDialog({
       await upsertFn({ data: { operacao, nome: n, cor, ordem: stages.length + 1 } });
     },
     onSuccess: () => {
-      toast.success("Coluna criada");
+      toast.success("Coluna adicionada");
       setNome("");
       qc.invalidateQueries({ queryKey: ["crm-stages"] });
     },
@@ -262,61 +267,84 @@ export function StagesManagerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Columns3 className="h-5 w-5" /> Colunas do CRM — {operacao}</DialogTitle>
           <DialogDescription>
-            Personalize as colunas além das padrões (Novo, Em contato, Qualificado…). Vincule etiquetas no menu de Etiquetas pra mover leads automaticamente.
+            Oculte as colunas padrão que você não usa e adicione as suas. Etiquetas podem mover leads automaticamente pra qualquer coluna.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="rounded-lg border p-3 space-y-2">
-            <p className="text-xs font-medium">Nova coluna</p>
+        <div className="space-y-5">
+          {/* ADICIONAR NOVA */}
+          <section className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Adicionar nova coluna</p>
+            </div>
             <div className="flex gap-2">
               <Input
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && create.mutate()}
                 placeholder="Ex: Reagendar, Esperando pagamento…"
+                className="bg-background"
               />
               <Button onClick={() => create.mutate()} disabled={create.isPending || !nome.trim()}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
               </Button>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {PRESET_COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setCor(c)}
-                  className={`h-6 w-6 rounded-full border-2 ${cor === c ? "border-foreground" : "border-transparent"}`}
-                  style={{ backgroundColor: c }} />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Colunas padrão</p>
-            {DEFAULT_STAGES.map((s) => (
-              <div key={s.id} className="flex items-center gap-2 rounded-md border border-dashed p-2 opacity-70">
-                <span className="h-3 w-3 rounded-full" style={{ background: s.cor }} />
-                <span className="text-sm">{s.nome}</span>
-                <span className="ml-auto text-[10px] uppercase text-muted-foreground">padrão</span>
+            <div>
+              <p className="mb-1.5 text-[11px] text-muted-foreground">Cor da coluna:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_COLORS.map((c) => (
+                  <button key={c} type="button" onClick={() => setCor(c)}
+                    className={`h-7 w-7 rounded-full border-2 transition ${cor === c ? "border-foreground scale-110" : "border-transparent hover:scale-105"}`}
+                    style={{ backgroundColor: c }} aria-label={c} />
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          </section>
 
-          <div className="space-y-2 max-h-[260px] overflow-y-auto scrollbar-fancy">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Colunas customizadas</p>
+          {/* PADRÕES */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Colunas padrão</p>
+              <span className="text-[10px] text-muted-foreground">{DEFAULT_STAGES.length - hidden.length}/{DEFAULT_STAGES.length} visíveis</span>
+            </div>
+            {DEFAULT_STAGES.map((s) => {
+              const isHidden = hidden.includes(s.id);
+              return (
+                <div key={s.id} className={`flex items-center gap-2 rounded-md border p-2 transition ${isHidden ? "opacity-40 bg-muted/30" : "bg-card"}`}>
+                  <span className="h-3 w-3 rounded-full shrink-0" style={{ background: s.cor }} />
+                  <span className={`text-sm flex-1 ${isHidden ? "line-through" : ""}`}>{s.nome}</span>
+                  <span className="text-[10px] uppercase text-muted-foreground">padrão</span>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => toggleHidden(s.id)}>
+                    {isHidden ? <><Eye className="h-3.5 w-3.5" /> Mostrar</> : <><EyeOff className="h-3.5 w-3.5" /> Ocultar</>}
+                  </Button>
+                </div>
+              );
+            })}
+          </section>
+
+          {/* CUSTOMIZADAS */}
+          <section className="space-y-2">
+            <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Suas colunas personalizadas</p>
             {isLoading && <p className="text-xs text-muted-foreground">Carregando…</p>}
             {!isLoading && stages.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-3">Nenhuma coluna personalizada.</p>
+              <div className="rounded-md border border-dashed p-4 text-center">
+                <p className="text-xs text-muted-foreground">Nenhuma coluna personalizada ainda.</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Use o formulário acima pra adicionar.</p>
+              </div>
             )}
             {stages.map((s) => (
-              <div key={s.id} className="flex items-center gap-2 rounded-md border p-2">
-                <span className="h-3 w-3 rounded-full" style={{ background: s.cor }} />
+              <div key={s.id} className="flex items-center gap-2 rounded-md border bg-card p-2">
+                <span className="h-3 w-3 rounded-full shrink-0" style={{ background: s.cor }} />
                 {editingId === s.id ? (
                   <>
-                    <Input value={editNome} onChange={(e) => setEditNome(e.target.value)} className="h-7 flex-1" />
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+                    <Input value={editNome} onChange={(e) => setEditNome(e.target.value)} className="h-7 flex-1"
+                      onKeyDown={(e) => { if (e.key === "Enter") { update.mutate({ ...s, nome: editNome.trim() || s.nome }); setEditingId(null); } }} />
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-500" onClick={() => {
                       update.mutate({ ...s, nome: editNome.trim() || s.nome });
                       setEditingId(null);
                     }}>
@@ -336,7 +364,7 @@ export function StagesManagerDialog({
                 )}
               </div>
             ))}
-          </div>
+          </section>
         </div>
       </DialogContent>
     </Dialog>
