@@ -183,3 +183,27 @@ select:-webkit-autofill {
   transition: background-color 9999s ease-in-out 0s !important;
   caret-color: var(--foreground);
 }
+
+/* ============ Thin themed scrollbars ============ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--primary) 40%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--primary) 35%, transparent);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--primary) 60%, transparent);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
