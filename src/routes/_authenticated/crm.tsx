@@ -31,6 +31,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { DragScroll } from "@/components/drag-scroll";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crm")({
