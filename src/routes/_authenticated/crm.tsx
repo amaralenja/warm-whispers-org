@@ -31,6 +31,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { DragScroll } from "@/components/drag-scroll";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crm")({
@@ -319,7 +320,7 @@ function Kanban({
   const PAGE = 15;
 
   return (
-    <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">
+    <DragScroll className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide cursor-grab active:cursor-grabbing select-none">
       {stages.map((s) => {
         const items = grouped.get(s.id) ?? [];
         const shown = visible[s.id] ?? PAGE;
@@ -367,7 +368,7 @@ function Kanban({
           </div>
         );
       })}
-    </div>
+    </DragScroll>
   );
 }
 
