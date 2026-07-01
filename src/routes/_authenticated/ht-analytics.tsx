@@ -166,18 +166,32 @@ function HTAnalytics() {
   }, [period, nonce]);
 
   const kpis = useMemo(() => {
-    const receita = vendas.reduce((s, x) => s + Number(x.valor_total || 0), 0);
-    const liquido = vendas.reduce((s, x) => s + Number(x.valor_liquido || 0), 0);
-    const ticket = vendas.length ? receita / vendas.length : 0;
+    // Receita do quiz (crm_status = fechado/ganho, valor = crm_valor)
+    const fechadosQuiz = leads.filter((l) => STATUS_FECHADO.includes(norm(l.crm_status || "")));
+    const receitaQuiz = fechadosQuiz.reduce((s, l) => s + Number(l.crm_valor || 0), 0);
+    // Vendas registradas em ht_vendas (se houver)
+    const receitaVendas = vendas.reduce((s, x) => s + Number(x.valor_total || 0), 0);
+    const liquidoVendas = vendas.reduce((s, x) => s + Number(x.valor_liquido || 0), 0);
+    const receita = receitaQuiz + receitaVendas;
+    const qtdVendas = fechadosQuiz.length + vendas.length;
+    // Estimar líquido: usa ht_vendas se tiver, senão 85% do bruto do quiz (proxy pós-taxas)
+    const liquido = liquidoVendas + (receitaQuiz * 0.85);
+    const ticket = qtdVendas > 0 ? receita / qtdVendas : 0;
     const iniciados = leads.length;
     const finalizados = leads.filter(isFinalizado).length;
     const abandonos = iniciados - finalizados;
     const quentes = leads.filter(isQuente).length;
     const conv = iniciados > 0 ? (finalizados / iniciados) * 100 : 0;
+    // Reuniões: leads com crm_data_agendamento OU status agendado/pós-agendamento
+    const reunioesQuiz = leads.filter((l) => {
+      if (l.crm_data_agendamento) return true;
+      return STATUS_AGENDADO.includes(norm(l.crm_status || ""));
+    }).length;
+    const qtdReunioes = reunioesQuiz + reunioes.length;
     return {
-      receita, liquido, ticket, qtdVendas: vendas.length,
+      receita, liquido, ticket, qtdVendas,
       iniciados, finalizados, abandonos, quentes, conv,
-      qtdHtLeads: htLeads.length, qtdReunioes: reunioes.length,
+      qtdHtLeads: htLeads.length, qtdReunioes,
     };
   }, [leads, vendas, htLeads, reunioes]);
 
