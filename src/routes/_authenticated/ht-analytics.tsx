@@ -769,148 +769,279 @@ function LeadsListSection(props: LeadsListProps) {
   const shown = filtered.slice(0, listLimit);
   const activeCount = flStatus.size + flScore.size + flCaixa.size + flUtm.size + (flSearch ? 1 : 0);
 
+  // KPIs contextuais dos leads filtrados
+  const kpisLista = useMemo(() => {
+    const fin = filtered.filter(isFinalizado).length;
+    const aband = filtered.length - fin;
+    const quentes = filtered.filter((l) => ["D","E","F","G"].includes((l.caixa_letra ?? "").toUpperCase())).length;
+    const rate = filtered.length > 0 ? (fin / filtered.length) * 100 : 0;
+    return { fin, aband, quentes, rate };
+  }, [filtered]);
+
+  const clearAll = () => {
+    setFlStatus(new Set()); setFlScore(new Set());
+    setFlCaixa(new Set()); setFlUtm(new Set()); setFlSearch("");
+  };
+
   return (
-    <section>
-      <SectionTitle overline="Bloco 05" title="Lista de Leads" />
-      <Card className="border-border/50 bg-card/50 backdrop-blur">
-        <CardContent className="p-5 space-y-5">
-          {/* Filtros */}
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <FilterGroup label="Status">
-                <Chip active={flStatus.has("finalizado")} onClick={() => setFlStatus((s) => toggleInSet(s, "finalizado"))}>Finalizados</Chip>
-                <Chip active={flStatus.has("abandono")} onClick={() => setFlStatus((s) => toggleInSet(s, "abandono"))}>Abandonaram</Chip>
-              </FilterGroup>
-              <FilterGroup label="Score">
+    <section className="space-y-5">
+      {/* HERO / HEADER */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card/80 to-card/40 backdrop-blur">
+        <div className="absolute inset-0 opacity-40 pointer-events-none">
+          <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
+          <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+        </div>
+        <div className="relative p-6 grid gap-6 lg:grid-cols-[1fr_auto] items-center">
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-accent/80 mb-2">
+              Lista de Leads · Quiz High Ticket
+            </div>
+            <h2 className="text-3xl font-black tracking-tight">
+              {fmtInt(total)} <span className="text-muted-foreground font-medium text-2xl">leads encontrados</span>
+            </h2>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Filtragem avançada por status, score, caixa e origem de tráfego.
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <MiniKpi icon={CheckCircle2} label="Finalizados" value={fmtInt(kpisLista.fin)} tone="ok" />
+            <MiniKpi icon={XCircle} label="Abandono" value={fmtInt(kpisLista.aband)} tone="mute" />
+            <MiniKpi icon={Flame} label="Quentes D+" value={fmtInt(kpisLista.quentes)} tone="hot" />
+            <MiniKpi icon={TrendingUp} label="Conversão" value={`${kpisLista.rate.toFixed(1)}%`} tone="accent" />
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
+        {/* SIDEBAR DE FILTROS */}
+        <aside className="lg:sticky lg:top-4 lg:self-start">
+          <Card className="border-border/50 bg-card/50 backdrop-blur overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-gradient-to-r from-accent/5 to-transparent">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-accent" />
+                <div className="text-[11px] font-semibold uppercase tracking-wider">Filtros</div>
+              </div>
+              {activeCount > 0 && (
+                <button onClick={clearAll} className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                  <X className="h-3 w-3" /> Limpar ({activeCount})
+                </button>
+              )}
+            </div>
+            <div className="p-4 space-y-5 max-h-[calc(100vh-14rem)] overflow-y-auto">
+              <FilterBlock label="Status">
+                <Chip active={flStatus.has("finalizado")} onClick={() => setFlStatus((s) => toggleInSet(s, "finalizado"))}>
+                  <CheckCircle2 className="h-3 w-3" /> Finalizados
+                </Chip>
+                <Chip active={flStatus.has("abandono")} onClick={() => setFlStatus((s) => toggleInSet(s, "abandono"))}>
+                  <XCircle className="h-3 w-3" /> Abandono
+                </Chip>
+              </FilterBlock>
+
+              <FilterBlock label="Score / Grupo">
                 {SCORE_GROUPS.map((g) => (
                   <Chip key={g.id} active={flScore.has(g.id)} onClick={() => setFlScore((s) => toggleInSet(s, g.id))}>
                     {g.label}
                   </Chip>
                 ))}
-              </FilterGroup>
-            </div>
+              </FilterBlock>
 
-            <FilterGroup label="Caixa (bolso)">
-              {CAIXA_LETRAS.map((c) => (
-                <Chip key={c.letra} active={flCaixa.has(c.letra)} onClick={() => setFlCaixa((s) => toggleInSet(s, c.letra))}>
-                  <span className="font-mono text-accent mr-1.5">{c.letra}</span>{c.label}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            {utmOptions.length > 0 && (
-              <FilterGroup label="Origem (UTM Source)">
-                {utmOptions.map((u) => (
-                  <Chip key={u} active={flUtm.has(u)} onClick={() => setFlUtm((s) => toggleInSet(s, u))}>{u}</Chip>
+              <FilterBlock label="Caixa (bolso)">
+                {CAIXA_LETRAS.map((c) => (
+                  <Chip key={c.letra} active={flCaixa.has(c.letra)} onClick={() => setFlCaixa((s) => toggleInSet(s, c.letra))}>
+                    <span className="font-mono text-accent">{c.letra}</span>
+                    <span className="opacity-70">{c.label}</span>
+                  </Chip>
                 ))}
-              </FilterGroup>
-            )}
+              </FilterBlock>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <input
-                type="text"
-                value={flSearch}
-                onChange={(e) => setFlSearch(e.target.value)}
-                placeholder="Buscar por nome, email ou WhatsApp…"
-                className="flex-1 min-w-64 h-9 px-3 rounded-md bg-card/60 border border-border/60 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-accent/50"
-              />
-              {activeCount > 0 && (
-                <Button variant="ghost" size="sm" className="text-xs h-8"
-                  onClick={() => {
-                    setFlStatus(new Set()); setFlScore(new Set());
-                    setFlCaixa(new Set()); setFlUtm(new Set()); setFlSearch("");
-                  }}>
-                  Limpar {activeCount} filtro{activeCount > 1 ? "s" : ""}
-                </Button>
+              {utmOptions.length > 0 && (
+                <FilterBlock label="Origem UTM">
+                  {utmOptions.map((u) => (
+                    <Chip key={u} active={flUtm.has(u)} onClick={() => setFlUtm((s) => toggleInSet(s, u))}>{u}</Chip>
+                  ))}
+                </FilterBlock>
               )}
-              <div className="text-[11px] text-muted-foreground font-mono tabular-nums">
-                {fmtInt(total)} lead{total !== 1 ? "s" : ""}
+            </div>
+          </Card>
+        </aside>
+
+        {/* TABELA */}
+        <div className="min-w-0 space-y-3">
+          {/* Toolbar de busca */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur">
+            <div className="p-3 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={flSearch}
+                  onChange={(e) => setFlSearch(e.target.value)}
+                  placeholder="Buscar por nome, e-mail ou WhatsApp…"
+                  className="w-full h-10 pl-9 pr-9 rounded-lg bg-background/60 border border-border/60 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/10 transition-all"
+                />
+                {flSearch && (
+                  <button onClick={() => setFlSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border border-border/50 rounded-lg px-3 h-10">
+                <Users className="h-3.5 w-3.5 text-accent" />
+                {fmtInt(shown.length)} / {fmtInt(total)}
               </div>
             </div>
-          </div>
+          </Card>
 
-          {/* Tabela */}
-          <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-y border-border/50">
-                  <th className="px-5 py-2.5">Data</th>
-                  <th className="py-2.5">Lead</th>
-                  <th className="py-2.5">Contato</th>
-                  <th className="py-2.5">Score</th>
-                  <th className="py-2.5">Caixa</th>
-                  <th className="py-2.5">UTM</th>
-                  <th className="px-5 py-2.5 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.length === 0 && (
-                  <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground text-xs">
-                    Nenhum lead encontrado com esses filtros.
-                  </td></tr>
-                )}
-                {shown.map((l) => {
-                  const fin = isFinalizado(l);
-                  const letra = (l.caixa_letra ?? "").toUpperCase();
-                  const scoreLabel = "DEFG".includes(letra) ? "Call agendada"
-                    : "BC".includes(letra) ? "Análise equipe"
-                    : letra === "A" ? "Minicurso" : "—";
-                  return (
-                    <tr key={l.id} className="border-b border-border/30 last:border-0 hover:bg-accent/5 transition-colors">
-                      <td className="px-5 py-2.5 text-muted-foreground tabular-nums text-xs">
-                        {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="py-2.5">
-                        <div className="font-medium truncate max-w-40">{l.nome || "—"}</div>
-                      </td>
-                      <td className="py-2.5 text-xs text-muted-foreground">
-                        <div className="truncate max-w-48">{l.email || "—"}</div>
-                        <div className="tabular-nums">{l.whatsapp || ""}</div>
-                      </td>
-                      <td className="py-2.5">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">
-                          {scoreLabel}
-                        </span>
-                      </td>
-                      <td className="py-2.5">
-                        {letra ? (
-                          <span className="text-xs font-mono">
-                            <span className="text-accent font-bold">{letra}</span>
-                            <span className="text-muted-foreground ml-1.5">
-                              {CAIXA_LETRAS.find((c) => c.letra === letra)?.label ?? l.caixa_label ?? ""}
-                            </span>
+          {/* Tabela premium */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80 bg-muted/20 border-b border-border/50">
+                    <th className="px-5 py-3 font-semibold">Lead</th>
+                    <th className="py-3 font-semibold">Contato</th>
+                    <th className="py-3 font-semibold">Score</th>
+                    <th className="py-3 font-semibold">Caixa</th>
+                    <th className="py-3 font-semibold">Origem</th>
+                    <th className="py-3 font-semibold">Data</th>
+                    <th className="px-5 py-3 font-semibold text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.length === 0 && (
+                    <tr><td colSpan={7} className="px-5 py-16 text-center">
+                      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                        <div className="h-12 w-12 rounded-full bg-muted/30 grid place-items-center">
+                          <Search className="h-5 w-5 opacity-50" />
+                        </div>
+                        <div className="text-sm">Nenhum lead encontrado</div>
+                        <div className="text-xs opacity-70">Ajuste os filtros para ver mais resultados</div>
+                      </div>
+                    </td></tr>
+                  )}
+                  {shown.map((l) => {
+                    const fin = isFinalizado(l);
+                    const letra = (l.caixa_letra ?? "").toUpperCase();
+                    const scoreLabel = "DEFG".includes(letra) ? "Call agendada"
+                      : "BC".includes(letra) ? "Análise equipe"
+                      : letra === "A" ? "Minicurso" : "—";
+                    const iniciais = (l.nome || "?").trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("");
+                    return (
+                      <tr key={l.id} className="border-b border-border/20 last:border-0 hover:bg-accent/[0.04] transition-colors group">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`h-8 w-8 shrink-0 rounded-full grid place-items-center text-[10px] font-bold ${
+                              fin ? "bg-accent/20 text-accent" : "bg-muted/40 text-muted-foreground"
+                            }`}>{iniciais || "?"}</div>
+                            <div className="min-w-0">
+                              <div className="font-medium truncate max-w-[180px]">{l.nome || "Sem nome"}</div>
+                              <div className="text-[10px] text-muted-foreground font-mono">#{String(l.id).slice(0, 8)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 text-xs">
+                          <div className="flex items-center gap-1.5 text-muted-foreground truncate max-w-[200px]">
+                            <Mail className="h-3 w-3 shrink-0 opacity-60" />
+                            <span className="truncate">{l.email || "—"}</span>
+                          </div>
+                          {l.whatsapp && (
+                            <div className="flex items-center gap-1.5 text-muted-foreground/80 tabular-nums mt-0.5">
+                              <Phone className="h-3 w-3 shrink-0 opacity-60" />
+                              {l.whatsapp}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          <span className="text-[10px] px-2 py-1 rounded-md bg-muted/40 text-muted-foreground whitespace-nowrap">
+                            {scoreLabel}
                           </span>
-                        ) : <span className="text-muted-foreground text-xs">—</span>}
-                      </td>
-                      <td className="py-2.5 text-xs text-muted-foreground truncate max-w-32">
-                        {l.utm_source || "—"}
-                      </td>
-                      <td className="px-5 py-2.5 text-right">
-                        <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded ${
-                          fin ? "bg-accent/20 text-accent" : "bg-muted/30 text-muted-foreground"
-                        }`}>
-                          {fin ? "Finalizado" : "Abandono"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {shown.length < total && (
-            <div className="flex justify-center">
-              <Button variant="outline" size="sm" onClick={() => setListLimit((n) => n + 50)}>
-                Ver mais ({fmtInt(total - shown.length)} restantes)
-              </Button>
+                        </td>
+                        <td className="py-3">
+                          {letra ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-6 w-6 rounded-md bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/30 grid place-items-center text-[11px] font-mono font-bold text-accent">
+                                {letra}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                                {CAIXA_LETRAS.find((c) => c.letra === letra)?.label ?? ""}
+                              </span>
+                            </div>
+                          ) : <span className="text-muted-foreground text-xs">—</span>}
+                        </td>
+                        <td className="py-3 text-xs text-muted-foreground truncate max-w-[120px]">
+                          {l.utm_source ? (
+                            <span className="px-2 py-0.5 rounded bg-primary/10 text-primary/80 text-[10px] font-medium">
+                              {l.utm_source}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="py-3 text-muted-foreground tabular-nums text-xs whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3 opacity-60" />
+                            {new Date(l.data_criacao).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                            fin
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                              : "bg-muted/30 text-muted-foreground border border-border/40"
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${fin ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+                            {fin ? "Finalizado" : "Abandono"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {shown.length < total && (
+              <div className="p-4 border-t border-border/40 flex justify-center bg-gradient-to-b from-transparent to-accent/[0.02]">
+                <Button variant="outline" size="sm" onClick={() => setListLimit((n) => n + 50)} className="gap-2">
+                  Carregar mais <span className="text-muted-foreground">({fmtInt(total - shown.length)})</span>
+                  <ArrowUpRight className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
     </section>
   );
 }
+
+function FilterBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 mb-2 font-semibold">{label}</div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function MiniKpi({ icon: Icon, label, value, tone }: {
+  icon: any; label: string; value: string; tone: "ok" | "mute" | "hot" | "accent";
+}) {
+  const toneClass = {
+    ok: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    mute: "text-muted-foreground bg-muted/20 border-border/50",
+    hot: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+    accent: "text-accent bg-accent/10 border-accent/20",
+  }[tone];
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 min-w-[100px] ${toneClass}`}>
+      <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider opacity-80 mb-1">
+        <Icon className="h-3 w-3" /> {label}
+      </div>
+      <div className="text-lg font-black tabular-nums">{value}</div>
+    </div>
+  );
+}
+
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
