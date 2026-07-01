@@ -595,8 +595,8 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
     mediaId: String(d?.mediaId ?? ""),
   }))
   .handler(async ({ context, data }) => {
-    await assertVendorChannel(context, data.channelId, db);
     const db = await dbFor(context);
+    await assertVendorChannel(context, data.channelId, db);
     const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
