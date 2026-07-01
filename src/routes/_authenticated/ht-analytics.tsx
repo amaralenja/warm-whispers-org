@@ -122,7 +122,7 @@ function HTAnalytics() {
       }
 
       // HT tables in parallel
-      const [v, hl, r] = await Promise.all([
+      const [v, hl, r, ag] = await Promise.all([
         (() => {
           let q = supabase.from("ht_vendas").select("*").limit(5000);
           if (startIso) q = q.gte("data", startIso);
@@ -154,13 +154,7 @@ function HTAnalytics() {
       setVendas(v.data ?? []);
       setHtLeads(hl.data ?? []);
       setReunioes(r.data ?? []);
-      setAgenda((r as any).data ?? []);
-      // @ts-expect-error tuple length changed
-      setAgenda(arguments[0] ?? []);
-      setLoading(false);
-    })();
-    return () => { cancel = true; };
-  }, [period, nonce]);
+      setAgenda(ag.data ?? []);
       setLoading(false);
     })();
     return () => { cancel = true; };
