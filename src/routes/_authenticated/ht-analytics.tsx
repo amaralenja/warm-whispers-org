@@ -664,15 +664,16 @@ function ChartCard({
   title, subtitle, children, full,
 }: { title: string; subtitle?: string; children: React.ReactNode; full?: boolean }) {
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur">
-      <CardContent className="p-6">
-        <div className="mb-4">
+    <Card className="border-border/50 bg-card/50 backdrop-blur flex flex-col">
+      <CardContent className="p-6 flex-1 flex flex-col min-h-0">
+        <div className="mb-4 shrink-0">
           <div className="text-sm font-semibold tracking-tight">{title}</div>
           {subtitle && <div className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</div>}
         </div>
-        <div className={full ? "h-56" : "h-64"}>{children}</div>
+        <div className={`${full ? "h-56" : "h-72"} flex-1 min-h-0`}>{children}</div>
       </CardContent>
     </Card>
+
   );
 }
 
