@@ -28,6 +28,7 @@ export const MENU_TREE: MenuNode[] = [
     key: "high-ticket",
     title: "High Ticket",
     children: [
+      { key: "ht-analytics", title: "Analytics", url: "/ht-analytics" },
       { key: "calendar", title: "Calendário Calls", url: "/calendar" },
       { key: "quiz", title: "Quiz", url: "/quiz" },
       { key: "meta-ads", title: "Facebook Ads", url: "/meta-ads" },
