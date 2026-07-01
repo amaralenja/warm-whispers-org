@@ -35,6 +35,36 @@ export const DEFAULT_STAGES: { id: string; nome: string; cor: string }[] = [
   { id: "perdido", nome: "Perdido", cor: "#ef4444" },
 ];
 
+// LocalStorage-persisted hidden default stages per operação.
+const HIDDEN_KEY = (op: string) => `crm-hidden-stages:${op || "all"}`;
+export function getHiddenDefaultStages(operacao: string | undefined): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_KEY(operacao ?? "all"));
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch { return []; }
+}
+export function setHiddenDefaultStages(operacao: string | undefined, ids: string[]) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(HIDDEN_KEY(operacao ?? "all"), JSON.stringify(ids)); } catch {}
+  try { window.dispatchEvent(new CustomEvent("crm-hidden-stages-changed")); } catch {}
+}
+export function useHiddenDefaultStages(operacao: string | undefined): [string[], (ids: string[]) => void] {
+  const [hidden, setHidden] = useState<string[]>(() => getHiddenDefaultStages(operacao));
+  useEffect(() => { setHidden(getHiddenDefaultStages(operacao)); }, [operacao]);
+  useEffect(() => {
+    const on = () => setHidden(getHiddenDefaultStages(operacao));
+    window.addEventListener("crm-hidden-stages-changed", on);
+    window.addEventListener("storage", on);
+    return () => {
+      window.removeEventListener("crm-hidden-stages-changed", on);
+      window.removeEventListener("storage", on);
+    };
+  }, [operacao]);
+  const update = (ids: string[]) => { setHiddenDefaultStages(operacao, ids); setHidden(ids); };
+  return [hidden, update];
+}
+
 export function useCrmTags(operacao: string | undefined) {
   const listTagsFn = useServerFn(listCrmTags);
   return useQuery({
