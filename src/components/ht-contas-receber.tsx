@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,24 +7,29 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, DollarSign, Wallet, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Pencil, DollarSign, Wallet, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 type Conta = {
   id: string;
-  nome: string;
+  nome: string | null;
   whatsapp: string | null;
-  closer: string | null;
-  faturamento_total: number;
-  recebido: number;
-  falta_receber: number;
-  data_fechamento: string | null;
-  previsao_pagar_restante: string | null;
-  status: string;
-  observacoes: string | null;
-  created_at: string;
+  crm_status: string | null;
+  crm_valor: number | null;
+  crm_valor_recebido: number | null;
+  crm_data_agendamento: string | null;
+  crm_data_pagamento_restante: string | null;
+  crm_notas_closer: string | null;
+  updated_at: string | null;
 };
 
 const fmtBRL = (n: number) =>
@@ -32,7 +37,7 @@ const fmtBRL = (n: number) =>
 
 function fmtDate(d: string | null) {
   if (!d) return "—";
-  const dt = new Date(d + "T00:00:00");
+  const dt = new Date(d);
   if (isNaN(dt.getTime())) return "—";
   return dt.toLocaleDateString("pt-BR");
 }
@@ -40,22 +45,26 @@ function fmtDate(d: string | null) {
 export function HTContasReceber() {
   const [rows, setRows] = useState<Conta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"all" | "aberto" | "quitado">("aberto");
+  const [statusFilter, setStatusFilter] = useState<"all" | "aberto" | "quitado">("all");
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Conta | null>(null);
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("ht_contas_receber")
-      .select("*")
-      .order("data_fechamento", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false });
+    // Puxa fechados + followup do quiz que tenham valor
+    const { data, error } = await quizSb
+      .from("leads")
+      .select("id,nome,whatsapp,crm_status,crm_valor,crm_valor_recebido,crm_data_agendamento,crm_data_pagamento_restante,crm_notas_closer,updated_at")
+      .in("crm_status", ["fechado", "followup"])
+      .gt("crm_valor", 0)
+      .order("updated_at", { ascending: false })
+      .limit(500);
     if (error) {
       toast.error("Erro ao carregar contas");
+      setRows([]);
     } else {
-      setRows((data || []) as Conta[]);
+      setRows((data || []) as unknown as Conta[]);
     }
     setLoading(false);
   }
@@ -64,44 +73,32 @@ export function HTContasReceber() {
 
   const filtered = useMemo(() => {
     let list = rows;
-    if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
+    if (statusFilter !== "all") {
+      list = list.filter((r) => {
+        const total = Number(r.crm_valor || 0);
+        const rec = Number(r.crm_valor_recebido || 0);
+        const quitado = total > 0 && rec >= total;
+        return statusFilter === "quitado" ? quitado : !quitado;
+      });
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(
         (r) =>
           (r.nome || "").toLowerCase().includes(q) ||
-          (r.whatsapp || "").toLowerCase().includes(q) ||
-          (r.closer || "").toLowerCase().includes(q),
+          (r.whatsapp || "").toLowerCase().includes(q),
       );
     }
     return list;
   }, [rows, statusFilter, search]);
 
   const kpis = useMemo(() => {
-    const total = filtered.reduce((s, r) => s + Number(r.faturamento_total || 0), 0);
-    const recebido = filtered.reduce((s, r) => s + Number(r.recebido || 0), 0);
-    const falta = filtered.reduce((s, r) => s + Number(r.falta_receber || 0), 0);
-    const qtd = filtered.length;
-    return { total, recebido, falta, qtd };
+    const total = filtered.reduce((s, r) => s + Number(r.crm_valor || 0), 0);
+    const recebido = filtered.reduce((s, r) => s + Number(r.crm_valor_recebido || 0), 0);
+    const falta = Math.max(0, total - recebido);
+    return { total, recebido, falta, qtd: filtered.length };
   }, [filtered]);
 
-  function openNew() {
-    setEditing({
-      id: "",
-      nome: "",
-      whatsapp: "",
-      closer: "",
-      faturamento_total: 0,
-      recebido: 0,
-      falta_receber: 0,
-      data_fechamento: new Date().toISOString().slice(0, 10),
-      previsao_pagar_restante: null,
-      status: "aberto",
-      observacoes: "",
-      created_at: "",
-    });
-    setDialogOpen(true);
-  }
   function openEdit(c: Conta) {
     setEditing({ ...c });
     setDialogOpen(true);
@@ -109,48 +106,20 @@ export function HTContasReceber() {
 
   async function save() {
     if (!editing) return;
-    if (!editing.nome.trim()) {
-      toast.error("Nome é obrigatório");
-      return;
-    }
+    const total = Number(editing.crm_valor || 0);
+    const rec = Number(editing.crm_valor_recebido || 0);
     const payload = {
-      nome: editing.nome.trim(),
-      whatsapp: editing.whatsapp || null,
-      closer: editing.closer || null,
-      faturamento_total: Number(editing.faturamento_total || 0),
-      recebido: Number(editing.recebido || 0),
-      data_fechamento: editing.data_fechamento || null,
-      previsao_pagar_restante: editing.previsao_pagar_restante || null,
-      status:
-        Number(editing.recebido || 0) >= Number(editing.faturamento_total || 0) &&
-        Number(editing.faturamento_total || 0) > 0
-          ? "quitado"
-          : editing.status || "aberto",
-      observacoes: editing.observacoes || null,
+      crm_valor: total,
+      crm_valor_recebido: rec,
+      crm_data_pagamento_restante: editing.crm_data_pagamento_restante || null,
+      crm_status: total > 0 && rec >= total ? "fechado" : editing.crm_status || "fechado",
+      crm_notas_closer: editing.crm_notas_closer || null,
     };
-
-    if (editing.id) {
-      const { error } = await supabase
-        .from("ht_contas_receber")
-        .update(payload)
-        .eq("id", editing.id);
-      if (error) { toast.error("Erro ao salvar"); return; }
-      toast.success("Conta atualizada");
-    } else {
-      const { error } = await supabase.from("ht_contas_receber").insert(payload);
-      if (error) { toast.error("Erro ao criar"); return; }
-      toast.success("Conta criada");
-    }
+    const { error } = await quizSb.from("leads").update(payload).eq("id", editing.id);
+    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+    toast.success("Conta atualizada");
     setDialogOpen(false);
     setEditing(null);
-    load();
-  }
-
-  async function remove(id: string) {
-    if (!confirm("Remover esta conta?")) return;
-    const { error } = await supabase.from("ht_contas_receber").delete().eq("id", id);
-    if (error) { toast.error("Erro ao remover"); return; }
-    toast.success("Removida");
     load();
   }
 
@@ -173,12 +142,12 @@ export function HTContasReceber() {
         <div>
           <h2 className="text-2xl font-bold">Contas a Receber</h2>
           <p className="text-sm text-muted-foreground">
-            Controle de pagamentos parciais e agendamentos de recebimento
+            Fechamentos e sinais recebidos · dados do CRM do Quiz
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Buscar nome / whatsapp / closer"
+            placeholder="Buscar nome / whatsapp"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-64"
@@ -191,8 +160,8 @@ export function HTContasReceber() {
               <SelectItem value="quitado">Quitados</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={openNew} className="gap-2">
-            <Plus className="h-4 w-4" /> Nova conta
+          <Button variant="outline" size="icon" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
@@ -207,7 +176,6 @@ export function HTContasReceber() {
                   <th className="text-left px-4 py-3">Data Fechamento</th>
                   <th className="text-left px-4 py-3">Nome</th>
                   <th className="text-left px-4 py-3">WhatsApp</th>
-                  <th className="text-left px-4 py-3">Closer</th>
                   <th className="text-right px-4 py-3">Faturamento</th>
                   <th className="text-right px-4 py-3">Recebido (Sinal)</th>
                   <th className="text-right px-4 py-3">Falta Receber</th>
@@ -218,43 +186,41 @@ export function HTContasReceber() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} className="p-8 text-center text-muted-foreground">Carregando…</td></tr>
+                  <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">Carregando…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={10} className="p-8 text-center text-muted-foreground">
-                    Nenhuma conta encontrada. Clique em "Nova conta" para começar.
+                  <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">
+                    Nenhuma conta encontrada.
                   </td></tr>
                 ) : (
-                  filtered.map((r) => (
-                    <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20">
-                      <td className="px-4 py-3 tabular-nums text-muted-foreground">{fmtDate(r.data_fechamento)}</td>
-                      <td className="px-4 py-3 font-medium">{r.nome}</td>
-                      <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.whatsapp || "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{r.closer || "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold">{fmtBRL(r.faturamento_total)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-emerald-400">{fmtBRL(r.recebido)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-amber-400 font-semibold">{fmtBRL(r.falta_receber)}</td>
-                      <td className="px-4 py-3 tabular-nums text-muted-foreground">{fmtDate(r.previsao_pagar_restante)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-block text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${
-                          r.status === "quitado"
-                            ? "bg-emerald-500/15 text-emerald-400"
-                            : "bg-amber-500/15 text-amber-400"
-                        }`}>
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1">
+                  filtered.map((r) => {
+                    const total = Number(r.crm_valor || 0);
+                    const rec = Number(r.crm_valor_recebido || 0);
+                    const falta = Math.max(0, total - rec);
+                    const quitado = total > 0 && rec >= total;
+                    return (
+                      <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20">
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{fmtDate(r.crm_data_agendamento || r.updated_at)}</td>
+                        <td className="px-4 py-3 font-medium">{r.nome || "—"}</td>
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.whatsapp || "—"}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold">{fmtBRL(total)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-emerald-400">{fmtBRL(rec)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-amber-400 font-semibold">{fmtBRL(falta)}</td>
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{fmtDate(r.crm_data_pagamento_restante)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${
+                            quitado ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+                          }`}>
+                            {quitado ? "quitado" : "aberto"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
                           <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => remove(r.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -262,58 +228,39 @@ export function HTContasReceber() {
         </CardContent>
       </Card>
 
-      {/* Dialog Edit/New */}
+      {/* Dialog Edit */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editing?.id ? "Editar conta" : "Nova conta a receber"}</DialogTitle>
+            <DialogTitle>Editar conta — {editing?.nome}</DialogTitle>
           </DialogHeader>
           {editing && (
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Label>Nome do cliente *</Label>
-                <Input value={editing.nome}
-                  onChange={(e) => setEditing({ ...editing, nome: e.target.value })} />
-              </div>
-              <div>
-                <Label>WhatsApp</Label>
-                <Input value={editing.whatsapp || ""}
-                  onChange={(e) => setEditing({ ...editing, whatsapp: e.target.value })} />
-              </div>
-              <div>
-                <Label>Closer</Label>
-                <Input value={editing.closer || ""}
-                  onChange={(e) => setEditing({ ...editing, closer: e.target.value })} />
-              </div>
               <div>
                 <Label>Faturamento total (R$)</Label>
-                <Input type="number" step="0.01" value={editing.faturamento_total}
-                  onChange={(e) => setEditing({ ...editing, faturamento_total: Number(e.target.value) })} />
+                <Input type="number" step="0.01" value={editing.crm_valor ?? 0}
+                  onChange={(e) => setEditing({ ...editing, crm_valor: Number(e.target.value) })} />
               </div>
               <div>
                 <Label>Recebido / Sinal (R$)</Label>
-                <Input type="number" step="0.01" value={editing.recebido}
-                  onChange={(e) => setEditing({ ...editing, recebido: Number(e.target.value) })} />
-              </div>
-              <div>
-                <Label>Data de fechamento</Label>
-                <Input type="date" value={editing.data_fechamento || ""}
-                  onChange={(e) => setEditing({ ...editing, data_fechamento: e.target.value })} />
-              </div>
-              <div>
-                <Label>Previsão do restante</Label>
-                <Input type="date" value={editing.previsao_pagar_restante || ""}
-                  onChange={(e) => setEditing({ ...editing, previsao_pagar_restante: e.target.value })} />
+                <Input type="number" step="0.01" value={editing.crm_valor_recebido ?? 0}
+                  onChange={(e) => setEditing({ ...editing, crm_valor_recebido: Number(e.target.value) })} />
               </div>
               <div className="col-span-2">
-                <Label>Observações</Label>
-                <Textarea value={editing.observacoes || ""} rows={3}
-                  onChange={(e) => setEditing({ ...editing, observacoes: e.target.value })} />
+                <Label>Previsão do restante</Label>
+                <Input type="date"
+                  value={editing.crm_data_pagamento_restante?.slice(0, 10) || ""}
+                  onChange={(e) => setEditing({ ...editing, crm_data_pagamento_restante: e.target.value ? `${e.target.value}T00:00:00` : null })} />
+              </div>
+              <div className="col-span-2">
+                <Label>Notas do Closer</Label>
+                <Textarea value={editing.crm_notas_closer || ""} rows={3}
+                  onChange={(e) => setEditing({ ...editing, crm_notas_closer: e.target.value })} />
               </div>
               <div className="col-span-2 rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-sm flex justify-between">
                 <span className="text-muted-foreground">Falta receber:</span>
                 <span className="font-semibold text-amber-400 tabular-nums">
-                  {fmtBRL(Math.max(0, Number(editing.faturamento_total || 0) - Number(editing.recebido || 0)))}
+                  {fmtBRL(Math.max(0, Number(editing.crm_valor || 0) - Number(editing.crm_valor_recebido || 0)))}
                 </span>
               </div>
             </div>
