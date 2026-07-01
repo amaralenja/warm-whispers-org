@@ -198,6 +198,41 @@ function assertVendorChannel(context: any, channelId: string) {
   }
 }
 
+async function autoAssignUnassignedConversations(db: any, channelIds?: string[]) {
+  const allowedChannels = Array.isArray(channelIds) ? channelIds.map(String).filter(Boolean) : [];
+  let q = db
+    .from("wa_conversations" as any)
+    .select("id,channel_id")
+    .is("assigned_vendor_id", null)
+    .neq("operacao_id", "__notificador__")
+    .limit(200);
+
+  if (allowedChannels.length > 0) q = q.in("channel_id", allowedChannels);
+
+  const { data: rows, error } = await q;
+  if (error || !Array.isArray(rows) || rows.length === 0) return;
+
+  const channelCache = new Map<string, number | null>();
+  for (const row of rows as any[]) {
+    const channelId = String(row.channel_id ?? "");
+    if (!channelId) continue;
+
+    if (!channelCache.has(channelId)) {
+      const { data: vendorId } = await db.rpc("assign_vendor_for_channel" as any, { _channel_id: channelId });
+      channelCache.set(channelId, vendorId ? Number(vendorId) : null);
+    }
+
+    const vendorId = channelCache.get(channelId);
+    if (!vendorId) continue;
+
+    await db
+      .from("wa_conversations" as any)
+      .update({ assigned_vendor_id: vendorId })
+      .eq("id", row.id)
+      .is("assigned_vendor_id", null);
+  }
+}
+
 async function assertConversationAccess(context: any, db: any, conversationId: string) {
   if (!conversationId) throw new Error("conversationId obrigatório");
   const { data: conv, error } = await db
@@ -209,7 +244,19 @@ async function assertConversationAccess(context: any, db: any, conversationId: s
   if (!conv) throw new Error("Conversa não encontrada");
   if (context?.vendor) {
     assertVendorChannel(context, String((conv as any).channel_id));
-    if (Number((conv as any).assigned_vendor_id) !== Number(context.vendor.id)) {
+    const assignedVendorId = (conv as any).assigned_vendor_id == null ? null : Number((conv as any).assigned_vendor_id);
+    if (assignedVendorId == null) {
+      const { data: vendorId } = await db.rpc("assign_vendor_for_channel" as any, { _channel_id: String((conv as any).channel_id) });
+      if (Number(vendorId) === Number(context.vendor.id)) {
+        await db
+          .from("wa_conversations" as any)
+          .update({ assigned_vendor_id: Number(vendorId) })
+          .eq("id", conversationId)
+          .is("assigned_vendor_id", null);
+        return { ...(conv as any), assigned_vendor_id: Number(vendorId) };
+      }
+    }
+    if (assignedVendorId !== Number(context.vendor.id)) {
       throw new Error("Inautorizado: este lead está com outro vendedor");
     }
   }
@@ -231,6 +278,13 @@ export const listConversations = createServerFn({ method: "GET" })
       .eq("kind", "notification");
     const notifIds = ((notifChans ?? []) as any[]).map((c) => c.id);
 
+    const isVendor = Boolean((context as any).vendor);
+    const allowed = isVendor ? vendorChannelIds(context).filter((id) => !notifIds.includes(id)) : [];
+
+    await autoAssignUnassignedConversations(db, allowed.length ? allowed : undefined).catch((e) => {
+      console.warn("[whatsapp-chat] auto-assign skipped", e);
+    });
+
     let q = db
       .from("wa_conversations" as any)
       .select("*")
@@ -239,10 +293,9 @@ export const listConversations = createServerFn({ method: "GET" })
       .neq("operacao_id", "__notificador__");
     if (notifIds.length) q = q.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
-    if ((context as any).vendor) {
-      const allowed = vendorChannelIds(context).filter((id) => !notifIds.includes(id));
+    if (isVendor) {
       if (allowed.length === 0) return [];
-      q = q.eq("assigned_vendor_id", (context as any).vendor.id).in("channel_id", allowed);
+      q = q.in("channel_id", allowed).or(`assigned_vendor_id.eq.${(context as any).vendor.id},assigned_vendor_id.is.null`);
     } else if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
