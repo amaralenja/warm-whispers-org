@@ -45,7 +45,7 @@ function fmtDate(d: string | null) {
 export function HTContasReceber() {
   const [rows, setRows] = useState<Conta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"all" | "aberto" | "quitado">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "aberto" | "quitado">("aberto");
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Conta | null>(null);
