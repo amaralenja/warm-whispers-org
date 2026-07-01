@@ -3,7 +3,6 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 import { renderErrorPage } from "./lib/error-page";
 import { fetchWithSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
-
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     return await next();
