@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, TrendingUp, Users, Calendar as CalIcon, Target, Award } from "lucide-react";
+import { HTInteligencia } from "@/components/ht-inteligencia";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: HTAnalytics,
