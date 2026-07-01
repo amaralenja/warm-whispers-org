@@ -40,21 +40,29 @@ type QLead = {
   respostas_json: Record<string, unknown> | null;
 };
 
-type Period = "today" | "7d" | "15d" | "30d" | "all";
+type Period = "today" | "yesterday" | "7d" | "15d" | "30d" | "all";
 
 const COLORS = [
-  "#f97316", "#22c55e", "#3b82f6", "#eab308", "#a3e635",
-  "#06b6d4", "#ef4444", "#ec4899", "#8b5cf6", "#14b8a6",
-  "#f59e0b", "#84cc16", "#0ea5e9",
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "#22c55e", "#3b82f6", "#f97316", "#a855f7", "#eab308",
+  "#06b6d4", "#ef4444", "#ec4899", "#14b8a6", "#84cc16", "#f59e0b",
 ];
 
-function periodStart(p: Period): Date | null {
-  if (p === "all") return null;
-  const d = new Date(); d.setHours(0, 0, 0, 0);
-  if (p === "today") return d;
+function periodRange(p: Period): { start: Date | null; end: Date | null } {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (p === "all") return { start: null, end: null };
+  if (p === "today") return { start: today, end: tomorrow };
+  if (p === "yesterday") {
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    return { start: y, end: today };
+  }
   const days = p === "7d" ? 7 : p === "15d" ? 15 : 30;
-  const x = new Date(d); x.setDate(x.getDate() - days); return x;
+  const s = new Date(today); s.setDate(s.getDate() - days);
+  return { start: s, end: tomorrow };
 }
+
 
 function isFinalizado(l: QLead) {
   return !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
