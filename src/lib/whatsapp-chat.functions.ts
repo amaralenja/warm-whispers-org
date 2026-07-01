@@ -185,14 +185,27 @@ async function dbFor(context: any) {
   return context.supabase as any;
 }
 
-function vendorChannelIds(context: any): string[] {
+function vendorChannelIdsSync(context: any): string[] {
   const ids = context?.vendor?.wa_channel_ids;
   return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
 }
 
-function assertVendorChannel(context: any, channelId: string) {
+async function vendorChannelIds(context: any, db?: any): Promise<string[]> {
+  const explicit = vendorChannelIdsSync(context);
+  if (explicit.length > 0) return explicit;
+  const expert = context?.vendor?.expert ? String(context.vendor.expert) : "";
+  if (!expert || !db) return [];
+  // Fallback: qualquer canal da operação do vendedor.
+  const { data } = await db
+    .from("wa_channels" as any)
+    .select("id")
+    .eq("operacao_id", expert);
+  return ((data ?? []) as any[]).map((r) => String(r.id)).filter(Boolean);
+}
+
+async function assertVendorChannel(context: any, channelId: string, db?: any) {
   if (!context?.vendor) return;
-  const allowed = vendorChannelIds(context);
+  const allowed = await vendorChannelIds(context, db);
   if (!channelId || !allowed.includes(String(channelId))) {
     throw new Error("Inautorizado: vendedor sem acesso a este número de WhatsApp");
   }
@@ -243,7 +256,7 @@ async function assertConversationAccess(context: any, db: any, conversationId: s
   if (error) throw new Error(error.message);
   if (!conv) throw new Error("Conversa não encontrada");
   if (context?.vendor) {
-    assertVendorChannel(context, String((conv as any).channel_id));
+    await assertVendorChannel(context, String((conv as any).channel_id), db);
     const assignedVendorId = (conv as any).assigned_vendor_id == null ? null : Number((conv as any).assigned_vendor_id);
     if (assignedVendorId == null) {
       const { data: vendorId } = await db.rpc("assign_vendor_for_channel" as any, { _channel_id: String((conv as any).channel_id) });
@@ -279,7 +292,7 @@ export const listConversations = createServerFn({ method: "GET" })
     const notifIds = ((notifChans ?? []) as any[]).map((c) => c.id);
 
     const isVendor = Boolean((context as any).vendor);
-    const allowed = isVendor ? vendorChannelIds(context).filter((id) => !notifIds.includes(id)) : [];
+    const allowed = isVendor ? (await vendorChannelIds(context, db)).filter((id: string) => !notifIds.includes(id)) : [];
 
     await autoAssignUnassignedConversations(db, allowed.length ? allowed : undefined).catch((e) => {
       console.warn("[whatsapp-chat] auto-assign skipped", e);
@@ -369,7 +382,7 @@ export const listVendorsForChannel = createServerFn({ method: "GET" })
   .inputValidator((d: { channelId: string }) => ({ channelId: String(d?.channelId ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    if ((context as any).vendor) assertVendorChannel(context, data.channelId);
+    if ((context as any).vendor) await assertVendorChannel(context, data.channelId, db);
     let q = db
       .from("vendedores" as any)
       .select("id,nome,foto_url,wa_channel_ids,ativo")
@@ -391,7 +404,7 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
       .select("id,name,display_phone_number,verified_name,operacao_id")
       .order("name", { ascending: true });
     if ((context as any).vendor) {
-      const allowed = vendorChannelIds(context);
+      const allowed = await vendorChannelIds(context, db);
       if (allowed.length === 0) return [];
       q = q.in("id", allowed);
     }
@@ -411,7 +424,7 @@ export const uploadWhatsappMedia = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    assertVendorChannel(context, data.channelId);
+    await assertVendorChannel(context, data.channelId, db);
     const conv = await assertConversationAccess(context, db, data.conversationId);
     if (String(conv.channel_id) !== String(data.channelId)) throw new Error("Canal não pertence a esta conversa");
     if (!data.base64) throw new Error("Arquivo vazio");
@@ -475,7 +488,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    assertVendorChannel(context, data.channelId);
+    await assertVendorChannel(context, data.channelId, db);
     const conv = await assertConversationAccess(context, db, data.conversationId);
     if (String(conv.channel_id) !== String(data.channelId)) {
       throw new Error("Canal não pertence a esta conversa");
@@ -582,8 +595,8 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
     mediaId: String(d?.mediaId ?? ""),
   }))
   .handler(async ({ context, data }) => {
-    assertVendorChannel(context, data.channelId);
     const db = await dbFor(context);
+    await assertVendorChannel(context, data.channelId, db);
     const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
@@ -598,8 +611,8 @@ export const downloadIncomingMediaBase64 = createServerFn({ method: "POST" })
     mediaId: String(d?.mediaId ?? ""),
   }))
   .handler(async ({ context, data }) => {
-    assertVendorChannel(context, data.channelId);
     const db = await dbFor(context);
+    await assertVendorChannel(context, data.channelId, db);
     const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: meta, token } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });

@@ -60,9 +60,18 @@ async function dbFor(context: any) {
   return context.supabase as any;
 }
 
-function vendorChannelIds(context: any): string[] {
+function vendorChannelIdsSync(context: any): string[] {
   const ids = context?.vendor?.wa_channel_ids;
   return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+}
+
+async function vendorChannelIds(context: any, db?: any): Promise<string[]> {
+  const explicit = vendorChannelIdsSync(context);
+  if (explicit.length > 0) return explicit;
+  const expert = context?.vendor?.expert ? String(context.vendor.expert) : "";
+  if (!expert || !db) return [];
+  const { data } = await db.from("wa_channels" as any).select("id").eq("operacao_id", expert);
+  return ((data ?? []) as any[]).map((r) => String(r.id)).filter(Boolean);
 }
 
 function normalizeMetadata(metadata: any): Record<string, any> | null {
@@ -239,7 +248,7 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = await dbFor(context);
-    const vendorAllowed = context?.vendor ? new Set(vendorChannelIds(context)) : null;
+    const vendorAllowed = context?.vendor ? new Set(await vendorChannelIds(context, db)) : null;
     if (vendorAllowed && vendorAllowed.size === 0) return [];
     const data = await evoFetch("/api/v1/channels");
     const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
