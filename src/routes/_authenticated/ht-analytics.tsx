@@ -451,33 +451,27 @@ function HTAnalytics() {
           </ChartCard>
         </section>
 
-        {/* Closers + Funil */}
-        <section className="grid gap-6 lg:grid-cols-2">
-          <ChartCard title="Ranking de Closers" subtitle="Por receita no período">
-            {porCloser.length === 0 ? (
-              <EmptyState label="Sem vendas registradas." />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={porCloser} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} horizontal={false} />
-                  <XAxis type="number" fontSize={10} stroke={MUTED} tickLine={false} axisLine={false}
-                    tickFormatter={(v) => `R$${Math.round(v / 1000)}k`} />
-                  <YAxis type="category" dataKey="closer" fontSize={11} stroke={MUTED} tickLine={false} axisLine={false} width={110} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtBRL(v)} />
-                  <Bar dataKey="receita" fill={ACCENT} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
+        {/* Métricas do Funil */}
+        <FunilSection
+          leads={leads}
+          agenda={agenda}
+          reunioes={reunioes}
+          vendas={vendas}
+          grupo={funilGrupo}
+          setGrupo={setFunilGrupo}
+        />
 
-          <ChartCard title="Onde os leads abandonam" subtitle="Últimos passos antes de sair">
+        {/* Onde os leads abandonam */}
+        <section>
+          <SectionTitle overline="Bloco 05" title="Onde os leads abandonam" />
+          <ChartCard title="Últimos passos antes de sair" subtitle="Ranking de etapas de abandono">
             {funilAbandono.length === 0 ? (
               <EmptyState label="Sem abandonos no período." />
             ) : (
               <div className="space-y-2 overflow-auto h-full pr-1">
                 {funilAbandono.map((f) => (
                   <div key={f.label} className="flex items-center gap-3">
-                    <div className="w-32 shrink-0 text-[11px] truncate text-muted-foreground" title={f.label}>{f.label}</div>
+                    <div className="w-40 shrink-0 text-[11px] truncate text-muted-foreground" title={f.label}>{f.label}</div>
                     <div className="flex-1 h-6 rounded bg-muted/30 overflow-hidden relative">
                       <div className="h-full rounded"
                         style={{ width: `${(f.value / maxFunil) * 100}%`, background: `linear-gradient(90deg, ${ACCENT_SOFT}, ${ACCENT})` }} />
