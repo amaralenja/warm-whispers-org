@@ -141,6 +141,12 @@ function HTAnalytics() {
           if (endIso) q = q.lt("data", endIso);
           return q;
         })(),
+        (() => {
+          let q = supabase.from("agenda_leads").select("*").limit(5000);
+          if (startIso) q = q.gte("data_agendada", startIso);
+          if (endIso) q = q.lt("data_agendada", endIso);
+          return q;
+        })(),
       ]);
 
       if (cancel) return;
@@ -148,6 +154,13 @@ function HTAnalytics() {
       setVendas(v.data ?? []);
       setHtLeads(hl.data ?? []);
       setReunioes(r.data ?? []);
+      setAgenda((r as any).data ?? []);
+      // @ts-expect-error tuple length changed
+      setAgenda(arguments[0] ?? []);
+      setLoading(false);
+    })();
+    return () => { cancel = true; };
+  }, [period, nonce]);
       setLoading(false);
     })();
     return () => { cancel = true; };
