@@ -248,7 +248,7 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = await dbFor(context);
-    const vendorAllowed = context?.vendor ? new Set(vendorChannelIds(context)) : null;
+    const vendorAllowed = context?.vendor ? new Set(await vendorChannelIds(context, db)) : null;
     if (vendorAllowed && vendorAllowed.size === 0) return [];
     const data = await evoFetch("/api/v1/channels");
     const list: any[] = Array.isArray(data) ? data : data?.data ?? data?.channels ?? [];
