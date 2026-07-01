@@ -12,6 +12,7 @@ export const MENU_TREE: MenuNode[] = [
   { key: "ranking-tv", title: "Ranking TV", url: "/ranking-tv" },
   { key: "financeiro", title: "Financeiro", url: "/financeiro" },
   { key: "tasks", title: "Tarefas", url: "/tasks" },
+  { key: "sops", title: "SOPs / Processos", url: "/sops" },
   {
     key: "operacao-x1",
     title: "Operação X1",
@@ -30,9 +31,9 @@ export const MENU_TREE: MenuNode[] = [
       { key: "calendar", title: "Calendário Calls", url: "/calendar" },
       { key: "quiz", title: "Quiz", url: "/quiz" },
       { key: "meta-ads", title: "Facebook Ads", url: "/meta-ads" },
-      { key: "sops", title: "SOPs / Processos", url: "/sops" },
     ],
   },
+
 ];
 
 export type Permissoes = Record<string, boolean | Record<string, boolean>>;
