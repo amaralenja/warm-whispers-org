@@ -52,11 +52,12 @@ const fmtDate = (iso: string) => {
 };
 
 type QLead = {
-  id: string; data_criacao: string; whatsapp: string | null;
+  id: string; data_criacao: string; nome: string | null; email: string | null; whatsapp: string | null;
   caixa_letra: string | null; caixa_label: string | null;
   faturamento: string | null; momento: string | null; objetivo: string | null;
   investir: string | null; minicurso: string | null; socio: string | null;
   comprometimento: string | null; last_step: string | null; funil: string | null;
+  utm_source: string | null; utm_medium: string | null; utm_campaign: string | null;
 };
 const isFinalizado = (l: QLead) => !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
 const isQuente = (l: QLead) => {
