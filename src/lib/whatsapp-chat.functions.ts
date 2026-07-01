@@ -292,7 +292,7 @@ export const listConversations = createServerFn({ method: "GET" })
     const notifIds = ((notifChans ?? []) as any[]).map((c) => c.id);
 
     const isVendor = Boolean((context as any).vendor);
-    const allowed = isVendor ? vendorChannelIds(context).filter((id) => !notifIds.includes(id)) : [];
+    const allowed = isVendor ? (await vendorChannelIds(context, db)).filter((id: string) => !notifIds.includes(id)) : [];
 
     await autoAssignUnassignedConversations(db, allowed.length ? allowed : undefined).catch((e) => {
       console.warn("[whatsapp-chat] auto-assign skipped", e);
