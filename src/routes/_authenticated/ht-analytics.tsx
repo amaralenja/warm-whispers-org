@@ -347,7 +347,7 @@ function HTAnalytics() {
       </div>
 
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
-      {tab === "closer" && <KanbanCloser htLeads={htLeads} vendas={vendas} loading={loading} />}
+      {tab === "closer" && <KanbanCloser leads={leads} vendas={vendas} loading={loading} />}
       {tab === "receber" && <HTContasReceber />}
 
       {tab === "dashboard" && (
@@ -1285,9 +1285,15 @@ function saveCloserMap(m: Record<string, string>) {
 type CloserCard = {
   id: string; nome: string; valor: number; created_at: string;
   closer?: string | null; source: "lead" | "venda"; defaultStage: string;
+  caixa?: string | null; utm?: string | null;
 };
 
-function KanbanCloser({ htLeads, vendas, loading }: { htLeads: any[]; vendas: any[]; loading: boolean }) {
+// Valor estimado do sinal/ticket a partir da caixa do quiz
+const CAIXA_VALOR: Record<string, number> = {
+  D: 3000, E: 5000, F: 8000, G: 15000,
+};
+
+function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[]; loading: boolean }) {
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
   const [closerFilter, setCloserFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -1297,22 +1303,24 @@ function KanbanCloser({ htLeads, vendas, loading }: { htLeads: any[]; vendas: an
 
   const cards: CloserCard[] = useMemo(() => {
     const list: CloserCard[] = [];
-    for (const l of htLeads || []) {
-      const st = (l.status ?? "").toLowerCase();
-      const defaultStage = st === "fechado" ? "fechado"
-        : st === "followup" || st === "follow_up" || st === "follow up" ? "followup"
-        : st === "descartado" ? "descartado"
-        : "agendado";
+    // Leads quentes do quiz (caixa D+ e comprometidos) = agendados
+    for (const l of leads || []) {
+      if (!isFinalizado(l)) continue;
+      const caixa = (l.caixa_letra ?? "").toUpperCase();
+      if (!"DEFG".includes(caixa)) continue;
       list.push({
-        id: `lead-${l.id}`,
-        nome: l.nome || "Sem nome",
-        valor: Number(l.valor || 0),
-        created_at: l.data_agendamento || l.created_at,
-        closer: l.closer,
+        id: `qlead-${l.id}`,
+        nome: l.nome || l.whatsapp || "Sem nome",
+        valor: CAIXA_VALOR[caixa] ?? 0,
+        created_at: l.data_criacao,
+        closer: null,
         source: "lead",
-        defaultStage,
+        defaultStage: "agendado",
+        caixa: l.caixa_label,
+        utm: l.utm_source,
       });
     }
+    // Vendas confirmadas = fechado (ganho)
     for (const v of vendas || []) {
       list.push({
         id: `venda-${v.id}`,
@@ -1325,7 +1333,7 @@ function KanbanCloser({ htLeads, vendas, loading }: { htLeads: any[]; vendas: an
       });
     }
     return list;
-  }, [htLeads, vendas]);
+  }, [leads, vendas]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
