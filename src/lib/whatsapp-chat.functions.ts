@@ -404,7 +404,7 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
       .select("id,name,display_phone_number,verified_name,operacao_id")
       .order("name", { ascending: true });
     if ((context as any).vendor) {
-      const allowed = vendorChannelIds(context);
+      const allowed = await vendorChannelIds(context, db);
       if (allowed.length === 0) return [];
       q = q.in("id", allowed);
     }
