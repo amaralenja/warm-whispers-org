@@ -927,32 +927,34 @@ const FUNIL_GRUPOS: { id: FunilGrupo; label: string; sub: string; letras: string
   { id: "minicurso", label: "Minicurso", sub: "< R$ 1k · Caixa A", letras: ["A"] },
 ];
 
+// Buckets de crm_status vindos do banco do quiz
+const STATUS_AGENDADO = ["agendado", "fechado", "ganho", "followup", "follow_up", "remarcada", "remarcado", "no_show", "no-show", "noshow", "sinal", "sinal_recebido"];
+const STATUS_CALL_FEITA = ["fechado", "ganho", "followup", "follow_up", "remarcada", "remarcado", "sinal", "sinal_recebido"];
+const STATUS_FECHADO = ["fechado", "ganho"];
+const STATUS_NOSHOW = ["no_show", "no-show", "noshow"];
+
+const norm = (s: string | null | undefined) => (s ?? "").toString().trim().toLowerCase();
+
 function FunilSection({
-  leads, agenda, reunioes, vendas, grupo, setGrupo,
+  leads, grupo, setGrupo,
 }: {
   leads: QLead[]; agenda: any[]; reunioes: any[]; vendas: any[];
   grupo: FunilGrupo; setGrupo: (g: FunilGrupo) => void;
 }) {
-  const ACCENT = "oklch(0.78 0.13 75)";
-  const now = Date.now();
-
   const metricasPorGrupo = useMemo(() => {
     return FUNIL_GRUPOS.map((g) => {
       const set = new Set(g.letras);
-      const finalizados = leads.filter((l) => {
+      const doGrupo = leads.filter((l) => {
         const c = (l.caixa_letra ?? "").toUpperCase();
-        return set.has(c) && !!(l.whatsapp && (l.comprometimento || l.momento));
-      }).length;
+        return set.has(c) && isFinalizado(l);
+      });
+      const finalizados = doGrupo.length;
 
-      // Fatia proporcional de agenda/reunioes/vendas para o grupo
-      // (não temos caixa nas outras tabelas, aplicamos peso do grupo sobre o total de leads finalizados)
-      const totalFin = leads.filter((l) => !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento))).length;
-      const peso = totalFin > 0 ? finalizados / totalFin : 0;
-
-      const agendados = Math.round(agenda.length * peso);
-      const noShow = Math.round(agenda.filter((a) => !a.concluido && a.data_agendada && new Date(a.data_agendada).getTime() < now).length * peso);
-      const realizadas = Math.round((agenda.filter((a) => a.concluido).length + reunioes.length) * peso);
-      const fechamentos = Math.round(vendas.length * peso);
+      const withStatus = doGrupo.filter((l) => l.crm_status);
+      const agendados = withStatus.filter((l) => STATUS_AGENDADO.includes(norm(l.crm_status))).length;
+      const realizadas = withStatus.filter((l) => STATUS_CALL_FEITA.includes(norm(l.crm_status))).length;
+      const fechamentos = withStatus.filter((l) => STATUS_FECHADO.includes(norm(l.crm_status))).length;
+      const noShow = withStatus.filter((l) => STATUS_NOSHOW.includes(norm(l.crm_status))).length;
       const naoFechou = Math.max(0, realizadas - fechamentos);
 
       const taxaAgend = finalizados > 0 ? (agendados / finalizados) * 100 : 0;
@@ -963,7 +965,7 @@ function FunilSection({
       return { g, finalizados, agendados, realizadas, fechamentos, noShow, naoFechou,
         taxaAgend, showUp, taxaFech, taxaNoShow };
     });
-  }, [leads, agenda, reunioes, vendas, now]);
+  }, [leads]);
 
   const atual = metricasPorGrupo.find((m) => m.g.id === grupo)!;
 
@@ -1000,16 +1002,15 @@ function FunilSection({
               })}
             </div>
 
-            {/* Coluna central: funil visual */}
+            {/* Coluna central: funil visual (cone) */}
             <div className="flex items-center justify-center">
               <FunilVisual
                 stages={[
-                  { label: "Formulários finalizados", value: atual.finalizados, sub: atual.g.label, pct: null },
-                  { label: "Agendados p/ call", value: atual.agendados, sub: `Taxa: ${fmtPct(atual.taxaAgend)}`, pct: atual.taxaAgend },
-                  { label: "Calls realizadas", value: atual.realizadas, sub: `Show-up: ${fmtPct(atual.showUp)}`, pct: atual.showUp },
-                  { label: "Fechamentos", value: atual.fechamentos, sub: `Conversão: ${fmtPct(atual.taxaFech)}`, pct: atual.taxaFech },
+                  { label: "Formulários Finalizados", value: atual.finalizados, sub: atual.g.sub },
+                  { label: "Agendados p/ Call", value: atual.agendados, sub: `Taxa: ${fmtPct(atual.taxaAgend)}` },
+                  { label: "Calls Realizadas", value: atual.realizadas, sub: `Show-up: ${fmtPct(atual.showUp)}` },
+                  { label: "Fechamentos (Ganhos)", value: atual.fechamentos, sub: `Conversão: ${fmtPct(atual.taxaFech)}` },
                 ]}
-                accent={ACCENT}
               />
             </div>
 
@@ -1042,40 +1043,78 @@ function FunilSection({
   );
 }
 
-function FunilVisual({ stages, accent }: {
-  stages: { label: string; value: number; sub: string; pct: number | null }[];
-  accent: string;
+// Cone SVG — 4 estágios com largura decrescente
+function FunilVisual({ stages }: {
+  stages: { label: string; value: number; sub: string }[];
 }) {
-  const max = Math.max(1, ...stages.map((s) => s.value));
+  const W = 460;
+  const H = 420;
+  const topW = 440;   // largura no topo
+  const botW = 90;    // largura na base
+  const bandH = H / stages.length;
+
+  const widthAt = (y: number) => topW - ((topW - botW) * (y / H));
+
+  const COLORS = [
+    { fill: "#3B82F6", stroke: "#60A5FA" },   // azul
+    { fill: "#F59E0B", stroke: "#FBBF24" },   // âmbar
+    { fill: "#8B5CF6", stroke: "#A78BFA" },   // violeta
+    { fill: "#10B981", stroke: "#34D399" },   // verde
+  ];
+
   return (
-    <div className="w-full max-w-md space-y-1.5 py-2">
+    <svg viewBox={`0 0 ${W} ${H + 10}`} className="w-full max-w-[460px]" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        {COLORS.map((c, i) => (
+          <linearGradient key={i} id={`fg${i}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={c.stroke} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={c.fill} stopOpacity="1" />
+          </linearGradient>
+        ))}
+        <filter id="funilShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="6" />
+        </filter>
+      </defs>
+
       {stages.map((s, i) => {
-        const w = 30 + (s.value / max) * 70; // 30% → 100%
-        const opacity = 1 - i * 0.15;
+        const y1 = i * bandH;
+        const y2 = (i + 1) * bandH;
+        const w1 = widthAt(y1);
+        const w2 = widthAt(y2);
+        const cx = W / 2;
+        const x1L = cx - w1 / 2, x1R = cx + w1 / 2;
+        const x2L = cx - w2 / 2, x2R = cx + w2 / 2;
+        const path = `M ${x1L} ${y1} L ${x1R} ${y1} L ${x2R} ${y2} L ${x2L} ${y2} Z`;
+        const cy = (y1 + y2) / 2;
+
         return (
-          <div key={s.label} className="flex flex-col items-center">
-            <div
-              className="relative flex flex-col items-center justify-center px-4 py-3 text-center transition-all"
-              style={{
-                width: `${w}%`,
-                minWidth: 200,
-                clipPath: i === stages.length - 1
-                  ? "polygon(8% 0, 92% 0, 82% 100%, 18% 100%)"
-                  : "polygon(0 0, 100% 0, 92% 100%, 8% 100%)",
-                background: `linear-gradient(180deg, ${accent} 0%, oklch(0.68 0.15 65) 100%)`,
-                opacity,
-              }}
-            >
-              <div className="text-[9px] uppercase tracking-[0.15em] font-bold text-black/70">{s.label}</div>
-              <div className="text-2xl font-mono tabular-nums font-black text-black leading-none my-0.5">{fmtInt(s.value)}</div>
-              <div className="text-[10px] text-black/70 font-medium">{s.sub}</div>
-            </div>
-          </div>
+          <g key={s.label}>
+            {i === 0 && (
+              <ellipse cx={cx} cy={y1 + 4} rx={w1 / 2} ry={8}
+                fill="rgba(0,0,0,0.25)" filter="url(#funilShadow)" />
+            )}
+            <path d={path} fill={`url(#fg${i})`} stroke={COLORS[i].stroke} strokeWidth="1" opacity="0.95" />
+            {/* leve highlight elíptico */}
+            <ellipse cx={cx} cy={y1 + 6} rx={(w1 / 2) - 4} ry={4} fill="rgba(255,255,255,0.18)" />
+            <text x={cx} y={cy - 14} textAnchor="middle"
+              fontSize="11" fontWeight="700" fill="#fff" style={{ letterSpacing: 0.5 }}>
+              {s.label.toUpperCase()}
+            </text>
+            <text x={cx} y={cy + 10} textAnchor="middle"
+              fontSize="26" fontWeight="900" fill="#fff" style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace" }}>
+              {fmtInt(s.value)}
+            </text>
+            <text x={cx} y={cy + 26} textAnchor="middle"
+              fontSize="10" fill="rgba(255,255,255,0.85)">
+              {s.sub}
+            </text>
+          </g>
         );
       })}
-    </div>
+    </svg>
   );
 }
+
 
 // ============================================================
 // Kanban SDR
