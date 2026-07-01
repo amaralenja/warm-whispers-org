@@ -102,6 +102,7 @@ export function HTInteligencia() {
           .order("data_criacao", { ascending: false })
           .range(from, from + pageSize - 1);
         if (startIso) q = q.gte("data_criacao", startIso);
+        if (endIso) q = q.lt("data_criacao", endIso);
         const { data, error, count } = await q;
         if (error) break;
         const rows = (data ?? []) as QLead[];
