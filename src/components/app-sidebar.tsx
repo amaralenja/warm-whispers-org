@@ -87,6 +87,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/calendar": "calendar",
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
+  "/ht-analytics": "ht-analytics",
   "/sops": "sops",
   "/tasks": "tasks",
 };
