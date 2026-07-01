@@ -60,9 +60,18 @@ async function dbFor(context: any) {
   return context.supabase as any;
 }
 
-function vendorChannelIds(context: any): string[] {
+function vendorChannelIdsSync(context: any): string[] {
   const ids = context?.vendor?.wa_channel_ids;
   return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+}
+
+async function vendorChannelIds(context: any, db?: any): Promise<string[]> {
+  const explicit = vendorChannelIdsSync(context);
+  if (explicit.length > 0) return explicit;
+  const expert = context?.vendor?.expert ? String(context.vendor.expert) : "";
+  if (!expert || !db) return [];
+  const { data } = await db.from("wa_channels" as any).select("id").eq("operacao_id", expert);
+  return ((data ?? []) as any[]).map((r) => String(r.id)).filter(Boolean);
 }
 
 function normalizeMetadata(metadata: any): Record<string, any> | null {
