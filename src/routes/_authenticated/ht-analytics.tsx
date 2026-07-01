@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   RefreshCw, DollarSign, TrendingUp, Target, ShoppingBag,
   Users, CheckCircle2, XCircle, Flame, Activity,
+  Search, SlidersHorizontal, X, Mail, Phone, Calendar, TrendingDown, ArrowUpRight,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
