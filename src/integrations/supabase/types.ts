@@ -585,6 +585,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ht_contas_receber: {
+        Row: {
+          closer: string | null
+          created_at: string
+          data_fechamento: string | null
+          falta_receber: number | null
+          faturamento_total: number
+          id: string
+          nome: string
+          observacoes: string | null
+          previsao_pagar_restante: string | null
+          recebido: number
+          status: string
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          closer?: string | null
+          created_at?: string
+          data_fechamento?: string | null
+          falta_receber?: number | null
+          faturamento_total?: number
+          id?: string
+          nome: string
+          observacoes?: string | null
+          previsao_pagar_restante?: string | null
+          recebido?: number
+          status?: string
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          closer?: string | null
+          created_at?: string
+          data_fechamento?: string | null
+          falta_receber?: number | null
+          faturamento_total?: number
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          previsao_pagar_restante?: string | null
+          recebido?: number
+          status?: string
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       ht_leads: {
         Row: {
           closer: string | null

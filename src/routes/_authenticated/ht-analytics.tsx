@@ -13,6 +13,7 @@ import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import { HTContasReceber } from "@/components/ht-contas-receber";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: HTAnalytics,
@@ -90,7 +91,7 @@ function HTAnalytics() {
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
-  const [tab, setTab] = useState<"dashboard" | "kanban" | "closer">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "kanban" | "closer" | "receber">("dashboard");
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -332,6 +333,7 @@ function HTAnalytics() {
             { id: "dashboard", label: "Dashboard" },
             { id: "kanban", label: "Kanban SDR" },
             { id: "closer", label: "Kanban Closer" },
+            { id: "receber", label: "Contas a Receber" },
           ] as const).map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
@@ -346,6 +348,7 @@ function HTAnalytics() {
 
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
       {tab === "closer" && <KanbanCloser htLeads={htLeads} vendas={vendas} loading={loading} />}
+      {tab === "receber" && <HTContasReceber />}
 
       {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
