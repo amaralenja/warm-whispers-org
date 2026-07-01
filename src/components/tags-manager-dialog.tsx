@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Trash2, Tag as TagIcon, Loader2, Columns3, Pencil, Check } from "lucide-react";
+import { Plus, Trash2, Tag as TagIcon, Loader2, Columns3, Pencil, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import {
   createCrmTag, deleteCrmTag, listCrmTags, updateCrmTag,
