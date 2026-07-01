@@ -331,6 +331,7 @@ function HTAnalytics() {
           {([
             { id: "dashboard", label: "Dashboard" },
             { id: "kanban", label: "Kanban SDR" },
+            { id: "closer", label: "Kanban Closer" },
           ] as const).map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
@@ -344,6 +345,7 @@ function HTAnalytics() {
       </div>
 
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
+      {tab === "closer" && <KanbanCloser htLeads={htLeads} vendas={vendas} loading={loading} />}
 
       {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
