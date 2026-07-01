@@ -90,6 +90,7 @@ function HTAnalytics() {
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
+  const [tab, setTab] = useState<"dashboard" | "kanban">("dashboard");
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -324,7 +325,29 @@ function HTAnalytics() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-border/50 bg-background/60 backdrop-blur sticky top-0 z-10">
+        <div className="px-6 md:px-10 flex items-center gap-1">
+          {([
+            { id: "dashboard", label: "Dashboard" },
+            { id: "kanban", label: "Kanban SDR" },
+          ] as const).map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
+                tab === t.id ? "text-accent" : "text-muted-foreground hover:text-foreground"
+              }`}>
+              {t.label}
+              {tab === t.id && <span className="absolute bottom-0 left-0 right-0 h-px bg-accent" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
+
+      {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
+
         {/* KPIs — Receita */}
         <section>
           <SectionTitle overline="Bloco 01" title="Receita & Vendas" />
@@ -581,9 +604,11 @@ function HTAnalytics() {
           </Card>
         </section>
       </div>
+      )}
     </div>
   );
 }
+
 
 function SectionTitle({ overline, title }: { overline: string; title: string }) {
   return (
@@ -1035,4 +1060,199 @@ function FunilVisual({ stages, accent }: {
     </div>
   );
 }
+
+// ============================================================
+// Kanban SDR
+// ============================================================
+const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
+  { id: "novos", label: "Novos Leads (> 1k)" },
+  { id: "c1", label: "1º Contato (Msg Caio)" },
+  { id: "c2", label: "2º Contato (SDR)" },
+  { id: "c3", label: "3º Contato (Msg Caio)" },
+  { id: "convite", label: "Convite do Grupo" },
+  { id: "no_grupo", label: "1-3k no Grupo" },
+  { id: "agendado", label: "Agendado", accent: "text-emerald-400" },
+  { id: "no_show", label: "No-show", accent: "text-red-400" },
+  { id: "descartado", label: "Descartado", accent: "text-muted-foreground" },
+];
+
+const KANBAN_LS_KEY = "ht_kanban_sdr_v1";
+
+function loadKanbanMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(KANBAN_LS_KEY) || "{}"); } catch { return {}; }
+}
+function saveKanbanMap(m: Record<string, string>) {
+  try { localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m)); } catch {}
+}
+
+function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
+  const [stageMap, setStageMap] = useState<Record<string, string>>({});
+  const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
+  const [utmFilter, setUtmFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  useEffect(() => { setStageMap(loadKanbanMap()); }, []);
+
+  const utmOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of leads) if (l.utm_source) s.add(l.utm_source);
+    return Array.from(s).sort();
+  }, [leads]);
+
+  const eligible = useMemo(() => {
+    return leads.filter((l) => {
+      const c = (l.caixa_letra ?? "").toUpperCase();
+      if (!"BCDEFG".includes(c)) return false; // Leads > R$ 1k
+      if (caixaFilter !== "all" && c !== caixaFilter) return false;
+      if (utmFilter !== "all" && (l.utm_source ?? "") !== utmFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const hay = `${l.nome ?? ""} ${l.email ?? ""} ${l.whatsapp ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [leads, caixaFilter, utmFilter, search]);
+
+  const byStage = useMemo(() => {
+    const m: Record<string, QLead[]> = {};
+    for (const s of KANBAN_STAGES) m[s.id] = [];
+    for (const l of eligible) {
+      const st = stageMap[l.id] || "novos";
+      (m[st] || m.novos).push(l);
+    }
+    for (const s of KANBAN_STAGES) {
+      m[s.id].sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
+    }
+    return m;
+  }, [eligible, stageMap]);
+
+  function moveTo(leadId: string, stage: string) {
+    setStageMap((prev) => {
+      const next = { ...prev, [leadId]: stage };
+      saveKanbanMap(next);
+      return next;
+    });
+  }
+
+  return (
+    <div className="px-6 md:px-10 py-6 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black tracking-tight">
+            Kanban <span className="text-accent italic font-serif">SDR</span>
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Gestão de primeiros contatos e qualificação · {loading ? "carregando…" : `${fmtInt(eligible.length)} leads (caixa > R$ 1k)`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={caixaFilter} onValueChange={setCaixaFilter}>
+            <SelectTrigger className="h-9 w-48 bg-card/60"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Caixas (&gt; 1k)</SelectItem>
+              {["B","C","D","E","F","G"].map((c) => (
+                <SelectItem key={c} value={c}>Caixa {c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={utmFilter} onValueChange={setUtmFilter}>
+            <SelectTrigger className="h-9 w-44 bg-card/60"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as UTMs</SelectItem>
+              {utmOptions.map((u) => (
+                <SelectItem key={u} value={u}>{u}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar lead…"
+            className="h-9 px-3 rounded-md bg-card/60 border border-border/60 text-xs w-52 focus:outline-none focus:border-accent/60" />
+        </div>
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10">
+        {KANBAN_STAGES.map((s) => (
+          <div key={s.id}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const id = e.dataTransfer.getData("text/x-lead-id");
+              if (id) moveTo(id, s.id);
+              setDraggingId(null);
+            }}
+            className="shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh]">
+            <div className="px-3 py-3 border-b border-border/40 flex items-center justify-between sticky top-0 bg-card/60 rounded-t-xl">
+              <div className={`text-xs font-semibold tracking-tight ${s.accent ?? ""}`}>{s.label}</div>
+              <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground">
+                {byStage[s.id].length}
+              </span>
+            </div>
+            <div className="p-2 space-y-2 overflow-y-auto flex-1">
+              {byStage[s.id].length === 0 && (
+                <div className="text-[11px] text-muted-foreground text-center py-6 opacity-60">
+                  Arraste leads aqui
+                </div>
+              )}
+              {byStage[s.id].slice(0, 50).map((l) => (
+                <div key={l.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/x-lead-id", l.id);
+                    setDraggingId(l.id);
+                  }}
+                  onDragEnd={() => setDraggingId(null)}
+                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-grab active:cursor-grabbing ${
+                    draggingId === l.id ? "opacity-40" : ""
+                  }`}>
+                  <div className="text-xs font-semibold truncate">{l.nome || "Sem nome"}</div>
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    {l.utm_source && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
+                        {l.utm_source}
+                      </span>
+                    )}
+                    {l.caixa_letra && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground font-mono">
+                        {l.caixa_letra}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1.5 tabular-nums">
+                    {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1">
+                    <select
+                      value={stageMap[l.id] || "novos"}
+                      onChange={(e) => moveTo(l.id, e.target.value)}
+                      className="flex-1 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
+                      {KANBAN_STAGES.map((ks) => (
+                        <option key={ks.id} value={ks.id}>{ks.label}</option>
+                      ))}
+                    </select>
+                    {l.whatsapp && (
+                      <a href={`https://wa.me/${String(l.whatsapp).replace(/\D/g, "")}`}
+                        target="_blank" rel="noreferrer"
+                        className="text-[10px] px-2 h-6 flex items-center rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30">
+                        WA
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {byStage[s.id].length > 50 && (
+                <div className="text-[10px] text-center text-muted-foreground py-2">
+                  + {byStage[s.id].length - 50} leads ocultos
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
