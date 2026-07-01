@@ -118,13 +118,14 @@ function CRMPage() {
   // Dynamic stages: defaults + custom for the active operation
   const stageOperacao = isGeral ? "all" : (workspace?.nome ?? "all");
   const { data: customStages = [] } = useCrmStages(stageOperacao);
+  const [hiddenDefaults] = useHiddenDefaultStages(stageOperacao);
 
   const stages: StageView[] = useMemo(() => {
     return [
-      ...DEFAULT_STAGES.map((s) => stageView(s.id, s.nome, s.cor)),
+      ...DEFAULT_STAGES.filter((s) => !hiddenDefaults.includes(s.id)).map((s) => stageView(s.id, s.nome, s.cor)),
       ...customStages.map((s) => stageView(s.id, s.nome, s.cor)),
     ];
-  }, [customStages]);
+  }, [customStages, hiddenDefaults]);
 
 
   // Filters
