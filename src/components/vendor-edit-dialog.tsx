@@ -25,7 +25,9 @@ type Vendor = {
   foto_url?: string | null;
   meta?: number | null;
   genero?: string | null;
+  telefone?: string | null;
 };
+
 
 export function VendorEditDialog({
   open,
@@ -93,8 +95,10 @@ export function VendorEditDialog({
       foto_url: form.foto_url || null,
       meta: Number(form.meta ?? 0),
       genero: form.genero || null,
+      telefone: form.telefone?.trim() || null,
       ativo: form.ativo ?? true,
     };
+
     let error;
     if (isNew) {
       payload.permissoes = defaultPermissoes() as any;
@@ -202,6 +206,18 @@ export function VendorEditDialog({
                 <option value="F">Feminino</option>
               </select>
             </div>
+            <div className="col-span-2">
+              <Label>Número pessoal (WhatsApp)</Label>
+              <Input
+                value={form.telefone ?? ""}
+                onChange={(e) => set("telefone", e.target.value)}
+                placeholder="Ex: 5551999999999"
+                className="font-mono"
+              />
+              <div className="mt-1 text-[0.7rem] text-muted-foreground">
+                Vendedores com número pessoal podem receber tarefas e disparos no WhatsApp.
+              </div>
+            </div>
             <div className="col-span-2 flex items-center justify-between rounded-lg border border-border p-3">
               <div>
                 <div className="text-sm font-medium">Ativo</div>
@@ -209,6 +225,7 @@ export function VendorEditDialog({
               </div>
               <Switch checked={form.ativo ?? true} onCheckedChange={(v) => set("ativo", v)} />
             </div>
+
           </div>
         </div>
 

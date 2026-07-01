@@ -113,18 +113,20 @@ export function ParticipacaoVendedores({
             <div className="space-y-1.5">
               {vendedores.slice(0, 10).map((v, i) => {
                 const color = colorFor(i);
-                const pct = v.pctTotal * 100;
+                const fat = Number((v as any)?.faturamento) || 0;
+                const vendas = Number((v as any)?.vendas) || 0;
+                const pctTotal = Number((v as any)?.pctTotal) || 0;
+                const pct = pctTotal * 100;
                 const isTop = i === 0;
+                const utmStr = asStr((v as any)?.utm);
                 return (
                   <div
-                    key={asStr(v.utm)}
+                    key={utmStr || i}
                     className="group relative grid grid-cols-[1.5rem_2rem_1fr_auto_auto] items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-1.5 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/5"
                   >
-                    {/* posição */}
                     <span className="text-center text-[0.65rem] font-bold tabular-nums text-muted-foreground">
                       {isTop ? <Trophy className="mx-auto h-3 w-3 text-amber-400" /> : `#${i + 1}`}
                     </span>
-                    {/* avatar */}
                     <div
                       className="flex h-8 w-8 items-center justify-center rounded-md text-[0.65rem] font-bold"
                       style={{
@@ -133,12 +135,11 @@ export function ParticipacaoVendedores({
                         boxShadow: `0 0 0 1px ${color}55`,
                       }}
                     >
-                      {initials(v.utm)}
+                      {initials(utmStr)}
                     </div>
-                    {/* nome + barra */}
                     <div className="min-w-0">
                       <div className="truncate text-xs font-semibold text-foreground">
-                        {asStr(v.utm)}
+                        {utmStr}
                       </div>
                       <div className="mt-1 h-1 overflow-hidden rounded-full bg-secondary/40">
                         <div
@@ -150,16 +151,14 @@ export function ParticipacaoVendedores({
                         />
                       </div>
                     </div>
-                    {/* faturamento */}
                     <div className="text-right">
                       <div className="text-[0.7rem] font-semibold tabular-nums text-foreground">
-                        {BRL(v.faturamento)}
+                        {BRL(fat)}
                       </div>
                       <div className="text-[0.55rem] tabular-nums text-muted-foreground">
-                        {v.vendas} venda{v.vendas !== 1 ? "s" : ""}
+                        {vendas} venda{vendas !== 1 ? "s" : ""}
                       </div>
                     </div>
-                    {/* % */}
                     <span
                       className="min-w-[3rem] text-right font-display text-sm font-bold tabular-nums"
                       style={{ color }}
@@ -169,6 +168,7 @@ export function ParticipacaoVendedores({
                   </div>
                 );
               })}
+
               {vendedores.length > 10 && (
                 <div className="pt-1 text-center text-[0.65rem] text-muted-foreground">
                   +{vendedores.length - 10} vendedores

@@ -207,16 +207,34 @@ function TasksPage() {
   });
 
   const membersQ = useQuery({
-    queryKey: ["team_members"],
+    queryKey: ["team_members_and_vendors"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("team_members" as any)
-        .select("*")
-        .order("nome");
-      if (error) throw error;
-      return (data ?? []) as unknown as Member[];
+      const [tmRes, vdRes] = await Promise.all([
+        supabase.from("team_members" as any).select("*").order("nome"),
+        supabase
+          .from("vendedores" as any)
+          .select("id,nome,telefone,foto_url,ativo,expert")
+          .not("telefone", "is", null)
+          .neq("telefone", "")
+          .order("nome"),
+      ]);
+      if (tmRes.error) throw tmRes.error;
+      if (vdRes.error) throw vdRes.error;
+      const tm = ((tmRes.data ?? []) as any[]) as Member[];
+      const vd = ((vdRes.data ?? []) as any[]).map<Member>((v) => ({
+        id: `v:${v.id}`,
+        nome: String(v.nome ?? ""),
+        email: null,
+        telefone: v.telefone ?? null,
+        funcao: v.expert ? `Vendedor · ${v.expert}` : "Vendedor",
+        foto_url: v.foto_url ?? null,
+        cor: "#10b981",
+        ativo: v.ativo !== false,
+      }));
+      return [...tm, ...vd];
     },
   });
+
 
   const columns = columnsQ.data ?? [];
   const tasks = tasksQ.data ?? [];
@@ -450,7 +468,7 @@ function TasksPage() {
         <MembersDialog
           members={members}
           onClose={() => setShowMembers(false)}
-          onChanged={() => qc.invalidateQueries({ queryKey: ["team_members"] })}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["team_members_and_vendors"] })}
         />
       )}
     </div>
