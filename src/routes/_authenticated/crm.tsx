@@ -319,7 +319,7 @@ function Kanban({
   const PAGE = 15;
 
   return (
-    <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">
+    <DragScroll className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide cursor-grab active:cursor-grabbing select-none">
       {stages.map((s) => {
         const items = grouped.get(s.id) ?? [];
         const shown = visible[s.id] ?? PAGE;
