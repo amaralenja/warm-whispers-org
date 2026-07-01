@@ -8,7 +8,7 @@ import {
 import {
   TagsManagerDialog, StagesManagerDialog, useCrmStages, DEFAULT_STAGES,
 } from "@/components/tags-manager-dialog";
-import { InstagramLookup } from "@/components/instagram-lookup";
+
 import { useServerFn } from "@tanstack/react-start";
 import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
 import {
@@ -195,7 +195,6 @@ function CRMPage() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
-      <InstagramLookup />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">CRM Leads X1</h1>
