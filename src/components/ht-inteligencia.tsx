@@ -89,8 +89,9 @@ export function HTInteligencia() {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const start = periodStart(period);
+      const { start, end } = periodRange(period);
       const startIso = start ? start.toISOString() : null;
+      const endIso = end ? end.toISOString() : null;
       let all: QLead[] = [];
       const pageSize = 1000;
       let from = 0;
