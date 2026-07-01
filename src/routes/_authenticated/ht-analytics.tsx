@@ -958,9 +958,12 @@ function FunilSection({
   const metricasPorGrupo = useMemo(() => {
     return FUNIL_GRUPOS.map((g) => {
       const set = new Set(g.letras);
+      // "Formulário finalizado" no funil = lead que chegou até a atribuição de caixa
+      // (mesma base da Lista de Leads quando filtrada por Caixa). Não exigimos
+      // whatsapp/comprometimento aqui pra bater com o número que o usuário vê na lista.
       const doGrupo = leads.filter((l) => {
         const c = (l.caixa_letra ?? "").toUpperCase();
-        return set.has(c) && isFinalizado(l);
+        return set.has(c);
       });
       const finalizados = doGrupo.length;
 
