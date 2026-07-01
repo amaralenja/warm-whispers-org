@@ -367,7 +367,7 @@ function Kanban({
           </div>
         );
       })}
-    </div>
+    </DragScroll>
   );
 }
 
