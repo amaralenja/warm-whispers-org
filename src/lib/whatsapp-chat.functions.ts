@@ -1103,4 +1103,74 @@ export const updateConversationNotes = createServerFn({ method: "POST" })
   });
 
 
+// React (or remove reaction) to a WhatsApp message. Empty emoji removes the reaction.
+export const reactToWhatsappMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; messageId: string; emoji: string }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    messageId: String(d?.messageId ?? ""),
+    emoji: String(d?.emoji ?? ""),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId || !data.messageId) throw new Error("Parâmetros inválidos");
+    const db = await dbFor(context);
+    const conv = await assertConversationAccess(context, db, data.conversationId);
+    const ch = await findChannel(String(conv.channel_id), db);
+    if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
+
+    // load target message
+    const { data: msgRow, error: msgErr } = await db
+      .from("wa_messages" as any)
+      .select("id, wa_message_id, raw, direction")
+      .eq("id", data.messageId)
+      .maybeSingle();
+    if (msgErr || !msgRow) throw new Error("Mensagem não encontrada");
+    const targetWamid = (msgRow as any).wa_message_id as string | null;
+    if (!targetWamid) throw new Error("Mensagem ainda não confirmada pelo WhatsApp");
+
+    const toNormalized = normalizeBrWhatsappNumber(String(conv.contact_wa_id));
+    const body = {
+      messaging_product: "whatsapp",
+      to: toNormalized,
+      type: "reaction",
+      reaction: { message_id: targetWamid, emoji: data.emoji || "" },
+    };
+
+    const { body: resp } = await metaProxyForChannel(
+      ch,
+      `/${ch.phoneNumberId}/messages`,
+      { method: "POST", body: JSON.stringify(body) },
+      db,
+    );
+
+    // persist locally in raw.reactions.mine
+    const prevRaw = ((msgRow as any).raw ?? {}) as Record<string, any>;
+    const prevReactions = (prevRaw.reactions ?? {}) as Record<string, any>;
+    const nextRaw = {
+      ...prevRaw,
+      reactions: {
+        ...prevReactions,
+        mine: data.emoji || null,
+        mine_at: new Date().toISOString(),
+        mine_response: resp?.messages?.[0]?.id ?? null,
+      },
+    };
+
+    const isVendor = Boolean((context as any).vendor);
+    if (isVendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (rpcArgs) {
+        await db.rpc("vendor_update_wa_message_status" as any, {
+          ...rpcArgs,
+          _message_id: data.messageId,
+          _wa_message_id: targetWamid,
+          _status: null,
+          _raw: nextRaw,
+        });
+      }
+    } else {
+      await db.from("wa_messages" as any).update({ raw: nextRaw }).eq("id", data.messageId);
+    }
+    return { ok: true, emoji: data.emoji || null };
+  });
 
