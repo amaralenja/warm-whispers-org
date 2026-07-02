@@ -275,9 +275,10 @@ function CRMPage() {
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Carregando leads…</div>
       ) : view === "kanban" ? (
-        <Kanban stages={stages} leads={filtered} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} />
+        <Kanban stages={stages} leads={filtered} tagColors={tagColorMap} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} />
       ) : (
-        <Lista stages={stages} leads={filtered} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
+        <Lista stages={stages} leads={filtered} tagColors={tagColorMap} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
+
       )}
 
       <LeadDialog
