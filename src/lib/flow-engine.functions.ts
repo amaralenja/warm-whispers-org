@@ -454,10 +454,12 @@ export const importFlow = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     if (!data.code.trim()) throw new Error("Cole um código de fluxo.");
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any)?.vendor);
     const payload = decodeFlowCode(data.code);
     const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString();
-    const finalName = await uniqueFlowName(context.supabase, desired);
-    const { data: row, error } = await context.supabase
+    const finalName = await uniqueFlowName(db, desired);
+    const { data: row, error } = await db
       .from("wa_flows" as any)
       .insert({
         nome: finalName,
@@ -466,7 +468,7 @@ export const importFlow = createServerFn({ method: "POST" })
         entry_node_id: payload.entry_node_id ?? null,
         nodes: payload.nodes ?? [],
         edges: payload.edges ?? [],
-        created_by: context.userId,
+        created_by: isVendor ? null : context.userId,
       })
       .select("id").single();
     if (error) throw new Error(error.message);
@@ -479,7 +481,7 @@ export const importFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      await context.supabase.from("wa_flow_triggers" as any).insert(rows);
+      await db.from("wa_flow_triggers" as any).insert(rows);
     }
     return { id: (row as any).id, nome: finalName };
   });
