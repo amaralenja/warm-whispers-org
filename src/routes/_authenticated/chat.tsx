@@ -939,29 +939,74 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void }) {
   const isOut = msg.direction === "out";
+  const isDeleted = Boolean(msg.deleted_at);
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
   const caption = toText(msg.caption);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
-          isOut
-            ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
-            : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
-        }`}
-      >
-        <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
-        {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
-        {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
-        <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
-          <span>{formatTime(msg.created_at)}</span>
-          {isOut && <StatusTick status={msg.status} />}
+    <div className={`group flex ${isOut ? "justify-end" : "justify-start"}`}>
+      <div className="relative flex items-start gap-1">
+        {isOut && !isDeleted && onDelete && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Opções da mensagem">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-chat-line bg-popover">
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="mr-2 h-4 w-4" /> Apagar para todos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <div
+          className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
+            isOut
+              ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
+              : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
+          } ${isDeleted ? "italic opacity-70" : ""}`}
+        >
+          {isDeleted ? (
+            <p className="flex items-center gap-2 text-[15px] leading-relaxed">
+              <Ban className="h-4 w-4" /> Esta mensagem foi apagada
+            </p>
+          ) : (
+            <>
+              <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
+              {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
+              {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
+            </>
+          )}
+          <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
+            <span>{formatTime(msg.created_at)}</span>
+            {isOut && !isDeleted && <StatusTick status={msg.status} />}
+          </div>
         </div>
       </div>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar mensagem para todos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A mensagem será removida do sistema e o WhatsApp tentará apagá-la também para o contato. Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { onDelete?.(String(msg.id)); setConfirmDelete(false); }}
+            >
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
