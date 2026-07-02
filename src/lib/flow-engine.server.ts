@@ -225,13 +225,18 @@ function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): 
 }
 
 async function loadFlow(flowId: string, db: any) {
+  // Prefer SECURITY DEFINER RPC to bypass RLS in vendor sessions
+  try {
+    const { data: rpcRows } = await db.rpc("load_wa_flow", { _flow_id: flowId });
+    const row = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+    if (row) return row as any;
+  } catch {}
   let { data, error } = await db
     .from("wa_flows" as any)
     .select("*")
     .eq("id", flowId)
     .maybeSingle();
   if (!data) {
-    // Fallback to admin client (RLS may hide the flow from vendor sessions)
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const res = await supabaseAdmin
@@ -246,6 +251,7 @@ async function loadFlow(flowId: string, db: any) {
   if (error || !data) throw new Error(`Flow ${flowId} não encontrado`);
   return data as any;
 }
+
 
 
 async function executeFrom(ctx: Ctx, startNodeId: string) {
