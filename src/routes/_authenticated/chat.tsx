@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -171,6 +171,44 @@ function initials(name: unknown, fallback: unknown) {
     .map((s) => s[0]?.toUpperCase() ?? "")
     .join("") || "?";
 }
+
+// Paleta dark: cada letra tem sua cor pra diferenciar visualmente os contatos
+const AVATAR_PALETTE: Record<string, { bg: string; text: string }> = {
+  A: { bg: "linear-gradient(135deg,#7c2d12,#431407)", text: "#fdba74" }, // laranja
+  B: { bg: "linear-gradient(135deg,#134e4a,#042f2e)", text: "#5eead4" }, // teal
+  C: { bg: "linear-gradient(135deg,#1e3a8a,#0c1e4a)", text: "#93c5fd" }, // azul
+  D: { bg: "linear-gradient(135deg,#4c1d95,#2e1065)", text: "#c4b5fd" }, // roxo
+  E: { bg: "linear-gradient(135deg,#831843,#500724)", text: "#f9a8d4" }, // rosa
+  F: { bg: "linear-gradient(135deg,#78350f,#451a03)", text: "#fcd34d" }, // âmbar
+  G: { bg: "linear-gradient(135deg,#14532d,#052e16)", text: "#86efac" }, // verde
+  H: { bg: "linear-gradient(135deg,#164e63,#083344)", text: "#67e8f9" }, // ciano
+  I: { bg: "linear-gradient(135deg,#701a75,#4a044e)", text: "#f0abfc" }, // fúcsia
+  J: { bg: "linear-gradient(135deg,#365314,#1a2e05)", text: "#bef264" }, // lime
+  K: { bg: "linear-gradient(135deg,#7f1d1d,#450a0a)", text: "#fca5a5" }, // vermelho
+  L: { bg: "linear-gradient(135deg,#1e40af,#172554)", text: "#bfdbfe" }, // indigo
+  M: { bg: "linear-gradient(135deg,#9a3412,#7c2d12)", text: "#fdba74" }, // laranja escuro
+  N: { bg: "linear-gradient(135deg,#0f766e,#134e4a)", text: "#99f6e4" }, // teal claro
+  O: { bg: "linear-gradient(135deg,#6b21a8,#3b0764)", text: "#d8b4fe" }, // violeta
+  P: { bg: "linear-gradient(135deg,#9d174d,#500724)", text: "#f9a8d4" }, // pink
+  Q: { bg: "linear-gradient(135deg,#065f46,#022c22)", text: "#6ee7b7" }, // emerald
+  R: { bg: "linear-gradient(135deg,#991b1b,#450a0a)", text: "#fca5a5" }, // rose
+  S: { bg: "linear-gradient(135deg,#1e3a8a,#172554)", text: "#93c5fd" }, // sky
+  T: { bg: "linear-gradient(135deg,#854d0e,#422006)", text: "#fde047" }, // yellow
+  U: { bg: "linear-gradient(135deg,#3730a3,#1e1b4b)", text: "#a5b4fc" }, // indigo
+  V: { bg: "linear-gradient(135deg,#166534,#052e16)", text: "#86efac" }, // green
+  W: { bg: "linear-gradient(135deg,#155e75,#083344)", text: "#67e8f9" }, // cyan
+  X: { bg: "linear-gradient(135deg,#86198f,#4a044e)", text: "#f0abfc" }, // magenta
+  Y: { bg: "linear-gradient(135deg,#a16207,#422006)", text: "#fde047" }, // ouro
+  Z: { bg: "linear-gradient(135deg,#0369a1,#0c4a6e)", text: "#7dd3fc" }, // azul claro
+};
+const AVATAR_DEFAULT = { bg: "linear-gradient(135deg,#1f2937,#0f172a)", text: "#cbd5e1" };
+
+function avatarStyle(name: unknown, fallback: unknown): CSSProperties {
+  const key = initials(name, fallback).charAt(0).toUpperCase();
+  const c = AVATAR_PALETTE[key] ?? AVATAR_DEFAULT;
+  return { background: c.bg, color: c.text };
+}
+
 
 function toSafeDate(value: unknown) {
   const text = toText(value);
@@ -599,7 +637,10 @@ function ChatPage() {
                     >
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
-                          <AvatarFallback className="rounded-full bg-chat-soft text-sm font-bold text-chat-accent">
+                          <AvatarFallback
+                            className="rounded-full text-sm font-bold"
+                            style={avatarStyle(contactName, contactWaId)}
+                          >
                             {initials(contactName, contactWaId)}
                           </AvatarFallback>
                         </Avatar>
@@ -665,7 +706,10 @@ function ChatPage() {
               <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
                 <div className="flex min-w-0 items-center gap-4">
                   <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
-                    <AvatarFallback className="rounded-2xl bg-chat-soft text-base font-bold text-chat-accent">
+                    <AvatarFallback
+                      className="rounded-2xl text-base font-bold"
+                      style={avatarStyle(active.contact_name, active.contact_wa_id)}
+                    >
                       {initials(active.contact_name, active.contact_wa_id)}
                     </AvatarFallback>
                   </Avatar>
