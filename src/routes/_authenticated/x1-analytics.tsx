@@ -65,13 +65,25 @@ function fmtDur(seconds: number) {
   return `${h}h ${m}m`;
 }
 
-function defaultRange() {
+function todayRange() {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  return { from: iso(now), to: iso(now) };
+}
+
+type Preset = "hoje" | "7d" | "30d" | "mes";
+
+function presetRange(p: Preset) {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
   const to = new Date();
   const from = new Date();
-  from.setDate(from.getDate() - 30);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: iso(from), to: iso(to) };
+  if (p === "hoje") return { from: iso(to), to: iso(to) };
+  if (p === "7d") { from.setDate(from.getDate() - 6); return { from: iso(from), to: iso(to) }; }
+  if (p === "30d") { from.setDate(from.getDate() - 29); return { from: iso(from), to: iso(to) }; }
+  const first = new Date(to.getFullYear(), to.getMonth(), 1);
+  return { from: iso(first), to: iso(to) };
 }
+
 
 function X1AnalyticsPage() {
   const fetchFn = useServerFn(getX1Analytics);
