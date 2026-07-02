@@ -1189,6 +1189,7 @@ function FlowInlineBar({
 }) {
   const [q, setQ] = useState("");
   const [firing, setFiring] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ id: string; nome: string } | null>(null);
 
   const { data: flows = [] } = useQuery({
     queryKey: ["flows-for-dispatch"],
@@ -1201,8 +1202,6 @@ function FlowInlineBar({
     const list = asArray<any>(flows).filter((f) => {
       if (f?.ativo === false) return false;
       if (!f.operacao_id) return true;
-      // Quando a conversa antiga está sem operacao_id, o vendedor já recebeu
-      // apenas fluxos permitidos pelo backend; não esconde tudo no frontend.
       if (!op) return true;
       return f.operacao_id === op;
     });
@@ -1274,7 +1273,7 @@ function FlowInlineBar({
               key={String(f.id)}
               type="button"
               disabled={firing === f.id}
-              onClick={() => fire(f.id)}
+              onClick={() => setConfirm({ id: String(f.id), nome: toText(f.nome) || "Fluxo sem nome" })}
               className="group flex shrink-0 items-center gap-2 rounded-xl border border-chat-line bg-chat-panel px-3 py-2 text-left transition hover:border-chat-accent hover:bg-chat-soft disabled:opacity-50"
             >
               <Zap className="h-3.5 w-3.5 shrink-0 text-chat-accent" />
@@ -1289,9 +1288,32 @@ function FlowInlineBar({
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disparar fluxo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja disparar o fluxo <span className="font-semibold text-foreground">"{confirm?.nome}"</span> nesta conversa?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirm) fire(confirm.id);
+                setConfirm(null);
+              }}
+            >
+              Disparar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
 
 
 function FlowDispatcher({
