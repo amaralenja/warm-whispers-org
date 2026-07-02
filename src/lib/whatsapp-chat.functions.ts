@@ -647,7 +647,10 @@ type SendInput = {
   mediaUrl?: string;
   filename?: string;
   caption?: string;
+  contextWaMessageId?: string;
+  replyPreview?: string;
 };
+
 
 // Brazilian numbers: WhatsApp Cloud API expects mobile as 55 + DDD + 9 + 8 digits.
 // Many contacts arrive without the "9" (legacy 10-digit format). Insert it when missing.
