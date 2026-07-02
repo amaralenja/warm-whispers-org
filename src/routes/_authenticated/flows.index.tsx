@@ -502,10 +502,9 @@ function FlowsGrouped({
 }: {
   flows: any[];
   showOp: boolean;
-  workspaces: { id: string; nome: string }[];
+  workspaces: { id: string; nome: string; accent?: { hex: string; text: string; ring: string; border: string; bg: string } }[];
   renderCard: (f: any) => any;
 }) {
-  // Agrupa: operação -> pasta -> fluxos[]
   const opsMap = new Map<string, Map<string, any[]>>();
   for (const f of flows) {
     const opId = String(f.operacao_id ?? "__sem_op__");
@@ -515,22 +514,16 @@ function FlowsGrouped({
     if (!fm.has(fld)) fm.set(fld, []);
     fm.get(fld)!.push(f);
   }
-  const opName = (id: string) =>
-    id === "__sem_op__" ? "Sem operação" : workspaces.find((w) => w.id === id)?.nome ?? id;
-
-  // Cor consistente por operação (hash simples)
-  const opColor = (id: string) => {
-    const palette = [
-      { bg: "from-emerald-500/20 to-emerald-500/5", ring: "ring-emerald-500/40", text: "text-emerald-400", chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
-      { bg: "from-sky-500/20 to-sky-500/5", ring: "ring-sky-500/40", text: "text-sky-400", chip: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
-      { bg: "from-fuchsia-500/20 to-fuchsia-500/5", ring: "ring-fuchsia-500/40", text: "text-fuchsia-400", chip: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30" },
-      { bg: "from-amber-500/20 to-amber-500/5", ring: "ring-amber-500/40", text: "text-amber-400", chip: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
-      { bg: "from-rose-500/20 to-rose-500/5", ring: "ring-rose-500/40", text: "text-rose-400", chip: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
-      { bg: "from-indigo-500/20 to-indigo-500/5", ring: "ring-indigo-500/40", text: "text-indigo-400", chip: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
-    ];
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-    return palette[h % palette.length];
+  const wsById = new Map(workspaces.map((w) => [w.id, w]));
+  const opName = (id: string) => {
+    if (id === "__sem_op__") return "Sem operação";
+    const w = wsById.get(id);
+    return String(w?.nome ?? id);
+  };
+  const opAccent = (id: string): { hex: string; text: string; ring: string; border: string; bg: string } => {
+    const w = wsById.get(id);
+    if (w?.accent) return w.accent as any;
+    return { hex: "#64748b", text: "text-slate-400", ring: "ring-slate-500/40", border: "border-slate-500/30", bg: "bg-slate-500/10" };
   };
 
   const opEntries = Array.from(opsMap.entries()).sort((a, b) => opName(a[0]).localeCompare(opName(b[0])));
@@ -539,68 +532,171 @@ function FlowsGrouped({
     <div className="space-y-6">
       {opEntries.map(([opId, foldersMap]) => {
         const isOperacao = opId !== "__sem_op__";
-        // Nomes de pastas reais (excluindo o bucket sem pasta)
         const namedFolders = Array.from(foldersMap.entries())
           .filter(([k]) => k !== "__sem_pasta__")
           .sort((a, b) => a[0].localeCompare(b[0]));
         const semPasta = foldersMap.get("__sem_pasta__") ?? [];
         const totalFluxos = Array.from(foldersMap.values()).reduce((a, b) => a + b.length, 0);
-        const c = opColor(opId);
-        const initial = opName(opId).charAt(0).toUpperCase();
+        const c = opAccent(opId);
+        const nomeOp = opName(opId);
+        const initial = nomeOp.charAt(0).toUpperCase();
 
         return (
-          <section key={opId} className={`rounded-2xl border border-border/60 bg-gradient-to-br ${c.bg} backdrop-blur-sm overflow-hidden`}>
-            {showOp && (
-              <header className="flex items-center gap-3 px-5 py-4 border-b border-border/40 bg-background/30">
-                <div className={`h-10 w-10 rounded-xl grid place-items-center bg-background/60 ring-2 ${c.ring} ${c.text} font-bold`}>
-                  {initial}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-base font-semibold truncate">{opName(opId)}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {totalFluxos} fluxo{totalFluxos === 1 ? "" : "s"}
-                    {namedFolders.length > 0 && ` · ${namedFolders.length} pasta${namedFolders.length === 1 ? "" : "s"}`}
-                  </p>
-                </div>
-                <Badge variant="outline" className={`text-xs ${c.chip}`}>
-                  {totalFluxos}
-                </Badge>
-              </header>
-            )}
-
-            <div className="p-5 space-y-6">
-              {/* Fluxos "diretos" na operação (sem pasta) — quando temos operação, eles pertencem à pasta da operação */}
-              {semPasta.length > 0 && (
-                <div className="space-y-3">
-                  {(namedFolders.length > 0 || !isOperacao) && (
-                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <span>{isOperacao ? "📌 Diretos" : "📂 Sem operação"}</span>
-                      <span>({semPasta.length})</span>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {semPasta.map((f: any) => renderCard(f))}
-                  </div>
-                </div>
-              )}
-
-              {/* Sub-pastas nomeadas */}
-              {namedFolders.map(([fld, items]) => (
-                <div key={fld} className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <span>📁 {fld}</span>
-                    <span>({items.length})</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {items.map((f: any) => renderCard(f))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <OperacaoSection
+            key={opId}
+            opId={opId}
+            nomeOp={nomeOp}
+            initial={initial}
+            hex={c.hex}
+            totalFluxos={totalFluxos}
+            namedFolders={namedFolders}
+            semPasta={semPasta}
+            isOperacao={isOperacao}
+            showOp={showOp}
+            renderCard={renderCard}
+          />
         );
       })}
     </div>
   );
 }
+
+function OperacaoSection({
+  opId, nomeOp, initial, hex, totalFluxos, namedFolders, semPasta, isOperacao, showOp, renderCard,
+}: {
+  opId: string;
+  nomeOp: string;
+  initial: string;
+  hex: string;
+  totalFluxos: number;
+  namedFolders: [string, any[]][];
+  semPasta: any[];
+  isOperacao: boolean;
+  showOp: boolean;
+  renderCard: (f: any) => any;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const gradient = `linear-gradient(135deg, ${hex}22 0%, ${hex}0a 45%, transparent 100%)`;
+
+  return (
+    <section
+      className="rounded-2xl border overflow-hidden backdrop-blur-sm"
+      style={{ borderColor: `${hex}55`, background: gradient }}
+    >
+      {showOp && (
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="w-full grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b text-left hover:bg-background/30 transition-colors"
+          style={{ borderColor: `${hex}33`, backgroundColor: `${hex}14` }}
+        >
+          <div
+            className="h-10 w-10 shrink-0 rounded-xl grid place-items-center font-bold text-white text-lg"
+            style={{ backgroundColor: hex, boxShadow: `0 4px 14px ${hex}66` }}
+          >
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-semibold truncate">{nomeOp}</h2>
+            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+              {totalFluxos} fluxo{totalFluxos === 1 ? "" : "s"}
+              {namedFolders.length > 0 && ` · ${namedFolders.length} pasta${namedFolders.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums"
+              style={{ backgroundColor: `${hex}25`, color: hex, border: `1px solid ${hex}55` }}
+            >
+              {totalFluxos}
+            </span>
+            <span className="text-muted-foreground text-xs">{collapsed ? "▸" : "▾"}</span>
+          </div>
+        </button>
+      )}
+
+      {!collapsed && (
+        <div className="p-4 sm:p-5 space-y-6">
+          {semPasta.length > 0 && (
+            <FolderBlock
+              title={isOperacao ? "Diretos" : "Sem operação"}
+              items={semPasta}
+              hex={hex}
+              renderCard={renderCard}
+              showLabel={namedFolders.length > 0 || !isOperacao}
+              icon={isOperacao ? "📌" : "📂"}
+            />
+          )}
+          {namedFolders.map(([fld, items]) => (
+            <FolderBlock
+              key={fld}
+              title={fld}
+              items={items}
+              hex={hex}
+              renderCard={renderCard}
+              showLabel
+              icon="📁"
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function FolderBlock({
+  title, items, hex, renderCard, showLabel, icon,
+}: {
+  title: string;
+  items: any[];
+  hex: string;
+  renderCard: (f: any) => any;
+  showLabel: boolean;
+  icon: string;
+}) {
+  const [open, setOpen] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  const LIMIT = 3;
+  const visible = showAll ? items : items.slice(0, LIMIT);
+  const hidden = items.length - visible.length;
+
+  return (
+    <div className="space-y-3">
+      {showLabel && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <span>{open ? "▾" : "▸"}</span>
+          <span>{icon} {title}</span>
+          <span
+            className="rounded-full px-1.5 py-0.5 text-[10px] tabular-nums"
+            style={{ backgroundColor: `${hex}20`, color: hex }}
+          >
+            {items.length}
+          </span>
+        </button>
+      )}
+      {open && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+            {visible.map((f: any) => renderCard(f))}
+          </div>
+          {items.length > LIMIT && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="text-xs font-medium hover:underline"
+              style={{ color: hex }}
+            >
+              {showAll ? "Ver menos" : `Ver mais ${hidden} fluxo${hidden === 1 ? "" : "s"} →`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 
