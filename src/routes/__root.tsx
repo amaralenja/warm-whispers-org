@@ -2,11 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   createRootRouteWithContext,
-  useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Component, useEffect, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -36,10 +35,7 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error?: Error; reset?: () => void }) {
   const safeError = error ?? new Error("Erro desconhecido");
   console.error(error);
-  const router = useRouter();
-  useEffect(() => {
-    reportLovableError(safeError, { boundary: "tanstack_root_error_component" });
-  }, [safeError]);
+  reportLovableError(safeError, { boundary: "tanstack_root_error_component" });
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -51,8 +47,8 @@ function ErrorComponent({ error, reset }: { error?: Error; reset?: () => void })
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              router.invalidate();
               reset?.();
+              window.location.reload();
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
