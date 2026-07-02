@@ -1504,11 +1504,12 @@ Deno.serve(async (req) => {
         }
         const updateMsg: any = { status };
         if (errorMessage) updateMsg.error_message = errorMessage;
-        await supabase
+        const { data: updatedMsgs } = await supabase
           .from("wa_messages")
           .update(updateMsg)
           .eq("channel_id", channelId)
-          .eq("wa_message_id", statusId);
+          .eq("wa_message_id", statusId)
+          .select("id,conversation_id,created_at,direction");
         await supabase
           .from("wa_call_reminders")
           .update(updateMsg)
@@ -1519,6 +1520,24 @@ Deno.serve(async (req) => {
           .update(updateMsg)
           .eq("channel_id", channelId)
           .eq("wa_message_id", statusId);
+        // Refletir status na conversa para exibir os checks no preview da lista
+        const updatedMsg = Array.isArray(updatedMsgs) ? updatedMsgs[0] : null;
+        if (updatedMsg?.conversation_id && updatedMsg?.direction === "out") {
+          const { data: latestOut } = await supabase
+            .from("wa_messages")
+            .select("id,created_at")
+            .eq("conversation_id", updatedMsg.conversation_id)
+            .eq("direction", "out")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!latestOut || latestOut.id === updatedMsg.id) {
+            await supabase
+              .from("wa_conversations")
+              .update({ last_message_status: status })
+              .eq("id", updatedMsg.conversation_id);
+          }
+        }
       }
     }
   } catch (e) {

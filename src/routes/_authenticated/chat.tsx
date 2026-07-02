@@ -195,7 +195,7 @@ function formatDateLabel(iso: unknown) {
 function StatusTick({ status }: { status: string | null }) {
   if (status === "failed") return <span className="text-[10px] font-bold text-destructive">erro</span>;
   if (status === "pending") return <Clock className="h-3.5 w-3.5 text-white/70" />;
-  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 drop-shadow-sm" style={{ color: "#0a2540" }} strokeWidth={3} />;
+  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 drop-shadow-sm" style={{ color: "#7ec8ff" }} strokeWidth={3} />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
@@ -596,7 +596,15 @@ function ChatPage() {
                             </span>
                           </div>
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                            {c.last_message_direction === "out" && <CheckCheck className="h-3.5 w-3.5 shrink-0" />}
+                            {c.last_message_direction === "out" && (
+                              (c as any).last_message_status === "read" ? (
+                                <CheckCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "#7ec8ff" }} strokeWidth={3} />
+                              ) : (c as any).last_message_status === "delivered" ? (
+                                <CheckCheck className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            )}
                             <span className="truncate">{preview || "Sem prévia"}</span>
                           </div>
                         </div>
