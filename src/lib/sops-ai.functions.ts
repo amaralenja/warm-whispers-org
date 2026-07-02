@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1";
+const OPENAI_BASE = "https://api.openai.com/v1";
+const CHAT_MODEL = "gpt-4o-mini";
+const STT_MODEL = "gpt-4o-mini-transcribe";
 
 const SYSTEM_IMPROVE = `Você é um editor de processos internos (SOPs) de uma empresa brasileira de vendas digitais.
 
@@ -9,39 +11,36 @@ Sua missão: pegar o texto bruto que o usuário escreveu e devolver uma versão 
 
 Regras OBRIGATÓRIAS:
 - Mantenha 100% o sentido e as informações do que o usuário escreveu. Não invente passos, ferramentas, números ou políticas que não estavam ali.
-- Português brasileiro natural, direto, de gente real. Pode usar "a gente", "tá", linguagem do dia a dia se o original já era assim.
+- Português brasileiro natural, direto, de gente real.
 - NUNCA use travessão (— ou –). Use vírgula, dois pontos, ponto final ou parênteses no lugar.
-- Evite frases robóticas e clichês de IA tipo "no mundo de hoje", "é importante notar", "vamos mergulhar", "em conclusão".
-- Estruture em Markdown: títulos com ##, listas com -, negrito com ** quando ajudar a destacar passos críticos.
-- Se o original já tem estrutura, respeite. Só reorganize se ficar muito mais claro.
-- Devolva APENAS o markdown do processo melhorado. Sem comentários seus, sem "aqui está", sem explicações fora do conteúdo.`;
+- Estruture em Markdown: títulos com ##, listas com -, negrito com **.
+- Devolva APENAS o markdown do processo melhorado.`;
 
-const SYSTEM_CREATE = `Você é um redator de SOPs (processos operacionais) de uma empresa brasileira de vendas digitais.
+const SYSTEM_CREATE_LOCAL = `Você é um redator de SOPs (processos operacionais) de uma empresa brasileira de vendas digitais.
 Recebe uma ideia curta ou um pedido do usuário e gera um SOP completo, prático e claro em Markdown.
 
 Regras:
-- Português BR informal mas profissional, sem clichês de IA.
+- Português BR informal mas profissional.
 - NUNCA use travessão (— ou –).
-- Estrutura: um # título curto no topo, seções com ##, passos numerados ou bullets, e uma checklist final se fizer sentido.
-- Não invente números, ferramentas ou pessoas específicas. Se faltar contexto, escreve de forma genérica ("a ferramenta de CRM", "o gestor responsável").
-- Devolva APENAS o markdown. Sem introdução, sem "aqui está".`;
+- Estrutura: # título curto no topo, seções ##, passos numerados/bullets, checklist final se fizer sentido.
+- Devolva APENAS o markdown.`;
 
-function requireLovableKey(): string {
-  const k = process.env.LOVABLE_API_KEY;
-  if (!k) throw new Error("LOVABLE_API_KEY não configurada");
+function requireOpenAiKey(): string {
+  const k = process.env.OPENAI_API_KEY;
+  if (!k) throw new Error("OPENAI_API_KEY não configurada");
   return k;
 }
 
-async function callGateway(system: string, user: string): Promise<string> {
-  const apiKey = requireLovableKey();
-  const res = await fetch(`${LOVABLE_GATEWAY}/chat/completions`, {
+async function callOpenAi(system: string, user: string): Promise<string> {
+  const apiKey = requireOpenAiKey();
+  const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model: CHAT_MODEL,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -50,9 +49,9 @@ async function callGateway(system: string, user: string): Promise<string> {
   });
   if (!res.ok) {
     const t = await res.text();
-    if (res.status === 429) throw new Error("Muitas requisições agora, espera 1 minutinho e tenta de novo (ou adiciona créditos no Lovable AI).");
-    if (res.status === 402) throw new Error("Créditos do Lovable AI esgotados. Adicione créditos na workspace.");
-    throw new Error(`IA indisponível (${res.status}): ${t.slice(0, 200)}`);
+    if (res.status === 429) throw new Error("OpenAI rate limit, espera uns segundos e tenta de novo.");
+    if (res.status === 401) throw new Error("OPENAI_API_KEY inválida.");
+    throw new Error(`OpenAI indisponível (${res.status}): ${t.slice(0, 200)}`);
   }
   const json: any = await res.json();
   let out: string = json?.choices?.[0]?.message?.content ?? "";
@@ -76,7 +75,7 @@ export const improveSopText = createServerFn({ method: "POST" })
       "",
       "Devolva o processo reescrito em markdown, mantendo o sentido original.",
     ].filter(Boolean).join("\n");
-    return { conteudo: await callGateway(SYSTEM_IMPROVE, userMsg) };
+    return { conteudo: await callOpenAi(SYSTEM_IMPROVE, userMsg) };
   });
 
 export const createSopWithAi = createServerFn({ method: "POST" })
@@ -91,8 +90,8 @@ export const createSopWithAi = createServerFn({ method: "POST" })
       "",
       "Gere o SOP completo em markdown. A primeira linha deve ser um # Título curto e claro.",
     ].filter(Boolean).join("\n");
-    const conteudo = await callGateway(SYSTEM_CREATE, userMsg);
-    const firstLine = conteudo.split("\n").find((l) => l.trim().startsWith("#")) ?? "";
+    const conteudo = await callOpenAi(SYSTEM_CREATE_LOCAL, userMsg);
+    const firstLine = conteudo.split("\n").find((l: string) => l.trim().startsWith("#")) ?? "";
     const titulo = firstLine.replace(/^#+\s*/, "").trim() || "Novo processo";
     return { titulo, conteudo };
   });
@@ -101,7 +100,7 @@ export const transcribeSopAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { audioBase64: string; mime?: string }) => d)
   .handler(async ({ data }) => {
-    const apiKey = requireLovableKey();
+    const apiKey = requireOpenAiKey();
     const mime = data.mime || "audio/webm";
     const ext =
       mime.includes("wav") ? "wav" :
@@ -113,22 +112,18 @@ export const transcribeSopAudio = createServerFn({ method: "POST" })
     const blob = new Blob([bin], { type: mime });
 
     const fd = new FormData();
-    fd.append("model", "openai/gpt-4o-mini-transcribe");
+    fd.append("model", STT_MODEL);
     fd.append("file", blob, `recording.${ext}`);
 
-    const res = await fetch(`${LOVABLE_GATEWAY}/audio/transcriptions`, {
+    const res = await fetch(`${OPENAI_BASE}/audio/transcriptions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: fd,
     });
     if (!res.ok) {
       const t = await res.text();
-      if (res.status === 429) {
-        throw new Error("Muitas requisições agora, espera 1 minutinho e tenta de novo (ou adiciona créditos no Lovable AI).");
-      }
-      if (res.status === 402) {
-        throw new Error("Créditos do Lovable AI esgotados. Adicione créditos na workspace pra continuar usando transcrição.");
-      }
+      if (res.status === 429) throw new Error("OpenAI rate limit na transcrição, tenta de novo em uns segundos.");
+      if (res.status === 401) throw new Error("OPENAI_API_KEY inválida.");
       throw new Error(`Falha na transcrição (${res.status}): ${t.slice(0, 200)}`);
     }
     const json: any = await res.json();
