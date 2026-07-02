@@ -992,14 +992,10 @@ export const deleteWhatsappMessage = createServerFn({ method: "POST" })
         .from("wa_messages" as any)
         .update({
           deleted_at: new Date().toISOString(),
-          text_body: null,
-          media_url: null,
-          media_id: null,
-          media_filename: null,
-          caption: null,
         })
         .eq("id", data.messageId);
       if (upErr) throw new Error(upErr.message);
+
     }
 
     // Best-effort: pedir pro WhatsApp remover pra todos.
