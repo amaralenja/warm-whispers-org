@@ -38,28 +38,39 @@ export const Route = createFileRoute("/_authenticated/crm")({
   component: CRMPage,
 });
 
-type StageView = { id: string; label: string; color: string; soft: string; border: string; text: string };
+type StageView = { id: string; label: string; cor: string };
 
-function hexToSoft(hex: string, alpha = 0.1) {
-  const h = hex.replace("#", "");
+function stageView(id: string, nome: string, cor: string): StageView {
+  return { id, label: nome, cor: cor || "#64748b" };
+}
+
+function hexToRgba(hex: string, alpha = 0.15) {
+  const h = (hex || "#64748b").replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function stageView(id: string, nome: string, cor: string): StageView {
-  return {
-    id, label: nome,
-    color: "",
-    soft: "",
-    border: "",
-    text: "",
-    // we'll inline styles via cor in render
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...({ cor } as any),
-  };
+// Deterministic color from a string (name → hue)
+const AVATAR_PALETTE = [
+  "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e",
+  "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
+  "#8b5cf6", "#a855f7", "#d946ef", "#ec4899", "#f43f5e",
+];
+function colorFromName(name: string): string {
+  const s = (name || "?").trim();
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }
+function initialsOf(name: string): string {
+  const parts = (name || "?").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 
 type Lead = {
   id: string;
