@@ -2122,6 +2122,17 @@ export type Database = {
         Args: { _codigo: string; _vendor_id: number }
         Returns: string[]
       }
+      vendor_create_crm_tag: {
+        Args: {
+          _codigo: string
+          _cor: string
+          _nome: string
+          _operacao: string
+          _stage_id?: string
+          _vendor_id: number
+        }
+        Returns: string
+      }
       vendor_create_wa_flow_run: {
         Args: {
           _channel_id?: string
@@ -2154,6 +2165,14 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      vendor_delete_crm_stage: {
+        Args: { _codigo: string; _id: string; _vendor_id: number }
+        Returns: boolean
+      }
+      vendor_delete_crm_tag: {
+        Args: { _codigo: string; _id: string; _vendor_id: number }
+        Returns: boolean
       }
       vendor_delete_wa_message: {
         Args: { _codigo: string; _message_id: string; _vendor_id: number }
@@ -2504,6 +2523,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      vendor_update_crm_tag: {
+        Args: {
+          _clear_stage?: boolean
+          _codigo: string
+          _cor?: string
+          _id: string
+          _nome?: string
+          _stage_id?: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
       vendor_update_wa_flow_run: {
         Args: {
           _codigo: string
@@ -2523,6 +2554,18 @@ export type Database = {
           _wa_message_id?: string
         }
         Returns: boolean
+      }
+      vendor_upsert_crm_stage: {
+        Args: {
+          _codigo: string
+          _cor: string
+          _id: string
+          _nome: string
+          _operacao: string
+          _ordem: number
+          _vendor_id: number
+        }
+        Returns: string
       }
     }
     Enums: {
