@@ -193,6 +193,10 @@ function normalizeText(value: unknown): string {
     .trim();
 }
 
+function sameWorkspace(a: unknown, b: unknown) {
+  return normalizeText(a) === normalizeText(b);
+}
+
 function vendorRpcArgs(context: any) {
   const id = Number(context?.vendor?.id);
   const codigo = String(context?.vendor?.codigo ?? "").trim();
