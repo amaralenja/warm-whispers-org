@@ -22,7 +22,11 @@ import {
   Square,
   History,
   Bot,
+  Pencil,
+  Eye,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
