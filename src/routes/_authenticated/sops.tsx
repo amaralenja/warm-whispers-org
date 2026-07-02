@@ -94,6 +94,7 @@ function SopsPage() {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<Sop | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const initialRef = useRef<string>("");
 
