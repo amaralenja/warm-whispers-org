@@ -9,6 +9,24 @@ async function dbFor(context: any) {
   return context.supabase as any;
 }
 
+function normalizeText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function sameWorkspace(a: unknown, b: unknown) {
+  return normalizeText(a) === normalizeText(b);
+}
+
+function vendorRpcArgs(context: any) {
+  const id = Number(context?.vendor?.id);
+  const codigo = String(context?.vendor?.codigo ?? "").trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
+}
+
 function vendorWorkspaceIds(context: any): string[] | null {
   if (!context?.vendor) return null;
   const ids = context.vendor.workspace_ids;
@@ -28,13 +46,18 @@ function applyVendorWorkspaceFilter(context: any, q: any) {
   return q.in("expert", allowed);
 }
 
+function hasAllowedWorkspace(context: any, workspace: unknown) {
+  const allowed = vendorWorkspaceIds(context) ?? [];
+  return allowed.some((a) => sameWorkspace(a, workspace));
+}
+
 async function assertLeadAccess(context: any, db: any, leadId: string) {
   if (!context?.vendor) return;
   const { data, error } = await db.from("crm_leads" as any).select("id,expert").eq("id", leadId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Lead não encontrado");
   const allowed = vendorWorkspaceIds(context) ?? [];
-  if (!allowed.includes(String((data as any).expert ?? ""))) {
+  if (!hasAllowedWorkspace(context, (data as any).expert)) {
     throw new Error("Inautorizado: vendedor sem acesso a este workspace");
   }
 }
@@ -43,13 +66,19 @@ function assertPayloadWorkspace(context: any, payload: any) {
   if (!context?.vendor) return;
   const allowed = vendorWorkspaceIds(context) ?? [];
   const expert = String(payload?.expert ?? context.vendor.expert ?? "");
-  if (!expert || !allowed.includes(expert)) throw new Error("Inautorizado: vendedor sem acesso a este workspace");
+  if (!expert || !allowed.some((a) => sameWorkspace(a, expert))) throw new Error("Inautorizado: vendedor sem acesso a este workspace");
 }
 
 export const listCrmExperts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data, error } = await db.rpc("vendor_list_crm_experts" as any, rpcArgs);
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as any[]).map((e) => ({ ...e, crm_api_key: null }));
+    }
     let q = db.from("experts" as any).select("id,nome,ativo,crm_api_key").order("nome");
     const allowed = vendorWorkspaceIds(context);
     if (allowed) {
@@ -65,6 +94,12 @@ export const listCrmLeads = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data, error } = await db.rpc("vendor_list_crm_leads" as any, rpcArgs);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    }
     let q: any = db.from("crm_leads" as any).select("*").order("ordem", { ascending: true }).order("created_at", { ascending: false });
     q = applyVendorWorkspaceFilter(context, q);
     if (!q) return [];
@@ -119,6 +154,13 @@ export const updateCrmLeadStage = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; status: string }) => ({ id: String(d?.id ?? ""), status: String(d?.status ?? "novo") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data: ok, error } = await db.rpc("vendor_update_crm_lead_stage" as any, { ...rpcArgs, _lead_id: data.id, _status: data.status });
+      if (error) throw new Error(error.message);
+      if (!ok) throw new Error("Inautorizado: vendedor sem acesso a este lead");
+      return { ok: true };
+    }
     await assertLeadAccess(context, db, data.id);
     const { error } = await db.from("crm_leads" as any).update({ status: data.status }).eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -130,13 +172,19 @@ export const listCrmTags = createServerFn({ method: "GET" })
   .inputValidator((d: { operacao?: string }) => ({ operacao: d?.operacao ?? "all" }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data: rows, error } = await db.rpc("vendor_list_crm_tags" as any, { ...rpcArgs, _operacao: data.operacao ?? "all" });
+      if (error) throw new Error(error.message);
+      return rows ?? [];
+    }
     let q = db.from("crm_tags" as any).select("*").order("nome");
     if (data.operacao && data.operacao !== "all") q = q.eq("operacao", data.operacao);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const allowed = vendorWorkspaceIds(context);
     if (!allowed) return rows ?? [];
-    return ((rows ?? []) as any[]).filter((t) => allowed.includes(String(t.operacao ?? "")));
+    return ((rows ?? []) as any[]).filter((t) => allowed.some((a) => sameWorkspace(a, t.operacao)));
   });
 
 export const createCrmTag = createServerFn({ method: "POST" })
@@ -184,13 +232,19 @@ export const listCrmStages = createServerFn({ method: "GET" })
   .inputValidator((d: { operacao?: string }) => ({ operacao: d?.operacao ?? "all" }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data: rows, error } = await db.rpc("vendor_list_crm_stages" as any, { ...rpcArgs, _operacao: data.operacao ?? "all" });
+      if (error) throw new Error(error.message);
+      return rows ?? [];
+    }
     let q = db.from("crm_stages" as any).select("*").order("ordem").order("created_at");
     if (data.operacao && data.operacao !== "all") q = q.eq("operacao", data.operacao);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const allowed = vendorWorkspaceIds(context);
     if (!allowed) return rows ?? [];
-    return ((rows ?? []) as any[]).filter((t) => allowed.includes(String(t.operacao ?? "")));
+    return ((rows ?? []) as any[]).filter((t) => allowed.some((a) => sameWorkspace(a, t.operacao)));
   });
 
 export const upsertCrmStage = createServerFn({ method: "POST" })

@@ -35,6 +35,46 @@ type Conta = {
 const fmtBRL = (n: number) =>
   (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+function safeText(value: unknown, fallback = "—"): string {
+  if (value == null) return fallback;
+  if (["string", "number", "boolean"].includes(typeof value)) {
+    const text = String(value).trim();
+    return text || fallback;
+  }
+  if (Array.isArray(value)) {
+    const text: string = value.map((v: unknown) => safeText(v, "")).filter(Boolean).join(", ").trim();
+    return text || fallback;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    for (const key of ["text", "value", "label", "nome", "name", "phone", "whatsapp"]) {
+      if (obj[key] != null) return safeText(obj[key], fallback);
+    }
+  }
+  return fallback;
+}
+
+function safeNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") return Number(value.replace(/[^\d,.-]/g, "").replace(",", ".")) || 0;
+  return 0;
+}
+
+function sanitizeConta(row: any): Conta {
+  return {
+    id: String(row?.id ?? crypto.randomUUID()),
+    nome: safeText(row?.nome, ""),
+    whatsapp: safeText(row?.whatsapp, ""),
+    crm_status: safeText(row?.crm_status, ""),
+    crm_valor: safeNumber(row?.crm_valor),
+    crm_valor_recebido: safeNumber(row?.crm_valor_recebido),
+    crm_data_agendamento: typeof row?.crm_data_agendamento === "string" ? row.crm_data_agendamento : null,
+    crm_data_pagamento_restante: typeof row?.crm_data_pagamento_restante === "string" ? row.crm_data_pagamento_restante : null,
+    crm_notas_closer: safeText(row?.crm_notas_closer, ""),
+    updated_at: typeof row?.updated_at === "string" ? row.updated_at : null,
+  };
+}
+
 function fmtDate(d: string | null) {
   if (!d) return "—";
   const dt = new Date(d);
@@ -64,7 +104,7 @@ export function HTContasReceber() {
       toast.error("Erro ao carregar contas");
       setRows([]);
     } else {
-      setRows((data || []) as unknown as Conta[]);
+      setRows(((data || []) as any[]).map(sanitizeConta));
     }
     setLoading(false);
   }
@@ -85,8 +125,8 @@ export function HTContasReceber() {
       const q = search.trim().toLowerCase();
       list = list.filter(
         (r) =>
-          (r.nome || "").toLowerCase().includes(q) ||
-          (r.whatsapp || "").toLowerCase().includes(q),
+          safeText(r.nome, "").toLowerCase().includes(q) ||
+          safeText(r.whatsapp, "").toLowerCase().includes(q),
       );
     }
     return list;
@@ -112,8 +152,8 @@ export function HTContasReceber() {
       crm_valor: total,
       crm_valor_recebido: rec,
       crm_data_pagamento_restante: editing.crm_data_pagamento_restante || null,
-      crm_status: total > 0 && rec >= total ? "fechado" : editing.crm_status || "fechado",
-      crm_notas_closer: editing.crm_notas_closer || null,
+          crm_status: total > 0 && rec >= total ? "fechado" : safeText(editing.crm_status, "fechado"),
+          crm_notas_closer: safeText(editing.crm_notas_closer, "") || null,
     };
     const { error } = await quizSb.from("leads").update(payload).eq("id", editing.id);
     if (error) { toast.error("Erro ao salvar: " + error.message); return; }
@@ -200,8 +240,8 @@ export function HTContasReceber() {
                     return (
                       <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20">
                         <td className="px-4 py-3 tabular-nums text-muted-foreground">{fmtDate(r.crm_data_agendamento || r.updated_at)}</td>
-                        <td className="px-4 py-3 font-medium">{r.nome || "—"}</td>
-                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.whatsapp || "—"}</td>
+                         <td className="px-4 py-3 font-medium">{safeText(r.nome)}</td>
+                         <td className="px-4 py-3 tabular-nums text-muted-foreground">{safeText(r.whatsapp)}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-semibold">{fmtBRL(total)}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-emerald-400">{fmtBRL(rec)}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-amber-400 font-semibold">{fmtBRL(falta)}</td>
@@ -232,7 +272,7 @@ export function HTContasReceber() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar conta — {editing?.nome}</DialogTitle>
+             <DialogTitle>Editar conta — {safeText(editing?.nome)}</DialogTitle>
           </DialogHeader>
           {editing && (
             <div className="grid grid-cols-2 gap-4">
@@ -254,7 +294,7 @@ export function HTContasReceber() {
               </div>
               <div className="col-span-2">
                 <Label>Notas do Closer</Label>
-                <Textarea value={editing.crm_notas_closer || ""} rows={3}
+                 <Textarea value={safeText(editing.crm_notas_closer, "")} rows={3}
                   onChange={(e) => setEditing({ ...editing, crm_notas_closer: e.target.value })} />
               </div>
               <div className="col-span-2 rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-sm flex justify-between">

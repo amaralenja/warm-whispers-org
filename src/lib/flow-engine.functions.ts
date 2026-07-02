@@ -14,6 +14,52 @@ function vendorChannelIds(context: any): string[] {
   return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
 }
 
+function normalizeText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function vendorRpcArgs(context: any) {
+  const id = Number(context?.vendor?.id);
+  const codigo = String(context?.vendor?.codigo ?? "").trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
+}
+
+async function vendorAllowedChannelIds(context: any, db: any): Promise<string[]> {
+  const explicit = vendorChannelIds(context);
+  if (explicit.length > 0) return explicit;
+  const rpcArgs = vendorRpcArgs(context);
+  if (rpcArgs) {
+    const { data } = await db.rpc("vendor_allowed_channel_ids" as any, rpcArgs);
+    if (Array.isArray(data)) return data.map(String).filter(Boolean);
+  }
+  const expert = context?.vendor?.expert ? String(context.vendor.expert) : "";
+  if (!expert) return [];
+  const { data } = await db.from("wa_channels" as any).select("id,operacao_id,kind");
+  return ((data ?? []) as any[])
+    .filter((c) => normalizeText(c.operacao_id) === normalizeText(expert) && c.kind !== "notification")
+    .map((c) => String(c.id))
+    .filter(Boolean);
+}
+
+async function attachFlowTriggers(db: any, flows: any[]) {
+  if (!Array.isArray(flows) || flows.length === 0) return flows ?? [];
+  const ids = flows.map((f) => String(f.id)).filter(Boolean);
+  const { data: triggers } = await db
+    .from("wa_flow_triggers" as any)
+    .select("*")
+    .in("flow_id", ids);
+  const byFlow = new Map<string, any[]>();
+  for (const t of ((triggers ?? []) as any[])) {
+    const k = String(t.flow_id ?? "");
+    byFlow.set(k, [...(byFlow.get(k) ?? []), t]);
+  }
+  return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
+}
+
 async function assertVendorConversationAccess(context: any, db: any, conversationId: string) {
   if (!context?.vendor) return;
   const { data: conv, error } = await db
@@ -23,7 +69,7 @@ async function assertVendorConversationAccess(context: any, db: any, conversatio
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!conv) throw new Error("Conversa não encontrada");
-  const allowed = vendorChannelIds(context);
+  const allowed = await vendorAllowedChannelIds(context, db);
   if (!allowed.includes(String((conv as any).channel_id)) || Number((conv as any).assigned_vendor_id) !== Number(context.vendor.id)) {
     throw new Error("Inautorizado: este lead não está liberado para este vendedor");
   }
@@ -70,6 +116,12 @@ export const listFlows = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data, error } = await db.rpc("vendor_list_flows" as any, rpcArgs);
+      if (error) throw new Error(error.message);
+      return attachFlowTriggers(db, (data ?? []) as any[]);
+    }
     const { data, error } = await db
       .from("wa_flows" as any)
       .select("*, wa_flow_triggers(*)")
@@ -82,7 +134,16 @@ export const getFlow = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
-    const { data: flow, error } = await context.supabase
+    const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data: rows, error } = await db.rpc("vendor_get_flow" as any, { ...rpcArgs, _flow_id: data.id });
+      if (error) throw new Error(error.message);
+      const flow = Array.isArray(rows) ? rows[0] : rows;
+      if (!flow) throw new Error("Fluxo não encontrado");
+      return (await attachFlowTriggers(db, [flow]))[0];
+    }
+    const { data: flow, error } = await db
       .from("wa_flows" as any)
       .select("*, wa_flow_triggers(*)")
       .eq("id", data.id)
@@ -354,7 +415,7 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     if ((context as any).vendor) {
-      if (!vendorChannelIds(context).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
+      if (!(await vendorAllowedChannelIds(context, db)).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
       if (data.conversation_id) await assertVendorConversationAccess(context, db, data.conversation_id);
     }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");

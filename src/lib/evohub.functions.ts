@@ -60,6 +60,12 @@ async function dbFor(context: any) {
   return context.supabase as any;
 }
 
+function vendorRpcArgs(context: any) {
+  const id = Number(context?.vendor?.id);
+  const codigo = String(context?.vendor?.codigo ?? "").trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
+}
+
 function vendorChannelIdsSync(context: any): string[] {
   const ids = context?.vendor?.wa_channel_ids;
   return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
@@ -70,8 +76,11 @@ async function vendorChannelIds(context: any, db?: any): Promise<string[]> {
   if (explicit.length > 0) return explicit;
   const expert = context?.vendor?.expert ? String(context.vendor.expert) : "";
   if (!expert || !db) return [];
-  const { data } = await db.from("wa_channels" as any).select("id").eq("operacao_id", expert);
-  return ((data ?? []) as any[]).map((r) => String(r.id)).filter(Boolean);
+  const { data } = await db.from("wa_channels" as any).select("id,operacao_id,kind").neq("operacao_id", "__notificador__").neq("kind", "notification");
+  return ((data ?? []) as any[])
+    .filter((r) => normalizeText((r as any).operacao_id) === normalizeText(expert))
+    .map((r) => String(r.id))
+    .filter(Boolean);
 }
 
 function normalizeMetadata(metadata: any): Record<string, any> | null {
@@ -248,6 +257,13 @@ export const listWhatsappChannels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const db = await dbFor(context);
+    if (context?.vendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (!rpcArgs) return [];
+      const { data, error } = await db.rpc("vendor_list_wa_channels" as any, rpcArgs);
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as any[]).map((c) => withConnectUrl(mergeLocalIntoRemote(c, c)));
+    }
     const vendorAllowed = context?.vendor ? new Set(await vendorChannelIds(context, db)) : null;
     if (vendorAllowed && vendorAllowed.size === 0) return [];
     const data = await evoFetch("/api/v1/channels");
