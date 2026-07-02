@@ -525,6 +525,14 @@ function SopsPage() {
               >
                 <History className="mr-2 h-4 w-4" /> Histórico
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => setEditing((v) => !v)}
+                className="shrink-0"
+                title={editing ? "Visualizar" : "Editar"}
+              >
+                {editing ? <><Eye className="mr-2 h-4 w-4" /> Visualizar</> : <><Pencil className="mr-2 h-4 w-4" /> Editar</>}
+              </Button>
               <Button onClick={saveDraft} disabled={!dirty || saving} className="shrink-0">
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Salvar
@@ -535,15 +543,28 @@ function SopsPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-fancy p-6">
-              <Textarea
-                value={draft.conteudo}
-                onChange={(e) => setDraft({ ...draft, conteudo: e.target.value })}
-                placeholder={`# Visão geral\n\nDescreva o processo passo a passo...\n\n## Passo 1\n...\n\n## Passo 2\n...`}
-                className="min-h-[60vh] resize-none border-border bg-card/30 font-mono text-sm leading-relaxed"
-              />
-              <div className="mt-2 text-xs text-muted-foreground">
-                Aceita Markdown. Última atualização: {fmtDate(draft.updated_at)}
-              </div>
+              {editing ? (
+                <>
+                  <Textarea
+                    value={draft.conteudo}
+                    onChange={(e) => setDraft({ ...draft, conteudo: e.target.value })}
+                    placeholder={`# Visão geral\n\nDescreva o processo passo a passo...\n\n## Passo 1\n...\n\n## Passo 2\n...`}
+                    className="min-h-[60vh] resize-none border-border bg-card/30 font-mono text-sm leading-relaxed"
+                  />
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Aceita Markdown. Última atualização: {fmtDate(draft.updated_at)}
+                  </div>
+                </>
+              ) : (
+                <article className="sop-view mx-auto max-w-4xl">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {draft.conteudo || "_(vazio, clique em Editar pra começar)_"}
+                  </ReactMarkdown>
+                  <div className="mt-6 text-xs text-muted-foreground">
+                    Última atualização: {fmtDate(draft.updated_at)}
+                  </div>
+                </article>
+              )}
 
               {historyOpen && (
                 <div className="mt-6 rounded-xl border border-border bg-card/30 p-4">
