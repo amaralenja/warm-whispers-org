@@ -1156,21 +1156,12 @@ export const reactToWhatsappMessage = createServerFn({ method: "POST" })
       },
     };
 
-    const isVendor = Boolean((context as any).vendor);
-    if (isVendor) {
-      const rpcArgs = vendorRpcArgs(context);
-      if (rpcArgs) {
-        await db.rpc("vendor_update_wa_message_status" as any, {
-          ...rpcArgs,
-          _message_id: data.messageId,
-          _wa_message_id: targetWamid,
-          _status: null,
-          _raw: nextRaw,
-        });
-      }
-    } else {
-      await db.from("wa_messages" as any).update({ raw: nextRaw }).eq("id", data.messageId);
-    }
+    const { error: updErr } = await db
+      .from("wa_messages" as any)
+      .update({ raw: nextRaw })
+      .eq("id", data.messageId);
+    if (updErr) throw new Error(updErr.message);
     return { ok: true, emoji: data.emoji || null };
   });
+
 
