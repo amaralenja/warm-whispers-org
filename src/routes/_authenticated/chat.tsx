@@ -711,7 +711,20 @@ function ChatPage() {
                             <span className="truncate text-[15px] font-semibold tracking-normal">
                               {contactName || contactWaId}
                             </span>
+                            {(() => {
+                              const b = opBadgeFor((c as any).operacao_id);
+                              return b ? (
+                                <span
+                                  className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                  style={{ color: b.hex, borderColor: `${b.hex}55`, backgroundColor: `${b.hex}1a` }}
+                                  title={`Operação: ${b.nome}`}
+                                >
+                                  {b.nome}
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
+
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             {c.last_message_direction === "out" && (
                               <PreviewStatusTick status={c.last_message_status} />
