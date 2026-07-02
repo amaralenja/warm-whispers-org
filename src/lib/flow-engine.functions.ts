@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function dbFor(context: any) {
-  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (context?.vendor) {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return supabaseAdmin as any;
   }
@@ -20,6 +20,30 @@ function normalizeText(value: unknown): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function normalizeBrWhatsappNumber(raw: string): string {
+  let digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
+  if (digits.length === 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    if (rest.length === 8) return `55${ddd}9${rest}`;
+  }
+  return digits;
+}
+
+function whatsappNumberVariants(raw: string): string[] {
+  const variants = new Set<string>();
+  for (const value of [raw, String(raw ?? "").replace(/\D/g, ""), normalizeBrWhatsappNumber(raw)]) {
+    const clean = String(value ?? "").replace(/\D/g, "").trim();
+    if (clean) variants.add(clean);
+  }
+  for (const value of Array.from(variants)) {
+    if (value.startsWith("55") && value.length === 13 && value[4] === "9") variants.add(`${value.slice(0, 4)}${value.slice(5)}`);
+    if (value.startsWith("55") && value.length === 12) variants.add(`${value.slice(0, 4)}9${value.slice(4)}`);
+  }
+  return Array.from(variants).filter(Boolean);
 }
 
 function vendorRpcArgs(context: any) {
@@ -74,14 +98,14 @@ async function findVendorConversation(
   if (conv) return conv as any;
 
   const channelId = String(fallback?.channelId ?? "").trim();
-  const contactWaId = String(fallback?.contactWaId ?? "").replace(/\D/g, "");
-  if (!channelId || !contactWaId) return null;
+  const contactIds = whatsappNumberVariants(String(fallback?.contactWaId ?? ""));
+  if (!channelId || contactIds.length === 0) return null;
 
   const { data: fallbackConv, error: fallbackError } = await db
     .from("wa_conversations" as any)
     .select("id,channel_id,assigned_vendor_id,contact_wa_id")
     .eq("channel_id", channelId)
-    .eq("contact_wa_id", contactWaId)
+    .in("contact_wa_id", contactIds)
     .order("last_message_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -109,9 +133,9 @@ async function assertVendorConversationAccess(
     await db
       .from("wa_conversations" as any)
       .update({ assigned_vendor_id: Number(context.vendor.id) })
-      .eq("id", conversationId)
+      .eq("id", (conv as any).id)
       .is("assigned_vendor_id", null);
-    return conv as any;
+    return { ...(conv as any), assigned_vendor_id: Number(context.vendor.id) };
   }
   if (assignedId !== Number(context.vendor.id)) {
     throw new Error("Inautorizado: este lead está com outro vendedor");

@@ -178,7 +178,7 @@ async function metaProxyForChannel(
 // --- DB reads ---
 
 async function dbFor(context: any) {
-  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (context?.vendor) {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return supabaseAdmin as any;
   }
@@ -282,11 +282,7 @@ async function getConversationByIdOrContact(
   const rawContact = String(fallback?.contactWaId ?? "").trim();
   if (!channelId || !rawContact) return null;
 
-  const contactIds = Array.from(new Set([
-    rawContact,
-    rawContact.replace(/\D/g, ""),
-    normalizeBrWhatsappNumber(rawContact),
-  ].map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const contactIds = whatsappNumberVariants(rawContact);
   if (contactIds.length === 0) return null;
 
   const { data: fallbackConv, error: fallbackError } = await db
@@ -574,6 +570,23 @@ function normalizeBrWhatsappNumber(raw: string): string {
     }
   }
   return digits;
+}
+
+function whatsappNumberVariants(raw: string): string[] {
+  const variants = new Set<string>();
+  for (const value of [raw, String(raw ?? "").replace(/\D/g, ""), normalizeBrWhatsappNumber(raw)]) {
+    const clean = String(value ?? "").replace(/\D/g, "").trim();
+    if (clean) variants.add(clean);
+  }
+  for (const value of Array.from(variants)) {
+    if (value.startsWith("55") && value.length === 13 && value[4] === "9") {
+      variants.add(`${value.slice(0, 4)}${value.slice(5)}`);
+    }
+    if (value.startsWith("55") && value.length === 12) {
+      variants.add(`${value.slice(0, 4)}9${value.slice(4)}`);
+    }
+  }
+  return Array.from(variants).filter(Boolean);
 }
 
 export const sendWhatsappMessage = createServerFn({ method: "POST" })
