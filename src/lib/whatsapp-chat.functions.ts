@@ -793,6 +793,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
           last_message_at: new Date().toISOString(),
           last_message_preview: previewForOut(data),
           last_message_direction: "out",
+          last_message_status: "pending",
         })
         .eq("id", conversationId);
     }
