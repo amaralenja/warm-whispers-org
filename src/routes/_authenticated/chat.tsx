@@ -1215,12 +1215,12 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
   ) : null;
 
   return (
-    <div className={`group flex ${isOut ? "justify-end" : "justify-start"}`}>
-      <div className="relative flex items-start gap-1">
+    <div className={`group flex w-full ${isOut ? "justify-end" : "justify-start"}`}>
+      <div className={`relative flex w-full max-w-[min(74%,760px)] items-start gap-1 ${isOut ? "justify-end" : "justify-start"}`}>
         {isOut && (<>{menu}{reactionBar}</>)}
-        <div className="relative">
+        <div className="relative min-w-0 flex-1">
           <div
-            className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
+            className={`w-full overflow-hidden rounded-2xl border px-4 py-3 break-words ${
               isOut
                 ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
                 : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
