@@ -347,7 +347,7 @@ function QuizPage() {
       if (toIso) q = q.lt("data_criacao", toIso);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Lead[];
+      return (data ?? []).map(sanitizeLead) as Lead[];
     },
     refetchInterval: 30000,
   });
