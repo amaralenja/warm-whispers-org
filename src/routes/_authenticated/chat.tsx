@@ -839,7 +839,30 @@ function ChatPage() {
                     })()}
                   </div>
                 </div>
+                <ConversationMetaControls
+                  key={active.id}
+                  conv={active}
+                  onSaveTags={async (tags) => {
+                    try {
+                      await updateTagsFn({ data: { conversationId: active.id, tags } });
+                      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+                      toast.success("Etiquetas atualizadas");
+                    } catch (e) {
+                      toast.error(errorToText(e, "Falha ao salvar etiquetas"));
+                    }
+                  }}
+                  onSaveNotes={async (notes) => {
+                    try {
+                      await updateNotesFn({ data: { conversationId: active.id, notes } });
+                      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+                      toast.success("Nota salva");
+                    } catch (e) {
+                      toast.error(errorToText(e, "Falha ao salvar nota"));
+                    }
+                  }}
+                />
               </header>
+
 
               <ActiveFlowRuns conversationId={active.id} />
               <WindowCountdown lastInboundAt={
