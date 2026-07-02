@@ -440,7 +440,7 @@ function ChatPage() {
         media_filename: vars.filename ?? null,
         caption: vars.caption ?? null,
         status: "pending",
-        raw: { optimistic: true },
+        raw: { optimistic: true, ...(vars.contextWaMessageId ? { context: { message_id: vars.contextWaMessageId }, reply_preview: vars.replyPreview } : {}) },
         created_at: new Date().toISOString(),
       };
       qc.setQueryData(["wa-messages", vars.conversationId], (old: unknown) => [
