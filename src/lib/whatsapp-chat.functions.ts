@@ -247,7 +247,7 @@ async function autoAssignUnassignedConversations(db: any, channelIds?: string[])
     .from("wa_conversations" as any)
     .select("id,channel_id")
     .is("assigned_vendor_id", null)
-    .neq("operacao_id", "__notificador__")
+    .or("operacao_id.is.null,operacao_id.neq.__notificador__")
     .limit(200);
 
   if (allowedChannels.length > 0) q = q.in("channel_id", allowedChannels);
@@ -394,7 +394,7 @@ export const listConversations = createServerFn({ method: "GET" })
         .from("wa_conversations" as any)
         .select("*")
         .eq("assigned_vendor_id", vendorId)
-        .neq("operacao_id", "__notificador__")
+        .or("operacao_id.is.null,operacao_id.neq.__notificador__")
         .order("last_message_at", { ascending: false })
         .limit(200);
       if (notifIds.length) assignedQ = assignedQ.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
@@ -408,7 +408,7 @@ export const listConversations = createServerFn({ method: "GET" })
           .select("*")
           .in("channel_id", allowed)
           .is("assigned_vendor_id", null)
-          .neq("operacao_id", "__notificador__")
+          .or("operacao_id.is.null,operacao_id.neq.__notificador__")
           .order("last_message_at", { ascending: false })
           .limit(200);
         if (notifIds.length) openQ = openQ.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
@@ -440,7 +440,7 @@ export const listConversations = createServerFn({ method: "GET" })
       .select("*")
       .order("last_message_at", { ascending: false })
       .limit(200)
-      .neq("operacao_id", "__notificador__");
+      .or("operacao_id.is.null,operacao_id.neq.__notificador__");
     if (notifIds.length) q = q.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
     if (isVendor) {
