@@ -813,6 +813,9 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       }, db);
 
       const waMsgId = resp?.messages?.[0]?.id ?? null;
+      const replyMeta = data.contextWaMessageId
+        ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null }
+        : {};
       if (isVendor) {
         const rpcArgs = vendorRpcArgs(context);
         if (rpcArgs) {
@@ -821,15 +824,16 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
             _message_id: insertedMessageId,
             _wa_message_id: waMsgId,
             _status: "sent",
-            _raw: { request: body, response: resp },
+            _raw: { request: body, response: resp, ...replyMeta },
           });
         }
       } else {
         await db
           .from("wa_messages" as any)
-          .update({ wa_message_id: waMsgId, status: "sent", raw: { request: body, response: resp } })
+          .update({ wa_message_id: waMsgId, status: "sent", raw: { request: body, response: resp, ...replyMeta } })
           .eq("id", insertedMessageId);
       }
+
 
       return { ok: true, waMsgId, messageId: insertedMessageId };
     } catch (e: any) {
