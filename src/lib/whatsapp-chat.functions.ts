@@ -764,7 +764,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         _from_wa_id: ch.phoneNumberId,
         _to_wa_id: toNormalized,
         _status: "pending",
-        _raw: { pending: true, request: body, sent_by_vendor_id: (context as any).vendor?.id ?? null },
+        _raw: { pending: true, request: body, sent_by_vendor_id: (context as any).vendor?.id ?? null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
       });
       if (error || !messageId) throw new Error(`Falha ao salvar mensagem: ${error?.message ?? "mensagem não criada"}`);
       insertedMessageId = String(messageId);
