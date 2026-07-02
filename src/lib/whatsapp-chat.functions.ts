@@ -229,6 +229,18 @@ async function assertVendorChannel(context: any, channelId: string, db?: any) {
   }
 }
 
+function uniqueRowsById<T extends { id?: unknown }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const id = String(row?.id ?? "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(row);
+  }
+  return out;
+}
+
 async function autoAssignUnassignedConversations(db: any, channelIds?: string[]) {
   const allowedChannels = Array.isArray(channelIds) ? channelIds.map(String).filter(Boolean) : [];
   let q = db
@@ -332,10 +344,16 @@ async function assertConversationAccess(
     throw new Error(`Conversa não encontrada (id=${conversationId.slice(0, 8)}…)`);
   }
   if (context?.vendor) {
-    await assertVendorChannel(context, String((conv as any).channel_id), db);
     const assignedVendorId = (conv as any).assigned_vendor_id == null ? null : Number((conv as any).assigned_vendor_id);
+    const currentVendorId = Number(context.vendor.id);
+    // Se a conversa já está atribuída ao vendedor, libera mesmo que o cadastro do canal
+    // esteja sem vínculo/operacao correto. Isso evita chat zerado e envio bloqueado
+    // para vendedores que já receberam leads antes da normalização dos canais.
+    if (assignedVendorId !== currentVendorId) {
+      await assertVendorChannel(context, String((conv as any).channel_id), db);
+    }
     if (assignedVendorId == null) {
-      const vendorId = Number(context.vendor.id);
+      const vendorId = currentVendorId;
       await db
         .from("wa_conversations" as any)
         .update({ assigned_vendor_id: vendorId })
@@ -343,7 +361,7 @@ async function assertConversationAccess(
         .is("assigned_vendor_id", null);
       return { ...(conv as any), assigned_vendor_id: vendorId };
     }
-    if (assignedVendorId !== Number(context.vendor.id)) {
+    if (assignedVendorId !== currentVendorId) {
       throw new Error("Inautorizado: este lead está com outro vendedor");
     }
   }
@@ -360,9 +378,48 @@ export const listConversations = createServerFn({ method: "GET" })
     const db = await dbFor(context);
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
-      const { data: rows, error } = await db.rpc("vendor_list_wa_conversations" as any, { ...rpcArgs, _operacao_id: data.operacaoId ?? null });
-      if (error) throw new Error(error.message);
-      return rows ?? [];
+      const vendorId = Number((context as any).vendor.id);
+      const allowed = await vendorChannelIds(context, db);
+      await autoAssignUnassignedConversations(db, allowed.length ? allowed : undefined).catch((e) => {
+        console.warn("[whatsapp-chat] vendor auto-assign skipped", e);
+      });
+
+      const { data: notifChans } = await db
+        .from("wa_channels" as any)
+        .select("id")
+        .eq("kind", "notification");
+      const notifIds = ((notifChans ?? []) as any[]).map((c) => String(c.id)).filter(Boolean);
+
+      let assignedQ = db
+        .from("wa_conversations" as any)
+        .select("*")
+        .eq("assigned_vendor_id", vendorId)
+        .neq("operacao_id", "__notificador__")
+        .order("last_message_at", { ascending: false })
+        .limit(200);
+      if (notifIds.length) assignedQ = assignedQ.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
+      const { data: assignedRows, error: assignedError } = await assignedQ;
+      if (assignedError) throw new Error(assignedError.message);
+
+      let openRows: any[] = [];
+      if (allowed.length > 0) {
+        let openQ = db
+          .from("wa_conversations" as any)
+          .select("*")
+          .in("channel_id", allowed)
+          .is("assigned_vendor_id", null)
+          .neq("operacao_id", "__notificador__")
+          .order("last_message_at", { ascending: false })
+          .limit(200);
+        if (notifIds.length) openQ = openQ.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
+        const { data: rows, error } = await openQ;
+        if (error) throw new Error(error.message);
+        openRows = (rows ?? []) as any[];
+      }
+
+      return uniqueRowsById([ ...((assignedRows ?? []) as any[]), ...openRows ])
+        .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime())
+        .slice(0, 200);
     }
     // Excluir canais de notificação (não devem aparecer no chat ao vivo)
     const { data: notifChans } = await db
@@ -403,7 +460,14 @@ export const listMessages = createServerFn({ method: "GET" })
     const db = await dbFor(context);
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
-      const { data: rows, error } = await db.rpc("vendor_list_wa_messages" as any, { ...rpcArgs, _conversation_id: data.conversationId });
+      await assertConversationAccess(context, db, data.conversationId);
+      const { data: rows, error } = await db
+        .from("wa_messages" as any)
+        .select("*")
+        .eq("conversation_id", data.conversationId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(500);
       if (error) throw new Error(error.message);
       return rows ?? [];
     }
@@ -427,9 +491,13 @@ export const markConversationRead = createServerFn({ method: "POST" })
     const db = await dbFor(context);
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
-      const { data: ok, error } = await db.rpc("vendor_mark_conversation_read" as any, { ...rpcArgs, _conversation_id: data.conversationId });
+      await assertConversationAccess(context, db, data.conversationId);
+      const { error } = await db
+        .from("wa_conversations" as any)
+        .update({ unread_count: 0 })
+        .eq("id", data.conversationId);
       if (error) throw new Error(error.message);
-      return { ok: Boolean(ok) };
+      return { ok: true };
     }
     await assertConversationAccess(context, db, data.conversationId);
     await db
