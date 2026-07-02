@@ -1700,3 +1700,122 @@ function ConversationActionsMenu({
     </DropdownMenu>
   );
 }
+
+function ConversationMetaControls({
+  conv,
+  onSaveTags,
+  onSaveNotes,
+}: {
+  conv: Conv;
+  onSaveTags: (tags: string[]) => Promise<void> | void;
+  onSaveNotes: (notes: string) => Promise<void> | void;
+}) {
+  const initialTags = Array.isArray(conv.tags) ? conv.tags.filter(Boolean) : [];
+  const [tags, setTags] = useState<string[]>(initialTags);
+  const [tagInput, setTagInput] = useState("");
+  const [notes, setNotes] = useState<string>(conv.notes ?? "");
+  const [savingTags, setSavingTags] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  const addTag = async (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    if (tags.includes(t)) { setTagInput(""); return; }
+    const next = [...tags, t].slice(0, 50);
+    setTags(next);
+    setTagInput("");
+    setSavingTags(true);
+    try { await onSaveTags(next); } finally { setSavingTags(false); }
+  };
+  const removeTag = async (t: string) => {
+    const next = tags.filter((x) => x !== t);
+    setTags(next);
+    setSavingTags(true);
+    try { await onSaveTags(next); } finally { setSavingTags(false); }
+  };
+  const saveNotes = async () => {
+    setSavingNotes(true);
+    try { await onSaveNotes(notes); } finally { setSavingNotes(false); }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
+            <Tag className="h-4 w-4" /> Etiquetas
+            {tags.length > 0 ? (
+              <span className="rounded-full bg-chat-accent/20 px-1.5 text-[10px] font-semibold text-chat-accent">{tags.length}</span>
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 border-chat-line bg-chat-panel p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas do contato</div>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {tags.length === 0 ? (
+              <span className="text-xs text-muted-foreground">Nenhuma etiqueta ainda.</span>
+            ) : tags.map((t) => (
+              <span key={t} className="inline-flex items-center gap-1 rounded-full border border-chat-accent/40 bg-chat-accent/10 px-2 py-0.5 text-xs font-medium text-chat-accent">
+                {t}
+                <button
+                  type="button"
+                  onClick={() => removeTag(t)}
+                  className="ml-0.5 rounded-full p-0.5 hover:bg-chat-accent/20"
+                  aria-label={`Remover ${t}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); void addTag(tagInput); }
+              }}
+              placeholder="Nova etiqueta (Enter)"
+              className="h-9 border-chat-line bg-chat-soft text-sm"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void addTag(tagInput)}
+              disabled={savingTags || !tagInput.trim()}
+              className="h-9"
+            >
+              Adicionar
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
+            <StickyNote className="h-4 w-4" /> Nota
+            {(conv.notes ?? "").trim().length > 0 ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-chat-accent" />
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-96 border-chat-line bg-chat-panel p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anotações internas</div>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Escreva observações sobre este contato..."
+            className="min-h-[140px] border-chat-line bg-chat-soft text-sm"
+          />
+          <div className="mt-3 flex justify-end">
+            <Button size="sm" onClick={saveNotes} disabled={savingNotes}>
+              {savingNotes ? "Salvando..." : "Salvar nota"}
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
