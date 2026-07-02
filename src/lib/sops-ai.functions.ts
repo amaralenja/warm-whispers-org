@@ -75,7 +75,7 @@ export const improveSopText = createServerFn({ method: "POST" })
       "",
       "Devolva o processo reescrito em markdown, mantendo o sentido original.",
     ].filter(Boolean).join("\n");
-    return { conteudo: await callGateway(SYSTEM_IMPROVE, userMsg) };
+    return { conteudo: await callOpenAi(SYSTEM_IMPROVE, userMsg) };
   });
 
 export const createSopWithAi = createServerFn({ method: "POST" })
@@ -90,8 +90,8 @@ export const createSopWithAi = createServerFn({ method: "POST" })
       "",
       "Gere o SOP completo em markdown. A primeira linha deve ser um # Título curto e claro.",
     ].filter(Boolean).join("\n");
-    const conteudo = await callGateway(SYSTEM_CREATE, userMsg);
-    const firstLine = conteudo.split("\n").find((l) => l.trim().startsWith("#")) ?? "";
+    const conteudo = await callOpenAi(SYSTEM_CREATE_LOCAL, userMsg);
+    const firstLine = conteudo.split("\n").find((l: string) => l.trim().startsWith("#")) ?? "";
     const titulo = firstLine.replace(/^#+\s*/, "").trim() || "Novo processo";
     return { titulo, conteudo };
   });
@@ -100,7 +100,7 @@ export const transcribeSopAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { audioBase64: string; mime?: string }) => d)
   .handler(async ({ data }) => {
-    const apiKey = requireLovableKey();
+    const apiKey = requireOpenAiKey();
     const mime = data.mime || "audio/webm";
     const ext =
       mime.includes("wav") ? "wav" :
@@ -112,22 +112,18 @@ export const transcribeSopAudio = createServerFn({ method: "POST" })
     const blob = new Blob([bin], { type: mime });
 
     const fd = new FormData();
-    fd.append("model", "openai/gpt-4o-mini-transcribe");
+    fd.append("model", STT_MODEL);
     fd.append("file", blob, `recording.${ext}`);
 
-    const res = await fetch(`${LOVABLE_GATEWAY}/audio/transcriptions`, {
+    const res = await fetch(`${OPENAI_BASE}/audio/transcriptions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: fd,
     });
     if (!res.ok) {
       const t = await res.text();
-      if (res.status === 429) {
-        throw new Error("Muitas requisições agora, espera 1 minutinho e tenta de novo (ou adiciona créditos no Lovable AI).");
-      }
-      if (res.status === 402) {
-        throw new Error("Créditos do Lovable AI esgotados. Adicione créditos na workspace pra continuar usando transcrição.");
-      }
+      if (res.status === 429) throw new Error("OpenAI rate limit na transcrição, tenta de novo em uns segundos.");
+      if (res.status === 401) throw new Error("OPENAI_API_KEY inválida.");
       throw new Error(`Falha na transcrição (${res.status}): ${t.slice(0, 200)}`);
     }
     const json: any = await res.json();
