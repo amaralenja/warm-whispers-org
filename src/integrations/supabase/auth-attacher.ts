@@ -1,5 +1,7 @@
+import { createMiddleware } from '@tanstack/react-start'
 import { supabase } from './client'
 import { encodeVendorSessionHeader, getVendorSession } from '@/lib/vendor-session'
+
 
 function buildAuthHeaders(existing?: HeadersInit): Headers {
   const headers = new Headers(existing)
