@@ -145,7 +145,8 @@ async function attachFlowTriggers(db: any, flows: any[], context?: any) {
   const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
   if (rpcArgs) {
     const entries = await Promise.all(ids.map(async (flowId) => {
-      const { data } = await db.rpc("vendor_list_wa_flow_triggers" as any, { ...rpcArgs, _flow_id: flowId });
+      const { data, error } = await db.rpc("vendor_list_wa_flow_triggers" as any, { ...rpcArgs, _flow_id: flowId });
+      if (error) return [flowId, []] as const;
       return [flowId, Array.isArray(data) ? data : []] as const;
     }));
     const byFlow = new Map<string, any[]>(entries);
