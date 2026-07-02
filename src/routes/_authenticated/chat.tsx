@@ -805,6 +805,8 @@ function ChatPage() {
                   ) : messageList.map((m, i, arr) => {
                     const prev = arr[i - 1];
                     const showDate = !prev || toSafeDate(prev.created_at).toDateString() !== toSafeDate(m.created_at).toDateString();
+                    const ctxId = (m.raw as any)?.context?.message_id ?? null;
+                    const quoted = ctxId ? messageList.find((x) => x.wa_message_id === ctxId) ?? null : null;
                     return (
                       <div key={String(m.id)}>
                         {showDate && (
@@ -814,10 +816,11 @@ function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
+
                 </div>
               </div>
 
