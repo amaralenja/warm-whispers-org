@@ -344,12 +344,14 @@ function Kanban({
             onDragOver={(e) => { e.preventDefault(); setDragOver(s.id); }}
             onDragLeave={() => setDragOver((p) => (p === s.id ? null : p))}
             onDrop={(e) => onDrop(e, s.id)}
-            className={`flex min-h-0 w-72 shrink-0 flex-col rounded-xl border ${s.border} ${isOver ? "bg-card" : "bg-card/40"} transition-colors`}
+            style={{ borderColor: hexToRgba(s.cor, 0.4), background: isOver ? hexToRgba(s.cor, 0.08) : undefined }}
+            className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card/40 transition-colors"
           >
-            <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
+            <div className="h-1 w-full" style={{ background: s.cor }} />
+            <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5" style={{ background: hexToRgba(s.cor, 0.12) }}>
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${s.color}`} />
-                <span className={`text-xs font-semibold uppercase tracking-wider ${s.text}`}>{s.label}</span>
+                <span className="h-2 w-2 rounded-full" style={{ background: s.cor }} />
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: s.cor }}>{s.label}</span>
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                   {items.length}
                 </span>
@@ -358,6 +360,7 @@ function Kanban({
                 <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
               )}
             </div>
+
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
               {items.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border/40 py-6 text-center text-[11px] text-muted-foreground">
