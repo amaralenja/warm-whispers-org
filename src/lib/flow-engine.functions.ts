@@ -516,13 +516,11 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
     const db = await dbFor(context);
     if ((context as any).vendor) {
       if (!(await vendorAllowedChannelIds(context, db)).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
-      if (data.conversation_id) {
-        const conv = await assertVendorConversationAccess(context, db, data.conversation_id, {
-          channelId: data.channel_id,
-          contactWaId: data.contact_wa_id,
-        });
-        if (conv?.id) data.conversation_id = String(conv.id);
-      }
+      const conv = await assertVendorConversationAccess(context, db, data.conversation_id ?? "", {
+        channelId: data.channel_id,
+        contactWaId: data.contact_wa_id,
+      });
+      if (conv?.id) data.conversation_id = String(conv.id);
     }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");
     return runFlowAdmin({
