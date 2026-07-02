@@ -493,10 +493,14 @@ function Lista({
                 <td className="px-4 py-3 text-xs text-muted-foreground">{l.fonte ?? "—"}</td>
                 <td className="px-4 py-3 text-xs">{l.responsavel_nome ?? "—"}</td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex items-center gap-1.5 rounded-md border ${stage.border} ${stage.soft} px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${stage.text}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${stage.color}`} />{stage.label}
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                    style={{ borderColor: hexToRgba(stage.cor, 0.5), background: hexToRgba(stage.cor, 0.12), color: stage.cor }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: stage.cor }} />{stage.label}
                   </span>
                 </td>
+
                 <td className="px-4 py-3 text-right text-xs font-bold tabular-nums">
                   {(l.valor_estimado ?? 0) > 0 ? BRL(l.valor_estimado ?? 0) : <span className="text-muted-foreground">—</span>}
                 </td>
