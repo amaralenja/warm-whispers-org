@@ -1048,4 +1048,59 @@ export const deleteWhatsappMessage = createServerFn({ method: "POST" })
     return { ok: true, waRemoved, waError };
   });
 
+export const updateConversationTags = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; tags: string[] }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    tags: Array.isArray(d?.tags) ? d.tags.map((t) => String(t ?? "").trim()).filter(Boolean).slice(0, 50) : [],
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId) throw new Error("Conversa não informada");
+    const db = await dbFor(context);
+    const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { error } = await db.rpc("vendor_update_conversation_tags" as any, {
+        ...rpcArgs,
+        _conversation_id: data.conversationId,
+        _tags: data.tags,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+    const { error } = await db
+      .from("wa_conversations" as any)
+      .update({ tags: data.tags, updated_at: new Date().toISOString() })
+      .eq("id", data.conversationId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateConversationNotes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; notes: string }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    notes: String(d?.notes ?? ""),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId) throw new Error("Conversa não informada");
+    const db = await dbFor(context);
+    const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { error } = await db.rpc("vendor_update_conversation_notes" as any, {
+        ...rpcArgs,
+        _conversation_id: data.conversationId,
+        _notes: data.notes,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+    const { error } = await db
+      .from("wa_conversations" as any)
+      .update({ notes: data.notes, updated_at: new Date().toISOString() })
+      .eq("id", data.conversationId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
 

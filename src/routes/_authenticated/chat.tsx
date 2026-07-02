@@ -26,6 +26,8 @@ import {
   User,
   Reply,
   X,
+  Tag,
+  StickyNote,
 } from "lucide-react";
 
 
@@ -55,6 +57,8 @@ import {
   listVendorsForChannel,
   listWhatsappChannels,
   uploadWhatsappMedia,
+  updateConversationTags,
+  updateConversationNotes,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, listActiveFlowRuns, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
@@ -86,6 +90,8 @@ type Conv = {
   last_message_direction: string | null;
   last_message_status: string | null;
   unread_count: number;
+  tags?: string[] | null;
+  notes?: string | null;
 };
 
 type Msg = {
@@ -285,6 +291,8 @@ function ChatPage() {
   const uploadMediaFn = useServerFn(uploadWhatsappMedia);
   const listFlowsFn = useServerFn(listFlows);
   const triggerFlowFn = useServerFn(triggerFlowManually);
+  const updateTagsFn = useServerFn(updateConversationTags);
+  const updateNotesFn = useServerFn(updateConversationNotes);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -709,12 +717,34 @@ function ChatPage() {
                             })()}
                           </div>
 
+                          {(() => {
+                            const tags = Array.isArray((c as any).tags) ? ((c as any).tags as string[]).filter(Boolean) : [];
+                            if (tags.length === 0) return null;
+                            const shown = tags.slice(0, 3);
+                            const extra = tags.length - shown.length;
+                            return (
+                              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+                                {shown.map((t) => (
+                                  <span key={t} className="max-w-[110px] truncate rounded-full border border-chat-accent/40 bg-chat-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-chat-accent">
+                                    {t}
+                                  </span>
+                                ))}
+                                {extra > 0 ? (
+                                  <span className="rounded-full border border-chat-line px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                    +{extra}
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             {c.last_message_direction === "out" && (
                               <PreviewStatusTick status={c.last_message_status} />
                             )}
                             <span className="truncate">{preview || "Sem prévia"}</span>
                           </div>
+
                         </div>
                         <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
                           <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
@@ -809,7 +839,30 @@ function ChatPage() {
                     })()}
                   </div>
                 </div>
+                <ConversationMetaControls
+                  key={active.id}
+                  conv={active}
+                  onSaveTags={async (tags) => {
+                    try {
+                      await updateTagsFn({ data: { conversationId: active.id, tags } });
+                      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+                      toast.success("Etiquetas atualizadas");
+                    } catch (e) {
+                      toast.error(errorToText(e, "Falha ao salvar etiquetas"));
+                    }
+                  }}
+                  onSaveNotes={async (notes) => {
+                    try {
+                      await updateNotesFn({ data: { conversationId: active.id, notes } });
+                      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+                      toast.success("Nota salva");
+                    } catch (e) {
+                      toast.error(errorToText(e, "Falha ao salvar nota"));
+                    }
+                  }}
+                />
               </header>
+
 
               <ActiveFlowRuns conversationId={active.id} />
               <WindowCountdown lastInboundAt={
@@ -1647,3 +1700,122 @@ function ConversationActionsMenu({
     </DropdownMenu>
   );
 }
+
+function ConversationMetaControls({
+  conv,
+  onSaveTags,
+  onSaveNotes,
+}: {
+  conv: Conv;
+  onSaveTags: (tags: string[]) => Promise<void> | void;
+  onSaveNotes: (notes: string) => Promise<void> | void;
+}) {
+  const initialTags = Array.isArray(conv.tags) ? conv.tags.filter(Boolean) : [];
+  const [tags, setTags] = useState<string[]>(initialTags);
+  const [tagInput, setTagInput] = useState("");
+  const [notes, setNotes] = useState<string>(conv.notes ?? "");
+  const [savingTags, setSavingTags] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  const addTag = async (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    if (tags.includes(t)) { setTagInput(""); return; }
+    const next = [...tags, t].slice(0, 50);
+    setTags(next);
+    setTagInput("");
+    setSavingTags(true);
+    try { await onSaveTags(next); } finally { setSavingTags(false); }
+  };
+  const removeTag = async (t: string) => {
+    const next = tags.filter((x) => x !== t);
+    setTags(next);
+    setSavingTags(true);
+    try { await onSaveTags(next); } finally { setSavingTags(false); }
+  };
+  const saveNotes = async () => {
+    setSavingNotes(true);
+    try { await onSaveNotes(notes); } finally { setSavingNotes(false); }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
+            <Tag className="h-4 w-4" /> Etiquetas
+            {tags.length > 0 ? (
+              <span className="rounded-full bg-chat-accent/20 px-1.5 text-[10px] font-semibold text-chat-accent">{tags.length}</span>
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 border-chat-line bg-chat-panel p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas do contato</div>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {tags.length === 0 ? (
+              <span className="text-xs text-muted-foreground">Nenhuma etiqueta ainda.</span>
+            ) : tags.map((t) => (
+              <span key={t} className="inline-flex items-center gap-1 rounded-full border border-chat-accent/40 bg-chat-accent/10 px-2 py-0.5 text-xs font-medium text-chat-accent">
+                {t}
+                <button
+                  type="button"
+                  onClick={() => removeTag(t)}
+                  className="ml-0.5 rounded-full p-0.5 hover:bg-chat-accent/20"
+                  aria-label={`Remover ${t}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); void addTag(tagInput); }
+              }}
+              placeholder="Nova etiqueta (Enter)"
+              className="h-9 border-chat-line bg-chat-soft text-sm"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void addTag(tagInput)}
+              disabled={savingTags || !tagInput.trim()}
+              className="h-9"
+            >
+              Adicionar
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
+            <StickyNote className="h-4 w-4" /> Nota
+            {(conv.notes ?? "").trim().length > 0 ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-chat-accent" />
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-96 border-chat-line bg-chat-panel p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anotações internas</div>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Escreva observações sobre este contato..."
+            className="min-h-[140px] border-chat-line bg-chat-soft text-sm"
+          />
+          <div className="mt-3 flex justify-end">
+            <Button size="sm" onClick={saveNotes} disabled={savingNotes}>
+              {savingNotes ? "Salvando..." : "Salvar nota"}
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+

@@ -1556,8 +1556,10 @@ export type Database = {
           last_message_direction: string | null
           last_message_preview: string | null
           last_message_status: string | null
+          notes: string | null
           operacao_id: string | null
           phone_number_id: string | null
+          tags: string[]
           unread_count: number
           updated_at: string
         }
@@ -1572,8 +1574,10 @@ export type Database = {
           last_message_direction?: string | null
           last_message_preview?: string | null
           last_message_status?: string | null
+          notes?: string | null
           operacao_id?: string | null
           phone_number_id?: string | null
+          tags?: string[]
           unread_count?: number
           updated_at?: string
         }
@@ -1588,8 +1592,10 @@ export type Database = {
           last_message_direction?: string | null
           last_message_preview?: string | null
           last_message_status?: string | null
+          notes?: string | null
           operacao_id?: string | null
           phone_number_id?: string | null
+          tags?: string[]
           unread_count?: number
           updated_at?: string
         }
@@ -2342,8 +2348,10 @@ export type Database = {
           last_message_direction: string | null
           last_message_preview: string | null
           last_message_status: string | null
+          notes: string | null
           operacao_id: string | null
           phone_number_id: string | null
+          tags: string[]
           unread_count: number
           updated_at: string
         }[]
@@ -2409,8 +2417,10 @@ export type Database = {
           last_message_direction: string | null
           last_message_preview: string | null
           last_message_status: string | null
+          notes: string | null
           operacao_id: string | null
           phone_number_id: string | null
+          tags: string[]
           unread_count: number
           updated_at: string
         }[]
@@ -2427,6 +2437,24 @@ export type Database = {
           _conversation_id: string
           _direction?: string
           _preview?: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
+      vendor_update_conversation_notes: {
+        Args: {
+          _codigo: string
+          _conversation_id: string
+          _notes: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
+      vendor_update_conversation_tags: {
+        Args: {
+          _codigo: string
+          _conversation_id: string
+          _tags: string[]
           _vendor_id: number
         }
         Returns: boolean
