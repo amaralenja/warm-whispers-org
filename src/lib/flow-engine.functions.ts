@@ -123,21 +123,26 @@ async function assertVendorConversationAccess(
   if (!conversationId) return;
   const conv = await findVendorConversation(db, conversationId, fallback);
   if (!conv) throw new Error("Conversa não encontrada");
-  const allowed = await vendorAllowedChannelIds(context, db);
-  if (!allowed.includes(String((conv as any).channel_id))) {
-    throw new Error("Inautorizado: vendedor sem acesso a este número");
-  }
   const assigned = (conv as any).assigned_vendor_id;
   const assignedId = assigned == null ? null : Number(assigned);
+  const currentVendorId = Number(context.vendor.id);
+  // Conversas já atribuídas ao vendedor devem funcionar mesmo se o canal antigo
+  // ainda estiver sem vínculo de operação/canal no cadastro do vendedor.
+  if (assignedId !== currentVendorId) {
+    const allowed = await vendorAllowedChannelIds(context, db);
+    if (!allowed.includes(String((conv as any).channel_id))) {
+      throw new Error("Inautorizado: vendedor sem acesso a este número");
+    }
+  }
   if (assignedId == null) {
     await db
       .from("wa_conversations" as any)
-      .update({ assigned_vendor_id: Number(context.vendor.id) })
+      .update({ assigned_vendor_id: currentVendorId })
       .eq("id", (conv as any).id)
       .is("assigned_vendor_id", null);
-    return { ...(conv as any), assigned_vendor_id: Number(context.vendor.id) };
+    return { ...(conv as any), assigned_vendor_id: currentVendorId };
   }
-  if (assignedId !== Number(context.vendor.id)) {
+  if (assignedId !== currentVendorId) {
     throw new Error("Inautorizado: este lead está com outro vendedor");
   }
   return conv as any;

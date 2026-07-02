@@ -38,6 +38,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
+import { getVendorSession } from "@/lib/vendor-session";
 import {
   listConversations,
   listMessages,
@@ -145,6 +146,11 @@ function toText(v: unknown): string {
   return String(v);
 }
 
+function errorToText(error: unknown, fallback = "Erro inesperado"): string {
+  const direct = toText((error as any)?.message ?? error);
+  return direct || fallback;
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -224,21 +230,26 @@ function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
 
-  const opFilter = workspace.id === "all" ? undefined : workspace.id;
-
-  // Se for sessão de vendedor, filtra só as conversas atribuídas a ele
-  const vendorId = useMemo<number | null>(() => {
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("vendor_session") : null;
-      if (!raw) return null;
-      const s = JSON.parse(raw);
-      return typeof s?.id === "number" ? s.id : null;
-    } catch {
-      return null;
-    }
+  const [vendorSessionTick, setVendorSessionTick] = useState(0);
+  useEffect(() => {
+    const refresh = () => setVendorSessionTick((v) => v + 1);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("vendor-session-updated", refresh as EventListener);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("vendor-session-updated", refresh as EventListener);
+    };
   }, []);
 
-  const { data: convs = [] } = useQuery({
+  // Se for sessão de vendedor, filtra só as conversas atribuídas/liberadas pra ele.
+  const vendorSession = useMemo(() => getVendorSession(), [vendorSessionTick]);
+  const vendorId = vendorSession?.id ?? null;
+  // Vendedor já é filtrado pelos canais/operação permitidos no server function.
+  // Não manda o workspace atual como filtro aqui porque muitas conversas antigas
+  // estão sem operacao_id preenchido; isso fazia a Amanda ver o chat zerado.
+  const opFilter = vendorSession ? undefined : workspace.id === "all" ? undefined : workspace.id;
+
+  const { data: convs = [], error: convsError } = useQuery({
     queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin"],
     queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
     refetchInterval: 5000,
@@ -246,20 +257,23 @@ function ChatPage() {
   });
 
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
-  const { data: channels = [] } = useQuery({
-    queryKey: ["wa-channels-display"],
+  const { data: channels = [], error: channelsError } = useQuery({
+    queryKey: ["wa-channels-display", vendorId ?? "admin"],
     queryFn: () => listChannelsFn(),
     staleTime: 60_000,
   });
+  const channelList = useMemo(() => asArray<any>(channels), [channels]);
   const channelById = useMemo(() => {
     const m = new Map<string, { label: string; phone: string }>();
-    for (const c of channels) {
-      const phone = c.display_phone_number ? `+${String(c.display_phone_number).replace(/\D/g, "")}` : "";
-      const label = c.verified_name || c.name || phone || c.id;
-      m.set(c.id, { label, phone });
+    for (const c of channelList) {
+      const id = toText(c?.id);
+      if (!id) continue;
+      const phone = c?.display_phone_number ? `+${String(c.display_phone_number).replace(/\D/g, "")}` : "";
+      const label = toText(c?.verified_name) || toText(c?.name) || phone || id;
+      m.set(id, { label, phone });
     }
     return m;
-  }, [channels]);
+  }, [channelList]);
 
   // Realtime: refresh conv list when new conversation/message lands
   useEffect(() => {
@@ -293,7 +307,7 @@ function ChatPage() {
   const active = conversationList.find((c) => String(c.id) === activeId) ?? null;
 
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = [], error: messagesError } = useQuery({
     queryKey: ["wa-messages", activeId],
     queryFn: () => activeId ? listMsgFn({ data: { conversationId: activeId } }) : Promise.resolve([]),
     enabled: !!activeId,
@@ -376,7 +390,7 @@ function ChatPage() {
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
     onError: (e: any, _vars, ctx) => {
-      const msg = e?.message ?? "Erro ao enviar";
+      const msg = errorToText(e, "Erro ao enviar");
       setSendError(msg);
       toast.error(msg);
       if (ctx?.conversationId && ctx.optimisticId) {
@@ -427,7 +441,7 @@ function ChatPage() {
         caption: caption.trim() || undefined,
       });
     } catch (e: any) {
-      toast.error(e?.message ?? "Upload falhou");
+      toast.error(errorToText(e, "Upload falhou"));
     } finally {
       toast.dismiss("wa-media-upload");
     }
@@ -476,7 +490,7 @@ function ChatPage() {
       const res = await downloadMedia(msg);
       setMediaCache((prev) => ({ ...prev, [msg.id]: { url: res.url, mime: res.mime, loading: false } }));
     } catch (e: any) {
-      const error = e?.message ? String(e.message) : "Não foi possível carregar a mídia";
+      const error = errorToText(e, "Não foi possível carregar a mídia");
       // Em mensagens recentes (webhook ainda processando), não mostra erro — só mantém loading silencioso
       if (opts?.silent) {
         setMediaCache((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], loading: false } }));
@@ -543,7 +557,11 @@ function ChatPage() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy">
-            {filtered.length === 0 ? (
+            {convsError || channelsError ? (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
+                {errorToText(convsError ?? channelsError, "Falha ao carregar conversas do WhatsApp")}
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
                 Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
               </div>
@@ -673,7 +691,11 @@ function ChatPage() {
                 className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-6 py-6 scrollbar-fancy"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-                  {messageList.map((m, i, arr) => {
+                  {messagesError ? (
+                    <div className="my-8 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-center text-sm font-semibold text-destructive">
+                      {errorToText(messagesError, "Falha ao carregar mensagens desta conversa")}
+                    </div>
+                  ) : messageList.map((m, i, arr) => {
                     const prev = arr[i - 1];
                     const showDate = !prev || toSafeDate(prev.created_at).toDateString() !== toSafeDate(m.created_at).toDateString();
                     return (
@@ -752,7 +774,7 @@ function ChatPage() {
                   />
                   {sendError && (
                     <div className="max-w-72 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
-                      {sendError}
+                      {toText(sendError)}
                     </div>
                   )}
                   {draft.trim() ? (
@@ -1164,7 +1186,9 @@ function FlowInlineBar({
     const list = asArray<any>(flows).filter((f) => {
       if (f?.ativo === false) return false;
       if (!f.operacao_id) return true;
-      if (!op) return false;
+      // Quando a conversa antiga está sem operacao_id, o vendedor já recebeu
+      // apenas fluxos permitidos pelo backend; não esconde tudo no frontend.
+      if (!op) return true;
       return f.operacao_id === op;
     });
     const term = q.trim().toLowerCase();
@@ -1188,7 +1212,7 @@ function FlowInlineBar({
         },
       }),
     )
-      .catch((e: any) => toast.error(e?.message ?? "Erro ao disparar fluxo"))
+      .catch((e: any) => toast.error(errorToText(e, "Erro ao disparar fluxo")))
       .finally(() => setFiring(null));
   }
 
@@ -1260,7 +1284,7 @@ function FlowDispatcher({
       if (f?.ativo === false) return false;
       // Coerente com a operação: fluxo sem operação roda em qualquer; com operação só na mesma
       if (!f.operacao_id) return true;
-      if (!op) return false;
+      if (!op) return true;
       return f.operacao_id === op;
     });
   }, [flows, conversation.operacao_id]);
@@ -1281,7 +1305,7 @@ function FlowDispatcher({
       }),
     )
       .catch((e: any) => {
-        toast.error(e?.message ?? "Erro ao disparar fluxo");
+        toast.error(errorToText(e, "Erro ao disparar fluxo"));
       })
       .finally(() => setFiring(null));
   }
@@ -1350,7 +1374,7 @@ function ConversationActionsMenu({
       toast.success(vendorId ? "Lead transferido" : "Lead liberado");
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     } catch (e: any) {
-      toast.error(`Falha ao transferir: ${e?.message ?? "erro"}`);
+      toast.error(`Falha ao transferir: ${errorToText(e, "erro")}`);
     } finally {
       setOpen(false);
     }
@@ -1383,7 +1407,7 @@ function ConversationActionsMenu({
               onSelect={(e) => { e.preventDefault(); transfer(v.id); }}
               className="rounded-xl"
             >
-              {v.nome}
+              {toText(v.nome)}
               {v.id === currentVendorId && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
             </DropdownMenuItem>
           ))
