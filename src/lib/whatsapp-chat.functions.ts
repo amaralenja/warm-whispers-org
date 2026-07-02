@@ -309,7 +309,32 @@ async function assertConversationAccess(
 ) {
   if (!conversationId) throw new Error("conversationId obrigatório");
   const conv = await getConversationByIdOrContact(db, conversationId, fallback);
-  if (!conv) throw new Error("Conversa não encontrada");
+  if (!conv) {
+    // Última tentativa: se veio channelId+contact, cria a conversa on-the-fly
+    // (isso destrava vendedor quando o webhook criou noutro canal e a UI perdeu o ID).
+    const channelId = String(fallback?.channelId ?? "").trim();
+    const rawContact = String(fallback?.contactWaId ?? "").trim();
+    if (channelId && rawContact) {
+      const normalized = normalizeBrWhatsappNumber(rawContact) || rawContact.replace(/\D/g, "");
+      const vendorId = (context as any)?.vendor ? Number((context as any).vendor.id) : null;
+      const { data: created, error: createError } = await db
+        .from("wa_conversations" as any)
+        .insert({
+          channel_id: channelId,
+          contact_wa_id: normalized,
+          assigned_vendor_id: vendorId,
+          last_message_at: new Date().toISOString(),
+        })
+        .select("id,channel_id,assigned_vendor_id,contact_wa_id")
+        .single();
+      if (createError) {
+        console.error("[whatsapp-chat] fallback create conversation failed", createError);
+        throw new Error(`Conversa não encontrada (id=${conversationId.slice(0, 8)}… canal=${channelId.slice(0, 8)}… contato=${normalized})`);
+      }
+      return created as any;
+    }
+    throw new Error(`Conversa não encontrada (id=${conversationId.slice(0, 8)}…)`);
+  }
   if (context?.vendor) {
     await assertVendorChannel(context, String((conv as any).channel_id), db);
     const assignedVendorId = (conv as any).assigned_vendor_id == null ? null : Number((conv as any).assigned_vendor_id);
