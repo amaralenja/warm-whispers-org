@@ -108,7 +108,13 @@ function X1AnalyticsPage() {
 
   const payload = (data ?? null) as X1AnalyticsPayload | null;
 
-  const chartMsgs = useMemo(() => payload?.serieDiaria ?? [], [payload]);
+  const isHoje = preset === "hoje" || range.from === range.to;
+  const chartMsgs = useMemo(() => {
+    if (!payload) return [];
+    return isHoje
+      ? (payload.serieHoraria ?? []).map((r) => ({ ...r, data: r.hora }))
+      : (payload.serieDiaria ?? []);
+  }, [payload, isHoje]);
 
 
   return (
@@ -283,7 +289,7 @@ function X1AnalyticsPage() {
         {/* Chart mensagens/vendas por dia */}
         <Card className="border-border/60">
           <CardHeader>
-            <CardTitle className="text-base">Mensagens e vendas por dia</CardTitle>
+            <CardTitle className="text-base">{isHoje ? "Mensagens e vendas por hora (hoje)" : "Mensagens e vendas por dia"}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72 w-full">

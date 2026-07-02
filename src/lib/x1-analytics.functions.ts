@@ -70,6 +70,7 @@ export type X1VendedorRow = {
 };
 
 export type X1SerieDia = { data: string; msgsIn: number; msgsOut: number; vendas: number };
+export type X1SerieHora = { hora: string; msgsIn: number; msgsOut: number; vendas: number };
 
 export type X1AnalyticsPayload = {
   kpis: {
@@ -87,6 +88,7 @@ export type X1AnalyticsPayload = {
   porOperacao: X1OperacaoRow[];
   porVendedor: X1VendedorRow[];
   serieDiaria: X1SerieDia[];
+  serieHoraria: X1SerieHora[];
   operacoesDisponiveis: string[];
 };
 
@@ -106,6 +108,7 @@ const EMPTY: X1AnalyticsPayload = {
   porOperacao: [],
   porVendedor: [],
   serieDiaria: [],
+  serieHoraria: [],
   operacoesDisponiveis: [],
 };
 
@@ -389,6 +392,33 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     }
     const serieDiaria = Array.from(dayMap.values()).sort((a, b) => a.data.localeCompare(b.data));
 
+    // Série horária (0..23) — usa horário local BR (UTC-3)
+    const hourMap = new Map<number, X1SerieHora>();
+    for (let h = 0; h < 24; h++) {
+      hourMap.set(h, { hora: `${String(h).padStart(2, "0")}h`, msgsIn: 0, msgsOut: 0, vendas: 0 });
+    }
+    const brHour = (ts: number) => {
+      const d = new Date(ts);
+      // UTC-3 (Brasil)
+      return (d.getUTCHours() - 3 + 24) % 24;
+    };
+    for (const m of msgsScoped) {
+      const t = Date.parse(m.created_at);
+      if (!Number.isFinite(t)) continue;
+      const h = brHour(t);
+      const e = hourMap.get(h)!;
+      if (m.direction === "in") e.msgsIn += 1;
+      else if (m.direction === "out") e.msgsOut += 1;
+    }
+    for (const v of vendasScoped) {
+      const t = parseDataField(v.Data);
+      if (!t) continue;
+      const h = brHour(t);
+      const e = hourMap.get(h)!;
+      e.vendas += 1;
+    }
+    const serieHoraria = Array.from(hourMap.values());
+
     const novosLeads = novosLeadsRows.length;
     return {
       kpis: {
@@ -406,6 +436,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       porOperacao: opRows,
       porVendedor,
       serieDiaria,
+      serieHoraria,
       operacoesDisponiveis: Array.from(operacoesSet).sort(),
     };
   });
