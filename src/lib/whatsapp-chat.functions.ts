@@ -1002,34 +1002,50 @@ export const deleteWhatsappMessage = createServerFn({ method: "POST" })
 
     }
 
-    // Best-effort: pedir pro WhatsApp remover pra todos.
+    // WhatsApp Cloud API não expõe endpoint oficial de "delete for everyone".
+    // Tentamos alguns caminhos que a Meta às vezes aceita e reportamos o resultado real.
     let waRemoved = false;
+    let waError: string | null = null;
     if (waMessageId && channelId) {
       try {
         const ch = await findChannel(channelId, db);
         if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
-        // WhatsApp Cloud API: para apagar pra todos, POST no endpoint de messages com status=deleted
-        await metaProxyForChannel(
-          ch,
-          `/${ch.phoneNumberId}/messages`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messaging_product: "whatsapp",
-              status: "deleted",
-              message_id: waMessageId,
-            }),
-          },
-          db,
-        );
-        waRemoved = true;
-      } catch (e) {
-        console.warn("Falha ao apagar mensagem no WhatsApp (mantida como apagada no sistema):", (e as any)?.message ?? e);
+        // Tentativa 1: DELETE /{wamid}
+        try {
+          await metaProxyForChannel(ch, `/${waMessageId}`, { method: "DELETE" }, db);
+          waRemoved = true;
+        } catch (e1: any) {
+          // Tentativa 2: POST /{phone_number_id}/messages { status:"deleted", message_id }
+          try {
+            await metaProxyForChannel(
+              ch,
+              `/${ch.phoneNumberId}/messages`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  messaging_product: "whatsapp",
+                  status: "deleted",
+                  message_id: waMessageId,
+                }),
+              },
+              db,
+            );
+            waRemoved = true;
+          } catch (e2: any) {
+            waError = String(e2?.message || e1?.message || "Falha ao apagar no WhatsApp");
+          }
+        }
+      } catch (e: any) {
+        waError = String(e?.message || "Falha ao apagar no WhatsApp");
       }
     }
 
+    if (!waRemoved) {
+      console.warn("[whatsapp-chat] delete for everyone falhou:", waError);
+    }
 
-    return { ok: true, waRemoved };
+    return { ok: true, waRemoved, waError };
   });
+
 
