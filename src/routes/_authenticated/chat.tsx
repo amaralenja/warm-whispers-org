@@ -216,9 +216,17 @@ const AVATAR_PALETTE: Record<string, { bg: string; text: string }> = {
 };
 const AVATAR_DEFAULT = { bg: "linear-gradient(135deg,#1f2937,#0f172a)", text: "#cbd5e1" };
 
-function avatarStyle(_name?: unknown, _fallback?: unknown): CSSProperties {
-  return { background: AVATAR_DEFAULT.bg, color: AVATAR_DEFAULT.text };
+function avatarStyle(name?: unknown, fallback?: unknown): CSSProperties {
+  const raw = `${toText(name)}|${toText(fallback)}`.trim().toUpperCase();
+  if (!raw) return { background: AVATAR_DEFAULT.bg, color: AVATAR_DEFAULT.text };
+  // Deterministic hash → pick a palette entry (A-Z)
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  const keys = Object.keys(AVATAR_PALETTE);
+  const pick = AVATAR_PALETTE[keys[hash % keys.length]] ?? AVATAR_DEFAULT;
+  return { background: pick.bg, color: pick.text };
 }
+
 
 
 
@@ -684,7 +692,7 @@ function ChatPage() {
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback
                             className="rounded-full"
-                            style={avatarStyle()}
+                            style={avatarStyle(contactName, contactWaId)}
                           >
                             <User className="h-6 w-6 opacity-80" />
                           </AvatarFallback>
@@ -754,7 +762,7 @@ function ChatPage() {
                   <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
                     <AvatarFallback
                       className="rounded-2xl"
-                      style={avatarStyle()}
+                      style={avatarStyle(active.contact_name, active.contact_wa_id)}
                     >
                       <User className="h-7 w-7 opacity-80" />
                     </AvatarFallback>
