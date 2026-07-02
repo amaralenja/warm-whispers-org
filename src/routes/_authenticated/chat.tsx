@@ -468,8 +468,39 @@ function ChatPage() {
         ...asArray<Msg>(old),
         optimistic,
       ]);
+      // Optimistically bump this conversation to the top of every cached list
+      const nowIso = new Date().toISOString();
+      const preview =
+        vars.type === "text"
+          ? (vars.text ?? "").slice(0, 140)
+          : vars.type === "image"
+          ? "📷 Imagem"
+          : vars.type === "audio"
+          ? "🎤 Áudio"
+          : vars.type === "video"
+          ? "🎬 Vídeo"
+          : vars.type === "document"
+          ? `📄 ${vars.filename ?? "Documento"}`
+          : "Mensagem";
+      qc.setQueriesData({ queryKey: ["wa-conversations"] }, (old: unknown) => {
+        const arr = asArray<any>(old);
+        if (arr.length === 0) return old;
+        const idx = arr.findIndex((c) => c?.id === vars.conversationId);
+        if (idx < 0) return old;
+        const updated = {
+          ...arr[idx],
+          last_message_at: nowIso,
+          last_message_preview: preview,
+          last_message_direction: "out",
+        };
+        const next = arr.slice();
+        next.splice(idx, 1);
+        next.unshift(updated);
+        return next;
+      });
       window.setTimeout(scrollToBottom, 0);
       return { optimisticId, conversationId: vars.conversationId };
+
     },
     onSuccess: () => {
       setDraft("");
