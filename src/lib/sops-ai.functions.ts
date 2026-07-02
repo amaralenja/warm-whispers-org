@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 const CHAT_MODEL = "gpt-4o-mini";
-const STT_MODEL = "gpt-4o-mini-transcribe";
+const STT_MODEL = "whisper-1";
 
 const SYSTEM_IMPROVE = `Você é um editor de processos internos (SOPs) de uma empresa brasileira de vendas digitais.
 
