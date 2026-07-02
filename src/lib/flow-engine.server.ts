@@ -722,7 +722,7 @@ export async function runFlowAdmin(args: {
     flowId: args.flowId,
     channelId: args.channelId,
     contactWaId: args.contactWaId,
-    conversationId: args.conversationId,
+    conversationId: (run as any).conversation_id ?? args.conversationId,
     db,
     variables: { trigger: args.triggerContext ?? {} },
     vendor: args.vendor ?? null,
