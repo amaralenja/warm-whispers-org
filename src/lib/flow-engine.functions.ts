@@ -139,9 +139,18 @@ async function vendorAllowedChannelIds(context: any, db: any): Promise<string[]>
     .filter(Boolean);
 }
 
-async function attachFlowTriggers(db: any, flows: any[]) {
+async function attachFlowTriggers(db: any, flows: any[], context?: any) {
   if (!Array.isArray(flows) || flows.length === 0) return flows ?? [];
   const ids = flows.map((f) => String(f.id)).filter(Boolean);
+  const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+  if (rpcArgs) {
+    const entries = await Promise.all(ids.map(async (flowId) => {
+      const { data } = await db.rpc("vendor_list_wa_flow_triggers" as any, { ...rpcArgs, _flow_id: flowId });
+      return [flowId, Array.isArray(data) ? data : []] as const;
+    }));
+    const byFlow = new Map<string, any[]>(entries);
+    return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
+  }
   const { data: triggers } = await db
     .from("wa_flow_triggers" as any)
     .select("*")
@@ -152,6 +161,60 @@ async function attachFlowTriggers(db: any, flows: any[]) {
     byFlow.set(k, [...(byFlow.get(k) ?? []), t]);
   }
   return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
+}
+
+async function vendorReplaceTriggers(context: any, db: any, flowId: string, triggers: any[]) {
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { data, error } = await db.rpc("vendor_replace_wa_flow_triggers" as any, {
+    ...rpcArgs,
+    _flow_id: flowId,
+    _triggers: triggers ?? [],
+  });
+  if (error) throw new Error(error.message);
+  if (data === false) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+  return { ok: true };
+}
+
+async function vendorUpdateFlowViaRpc(context: any, db: any, flowId: string, patch: Record<string, any>) {
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { data, error } = await db.rpc("vendor_update_wa_flow" as any, {
+    ...rpcArgs,
+    _flow_id: flowId,
+    _nome: Object.prototype.hasOwnProperty.call(patch, "nome") ? patch.nome : null,
+    _operacao_id: Object.prototype.hasOwnProperty.call(patch, "operacao_id") ? patch.operacao_id : null,
+    _folder: Object.prototype.hasOwnProperty.call(patch, "folder") ? patch.folder : null,
+    _ativo: Object.prototype.hasOwnProperty.call(patch, "ativo") ? patch.ativo : null,
+    _entry_node_id: Object.prototype.hasOwnProperty.call(patch, "entry_node_id") ? patch.entry_node_id : null,
+    _nodes: Object.prototype.hasOwnProperty.call(patch, "nodes") ? patch.nodes : null,
+    _edges: Object.prototype.hasOwnProperty.call(patch, "edges") ? patch.edges : null,
+    _set_operacao: Object.prototype.hasOwnProperty.call(patch, "operacao_id"),
+    _set_folder: Object.prototype.hasOwnProperty.call(patch, "folder"),
+    _set_ativo: Object.prototype.hasOwnProperty.call(patch, "ativo"),
+    _set_entry_node_id: Object.prototype.hasOwnProperty.call(patch, "entry_node_id"),
+    _set_nodes: Object.prototype.hasOwnProperty.call(patch, "nodes"),
+    _set_edges: Object.prototype.hasOwnProperty.call(patch, "edges"),
+  });
+  if (error) throw new Error(error.message);
+  if (data === false) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+  return { ok: true };
+}
+
+async function listFlowsForNameCheck(db: any, context?: any) {
+  const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+  if (rpcArgs) {
+    const { data } = await db.rpc("vendor_list_flows" as any, rpcArgs);
+    return (data ?? []) as any[];
+  }
+  const { data } = await db.from("wa_flows" as any).select("id, nome");
+  return (data ?? []) as any[];
+}
+
+async function flowNameExists(db: any, nome: string, excludeId: string | null = null, context?: any) {
+  const rows = await listFlowsForNameCheck(db, context);
+  const wanted = String(nome ?? "").trim().toLowerCase();
+  return rows.some((r) => (!excludeId || String(r.id) !== String(excludeId)) && String(r.nome ?? "").trim().toLowerCase() === wanted);
 }
 
 async function findVendorConversation(
