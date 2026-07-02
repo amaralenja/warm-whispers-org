@@ -207,27 +207,27 @@ function FlowsListPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Workflow className="h-6 w-6 text-emerald-500" /> Fluxos
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+            <Workflow className="h-6 w-6 shrink-0 text-emerald-500" /> <span className="truncate">Fluxos</span>
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Crie automações conectando blocos visuais. Disparadas por gatilhos (palavra-chave, nova conversa, etc).
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Automações conectando blocos. Gatilhos: palavra-chave, nova conversa, etc.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setZvSummary(null); setZvOpen(true); }}>
-            <FileJson className="h-4 w-4 mr-2" /> Importar ZapVoice
+        <div className="col-span-2 flex flex-wrap gap-2 sm:col-auto">
+          <Button variant="outline" size="sm" onClick={() => { setZvSummary(null); setZvOpen(true); }}>
+            <FileJson className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar ZapVoice</span>
           </Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" /> Importar código
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Importar código</span>
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                <Plus className="h-4 w-4 mr-2" /> Novo fluxo
+              <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Novo fluxo</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -261,6 +261,7 @@ function FlowsListPage() {
           </Dialog>
         </div>
       </div>
+
 
       {filtered.length === 0 ? (
         <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground">
