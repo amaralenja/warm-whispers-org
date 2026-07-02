@@ -59,6 +59,7 @@ import {
   uploadWhatsappMedia,
   updateConversationTags,
   updateConversationNotes,
+  reactToWhatsappMessage,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, listActiveFlowRuns, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
