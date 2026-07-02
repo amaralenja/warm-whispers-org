@@ -402,33 +402,48 @@ function Kanban({
 
 
 function KanbanCard({
-  lead, onClick, onDragStart,
+  lead, stageColor, tagColors, onClick, onDragStart,
 }: {
   lead: Lead;
+  stageColor: string;
+  tagColors: Map<string, string>;
   onClick: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
 }) {
+  const avatarColor = colorFromName(lead.nome);
+  const initials = initialsOf(lead.nome);
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, lead)}
       onClick={onClick}
-      className="group cursor-pointer rounded-lg border border-border bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
+      style={{ borderLeftColor: stageColor }}
+      className="group cursor-pointer rounded-lg border border-border border-l-4 bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">{lead.nome}</p>
-          {lead.expert && (
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {lead.expert}
-            </p>
-          )}
+      <div className="flex items-start gap-2.5">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
+          style={{ background: avatarColor, boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
+        >
+          {initials}
         </div>
-        {(lead.valor_estimado ?? 0) > 0 && (
-          <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-            {BRL(lead.valor_estimado ?? 0)}
-          </span>
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">{lead.nome}</p>
+              {lead.expert && (
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {lead.expert}
+                </p>
+              )}
+            </div>
+            {(lead.valor_estimado ?? 0) > 0 && (
+              <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                {BRL(lead.valor_estimado ?? 0)}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
       {(lead.telefone || lead.email) && (
         <div className="mt-2 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
@@ -438,9 +453,21 @@ function KanbanCard({
       )}
       {lead.tags && lead.tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {lead.tags.slice(0, 3).map((t) => (
-            <Badge key={t} variant="outline" className="px-1.5 py-0 text-[9px]">{t}</Badge>
-          ))}
+          {lead.tags.slice(0, 3).map((t) => {
+            const c = tagColors.get(t.toLowerCase()) ?? colorFromName(t);
+            return (
+              <span
+                key={t}
+                className="rounded-md border px-1.5 py-0 text-[9px] font-semibold"
+                style={{ borderColor: hexToRgba(c, 0.6), background: hexToRgba(c, 0.15), color: c }}
+              >
+                {t}
+              </span>
+            );
+          })}
+          {lead.tags.length > 3 && (
+            <span className="rounded-md border border-border px-1.5 py-0 text-[9px] font-semibold text-muted-foreground">+{lead.tags.length - 3}</span>
+          )}
         </div>
       )}
       <div className="mt-2 flex items-center justify-between border-t border-border/40 pt-2 text-[10px] text-muted-foreground">
@@ -452,6 +479,7 @@ function KanbanCard({
     </div>
   );
 }
+
 
 // ---------- Lista ----------
 function Lista({
