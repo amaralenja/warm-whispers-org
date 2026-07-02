@@ -1887,19 +1887,24 @@ function ConversationMetaControls({
           <div className="mb-3 flex flex-wrap gap-1.5">
             {tags.length === 0 ? (
               <span className="text-xs text-muted-foreground">Nenhuma etiqueta ainda.</span>
-            ) : tags.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 rounded-full border border-chat-accent/40 bg-chat-accent/10 px-2 py-0.5 text-xs font-medium text-chat-accent">
-                {t}
-                <button
-                  type="button"
-                  onClick={() => removeTag(t)}
-                  className="ml-0.5 rounded-full p-0.5 hover:bg-chat-accent/20"
-                  aria-label={`Remover ${t}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+            ) : tags.map((t) => {
+              const found = (crmTags as any[]).find((x: any) => String(x?.nome ?? "").toLowerCase() === t.toLowerCase());
+              const cor = String(found?.cor ?? "");
+              const style = cor ? { backgroundColor: `${cor}1a`, borderColor: `${cor}66`, color: cor } : undefined;
+              return (
+                <span key={t} style={style} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${cor ? "" : "border-chat-accent/40 bg-chat-accent/10 text-chat-accent"}`}>
+                  {t}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(t)}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-black/10"
+                    aria-label={`Remover ${t}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              );
+            })}
           </div>
           <Input
             value={tagSearch}
