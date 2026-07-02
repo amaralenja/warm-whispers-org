@@ -1290,7 +1290,7 @@ function FlowInlineBar({
         </div>
       )}
 
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+      <AlertDialog open={!!confirm} onOpenChange={(o: boolean) => !o && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Disparar fluxo?</AlertDialogTitle>
