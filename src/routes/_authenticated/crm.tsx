@@ -139,6 +139,14 @@ function CRMPage() {
     ];
   }, [customStages, hiddenDefaults]);
 
+  const { data: crmTags = [] } = useCrmTags(stageOperacao);
+  const tagColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of crmTags) m.set(t.nome.toLowerCase(), t.cor);
+    return m;
+  }, [crmTags]);
+
+
 
   // Filters
   const filtered = useMemo(() => {
