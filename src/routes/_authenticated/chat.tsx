@@ -99,7 +99,9 @@ type Msg = {
   status: string | null;
   raw: any;
   created_at: string;
+  deleted_at?: string | null;
 };
+
 
 type SendVars = {
   channelId: string;
