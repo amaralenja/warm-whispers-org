@@ -78,6 +78,7 @@ type Conv = {
   last_message_at: string;
   last_message_preview: string | null;
   last_message_direction: string | null;
+  last_message_status: string | null;
   unread_count: number;
 };
 
@@ -201,6 +202,13 @@ function StatusTick({ status }: { status: string | null }) {
   return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
 }
 
+function PreviewStatusTick({ status }: { status: string | null }) {
+  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 shrink-0 drop-shadow-sm" style={{ color: "#7ec8ff" }} strokeWidth={3} />;
+  if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 shrink-0 text-white/85" strokeWidth={2.5} />;
+  if (status === "sent") return <Check className="h-3.5 w-3.5 shrink-0 text-white/85" strokeWidth={2.5} />;
+  return <Clock className="h-3.5 w-3.5 shrink-0 text-white/60" />;
+}
+
 function ChatPage() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();
@@ -286,6 +294,11 @@ function ChatPage() {
         const m = payload.new as any;
         qc.invalidateQueries({ queryKey: ["wa-conversations"] });
         qc.invalidateQueries({ queryKey: ["wa-messages", m.conversation_id] });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wa_messages" }, (payload) => {
+        const m = payload.new as any;
+        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+        if (m?.conversation_id) qc.invalidateQueries({ queryKey: ["wa-messages", m.conversation_id] });
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -597,13 +610,7 @@ function ChatPage() {
                           </div>
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             {c.last_message_direction === "out" && (
-                              (c as any).last_message_status === "read" ? (
-                                <CheckCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "#7ec8ff" }} strokeWidth={3} />
-                              ) : (c as any).last_message_status === "delivered" ? (
-                                <CheckCheck className="h-3.5 w-3.5 shrink-0" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5 shrink-0" />
-                              )
+                              <PreviewStatusTick status={c.last_message_status} />
                             )}
                             <span className="truncate">{preview || "Sem prévia"}</span>
                           </div>
