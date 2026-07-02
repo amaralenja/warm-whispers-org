@@ -289,12 +289,16 @@ function FlowsListPage() {
                 </div>
                 <div className="flex flex-wrap gap-1 mt-3">
                   {triggers.length === 0 && <Badge variant="outline" className="text-xs">Sem gatilho</Badge>}
-                  {triggers.map((t: any) => (
-                    <Badge key={t.id} variant="outline" className="text-xs">
-                      {t.tipo === "keyword" ? `🔑 ${t.valor}` : t.tipo === "new_conversation" ? "🆕 Nova conversa" : t.tipo === "any_message" ? "💬 Qualquer msg" : t.tipo === "new_lead" ? "👤 Novo lead" : "✋ Manual"}
-                    </Badge>
-                  ))}
+                  {triggers.map((t: any) => {
+                    const val = t?.valor == null ? "" : (typeof t.valor === "object" ? JSON.stringify(t.valor) : String(t.valor));
+                    return (
+                      <Badge key={t.id} variant="outline" className="text-xs">
+                        {t.tipo === "keyword" ? `🔑 ${val}` : t.tipo === "new_conversation" ? "🆕 Nova conversa" : t.tipo === "any_message" ? "💬 Qualquer msg" : t.tipo === "new_lead" ? "👤 Novo lead" : "✋ Manual"}
+                      </Badge>
+                    );
+                  })}
                 </div>
+
                 <div className="flex gap-2 mt-4">
                   <Button asChild size="sm" variant="outline" className="flex-1">
                     <Link to="/flows/$flowId" params={{ flowId: f.id }}>
