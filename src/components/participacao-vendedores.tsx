@@ -1,4 +1,3 @@
-import { Trophy, Users } from "lucide-react";
 import type { VendedorStat } from "@/lib/operacoes.functions";
 
 const BRL = (n: number) =>
@@ -69,7 +68,7 @@ export function ParticipacaoVendedores({
       <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-400">
-            <Users className="h-3.5 w-3.5" />
+            <UsersIcon className="h-3.5 w-3.5" />
           </div>
           <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-foreground">
             Participação por Vendedor
@@ -125,7 +124,7 @@ export function ParticipacaoVendedores({
                     className="group relative grid grid-cols-[1.5rem_2rem_1fr_auto_auto] items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-1.5 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/5"
                   >
                     <span className="text-center text-[0.65rem] font-bold tabular-nums text-muted-foreground">
-                      {isTop ? <Trophy className="mx-auto h-3 w-3 text-amber-400" /> : `#${i + 1}`}
+                      {isTop ? <TrophyIcon className="mx-auto h-3 w-3 text-amber-400" /> : `#${i + 1}`}
                     </span>
                     <div
                       className="flex h-8 w-8 items-center justify-center rounded-md text-[0.65rem] font-bold"
@@ -179,6 +178,30 @@ export function ParticipacaoVendedores({
         )}
       </div>
     </div>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function TrophyIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978" />
+      <path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978" />
+      <path d="M18 9h1.5a1 1 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />
+      <path d="M6 9H4.5a1 1 0 0 1 0-5H6" />
+    </svg>
   );
 }
 
