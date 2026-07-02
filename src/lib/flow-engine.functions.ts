@@ -147,6 +147,7 @@ async function assertVendorConversationAccess(
 
   const resolved = Array.isArray(rpcData) ? rpcData[0] : rpcData;
   if (resolved?.id) return resolved as any;
+  if (!conversationId) throw new Error("Conversa não encontrada");
 
   const conv = await findVendorConversation(db, conversationId, fallback);
   if (!conv) throw new Error("Conversa não encontrada");
