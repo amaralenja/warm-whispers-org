@@ -29,19 +29,42 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+function pickFirstEnv(...names: string[]): { key: string; value: string } | null {
+  for (const name of names) {
+    const raw = process.env[name];
+    if (!raw) continue;
+    // Some envs contain a JSON array of keys (e.g. SUPABASE_SECRET_KEYS)
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const arr = JSON.parse(trimmed);
+        if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === 'string') {
+          return { key: name, value: arr[0] };
+        }
+      } catch {
+        // fall through
+      }
+    }
+    return { key: name, value: trimmed };
+  }
+  return null;
+}
+
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = pickFirstEnv('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEYS', 'SUPABASE_SECRET_KEY');
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !secret) {
     const missing = [
       ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
+      ...(!secret ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
     ];
     const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
+  const SUPABASE_SERVICE_ROLE_KEY = secret.value;
+
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     global: {
