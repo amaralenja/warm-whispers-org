@@ -22,6 +22,7 @@ import {
   User,
   BookOpenText,
   CheckSquare,
+  BarChart3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -64,6 +65,7 @@ const operacaoX1Items: Item[] = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },
+  { title: "Analytics X1", url: "/x1-analytics", icon: BarChart3 },
 ];
 
 const highTicketItems: Item[] = [
@@ -90,6 +92,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/ht-analytics": "ht-analytics",
   "/sops": "sops",
   "/tasks": "tasks",
+  "/x1-analytics": "x1-analytics",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 

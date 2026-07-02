@@ -13,6 +13,7 @@ import { Route as RankingTvRouteImport } from './routes/ranking-tv'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedX1AnalyticsRouteImport } from './routes/_authenticated/x1-analytics'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedVendorRouteImport } from './routes/_authenticated/vendor'
 import { Route as AuthenticatedVendedoresRouteImport } from './routes/_authenticated/vendedores'
@@ -59,6 +60,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedX1AnalyticsRoute =
+  AuthenticatedX1AnalyticsRouteImport.update({
+    id: '/x1-analytics',
+    path: '/x1-analytics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
@@ -218,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/vendedores': typeof AuthenticatedVendedoresRoute
   '/vendor': typeof AuthenticatedVendorRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/x1-analytics': typeof AuthenticatedX1AnalyticsRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
@@ -249,6 +257,7 @@ export interface FileRoutesByTo {
   '/vendedores': typeof AuthenticatedVendedoresRoute
   '/vendor': typeof AuthenticatedVendorRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/x1-analytics': typeof AuthenticatedX1AnalyticsRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
@@ -282,6 +291,7 @@ export interface FileRoutesById {
   '/_authenticated/vendedores': typeof AuthenticatedVendedoresRoute
   '/_authenticated/vendor': typeof AuthenticatedVendorRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/x1-analytics': typeof AuthenticatedX1AnalyticsRoute
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/vendedores'
     | '/vendor'
     | '/whatsapp'
+    | '/x1-analytics'
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows/'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/vendedores'
     | '/vendor'
     | '/whatsapp'
+    | '/x1-analytics'
     | '/flows/$flowId'
     | '/api/public/ig-image'
     | '/flows'
@@ -378,6 +390,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vendedores'
     | '/_authenticated/vendor'
     | '/_authenticated/whatsapp'
+    | '/_authenticated/x1-analytics'
     | '/_authenticated/flows/$flowId'
     | '/api/public/ig-image'
     | '/_authenticated/flows/'
@@ -436,6 +449,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/x1-analytics': {
+      id: '/_authenticated/x1-analytics'
+      path: '/x1-analytics'
+      fullPath: '/x1-analytics'
+      preLoaderRoute: typeof AuthenticatedX1AnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/whatsapp': {
       id: '/_authenticated/whatsapp'
@@ -638,6 +658,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendedoresRoute: typeof AuthenticatedVendedoresRoute
   AuthenticatedVendorRoute: typeof AuthenticatedVendorRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
+  AuthenticatedX1AnalyticsRoute: typeof AuthenticatedX1AnalyticsRoute
   AuthenticatedFlowsFlowIdRoute: typeof AuthenticatedFlowsFlowIdRoute
   AuthenticatedFlowsIndexRoute: typeof AuthenticatedFlowsIndexRoute
 }
@@ -658,6 +679,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVendedoresRoute: AuthenticatedVendedoresRoute,
   AuthenticatedVendorRoute: AuthenticatedVendorRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
+  AuthenticatedX1AnalyticsRoute: AuthenticatedX1AnalyticsRoute,
   AuthenticatedFlowsFlowIdRoute: AuthenticatedFlowsFlowIdRoute,
   AuthenticatedFlowsIndexRoute: AuthenticatedFlowsIndexRoute,
 }
