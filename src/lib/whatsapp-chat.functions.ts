@@ -379,47 +379,27 @@ export const listConversations = createServerFn({ method: "GET" })
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
       const vendorId = Number((context as any).vendor.id);
-      const allowed = await vendorChannelIds(context, db);
-      await autoAssignUnassignedConversations(db, allowed.length ? allowed : undefined).catch((e) => {
-        console.warn("[whatsapp-chat] vendor auto-assign skipped", e);
+      const { data: rows, error } = await db.rpc("vendor_list_wa_conversations" as any, {
+        ...rpcArgs,
+        _operacao_id: data.operacaoId ?? null,
       });
-
-      const { data: notifChans } = await db
-        .from("wa_channels" as any)
-        .select("id")
-        .eq("kind", "notification");
-      const notifIds = ((notifChans ?? []) as any[]).map((c) => String(c.id)).filter(Boolean);
-
-      let assignedQ = db
-        .from("wa_conversations" as any)
-        .select("*")
-        .eq("assigned_vendor_id", vendorId)
-        .or("operacao_id.is.null,operacao_id.neq.__notificador__")
-        .order("last_message_at", { ascending: false })
-        .limit(200);
-      if (notifIds.length) assignedQ = assignedQ.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
-      const { data: assignedRows, error: assignedError } = await assignedQ;
-      if (assignedError) throw new Error(assignedError.message);
-
-      let openRows: any[] = [];
-      if (allowed.length > 0) {
-        let openQ = db
-          .from("wa_conversations" as any)
-          .select("*")
-          .in("channel_id", allowed)
-          .is("assigned_vendor_id", null)
-          .or("operacao_id.is.null,operacao_id.neq.__notificador__")
-          .order("last_message_at", { ascending: false })
-          .limit(200);
-        if (notifIds.length) openQ = openQ.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
-        const { data: rows, error } = await openQ;
-        if (error) throw new Error(error.message);
-        openRows = (rows ?? []) as any[];
+      if (error) {
+        console.error("[whatsapp-chat] vendor listConversations RPC failed", {
+          vendorId,
+          operacaoId: data.operacaoId ?? null,
+          error: error.message,
+        });
+        throw new Error(error.message);
       }
-
-      return uniqueRowsById([ ...((assignedRows ?? []) as any[]), ...openRows ])
+      const result = ((rows ?? []) as any[])
         .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime())
         .slice(0, 200);
+      console.info("[whatsapp-chat] vendor listConversations", {
+        vendorId,
+        operacaoId: data.operacaoId ?? null,
+        rows: result.length,
+      });
+      return result;
     }
     // Excluir canais de notificação (não devem aparecer no chat ao vivo)
     const { data: notifChans } = await db
@@ -460,15 +440,24 @@ export const listMessages = createServerFn({ method: "GET" })
     const db = await dbFor(context);
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
-      await assertConversationAccess(context, db, data.conversationId);
-      const { data: rows, error } = await db
-        .from("wa_messages" as any)
-        .select("*")
-        .eq("conversation_id", data.conversationId)
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true })
-        .limit(500);
-      if (error) throw new Error(error.message);
+      const vendorId = Number((context as any).vendor.id);
+      const { data: rows, error } = await db.rpc("vendor_list_wa_messages" as any, {
+        ...rpcArgs,
+        _conversation_id: data.conversationId,
+      });
+      if (error) {
+        console.error("[whatsapp-chat] vendor listMessages RPC failed", {
+          vendorId,
+          conversationId: data.conversationId,
+          error: error.message,
+        });
+        throw new Error(error.message);
+      }
+      console.info("[whatsapp-chat] vendor listMessages", {
+        vendorId,
+        conversationId: data.conversationId,
+        rows: Array.isArray(rows) ? rows.length : 0,
+      });
       return rows ?? [];
     }
     await assertConversationAccess(context, db, data.conversationId);
@@ -491,13 +480,21 @@ export const markConversationRead = createServerFn({ method: "POST" })
     const db = await dbFor(context);
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
-      await assertConversationAccess(context, db, data.conversationId);
-      const { error } = await db
-        .from("wa_conversations" as any)
-        .update({ unread_count: 0 })
-        .eq("id", data.conversationId);
-      if (error) throw new Error(error.message);
-      return { ok: true };
+      const vendorId = Number((context as any).vendor.id);
+      const { data: ok, error } = await db.rpc("vendor_mark_conversation_read" as any, {
+        ...rpcArgs,
+        _conversation_id: data.conversationId,
+      });
+      if (error) {
+        console.error("[whatsapp-chat] vendor markRead RPC failed", {
+          vendorId,
+          conversationId: data.conversationId,
+          error: error.message,
+        });
+        throw new Error(error.message);
+      }
+      console.info("[whatsapp-chat] vendor markRead", { vendorId, conversationId: data.conversationId, ok: Boolean(ok) });
+      return { ok: Boolean(ok) };
     }
     await assertConversationAccess(context, db, data.conversationId);
     await db

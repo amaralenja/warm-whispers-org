@@ -1,7 +1,7 @@
 import { Component, Fragment, isValidElement, type ReactNode } from "react";
 
 type Props = { children: ReactNode };
-type State = { error: unknown | null };
+type State = { error: unknown | null; errorText: string; stackText: string };
 
 function safeErrorText(error: unknown, fallback: string): string {
   try {
@@ -58,23 +58,31 @@ function SafeChildren({ children }: { children: ReactNode }) {
 }
 
 export class ChatErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, errorText: "", stackText: "" };
 
   static getDerivedStateFromError(error: unknown): State {
-    return { error };
+    return {
+      error,
+      errorText: safeErrorText(error, "Erro desconhecido"),
+      stackText: safeStackText(error),
+    };
   }
 
   componentDidCatch(error: unknown, info: { componentStack?: string }) {
     // Logamos com prefixo pra ficar fácil de achar no console em produção.
-    console.error("[ChatErrorBoundary]", error, info?.componentStack);
+    console.error("[ChatErrorBoundary] render crash", {
+      message: safeErrorText(error, "Erro desconhecido"),
+      stack: safeStackText(error),
+      componentStack: typeof info?.componentStack === "string" ? info.componentStack : "",
+    });
   }
 
-  reset = () => this.setState({ error: null });
+  reset = () => this.setState({ error: null, errorText: "", stackText: "" });
 
   render() {
     if (!this.state.error) return <SafeChildren>{this.props.children}</SafeChildren>;
-    const errorText = safeErrorText(this.state.error, "Erro desconhecido");
-    const stackText = safeStackText(this.state.error);
+    const errorText = this.state.errorText || "Erro desconhecido";
+    const stackText = this.state.stackText || "Sem detalhes técnicos disponíveis.";
     return (
       <div className="flex h-full w-full items-center justify-center bg-chat-shell p-8 text-foreground">
         <div className="max-w-lg space-y-4 rounded-2xl border border-chat-line bg-chat-panel p-6 text-center">
