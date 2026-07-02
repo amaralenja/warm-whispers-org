@@ -26,6 +26,8 @@ import {
   User,
   Reply,
   X,
+  Tag,
+  StickyNote,
 } from "lucide-react";
 
 
