@@ -647,7 +647,10 @@ type SendInput = {
   mediaUrl?: string;
   filename?: string;
   caption?: string;
+  contextWaMessageId?: string;
+  replyPreview?: string;
 };
+
 
 // Brazilian numbers: WhatsApp Cloud API expects mobile as 55 + DDD + 9 + 8 digits.
 // Many contacts arrive without the "9" (legacy 10-digit format). Insert it when missing.
@@ -694,7 +697,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     mediaUrl: d?.mediaUrl ?? "",
     filename: d?.filename ?? "",
     caption: d?.caption ?? "",
+    contextWaMessageId: d?.contextWaMessageId ? String(d.contextWaMessageId) : "",
+    replyPreview: d?.replyPreview ? String(d.replyPreview) : "",
   }))
+
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     const isVendor = Boolean((context as any).vendor);
@@ -715,7 +721,9 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       messaging_product: "whatsapp",
       to: toNormalized,
       type: data.type,
+      ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId } } : {}),
     };
+
     if (data.type === "text") {
       if (!data.text) throw new Error("Texto vazio");
       body.text = { body: data.text };
@@ -756,7 +764,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         _from_wa_id: ch.phoneNumberId,
         _to_wa_id: toNormalized,
         _status: "pending",
-        _raw: { pending: true, request: body, sent_by_vendor_id: (context as any).vendor?.id ?? null },
+        _raw: { pending: true, request: body, sent_by_vendor_id: (context as any).vendor?.id ?? null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
       });
       if (error || !messageId) throw new Error(`Falha ao salvar mensagem: ${error?.message ?? "mensagem não criada"}`);
       insertedMessageId = String(messageId);
@@ -782,7 +790,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         to_wa_id: toNormalized,
         status: "pending",
         sent_by: context.userId,
-        raw: { pending: true, request: body, sent_by_vendor_id: null },
+        raw: { pending: true, request: body, sent_by_vendor_id: null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
       }).select("id").single();
       if (error) throw new Error(`Falha ao salvar mensagem: ${error.message}`);
       insertedMessageId = String((inserted as any).id);

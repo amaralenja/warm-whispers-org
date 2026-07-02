@@ -26,8 +26,11 @@ import {
   Trash2,
   Ban,
   User,
-
+  Reply,
+  X,
 } from "lucide-react";
+
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -117,7 +120,10 @@ type SendVars = {
   mediaUrl?: string;
   filename?: string;
   caption?: string;
+  contextWaMessageId?: string;
+  replyPreview?: string;
 };
+
 
 function asArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
@@ -270,6 +276,8 @@ function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -432,7 +440,7 @@ function ChatPage() {
         media_filename: vars.filename ?? null,
         caption: vars.caption ?? null,
         status: "pending",
-        raw: { optimistic: true },
+        raw: { optimistic: true, ...(vars.contextWaMessageId ? { context: { message_id: vars.contextWaMessageId }, reply_preview: vars.replyPreview } : {}) },
         created_at: new Date().toISOString(),
       };
       qc.setQueryData(["wa-messages", vars.conversationId], (old: unknown) => [
@@ -476,18 +484,36 @@ function ChatPage() {
   const handleDeleteMessage = (id: string) => deleteMut.mutate(id);
 
 
+  function msgQuotePreview(m: Msg): string {
+    if (m.text_body) return String(m.text_body).slice(0, 140);
+    if (m.caption) return String(m.caption).slice(0, 140);
+    switch (m.msg_type) {
+      case "image": return "📷 Imagem";
+      case "audio": return "🎤 Áudio";
+      case "video": return "🎬 Vídeo";
+      case "document": return `📄 ${m.media_filename || "Documento"}`;
+      case "sticker": return "🎭 Figurinha";
+      default: return "Mensagem";
+    }
+  }
+
   async function handleSendText() {
     if (!active || !draft.trim()) return;
     const text = draft.trim();
+    const reply = replyTo;
     setDraft("");
+    setReplyTo(null);
     await sendMut.mutateAsync({
       channelId: active.channel_id,
       conversationId: active.id,
       to: active.contact_wa_id,
       type: "text",
       text,
+      contextWaMessageId: reply?.wa_message_id ?? undefined,
+      replyPreview: reply ? msgQuotePreview(reply) : undefined,
     }).catch(() => undefined);
   }
+
 
   async function handleFileUpload(file: File, opts?: { type?: typeof pendingType; caption?: string }) {
     if (!active) return;
@@ -779,6 +805,8 @@ function ChatPage() {
                   ) : messageList.map((m, i, arr) => {
                     const prev = arr[i - 1];
                     const showDate = !prev || toSafeDate(prev.created_at).toDateString() !== toSafeDate(m.created_at).toDateString();
+                    const ctxId = (m.raw as any)?.context?.message_id ?? null;
+                    const quoted = ctxId ? messageList.find((x) => x.wa_message_id === ctxId) ?? null : null;
                     return (
                       <div key={String(m.id)}>
                         {showDate && (
@@ -788,15 +816,31 @@ function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
+
                 </div>
               </div>
 
               <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
+                {replyTo && (
+                  <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
+                    <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-chat-accent">
+                        Respondendo a {replyTo.direction === "out" ? "você" : "cliente"}
+                      </div>
+                      <div className="truncate text-xs text-muted-foreground">{msgQuotePreview(replyTo)}</div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:bg-chat-soft" onClick={() => setReplyTo(null)} aria-label="Cancelar resposta">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
                 <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
+
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
@@ -942,31 +986,42 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null }) {
   const isOut = msg.direction === "out";
   const isDeleted = Boolean(msg.deleted_at);
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
   const caption = toText(msg.caption);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const quotedPreview = toText((msg.raw as any)?.reply_preview);
+  const quotedFromOut = quotedFrom ? quotedFrom.direction === "out" : undefined;
+
+  const menu = !isDeleted && (onReply || (isOut && onDelete)) ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Opções da mensagem">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align={isOut ? "end" : "start"} className="w-56 rounded-2xl border-chat-line bg-popover">
+        {onReply && (
+          <DropdownMenuItem onClick={() => onReply(msg)}>
+            <Reply className="mr-2 h-4 w-4" /> Responder
+          </DropdownMenuItem>
+        )}
+        {isOut && onDelete && (
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Apagar para todos
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
 
   return (
     <div className={`group flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div className="relative flex items-start gap-1">
-        {isOut && !isDeleted && onDelete && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Opções da mensagem">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-chat-line bg-popover">
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
-                <Trash2 className="mr-2 h-4 w-4" /> Apagar para todos
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        {isOut && menu}
         <div
           className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
             isOut
@@ -974,6 +1029,16 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete 
               : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
           } ${isDeleted ? "italic opacity-70" : ""}`}
         >
+          {!isDeleted && (quotedPreview || quotedFrom) && (
+            <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
+              <div className="font-semibold opacity-80">
+                {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
+              </div>
+              <div className="mt-0.5 truncate opacity-90">
+                {quotedPreview || (quotedFrom ? (quotedFrom.text_body || quotedFrom.caption || quotedFrom.msg_type) : "")}
+              </div>
+            </div>
+          )}
           {isDeleted ? (
             <p className="flex items-center gap-2 text-[15px] leading-relaxed">
               <Ban className="h-4 w-4" /> Esta mensagem foi apagada
@@ -983,6 +1048,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete 
               <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
               {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
               {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
+
             </>
           )}
           <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
@@ -990,7 +1056,9 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete 
             {isOut && !isDeleted && <StatusTick status={msg.status} />}
           </div>
         </div>
+        {!isOut && menu}
       </div>
+
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
