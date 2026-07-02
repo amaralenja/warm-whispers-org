@@ -64,12 +64,22 @@ function interpolate(tpl: string, ctx: Ctx): string {
 }
 
 async function fetchChannelToken(channelId: string, db: any): Promise<{ token: string; phoneNumberId: string }> {
-  const { data: localRow } = await db
-    .from("wa_channels" as any)
-    .select("id,token,phone_number_id,metadata")
-    .eq("id", channelId)
-    .maybeSingle();
-  const local = localRow as any;
+  // 1) Prefer SECURITY DEFINER RPC — funciona mesmo sem service role (bypassa RLS).
+  let local: any = null;
+  try {
+    const { data: rpcRows } = await db.rpc("load_wa_channel_credentials" as any, { _channel_id: String(channelId) });
+    local = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+  } catch {}
+
+  if (!local) {
+    const { data: localRow } = await db
+      .from("wa_channels" as any)
+      .select("id,token,phone_number_id,metadata")
+      .eq("id", channelId)
+      .maybeSingle();
+    local = localRow as any;
+  }
+
   const localToken = local?.token ? String(local.token) : "";
   const localPhoneNumberId = local?.phone_number_id
     ? String(local.phone_number_id)
