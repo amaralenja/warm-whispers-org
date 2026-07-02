@@ -587,37 +587,41 @@ function OperacaoSection({
       className="rounded-2xl border overflow-hidden backdrop-blur-sm"
       style={{ borderColor: `${hex}55`, background: gradient }}
     >
-      {showOp && (
-        <button
-          type="button"
-          onClick={() => setCollapsed((v) => !v)}
-          className="w-full grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b text-left hover:bg-background/30 transition-colors"
-          style={{ borderColor: `${hex}33`, backgroundColor: `${hex}14` }}
+      <button
+        type="button"
+        onClick={() => setCollapsed((v) => !v)}
+        className="w-full grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 sm:px-7 py-5 sm:py-6 border-b text-left hover:bg-background/30 transition-colors"
+        style={{ borderColor: `${hex}33`, backgroundColor: `${hex}14` }}
+      >
+        <div
+          className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-2xl grid place-items-center font-bold text-white text-2xl sm:text-3xl"
+          style={{ backgroundColor: hex, boxShadow: `0 6px 20px ${hex}66` }}
         >
-          <div
-            className="h-10 w-10 shrink-0 rounded-xl grid place-items-center font-bold text-white text-lg"
-            style={{ backgroundColor: hex, boxShadow: `0 4px 14px ${hex}66` }}
+          {initial}
+        </div>
+        <div className="min-w-0">
+          <h2
+            className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight truncate leading-tight"
+            style={{ color: hex }}
           >
-            {initial}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-sm sm:text-base font-semibold truncate">{nomeOp}</h2>
-            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
-              {totalFluxos} fluxo{totalFluxos === 1 ? "" : "s"}
-              {namedFolders.length > 0 && ` · ${namedFolders.length} pasta${namedFolders.length === 1 ? "" : "s"}`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums"
-              style={{ backgroundColor: `${hex}25`, color: hex, border: `1px solid ${hex}55` }}
-            >
-              {totalFluxos}
-            </span>
-            <span className="text-muted-foreground text-xs">{collapsed ? "▸" : "▾"}</span>
-          </div>
-        </button>
-      )}
+            {nomeOp}
+          </h2>
+          <p className="text-xs sm:text-sm text-muted-foreground truncate mt-1">
+            {totalFluxos} fluxo{totalFluxos === 1 ? "" : "s"}
+            {namedFolders.length > 0 && ` · ${namedFolders.length} pasta${namedFolders.length === 1 ? "" : "s"}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className="rounded-full px-3 py-1 text-sm font-bold tabular-nums"
+            style={{ backgroundColor: `${hex}25`, color: hex, border: `1px solid ${hex}55` }}
+          >
+            {totalFluxos}
+          </span>
+          <span className="text-muted-foreground text-lg">{collapsed ? "▸" : "▾"}</span>
+        </div>
+      </button>
+
 
       {!collapsed && (
         <div className="p-4 sm:p-5 space-y-6">
