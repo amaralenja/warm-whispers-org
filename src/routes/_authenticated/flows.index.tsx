@@ -517,41 +517,89 @@ function FlowsGrouped({
   const opName = (id: string) =>
     id === "__sem_op__" ? "Sem operação" : workspaces.find((w) => w.id === id)?.nome ?? id;
 
+  // Cor consistente por operação (hash simples)
+  const opColor = (id: string) => {
+    const palette = [
+      { bg: "from-emerald-500/20 to-emerald-500/5", ring: "ring-emerald-500/40", text: "text-emerald-400", chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+      { bg: "from-sky-500/20 to-sky-500/5", ring: "ring-sky-500/40", text: "text-sky-400", chip: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
+      { bg: "from-fuchsia-500/20 to-fuchsia-500/5", ring: "ring-fuchsia-500/40", text: "text-fuchsia-400", chip: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30" },
+      { bg: "from-amber-500/20 to-amber-500/5", ring: "ring-amber-500/40", text: "text-amber-400", chip: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+      { bg: "from-rose-500/20 to-rose-500/5", ring: "ring-rose-500/40", text: "text-rose-400", chip: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
+      { bg: "from-indigo-500/20 to-indigo-500/5", ring: "ring-indigo-500/40", text: "text-indigo-400", chip: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
+    ];
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return palette[h % palette.length];
+  };
+
   const opEntries = Array.from(opsMap.entries()).sort((a, b) => opName(a[0]).localeCompare(opName(b[0])));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {opEntries.map(([opId, foldersMap]) => {
-        const folderEntries = Array.from(foldersMap.entries()).sort((a, b) => {
-          if (a[0] === "__sem_pasta__") return 1;
-          if (b[0] === "__sem_pasta__") return -1;
-          return a[0].localeCompare(b[0]);
-        });
+        const isOperacao = opId !== "__sem_op__";
+        // Nomes de pastas reais (excluindo o bucket sem pasta)
+        const namedFolders = Array.from(foldersMap.entries())
+          .filter(([k]) => k !== "__sem_pasta__")
+          .sort((a, b) => a[0].localeCompare(b[0]));
+        const semPasta = foldersMap.get("__sem_pasta__") ?? [];
+        const totalFluxos = Array.from(foldersMap.values()).reduce((a, b) => a + b.length, 0);
+        const c = opColor(opId);
+        const initial = opName(opId).charAt(0).toUpperCase();
+
         return (
-          <section key={opId} className="space-y-4">
+          <section key={opId} className={`rounded-2xl border border-border/60 bg-gradient-to-br ${c.bg} backdrop-blur-sm overflow-hidden`}>
             {showOp && (
-              <div className="flex items-center gap-2 border-b border-border pb-2">
-                <span className="text-lg">🏢</span>
-                <h2 className="text-lg font-semibold">{opName(opId)}</h2>
-                <Badge variant="outline" className="text-xs">
-                  {Array.from(foldersMap.values()).reduce((a, b) => a + b.length, 0)} fluxos
+              <header className="flex items-center gap-3 px-5 py-4 border-b border-border/40 bg-background/30">
+                <div className={`h-10 w-10 rounded-xl grid place-items-center bg-background/60 ring-2 ${c.ring} ${c.text} font-bold`}>
+                  {initial}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-semibold truncate">{opName(opId)}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {totalFluxos} fluxo{totalFluxos === 1 ? "" : "s"}
+                    {namedFolders.length > 0 && ` · ${namedFolders.length} pasta${namedFolders.length === 1 ? "" : "s"}`}
+                  </p>
+                </div>
+                <Badge variant="outline" className={`text-xs ${c.chip}`}>
+                  {totalFluxos}
                 </Badge>
-              </div>
+              </header>
             )}
-            {folderEntries.map(([fld, items]) => (
-              <div key={fld} className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <span>{fld === "__sem_pasta__" ? "📂 Sem pasta" : `📁 ${fld}`}</span>
-                  <span className="text-xs">({items.length})</span>
+
+            <div className="p-5 space-y-6">
+              {/* Fluxos "diretos" na operação (sem pasta) — quando temos operação, eles pertencem à pasta da operação */}
+              {semPasta.length > 0 && (
+                <div className="space-y-3">
+                  {(namedFolders.length > 0 || !isOperacao) && (
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <span>{isOperacao ? "📌 Diretos" : "📂 Sem operação"}</span>
+                      <span>({semPasta.length})</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {semPasta.map((f: any) => renderCard(f))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {items.map((f) => renderCard(f))}
+              )}
+
+              {/* Sub-pastas nomeadas */}
+              {namedFolders.map(([fld, items]) => (
+                <div key={fld} className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <span>📁 {fld}</span>
+                    <span>({items.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {items.map((f: any) => renderCard(f))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </section>
         );
       })}
     </div>
   );
 }
+
