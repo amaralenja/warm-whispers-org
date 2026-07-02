@@ -491,10 +491,17 @@ function ChatPage() {
   const deleteMut = useMutation({
     mutationFn: (messageId: string) => deleteFn({ data: { messageId } }),
     onSuccess: (res: any) => {
-      toast.success(res?.waRemoved ? "Mensagem apagada para todos" : "Mensagem apagada do sistema");
+      if (res?.waRemoved) {
+        toast.success("Mensagem apagada para todos no WhatsApp");
+      } else {
+        toast.warning("Apagada só no sistema — WhatsApp Cloud API não permitiu remover pra todos", {
+          description: res?.waError ? String(res.waError).slice(0, 180) : "A Meta não retornou sucesso ao apagar remotamente.",
+        });
+      }
       qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
+
     onError: (e: any) => toast.error(errorToText(e, "Erro ao apagar")),
   });
   const handleDeleteMessage = (id: string) => deleteMut.mutate(id);
