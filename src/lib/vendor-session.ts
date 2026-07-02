@@ -66,9 +66,10 @@ export function encodeVendorSessionHeader(session: VendorSession | null): string
 
 export function allowedWorkspaceIdsFromSession(session: VendorSession | null): string[] {
   if (!session) return [];
-  // null/undefined = legado: cai no workspace do expert. [] = admin removeu todos.
+  // null/undefined/[] = legado: cai no workspace do expert para não deixar vendedor sem operação.
   if (Array.isArray(session.workspace_ids)) {
-    return session.workspace_ids.map(String).filter(Boolean);
+    const ids = session.workspace_ids.map(String).filter(Boolean);
+    return ids.length > 0 ? ids : session.expert ? [String(session.expert)] : [];
   }
   return session.expert ? [String(session.expert)] : [];
 }
