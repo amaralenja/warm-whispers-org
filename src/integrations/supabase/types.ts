@@ -2033,6 +2033,15 @@ export type Database = {
         Args: { _from?: string; _to?: string; _utm: string }
         Returns: Json
       }
+      load_wa_channel_credentials: {
+        Args: { _channel_id: string }
+        Returns: {
+          id: string
+          metadata: Json
+          phone_number_id: string
+          token: string
+        }[]
+      }
       load_wa_flow: {
         Args: { _flow_id: string }
         Returns: {
