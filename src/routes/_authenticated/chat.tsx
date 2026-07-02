@@ -120,7 +120,10 @@ type SendVars = {
   mediaUrl?: string;
   filename?: string;
   caption?: string;
+  contextWaMessageId?: string;
+  replyPreview?: string;
 };
+
 
 function asArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
