@@ -692,7 +692,7 @@ function ChatPage() {
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback
                             className="rounded-full"
-                            style={avatarStyle()}
+                            style={avatarStyle(contactName, contactWaId)}
                           >
                             <User className="h-6 w-6 opacity-80" />
                           </AvatarFallback>
