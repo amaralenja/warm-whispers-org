@@ -1038,7 +1038,9 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete,
             {isOut && !isDeleted && <StatusTick status={msg.status} />}
           </div>
         </div>
+        {!isOut && menu}
       </div>
+
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
