@@ -291,6 +291,8 @@ function ChatPage() {
   const uploadMediaFn = useServerFn(uploadWhatsappMedia);
   const listFlowsFn = useServerFn(listFlows);
   const triggerFlowFn = useServerFn(triggerFlowManually);
+  const updateTagsFn = useServerFn(updateConversationTags);
+  const updateNotesFn = useServerFn(updateConversationNotes);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
