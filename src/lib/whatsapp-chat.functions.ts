@@ -1134,6 +1134,14 @@ export const updateConversationTags = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!data.conversationId) throw new Error("Conversa não informada");
     const db = await dbFor(context);
+    const { data: currentConv } = await db
+      .from("wa_conversations" as any)
+      .select("tags")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    const oldTags = Array.isArray((currentConv as any)?.tags)
+      ? ((currentConv as any).tags as unknown[]).map(String).filter(Boolean)
+      : [];
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
       const { error } = await db.rpc("vendor_update_conversation_tags" as any, {
@@ -1142,14 +1150,16 @@ export const updateConversationTags = createServerFn({ method: "POST" })
         _tags: data.tags,
       });
       if (error) throw new Error(error.message);
-      return { ok: true };
+      const sync = await syncConversationTagsToCrmLead(db, data.conversationId, oldTags, data.tags);
+      return { ok: true, crmUpdated: sync.updated };
     }
     const { error } = await db
       .from("wa_conversations" as any)
       .update({ tags: data.tags, updated_at: new Date().toISOString() })
       .eq("id", data.conversationId);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    const sync = await syncConversationTagsToCrmLead(db, data.conversationId, oldTags, data.tags);
+    return { ok: true, crmUpdated: sync.updated };
   });
 
 export const updateConversationNotes = createServerFn({ method: "POST" })
