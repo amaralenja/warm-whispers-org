@@ -6,8 +6,9 @@ import {
   User, MoreVertical, Tag as TagIcon, Columns3,
 } from "lucide-react";
 import {
-  TagsManagerDialog, StagesManagerDialog, useCrmStages, DEFAULT_STAGES, useHiddenDefaultStages,
+  TagsManagerDialog, StagesManagerDialog, useCrmStages, useCrmTags, DEFAULT_STAGES, useHiddenDefaultStages,
 } from "@/components/tags-manager-dialog";
+
 
 import { useServerFn } from "@tanstack/react-start";
 import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
