@@ -39,3 +39,9 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
   return fetch(input, { ...init, headers })
 }
 
+// Legacy no-op middleware kept for backward compatibility with auto-generated start.ts.
+// Real auth attachment happens via `fetchWithSupabaseAuth` above.
+import { createMiddleware } from '@tanstack/react-start'
+export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(async ({ next }) => next())
+
+
