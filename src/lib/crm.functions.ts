@@ -220,6 +220,18 @@ export const createCrmTag = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     assertPayloadWorkspace(context, { expert: data.operacao });
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { error } = await db.rpc("vendor_create_crm_tag" as any, {
+        ...rpcArgs,
+        _nome: data.nome,
+        _cor: data.cor,
+        _operacao: data.operacao,
+        _stage_id: data.stage_id,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
     const { error } = await db.from("crm_tags" as any).insert({ nome: data.nome, cor: data.cor, operacao: data.operacao, stage_id: data.stage_id });
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -235,9 +247,18 @@ export const updateCrmTag = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    if (context?.vendor) {
-      const { data: tag } = await db.from("crm_tags" as any).select("operacao").eq("id", data.id).maybeSingle();
-      assertPayloadWorkspace(context, { expert: (tag as any)?.operacao });
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { error } = await db.rpc("vendor_update_crm_tag" as any, {
+        ...rpcArgs,
+        _id: data.id,
+        _nome: data.nome ?? null,
+        _cor: data.cor ?? null,
+        _stage_id: data.stage_id ?? null,
+        _clear_stage: data.stage_id === null,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
     }
     const patch: any = {};
     if (data.nome !== undefined) patch.nome = data.nome;
@@ -247,6 +268,7 @@ export const updateCrmTag = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 // ---------- Stages (colunas) ----------
 export const listCrmStages = createServerFn({ method: "GET" })
@@ -281,6 +303,19 @@ export const upsertCrmStage = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     assertPayloadWorkspace(context, { expert: data.operacao });
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data: newId, error } = await db.rpc("vendor_upsert_crm_stage" as any, {
+        ...rpcArgs,
+        _id: data.id ?? null,
+        _operacao: data.operacao,
+        _nome: data.nome,
+        _cor: data.cor,
+        _ordem: data.ordem,
+      });
+      if (error) throw new Error(error.message);
+      return { id: data.id ?? newId };
+    }
     if (data.id) {
       const { error } = await db.from("crm_stages" as any).update({ nome: data.nome, cor: data.cor, ordem: data.ordem }).eq("id", data.id);
       if (error) throw new Error(error.message);
@@ -296,9 +331,11 @@ export const deleteCrmStage = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    if (context?.vendor) {
-      const { data: st } = await db.from("crm_stages" as any).select("operacao").eq("id", data.id).maybeSingle();
-      assertPayloadWorkspace(context, { expert: (st as any)?.operacao });
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { error } = await db.rpc("vendor_delete_crm_stage" as any, { ...rpcArgs, _id: data.id });
+      if (error) throw new Error(error.message);
+      return { ok: true };
     }
     const { error } = await db.from("crm_stages" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -311,11 +348,14 @@ export const deleteCrmTag = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    if (context?.vendor) {
-      const { data: tag } = await db.from("crm_tags" as any).select("operacao").eq("id", data.id).maybeSingle();
-      assertPayloadWorkspace(context, { expert: (tag as any)?.operacao });
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { error } = await db.rpc("vendor_delete_crm_tag" as any, { ...rpcArgs, _id: data.id });
+      if (error) throw new Error(error.message);
+      return { ok: true };
     }
     const { error } = await db.from("crm_tags" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
