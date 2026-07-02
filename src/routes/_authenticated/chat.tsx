@@ -195,7 +195,7 @@ function formatDateLabel(iso: unknown) {
 function StatusTick({ status }: { status: string | null }) {
   if (status === "failed") return <span className="text-[10px] font-bold text-destructive">erro</span>;
   if (status === "pending") return <Clock className="h-3.5 w-3.5 text-white/70" />;
-  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 drop-shadow-sm" style={{ color: "#0a2540" }} strokeWidth={3} />;
+  if (status === "read") return <CheckCheck className="h-3.5 w-3.5 drop-shadow-sm" style={{ color: "#7ec8ff" }} strokeWidth={3} />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
