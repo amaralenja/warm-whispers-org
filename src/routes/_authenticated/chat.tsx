@@ -797,6 +797,19 @@ function ChatPage() {
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
+                      {(() => {
+                        const b = opBadgeFor((active as any).operacao_id);
+                        return b ? (
+                          <span
+                            className="inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                            style={{ color: b.hex, borderColor: `${b.hex}66`, backgroundColor: `${b.hex}1f` }}
+                            title={`Operação: ${b.nome}`}
+                          >
+                            {b.nome}
+                          </span>
+                        ) : null;
+                      })()}
+
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
                     {(() => {
