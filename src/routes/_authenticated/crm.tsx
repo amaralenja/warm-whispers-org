@@ -380,8 +380,9 @@ function Kanban({
                 </div>
               )}
               {items.slice(0, shown).map((lead) => (
-                <KanbanCard key={lead.id} lead={lead} onClick={() => onEdit(lead)} onDragStart={onDragStart} />
+                <KanbanCard key={lead.id} lead={lead} stageColor={s.cor} tagColors={tagColors} onClick={() => onEdit(lead)} onDragStart={onDragStart} />
               ))}
+
               {items.length > shown && (
                 <button
                   type="button"
