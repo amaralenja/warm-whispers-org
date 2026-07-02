@@ -697,7 +697,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     mediaUrl: d?.mediaUrl ?? "",
     filename: d?.filename ?? "",
     caption: d?.caption ?? "",
+    contextWaMessageId: d?.contextWaMessageId ? String(d.contextWaMessageId) : "",
+    replyPreview: d?.replyPreview ? String(d.replyPreview) : "",
   }))
+
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     const isVendor = Boolean((context as any).vendor);
