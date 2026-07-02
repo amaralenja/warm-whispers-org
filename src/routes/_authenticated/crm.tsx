@@ -454,12 +454,14 @@ function KanbanCard({
 
 // ---------- Lista ----------
 function Lista({
-  stages, leads, onEdit, onRemove,
+  stages, leads, tagColors, onEdit, onRemove,
 }: {
   stages: StageView[];
   leads: Lead[];
+  tagColors: Map<string, string>;
   onEdit: (l: Lead) => void;
   onRemove: (id: string) => void;
+
 }) {
   return (
     <div className="flex-1 overflow-auto rounded-xl border border-border bg-card/40">
