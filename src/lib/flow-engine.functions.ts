@@ -283,14 +283,16 @@ export const createFlow = createServerFn({ method: "POST" })
     folder: d?.folder ? String(d.folder).trim() || null : null,
   }))
   .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any)?.vendor);
     const startId = "n-trigger";
     const nome = data.nome.trim();
-    const { data: dup } = await context.supabase
+    const { data: dup } = await db
       .from("wa_flows" as any).select("id").ilike("nome", nome).limit(1);
     if (dup && dup.length > 0) {
       throw new Error(`Já existe um fluxo com o nome "${nome}". Escolha outro nome.`);
     }
-    const { data: row, error } = await context.supabase
+    const { data: row, error } = await db
       .from("wa_flows" as any)
       .insert({
         nome,
@@ -302,7 +304,7 @@ export const createFlow = createServerFn({ method: "POST" })
           { id: startId, type: "trigger", position: { x: 100, y: 100 }, data: { label: "Início" } },
         ],
         edges: [],
-        created_by: context.userId,
+        created_by: isVendor ? null : context.userId,
       })
       .select("id")
       .single();
