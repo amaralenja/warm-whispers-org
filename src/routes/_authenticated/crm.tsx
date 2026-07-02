@@ -302,13 +302,15 @@ function CRMPage() {
 
 // ---------- Kanban ----------
 function Kanban({
-  stages, leads, onMove, onEdit,
+  stages, leads, tagColors, onMove, onEdit,
 }: {
   stages: StageView[];
   leads: Lead[];
+  tagColors: Map<string, string>;
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
 }) {
+
   const [dragOver, setDragOver] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
