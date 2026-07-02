@@ -994,7 +994,7 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom, isAdmin }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null; isAdmin?: boolean }) {
   const isOut = msg.direction === "out";
   const isDeleted = Boolean(msg.deleted_at);
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
