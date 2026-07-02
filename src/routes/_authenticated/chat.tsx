@@ -1232,48 +1232,67 @@ function FlowInlineBar({
   }
 
   return (
-    <div className="mx-auto mt-3 w-full max-w-5xl">
+    <div className="mx-auto mt-3 w-full max-w-5xl space-y-2">
       <div className="flex items-center gap-2 rounded-2xl border border-chat-line bg-chat-thread p-2">
         <div className="relative flex-1">
           <Zap className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-chat-accent" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar e disparar fluxo…"
+            placeholder="Buscar fluxo pelo nome ou pasta…"
             className="h-10 rounded-xl border-0 bg-transparent pl-9 text-sm shadow-none focus-visible:ring-0"
           />
         </div>
-        <span className="px-2 text-[11px] text-muted-foreground">{compatible.length} disponíveis</span>
+        <span className="shrink-0 px-2 text-[11px] text-muted-foreground">
+          {compatible.length} fluxo{compatible.length === 1 ? "" : "s"}
+        </span>
       </div>
-      {q.trim() && (
-        <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-chat-line bg-chat-panel p-1 scrollbar-fancy">
-          {compatible.length === 0 ? (
-            <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-              Nenhum fluxo encontrado
-            </div>
-          ) : (
-            compatible.map((f: any) => (
-              <button
-                key={String(f.id)}
-                type="button"
-                disabled={firing === f.id}
-                onClick={() => fire(f.id)}
-                className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-chat-soft disabled:opacity-50"
-              >
-                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-chat-accent" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{toText(f.nome) || "Fluxo sem nome"}</div>
-                  {f.folder && <div className="truncate text-[10px] text-muted-foreground">📁 {toText(f.folder)}</div>}
-                </div>
-                {firing === f.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-              </button>
-            ))
-          )}
+      {compatible.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-chat-line bg-chat-panel/50 px-3 py-4 text-center text-xs text-muted-foreground">
+          Nenhum fluxo encontrado
+        </div>
+      ) : (
+        <div
+          className="flex gap-2 overflow-x-auto scrollbar-fancy pb-2 cursor-grab active:cursor-grabbing"
+          onMouseDown={(e) => {
+            const el = e.currentTarget;
+            const startX = e.pageX - el.offsetLeft;
+            const startScroll = el.scrollLeft;
+            const move = (ev: MouseEvent) => {
+              el.scrollLeft = startScroll - (ev.pageX - el.offsetLeft - startX);
+            };
+            const up = () => {
+              window.removeEventListener("mousemove", move);
+              window.removeEventListener("mouseup", up);
+            };
+            window.addEventListener("mousemove", move);
+            window.addEventListener("mouseup", up);
+          }}
+        >
+          {compatible.map((f: any) => (
+            <button
+              key={String(f.id)}
+              type="button"
+              disabled={firing === f.id}
+              onClick={() => fire(f.id)}
+              className="group flex shrink-0 items-center gap-2 rounded-xl border border-chat-line bg-chat-panel px-3 py-2 text-left transition hover:border-chat-accent hover:bg-chat-soft disabled:opacity-50"
+            >
+              <Zap className="h-3.5 w-3.5 shrink-0 text-chat-accent" />
+              <div className="min-w-0 max-w-[200px]">
+                <div className="truncate text-xs font-medium">{toText(f.nome) || "Fluxo sem nome"}</div>
+                {f.folder && (
+                  <div className="truncate text-[10px] text-muted-foreground">📁 {toText(f.folder)}</div>
+                )}
+              </div>
+              {firing === f.id && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />}
+            </button>
+          ))}
         </div>
       )}
     </div>
   );
 }
+
 
 function FlowDispatcher({
   conversation,
