@@ -143,13 +143,6 @@ export const deleteCrmLead = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
-    if (rpcArgs) {
-      const { data: ok, error } = await db.rpc("vendor_update_crm_lead_stage" as any, { ...rpcArgs, _lead_id: data.id, _status: data.status });
-      if (error) throw new Error(error.message);
-      if (!ok) throw new Error("Inautorizado: vendedor sem acesso a este lead");
-      return { ok: true };
-    }
     await assertLeadAccess(context, db, data.id);
     const { error } = await db.from("crm_leads" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -161,6 +154,13 @@ export const updateCrmLeadStage = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; status: string }) => ({ id: String(d?.id ?? ""), status: String(d?.status ?? "novo") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    if (rpcArgs) {
+      const { data: ok, error } = await db.rpc("vendor_update_crm_lead_stage" as any, { ...rpcArgs, _lead_id: data.id, _status: data.status });
+      if (error) throw new Error(error.message);
+      if (!ok) throw new Error("Inautorizado: vendedor sem acesso a este lead");
+      return { ok: true };
+    }
     await assertLeadAccess(context, db, data.id);
     const { error } = await db.from("crm_leads" as any).update({ status: data.status }).eq("id", data.id);
     if (error) throw new Error(error.message);
