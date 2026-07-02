@@ -1555,6 +1555,7 @@ export type Database = {
           last_message_at: string
           last_message_direction: string | null
           last_message_preview: string | null
+          last_message_status: string | null
           operacao_id: string | null
           phone_number_id: string | null
           unread_count: number
@@ -1570,6 +1571,7 @@ export type Database = {
           last_message_at?: string
           last_message_direction?: string | null
           last_message_preview?: string | null
+          last_message_status?: string | null
           operacao_id?: string | null
           phone_number_id?: string | null
           unread_count?: number
@@ -1585,6 +1587,7 @@ export type Database = {
           last_message_at?: string
           last_message_direction?: string | null
           last_message_preview?: string | null
+          last_message_status?: string | null
           operacao_id?: string | null
           phone_number_id?: string | null
           unread_count?: number
@@ -2326,6 +2329,7 @@ export type Database = {
           last_message_at: string
           last_message_direction: string | null
           last_message_preview: string | null
+          last_message_status: string | null
           operacao_id: string | null
           phone_number_id: string | null
           unread_count: number
@@ -2391,6 +2395,7 @@ export type Database = {
           last_message_at: string
           last_message_direction: string | null
           last_message_preview: string | null
+          last_message_status: string | null
           operacao_id: string | null
           phone_number_id: string | null
           unread_count: number
