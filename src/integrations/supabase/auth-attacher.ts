@@ -17,9 +17,12 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
     typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
   )
 
-  if (init?.headers) {
-    new Headers(init.headers).forEach((value, key) => headers.set(key, value))
+  if (init && init.headers) {
+    try {
+      new Headers(init.headers as HeadersInit).forEach((value, key) => headers.set(key, value))
+    } catch {}
   }
+
 
   try {
     const result = await supabase.auth.getSession()

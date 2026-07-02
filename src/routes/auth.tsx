@@ -210,23 +210,13 @@ function AuthPage() {
             </form>
 
             {role === "admin" && (
-              <div className="mt-8 flex items-center justify-between text-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode(mode === "signin" ? "signup" : "signin");
-                    setError(null);
-                    setInfo(null);
-                  }}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {mode === "signin" ? "Criar uma conta" : "Já tenho conta"}
-                </button>
+              <div className="mt-8 flex items-center justify-end text-sm">
                 <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground/60">
                   MULTIUM ©
                 </span>
               </div>
             )}
+
           </div>
         </section>
       </div>
