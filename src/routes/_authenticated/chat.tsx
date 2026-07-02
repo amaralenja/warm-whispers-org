@@ -795,11 +795,17 @@ function ChatPage() {
                             const extra = tags.length - shown.length;
                             return (
                               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
-                                {shown.map((t) => (
-                                  <span key={t} className="max-w-[110px] truncate rounded-full border border-chat-accent/40 bg-chat-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-chat-accent">
-                                    {t}
-                                  </span>
-                                ))}
+                                {shown.map((t) => {
+                                  const cor = tagColorFor(t);
+                                  const style: CSSProperties = cor
+                                    ? { backgroundColor: `${cor}1a`, borderColor: `${cor}66`, color: cor }
+                                    : {};
+                                  return (
+                                    <span key={t} style={style} className={`max-w-[110px] truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${cor ? "" : "border-chat-accent/40 bg-chat-accent/10 text-chat-accent"}`}>
+                                      {t}
+                                    </span>
+                                  );
+                                })}
                                 {extra > 0 ? (
                                   <span className="rounded-full border border-chat-line px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                     +{extra}
