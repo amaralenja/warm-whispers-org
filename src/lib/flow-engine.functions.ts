@@ -604,7 +604,8 @@ export const duplicateFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      await db.from("wa_flow_triggers" as any).insert(rows);
+      if (isVendor) await vendorReplaceTriggers(context, db, (row as any).id, rows);
+      else await db.from("wa_flow_triggers" as any).insert(rows);
     }
     return { id: (row as any).id, nome: newName };
   });
@@ -695,7 +696,8 @@ export const importFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      await db.from("wa_flow_triggers" as any).insert(rows);
+      if (isVendor) await vendorReplaceTriggers(context, db, (row as any).id, rows);
+      else await db.from("wa_flow_triggers" as any).insert(rows);
     }
     return { id: (row as any).id, nome: finalName };
   });
