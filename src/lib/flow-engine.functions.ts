@@ -45,6 +45,21 @@ async function vendorAllowedChannelIds(context: any, db: any): Promise<string[]>
     .filter(Boolean);
 }
 
+async function attachFlowTriggers(db: any, flows: any[]) {
+  if (!Array.isArray(flows) || flows.length === 0) return flows ?? [];
+  const ids = flows.map((f) => String(f.id)).filter(Boolean);
+  const { data: triggers } = await db
+    .from("wa_flow_triggers" as any)
+    .select("*")
+    .in("flow_id", ids);
+  const byFlow = new Map<string, any[]>();
+  for (const t of ((triggers ?? []) as any[])) {
+    const k = String(t.flow_id ?? "");
+    byFlow.set(k, [...(byFlow.get(k) ?? []), t]);
+  }
+  return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
+}
+
 async function assertVendorConversationAccess(context: any, db: any, conversationId: string) {
   if (!context?.vendor) return;
   const { data: conv, error } = await db
@@ -105,7 +120,7 @@ export const listFlows = createServerFn({ method: "GET" })
     if (rpcArgs) {
       const { data, error } = await db.rpc("vendor_list_flows" as any, rpcArgs);
       if (error) throw new Error(error.message);
-      return data ?? [];
+      return attachFlowTriggers(db, (data ?? []) as any[]);
     }
     const { data, error } = await db
       .from("wa_flows" as any)
@@ -126,7 +141,7 @@ export const getFlow = createServerFn({ method: "GET" })
       if (error) throw new Error(error.message);
       const flow = Array.isArray(rows) ? rows[0] : rows;
       if (!flow) throw new Error("Fluxo não encontrado");
-      return flow;
+      return (await attachFlowTriggers(db, [flow]))[0];
     }
     const { data: flow, error } = await db
       .from("wa_flows" as any)
