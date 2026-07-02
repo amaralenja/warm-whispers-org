@@ -71,8 +71,7 @@ function AuthPage() {
         style={{ background: "radial-gradient(closest-side, var(--accent), transparent)" }}
       />
 
-      <header className="relative z-10 flex items-center justify-between px-8 py-7">
-        <img src={logoMultium} alt="MULTIUM" className="h-10 w-auto object-contain" />
+      <header className="relative z-10 flex items-center justify-end px-8 py-7">
         <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
           {role === "admin" ? (mode === "signin" ? "Acesso" : "Cadastro") : "Vendedor"}
         </div>
@@ -94,6 +93,10 @@ function AuthPage() {
             className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card/60 p-10 backdrop-blur-xl"
             style={{ boxShadow: "var(--shadow-elegant)" }}
           >
+            <div className="mb-6 flex justify-center">
+              <img src={logoMultium} alt="MULTIUM" className="h-12 w-auto object-contain" />
+            </div>
+
             {/* Toggle Admin / Vendedor */}
             <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-border bg-background/40 p-1">
               {(["admin", "vendedor"] as const).map((r) => (
