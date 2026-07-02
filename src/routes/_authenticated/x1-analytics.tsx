@@ -87,8 +87,14 @@ function presetRange(p: Preset) {
 
 function X1AnalyticsPage() {
   const fetchFn = useServerFn(getX1Analytics);
-  const [range, setRange] = useState(defaultRange);
+  const [preset, setPreset] = useState<Preset>("hoje");
+  const [range, setRange] = useState<{ from: string; to: string }>(() => todayRange());
   const [operacao, setOperacao] = useState<string>("all");
+
+  const applyPreset = (p: Preset) => {
+    setPreset(p);
+    setRange(presetRange(p));
+  };
 
   const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ["x1-analytics", range.from, range.to, operacao],
@@ -100,6 +106,7 @@ function X1AnalyticsPage() {
   const payload = (data ?? null) as X1AnalyticsPayload | null;
 
   const chartMsgs = useMemo(() => payload?.serieDiaria ?? [], [payload]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-6">
