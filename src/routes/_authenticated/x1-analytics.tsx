@@ -39,6 +39,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { getX1Analytics, type X1AnalyticsPayload } from "@/lib/x1-analytics.functions";
+import { generateX1AnalyticsPdf } from "@/lib/x1-analytics-pdf";
+import { FileDown } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/x1-analytics")({
   component: X1AnalyticsPage,
@@ -175,6 +178,23 @@ function X1AnalyticsPage() {
             </div>
             <Button onClick={() => refetch()} disabled={isFetching} className="h-9">
               {isFetching ? "Atualizando…" : "Atualizar"}
+            </Button>
+            <Button
+              onClick={() => {
+                if (!payload) { toast.error("Aguarde os dados carregarem"); return; }
+                try {
+                  generateX1AnalyticsPdf({ payload, from: range.from, to: range.to, operacao });
+                  toast.success("PDF gerado com sucesso");
+                } catch (e: any) {
+                  toast.error(`Erro ao gerar PDF: ${e?.message ?? "desconhecido"}`);
+                }
+              }}
+              disabled={!payload || isLoading}
+              variant="outline"
+              className="h-9 gap-2"
+            >
+              <FileDown className="h-4 w-4" />
+              Exportar PDF
             </Button>
           </div>
         </div>
