@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function dbFor(context: any) {
-  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (context?.vendor) {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return supabaseAdmin as any;
   }
