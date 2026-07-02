@@ -748,7 +748,7 @@ async function syncConversationTagsToCrmLead(db: any, conversationId: string, ol
     const lowerRemoved = new Set(removed.map((t) => t.toLowerCase()));
     const merged = current.filter((t) => !lowerRemoved.has(t.toLowerCase()));
     for (const tag of added) {
-      if (!merged.some((t) => t.toLowerCase() === tag.toLowerCase())) merged.push(tag);
+      if (!merged.some((t: string) => t.toLowerCase() === tag.toLowerCase())) merged.push(tag);
     }
 
     const patch: Record<string, any> = { tags: merged, updated_at: new Date().toISOString() };
