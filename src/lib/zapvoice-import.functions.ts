@@ -315,7 +315,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
           entry_node_id: triggerId,
           nodes,
           edges,
-          created_by: context.userId,
+          created_by: isVendor ? null : context.userId,
           descricao: `Importado do ZapVoice (id original: ${f.id})${f.isFavorite ? " · ⭐" : ""}`,
         });
         if (insErr) throw new Error(insErr.message);
