@@ -111,11 +111,12 @@ async function assertVendorConversationAccess(
       .update({ assigned_vendor_id: Number(context.vendor.id) })
       .eq("id", conversationId)
       .is("assigned_vendor_id", null);
-    return;
+    return conv as any;
   }
   if (assignedId !== Number(context.vendor.id)) {
     throw new Error("Inautorizado: este lead está com outro vendedor");
   }
+  return conv as any;
 }
 
 // ============================================================
@@ -460,10 +461,11 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
     if ((context as any).vendor) {
       if (!(await vendorAllowedChannelIds(context, db)).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
       if (data.conversation_id) {
-        await assertVendorConversationAccess(context, db, data.conversation_id, {
+        const conv = await assertVendorConversationAccess(context, db, data.conversation_id, {
           channelId: data.channel_id,
           contactWaId: data.contact_wa_id,
         });
+        if (conv?.id) data.conversation_id = String(conv.id);
       }
     }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");

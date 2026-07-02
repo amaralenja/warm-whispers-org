@@ -570,6 +570,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       channelId: data.channelId,
       contactWaId: data.to,
     });
+    const conversationId = String(conv.id);
     if (String(conv.channel_id) !== String(data.channelId)) {
       throw new Error("Canal não pertence a esta conversa");
     }
@@ -606,7 +607,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     }
 
     const { data: inserted, error } = await db.from("wa_messages" as any).insert({
-      conversation_id: data.conversationId,
+      conversation_id: conversationId,
       channel_id: data.channelId,
       wa_message_id: null,
       direction: "out",
@@ -630,7 +631,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         last_message_preview: previewForOut(data),
         last_message_direction: "out",
       })
-      .eq("id", data.conversationId);
+      .eq("id", conversationId);
 
     try {
       const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
