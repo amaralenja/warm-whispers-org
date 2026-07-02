@@ -133,9 +133,9 @@ async function assertVendorConversationAccess(
     await db
       .from("wa_conversations" as any)
       .update({ assigned_vendor_id: Number(context.vendor.id) })
-      .eq("id", conversationId)
+      .eq("id", (conv as any).id)
       .is("assigned_vendor_id", null);
-    return conv as any;
+    return { ...(conv as any), assigned_vendor_id: Number(context.vendor.id) };
   }
   if (assignedId !== Number(context.vendor.id)) {
     throw new Error("Inautorizado: este lead está com outro vendedor");
