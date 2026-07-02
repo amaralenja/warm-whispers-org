@@ -968,31 +968,42 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null }) {
   const isOut = msg.direction === "out";
   const isDeleted = Boolean(msg.deleted_at);
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
   const caption = toText(msg.caption);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const quotedPreview = toText((msg.raw as any)?.reply_preview);
+  const quotedFromOut = quotedFrom ? quotedFrom.direction === "out" : undefined;
+
+  const menu = !isDeleted && (onReply || (isOut && onDelete)) ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Opções da mensagem">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align={isOut ? "end" : "start"} className="w-56 rounded-2xl border-chat-line bg-popover">
+        {onReply && (
+          <DropdownMenuItem onClick={() => onReply(msg)}>
+            <Reply className="mr-2 h-4 w-4" /> Responder
+          </DropdownMenuItem>
+        )}
+        {isOut && onDelete && (
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Apagar para todos
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
 
   return (
     <div className={`group flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div className="relative flex items-start gap-1">
-        {isOut && !isDeleted && onDelete && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Opções da mensagem">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-chat-line bg-popover">
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
-                <Trash2 className="mr-2 h-4 w-4" /> Apagar para todos
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        {isOut && menu}
         <div
           className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
             isOut
@@ -1000,6 +1011,16 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete 
               : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
           } ${isDeleted ? "italic opacity-70" : ""}`}
         >
+          {!isDeleted && (quotedPreview || quotedFrom) && (
+            <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
+              <div className="font-semibold opacity-80">
+                {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
+              </div>
+              <div className="mt-0.5 truncate opacity-90">
+                {quotedPreview || (quotedFrom ? (quotedFrom.text_body || quotedFrom.caption || quotedFrom.msg_type) : "")}
+              </div>
+            </div>
+          )}
           {isDeleted ? (
             <p className="flex items-center gap-2 text-[15px] leading-relaxed">
               <Ban className="h-4 w-4" /> Esta mensagem foi apagada
@@ -1009,6 +1030,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete 
               <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
               {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
               {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
+
             </>
           )}
           <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
