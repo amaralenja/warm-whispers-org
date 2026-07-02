@@ -276,6 +276,8 @@ function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
