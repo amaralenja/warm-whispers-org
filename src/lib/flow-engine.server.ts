@@ -185,6 +185,41 @@ function nextFlowCreatedAt(): string {
 
 async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
   if (!ctx.conversationId) return;
+  const textBody = body?.text?.body ?? body?.interactive?.body?.text ?? null;
+  const mediaUrl = body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null;
+  const mediaFilename = body?.document?.filename ?? null;
+  const caption = body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null;
+  const toNormalized = toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId);
+  const preview = type === "text" ? String(textBody ?? "").slice(0, 120) : `[${type}]`;
+
+  const rpcArgs = vendorRpcArgs(ctx.vendor);
+  if (rpcArgs) {
+    const { error } = await ctx.db.rpc("vendor_insert_wa_message" as any, {
+      ...rpcArgs,
+      _conversation_id: ctx.conversationId,
+      _channel_id: ctx.channelId,
+      _wa_message_id: waMsgId,
+      _direction: "out",
+      _msg_type: type,
+      _text_body: textBody,
+      _media_url: mediaUrl,
+      _media_filename: mediaFilename,
+      _caption: caption,
+      _from_wa_id: phoneNumberId,
+      _to_wa_id: toNormalized,
+      _status: "sent",
+      _raw: body,
+    });
+    if (error) throw new Error(error.message);
+    await ctx.db.rpc("vendor_touch_wa_conversation" as any, {
+      ...rpcArgs,
+      _conversation_id: ctx.conversationId,
+      _preview: preview,
+      _direction: "out",
+    });
+    return;
+  }
+
   const createdAt = nextFlowCreatedAt();
   await ctx.db.from("wa_messages" as any).insert({
     conversation_id: ctx.conversationId,
@@ -192,19 +227,19 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     wa_message_id: waMsgId,
     direction: "out",
     msg_type: type,
-    text_body: body?.text?.body ?? body?.interactive?.body?.text ?? null,
-    media_url: body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null,
-    media_filename: body?.document?.filename ?? null,
-    caption: body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null,
+    text_body: textBody,
+    media_url: mediaUrl,
+    media_filename: mediaFilename,
+    caption,
     from_wa_id: phoneNumberId,
-    to_wa_id: toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId),
+    to_wa_id: toNormalized,
     status: "sent",
     raw: body,
     created_at: createdAt,
   });
   await ctx.db.from("wa_conversations" as any).update({
     last_message_at: createdAt,
-    last_message_preview: type === "text" ? (body?.text?.body ?? "").slice(0, 120) : `[${type}]`,
+    last_message_preview: preview,
     last_message_direction: "out",
   }).eq("id", ctx.conversationId);
 }
