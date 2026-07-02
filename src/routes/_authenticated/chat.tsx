@@ -23,8 +23,6 @@ import {
   Loader2,
   MoreVertical,
   UserCog,
-  Trash2,
-  Ban,
   User,
   Reply,
   X,
@@ -57,7 +55,6 @@ import {
   listVendorsForChannel,
   listWhatsappChannels,
   uploadWhatsappMedia,
-  deleteWhatsappMessage,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, listActiveFlowRuns, triggerFlowManually } from "@/lib/flow-engine.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
@@ -487,26 +484,6 @@ function ChatPage() {
     },
   });
 
-  const deleteFn = useServerFn(deleteWhatsappMessage);
-  const deleteMut = useMutation({
-    mutationFn: (messageId: string) => deleteFn({ data: { messageId } }),
-    onSuccess: (res: any) => {
-      if (res?.waRemoved) {
-        toast.success("Mensagem apagada para todos no WhatsApp");
-      } else {
-        toast.warning("Apagada só no sistema — WhatsApp Cloud API não permitiu remover pra todos", {
-          description: res?.waError ? String(res.waError).slice(0, 180) : "A Meta não retornou sucesso ao apagar remotamente.",
-        });
-      }
-      qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
-      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-    },
-
-    onError: (e: any) => toast.error(errorToText(e, "Erro ao apagar")),
-  });
-  const handleDeleteMessage = (id: string) => deleteMut.mutate(id);
-
-
   function msgQuotePreview(m: Msg): string {
     if (m.text_body) return String(m.text_body).slice(0, 140);
     if (m.caption) return String(m.caption).slice(0, 140);
@@ -865,7 +842,7 @@ function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} isAdmin={!vendorId} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
@@ -1035,17 +1012,15 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom, isAdmin }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null; isAdmin?: boolean }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null }) {
   const isOut = msg.direction === "out";
-  const isDeleted = Boolean(msg.deleted_at);
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
   const caption = toText(msg.caption);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const quotedPreview = toText((msg.raw as any)?.reply_preview);
   const quotedFromOut = quotedFrom ? quotedFrom.direction === "out" : undefined;
 
-  const menu = !isDeleted && (onReply || (isOut && onDelete)) ? (
+  const menu = onReply ? (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Opções da mensagem">
@@ -1056,11 +1031,6 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete,
         {onReply && (
           <DropdownMenuItem onClick={() => onReply(msg)}>
             <Reply className="mr-2 h-4 w-4" /> Responder
-          </DropdownMenuItem>
-        )}
-        {isOut && onDelete && (
-          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(true)}>
-            <Trash2 className="mr-2 h-4 w-4" /> Apagar para todos
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -1076,9 +1046,9 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete,
             isOut
               ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
               : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
-          } ${isDeleted ? "italic opacity-70" : ""}`}
+          }`}
         >
-          {!isDeleted && (quotedPreview || quotedFrom) && (
+          {(quotedPreview || quotedFrom) && (
             <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
               <div className="font-semibold opacity-80">
                 {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
@@ -1088,57 +1058,16 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete,
               </div>
             </div>
           )}
-          {isDeleted ? (
-            isAdmin ? (
-              <>
-                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-destructive/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
-                  <Ban className="h-3 w-3" /> Apagada • visível só para admin
-                </div>
-                <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
-                {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed line-through opacity-70">{body}</p>}
-                {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed line-through opacity-70">{caption}</p>}
-              </>
-            ) : (
-              <p className="flex items-center gap-2 text-[15px] leading-relaxed">
-                <Ban className="h-4 w-4" /> Esta mensagem foi apagada
-              </p>
-            )
-          ) : (
-            <>
-              <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
-              {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
-              {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
-
-            </>
-
-          )}
+          <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
+          {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
+          {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
           <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
             <span>{formatTime(msg.created_at)}</span>
-            {isOut && !isDeleted && <StatusTick status={msg.status} />}
+            {isOut && <StatusTick status={msg.status} />}
           </div>
         </div>
         {!isOut && menu}
       </div>
-
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar mensagem para todos?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A mensagem será removida do sistema e o WhatsApp tentará apagá-la também para o contato. Essa ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { onDelete?.(String(msg.id)); setConfirmDelete(false); }}
-            >
-              Apagar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

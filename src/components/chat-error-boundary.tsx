@@ -33,6 +33,11 @@ function safeStackText(error: unknown): string {
   return safeErrorText(error, "Sem detalhes técnicos disponíveis.");
 }
 
+function forceText(value: unknown, fallback: string): string {
+  const text = safeErrorText(value, fallback);
+  return typeof text === "string" ? text : fallback;
+}
+
 function isRenderableChild(value: unknown): value is ReactNode {
   if (value == null) return true;
   const type = typeof value;
@@ -81,8 +86,8 @@ export class ChatErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.error) return <SafeChildren>{this.props.children}</SafeChildren>;
-    const errorText = this.state.errorText || "Erro desconhecido";
-    const stackText = this.state.stackText || "Sem detalhes técnicos disponíveis.";
+    const errorText = forceText(this.state.errorText, "Erro desconhecido");
+    const stackText = forceText(this.state.stackText, "Sem detalhes técnicos disponíveis.");
     return (
       <div className="flex h-full w-full items-center justify-center bg-chat-shell p-8 text-foreground">
         <div className="max-w-lg space-y-4 rounded-2xl border border-chat-line bg-chat-panel p-6 text-center">
