@@ -60,15 +60,44 @@ async function attachFlowTriggers(db: any, flows: any[]) {
   return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
 }
 
-async function assertVendorConversationAccess(context: any, db: any, conversationId: string) {
-  if (!context?.vendor) return;
-  if (!conversationId) return;
+async function findVendorConversation(
+  db: any,
+  conversationId: string,
+  fallback?: { channelId?: string | null; contactWaId?: string | null },
+) {
   const { data: conv, error } = await db
     .from("wa_conversations" as any)
-    .select("id,channel_id,assigned_vendor_id")
+    .select("id,channel_id,assigned_vendor_id,contact_wa_id")
     .eq("id", conversationId)
     .maybeSingle();
   if (error) throw new Error(error.message);
+  if (conv) return conv as any;
+
+  const channelId = String(fallback?.channelId ?? "").trim();
+  const contactWaId = String(fallback?.contactWaId ?? "").replace(/\D/g, "");
+  if (!channelId || !contactWaId) return null;
+
+  const { data: fallbackConv, error: fallbackError } = await db
+    .from("wa_conversations" as any)
+    .select("id,channel_id,assigned_vendor_id,contact_wa_id")
+    .eq("channel_id", channelId)
+    .eq("contact_wa_id", contactWaId)
+    .order("last_message_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fallbackError) throw new Error(fallbackError.message);
+  return fallbackConv as any;
+}
+
+async function assertVendorConversationAccess(
+  context: any,
+  db: any,
+  conversationId: string,
+  fallback?: { channelId?: string | null; contactWaId?: string | null },
+) {
+  if (!context?.vendor) return;
+  if (!conversationId) return;
+  const conv = await findVendorConversation(db, conversationId, fallback);
   if (!conv) throw new Error("Conversa não encontrada");
   const allowed = await vendorAllowedChannelIds(context, db);
   if (!allowed.includes(String((conv as any).channel_id))) {
@@ -82,11 +111,12 @@ async function assertVendorConversationAccess(context: any, db: any, conversatio
       .update({ assigned_vendor_id: Number(context.vendor.id) })
       .eq("id", conversationId)
       .is("assigned_vendor_id", null);
-    return;
+    return conv as any;
   }
   if (assignedId !== Number(context.vendor.id)) {
     throw new Error("Inautorizado: este lead está com outro vendedor");
   }
+  return conv as any;
 }
 
 // ============================================================
@@ -430,7 +460,13 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
     const db = await dbFor(context);
     if ((context as any).vendor) {
       if (!(await vendorAllowedChannelIds(context, db)).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
-      if (data.conversation_id) await assertVendorConversationAccess(context, db, data.conversation_id);
+      if (data.conversation_id) {
+        const conv = await assertVendorConversationAccess(context, db, data.conversation_id, {
+          channelId: data.channel_id,
+          contactWaId: data.contact_wa_id,
+        });
+        if (conv?.id) data.conversation_id = String(conv.id);
+      }
     }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");
     return runFlowAdmin({

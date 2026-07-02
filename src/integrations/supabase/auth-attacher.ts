@@ -31,14 +31,3 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
   return fetch(input, { ...init, headers })
 }
 
-// Backwards-compat stub: legacy code / tooling occasionally re-imports
-// `attachSupabaseAuth` as a client functionMiddleware. Auth is now attached
-// via `fetchWithSupabaseAuth` above, so this middleware is a passthrough —
-// exported to keep the import path resolvable and avoid HMR crashes.
-import { createMiddleware } from '@tanstack/react-start'
-export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
-  async ({ next }) => next(),
-)
-
-
-

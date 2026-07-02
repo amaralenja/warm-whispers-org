@@ -264,28 +264,63 @@ async function autoAssignUnassignedConversations(db: any, channelIds?: string[])
   }
 }
 
-async function assertConversationAccess(context: any, db: any, conversationId: string) {
-  if (!conversationId) throw new Error("conversationId obrigatório");
+async function getConversationByIdOrContact(
+  db: any,
+  conversationId: string,
+  fallback?: { channelId?: string | null; contactWaId?: string | null },
+) {
+  const columns = "id,channel_id,assigned_vendor_id,contact_wa_id";
   const { data: conv, error } = await db
     .from("wa_conversations" as any)
-    .select("id,channel_id,assigned_vendor_id,contact_wa_id")
+    .select(columns)
     .eq("id", conversationId)
     .maybeSingle();
   if (error) throw new Error(error.message);
+  if (conv) return conv as any;
+
+  const channelId = String(fallback?.channelId ?? "").trim();
+  const rawContact = String(fallback?.contactWaId ?? "").trim();
+  if (!channelId || !rawContact) return null;
+
+  const contactIds = Array.from(new Set([
+    rawContact,
+    rawContact.replace(/\D/g, ""),
+    normalizeBrWhatsappNumber(rawContact),
+  ].map((v) => String(v ?? "").trim()).filter(Boolean)));
+  if (contactIds.length === 0) return null;
+
+  const { data: fallbackConv, error: fallbackError } = await db
+    .from("wa_conversations" as any)
+    .select(columns)
+    .eq("channel_id", channelId)
+    .in("contact_wa_id", contactIds)
+    .order("last_message_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fallbackError) throw new Error(fallbackError.message);
+  return fallbackConv as any;
+}
+
+async function assertConversationAccess(
+  context: any,
+  db: any,
+  conversationId: string,
+  fallback?: { channelId?: string | null; contactWaId?: string | null },
+) {
+  if (!conversationId) throw new Error("conversationId obrigatório");
+  const conv = await getConversationByIdOrContact(db, conversationId, fallback);
   if (!conv) throw new Error("Conversa não encontrada");
   if (context?.vendor) {
     await assertVendorChannel(context, String((conv as any).channel_id), db);
     const assignedVendorId = (conv as any).assigned_vendor_id == null ? null : Number((conv as any).assigned_vendor_id);
     if (assignedVendorId == null) {
-      const { data: vendorId } = await db.rpc("assign_vendor_for_channel" as any, { _channel_id: String((conv as any).channel_id) });
-      if (Number(vendorId) === Number(context.vendor.id)) {
-        await db
-          .from("wa_conversations" as any)
-          .update({ assigned_vendor_id: Number(vendorId) })
-          .eq("id", conversationId)
-          .is("assigned_vendor_id", null);
-        return { ...(conv as any), assigned_vendor_id: Number(vendorId) };
-      }
+      const vendorId = Number(context.vendor.id);
+      await db
+        .from("wa_conversations" as any)
+        .update({ assigned_vendor_id: vendorId })
+        .eq("id", (conv as any).id)
+        .is("assigned_vendor_id", null);
+      return { ...(conv as any), assigned_vendor_id: vendorId };
     }
     if (assignedVendorId !== Number(context.vendor.id)) {
       throw new Error("Inautorizado: este lead está com outro vendedor");
@@ -531,7 +566,11 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     await assertVendorChannel(context, data.channelId, db);
-    const conv = await assertConversationAccess(context, db, data.conversationId);
+    const conv = await assertConversationAccess(context, db, data.conversationId, {
+      channelId: data.channelId,
+      contactWaId: data.to,
+    });
+    const conversationId = String(conv.id);
     if (String(conv.channel_id) !== String(data.channelId)) {
       throw new Error("Canal não pertence a esta conversa");
     }
@@ -568,7 +607,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
     }
 
     const { data: inserted, error } = await db.from("wa_messages" as any).insert({
-      conversation_id: data.conversationId,
+      conversation_id: conversationId,
       channel_id: data.channelId,
       wa_message_id: null,
       direction: "out",
@@ -592,7 +631,7 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         last_message_preview: previewForOut(data),
         last_message_direction: "out",
       })
-      .eq("id", data.conversationId);
+      .eq("id", conversationId);
 
     try {
       const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
