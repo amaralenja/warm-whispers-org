@@ -216,9 +216,17 @@ const AVATAR_PALETTE: Record<string, { bg: string; text: string }> = {
 };
 const AVATAR_DEFAULT = { bg: "linear-gradient(135deg,#1f2937,#0f172a)", text: "#cbd5e1" };
 
-function avatarStyle(_name?: unknown, _fallback?: unknown): CSSProperties {
-  return { background: AVATAR_DEFAULT.bg, color: AVATAR_DEFAULT.text };
+function avatarStyle(name?: unknown, fallback?: unknown): CSSProperties {
+  const raw = `${toText(name)}|${toText(fallback)}`.trim().toUpperCase();
+  if (!raw) return { background: AVATAR_DEFAULT.bg, color: AVATAR_DEFAULT.text };
+  // Deterministic hash → pick a palette entry (A-Z)
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  const keys = Object.keys(AVATAR_PALETTE);
+  const pick = AVATAR_PALETTE[keys[hash % keys.length]] ?? AVATAR_DEFAULT;
+  return { background: pick.bg, color: pick.text };
 }
+
 
 
 
