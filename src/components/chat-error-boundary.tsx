@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, Fragment, isValidElement, type ReactNode } from "react";
 
 type Props = { children: ReactNode };
 type State = { error: unknown | null };
@@ -33,6 +33,30 @@ function safeStackText(error: unknown): string {
   return safeErrorText(error, "Sem detalhes técnicos disponíveis.");
 }
 
+function isRenderableChild(value: unknown): value is ReactNode {
+  if (value == null) return true;
+  const type = typeof value;
+  if (type === "string" || type === "number" || type === "boolean") return true;
+  if (isValidElement(value)) return true;
+  if (Array.isArray(value)) return value.every(isRenderableChild);
+  return false;
+}
+
+function SafeChildren({ children }: { children: ReactNode }) {
+  if (children == null) return null;
+  if (Array.isArray(children)) {
+    return (
+      <>
+        {children.map((child, index) => (
+          isRenderableChild(child) ? <Fragment key={index}>{child}</Fragment> : null
+        ))}
+      </>
+    );
+  }
+  if (isRenderableChild(children)) return <>{children}</>;
+  return null;
+}
+
 export class ChatErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
@@ -48,7 +72,9 @@ export class ChatErrorBoundary extends Component<Props, State> {
   reset = () => this.setState({ error: null });
 
   render() {
-    if (!this.state.error) return this.props.children;
+    if (!this.state.error) return <SafeChildren>{this.props.children}</SafeChildren>;
+    const errorText = safeErrorText(this.state.error, "Erro desconhecido");
+    const stackText = safeStackText(this.state.error);
     return (
       <div className="flex h-full w-full items-center justify-center bg-chat-shell p-8 text-foreground">
         <div className="max-w-lg space-y-4 rounded-2xl border border-chat-line bg-chat-panel p-6 text-center">
@@ -58,11 +84,11 @@ export class ChatErrorBoundary extends Component<Props, State> {
           <div>
             <h3 className="text-lg font-semibold">Algo travou no Chat ao Vivo</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {String(safeErrorText(this.state.error, "Erro desconhecido"))}
+              {errorText}
             </p>
           </div>
           <pre className="max-h-44 overflow-auto rounded-xl bg-background/40 p-3 text-left text-[11px] leading-relaxed text-muted-foreground">
-            {String(safeStackText(this.state.error))}
+            {stackText}
           </pre>
           <button
             type="button"

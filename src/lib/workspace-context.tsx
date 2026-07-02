@@ -56,6 +56,14 @@ function slugify(s: string) {
     .slice(0, 40) || `ws-${Date.now()}`;
 }
 
+function normWorkspaceKey(value: string | null | undefined) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 type Override = { accentIndex?: number; photo?: string | null };
 type Overrides = Record<string, Override>;
 
@@ -135,8 +143,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const allWorkspaces = useMemo(() => [...baseWithOverrides, ...customResolved], [baseWithOverrides, customResolved]);
   const workspaces = useMemo(() => {
     if (!vendorSession) return allWorkspaces;
-    const allowed = new Set(allowedWorkspaceIdsFromSession(vendorSession));
-    return allWorkspaces.filter((w) => w.id !== "all" && (allowed.has(w.id) || allowed.has(w.nome)));
+    const allowed = new Set(allowedWorkspaceIdsFromSession(vendorSession).map(normWorkspaceKey).filter(Boolean));
+    return allWorkspaces.filter((w) => (
+      w.id !== "all" && (allowed.has(normWorkspaceKey(w.id)) || allowed.has(normWorkspaceKey(w.nome)))
+    ));
   }, [allWorkspaces, vendorSession]);
   const fallbackWorkspace = allWorkspaces.find((w) => w.id !== "all") ?? allWorkspaces[0];
   const workspace = workspaces.find((w) => w.id === activeId) ?? workspaces[0] ?? fallbackWorkspace;
