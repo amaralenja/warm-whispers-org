@@ -717,12 +717,34 @@ function ChatPage() {
                             })()}
                           </div>
 
+                          {(() => {
+                            const tags = Array.isArray((c as any).tags) ? ((c as any).tags as string[]).filter(Boolean) : [];
+                            if (tags.length === 0) return null;
+                            const shown = tags.slice(0, 3);
+                            const extra = tags.length - shown.length;
+                            return (
+                              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+                                {shown.map((t) => (
+                                  <span key={t} className="max-w-[110px] truncate rounded-full border border-chat-accent/40 bg-chat-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-chat-accent">
+                                    {t}
+                                  </span>
+                                ))}
+                                {extra > 0 ? (
+                                  <span className="rounded-full border border-chat-line px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                    +{extra}
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             {c.last_message_direction === "out" && (
                               <PreviewStatusTick status={c.last_message_status} />
                             )}
                             <span className="truncate">{preview || "Sem prévia"}</span>
                           </div>
+
                         </div>
                         <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
                           <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
