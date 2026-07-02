@@ -52,6 +52,76 @@ function vendorRpcArgs(context: any) {
   return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
 }
 
+async function vendorAllowedWorkspaceIds(context: any, db: any): Promise<string[]> {
+  const explicit = context?.vendor?.workspace_ids;
+  if (Array.isArray(explicit) && explicit.length > 0) return explicit.map(String).filter(Boolean);
+
+  const expert = context?.vendor?.expert ? String(context.vendor.expert).trim() : "";
+  if (expert) return [expert];
+
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) return [];
+  const { data } = await db.rpc("vendor_allowed_workspace_ids" as any, rpcArgs);
+  return Array.isArray(data) ? data.map(String).filter(Boolean) : [];
+}
+
+async function coerceVendorOperacaoId(context: any, db: any, operacaoId?: string | null): Promise<string | null> {
+  if (!context?.vendor) return operacaoId ?? null;
+  const allowed = await vendorAllowedWorkspaceIds(context, db);
+  if (allowed.length === 0) throw new Error("Sessão de vendedor sem operação liberada");
+
+  const desired = String(operacaoId ?? "").trim();
+  if (!desired) return allowed[0];
+
+  const ok = allowed.some((op) => normalizeText(op) === normalizeText(desired));
+  if (!ok) throw new Error("Inautorizado: vendedor sem acesso a esta operação");
+  return desired;
+}
+
+async function assertVendorFlowAccess(context: any, db: any, flowId: string) {
+  if (!context?.vendor) return;
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { data, error } = await db.rpc("vendor_get_flow" as any, { ...rpcArgs, _flow_id: flowId });
+  if (error) throw new Error(error.message);
+  const flow = Array.isArray(data) ? data[0] : data;
+  if (!flow) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+  return flow;
+}
+
+async function createVendorFlowViaRpc(
+  context: any,
+  db: any,
+  payload: {
+    nome: string;
+    operacao_id: string | null;
+    folder?: string | null;
+    ativo: boolean;
+    entry_node_id?: string | null;
+    nodes: any[];
+    edges: any[];
+    descricao?: string | null;
+  },
+) {
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { data, error } = await db.rpc("vendor_create_wa_flow" as any, {
+    ...rpcArgs,
+    _nome: payload.nome,
+    _operacao_id: payload.operacao_id,
+    _folder: payload.folder ?? null,
+    _ativo: payload.ativo,
+    _entry_node_id: payload.entry_node_id ?? null,
+    _nodes: payload.nodes ?? [],
+    _edges: payload.edges ?? [],
+    _descricao: payload.descricao ?? null,
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.id) throw new Error("Não foi possível criar o fluxo do vendedor");
+  return row as any;
+}
+
 async function vendorAllowedChannelIds(context: any, db: any): Promise<string[]> {
   const explicit = vendorChannelIds(context);
   if (explicit.length > 0) return explicit;
@@ -69,9 +139,19 @@ async function vendorAllowedChannelIds(context: any, db: any): Promise<string[]>
     .filter(Boolean);
 }
 
-async function attachFlowTriggers(db: any, flows: any[]) {
+async function attachFlowTriggers(db: any, flows: any[], context?: any) {
   if (!Array.isArray(flows) || flows.length === 0) return flows ?? [];
   const ids = flows.map((f) => String(f.id)).filter(Boolean);
+  const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+  if (rpcArgs) {
+    const entries = await Promise.all(ids.map(async (flowId) => {
+      const { data, error } = await db.rpc("vendor_list_wa_flow_triggers" as any, { ...rpcArgs, _flow_id: flowId });
+      if (error) return [flowId, [] as any[]] as const;
+      return [flowId, Array.isArray(data) ? data : []] as const;
+    }));
+    const byFlow = new Map<string, any[]>(entries);
+    return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
+  }
   const { data: triggers } = await db
     .from("wa_flow_triggers" as any)
     .select("*")
@@ -82,6 +162,60 @@ async function attachFlowTriggers(db: any, flows: any[]) {
     byFlow.set(k, [...(byFlow.get(k) ?? []), t]);
   }
   return flows.map((f) => ({ ...f, wa_flow_triggers: byFlow.get(String(f.id)) ?? [] }));
+}
+
+async function vendorReplaceTriggers(context: any, db: any, flowId: string, triggers: any[]) {
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { data, error } = await db.rpc("vendor_replace_wa_flow_triggers" as any, {
+    ...rpcArgs,
+    _flow_id: flowId,
+    _triggers: triggers ?? [],
+  });
+  if (error) throw new Error(error.message);
+  if (data === false) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+  return { ok: true };
+}
+
+async function vendorUpdateFlowViaRpc(context: any, db: any, flowId: string, patch: Record<string, any>) {
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { data, error } = await db.rpc("vendor_update_wa_flow" as any, {
+    ...rpcArgs,
+    _flow_id: flowId,
+    _nome: Object.prototype.hasOwnProperty.call(patch, "nome") ? patch.nome : null,
+    _operacao_id: Object.prototype.hasOwnProperty.call(patch, "operacao_id") ? patch.operacao_id : null,
+    _folder: Object.prototype.hasOwnProperty.call(patch, "folder") ? patch.folder : null,
+    _ativo: Object.prototype.hasOwnProperty.call(patch, "ativo") ? patch.ativo : null,
+    _entry_node_id: Object.prototype.hasOwnProperty.call(patch, "entry_node_id") ? patch.entry_node_id : null,
+    _nodes: Object.prototype.hasOwnProperty.call(patch, "nodes") ? patch.nodes : null,
+    _edges: Object.prototype.hasOwnProperty.call(patch, "edges") ? patch.edges : null,
+    _set_operacao: Object.prototype.hasOwnProperty.call(patch, "operacao_id"),
+    _set_folder: Object.prototype.hasOwnProperty.call(patch, "folder"),
+    _set_ativo: Object.prototype.hasOwnProperty.call(patch, "ativo"),
+    _set_entry_node_id: Object.prototype.hasOwnProperty.call(patch, "entry_node_id"),
+    _set_nodes: Object.prototype.hasOwnProperty.call(patch, "nodes"),
+    _set_edges: Object.prototype.hasOwnProperty.call(patch, "edges"),
+  });
+  if (error) throw new Error(error.message);
+  if (data === false) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+  return { ok: true };
+}
+
+async function listFlowsForNameCheck(db: any, context?: any) {
+  const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+  if (rpcArgs) {
+    const { data } = await db.rpc("vendor_list_flows" as any, rpcArgs);
+    return (data ?? []) as any[];
+  }
+  const { data } = await db.from("wa_flows" as any).select("id, nome");
+  return (data ?? []) as any[];
+}
+
+async function flowNameExists(db: any, nome: string, excludeId: string | null = null, context?: any) {
+  const rows = await listFlowsForNameCheck(db, context);
+  const wanted = String(nome ?? "").trim().toLowerCase();
+  return rows.some((r) => (!excludeId || String(r.id) !== String(excludeId)) && String(r.nome ?? "").trim().toLowerCase() === wanted);
 }
 
 async function findVendorConversation(
@@ -221,7 +355,7 @@ export const listFlows = createServerFn({ method: "GET" })
     if (rpcArgs) {
       const { data, error } = await db.rpc("vendor_list_flows" as any, rpcArgs);
       if (error) throw new Error(error.message);
-      return attachFlowTriggers(db, (data ?? []) as any[]);
+      return attachFlowTriggers(db, (data ?? []) as any[], context);
     }
     const { data, error } = await db
       .from("wa_flows" as any)
@@ -242,7 +376,7 @@ export const getFlow = createServerFn({ method: "GET" })
       if (error) throw new Error(error.message);
       const flow = Array.isArray(rows) ? rows[0] : rows;
       if (!flow) throw new Error("Fluxo não encontrado");
-      return (await attachFlowTriggers(db, [flow]))[0];
+      return (await attachFlowTriggers(db, [flow], context))[0];
     }
     const { data: flow, error } = await db
       .from("wa_flows" as any)
@@ -258,9 +392,10 @@ async function uniqueFlowName(
   supabase: any,
   desired: string,
   excludeId: string | null = null,
+  context?: any,
 ): Promise<string> {
   const base = (desired || "").trim() || "Novo Fluxo";
-  const { data: rows } = await supabase.from("wa_flows" as any).select("id, nome");
+  const rows = await listFlowsForNameCheck(supabase, context);
   const taken = new Set<string>(
     ((rows ?? []) as any[])
       .filter((r) => !excludeId || r.id !== excludeId)
@@ -287,16 +422,29 @@ export const createFlow = createServerFn({ method: "POST" })
     const isVendor = Boolean((context as any)?.vendor);
     const startId = "n-trigger";
     const nome = data.nome.trim();
-    const { data: dup } = await db
-      .from("wa_flows" as any).select("id").ilike("nome", nome).limit(1);
-    if (dup && dup.length > 0) {
+    const operacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
+    if (await flowNameExists(db, nome, null, context)) {
       throw new Error(`Já existe um fluxo com o nome "${nome}". Escolha outro nome.`);
+    }
+    if (isVendor) {
+      const row = await createVendorFlowViaRpc(context, db, {
+        nome,
+        operacao_id: operacaoId,
+        folder: data.folder,
+        ativo: true,
+        entry_node_id: startId,
+        nodes: [
+          { id: startId, type: "trigger", position: { x: 100, y: 100 }, data: { label: "Início" } },
+        ],
+        edges: [],
+      });
+      return { id: row.id };
     }
     const { data: row, error } = await db
       .from("wa_flows" as any)
       .insert({
         nome,
-        operacao_id: data.operacao_id,
+        operacao_id: operacaoId,
         folder: data.folder,
         ativo: true,
         entry_node_id: startId,
@@ -325,6 +473,8 @@ export const saveFlow = createServerFn({ method: "POST" })
     edges?: FlowEdge[];
   }) => d)
   .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    await assertVendorFlowAccess(context, db, data.id);
     const patch: any = {};
     for (const k of ["nome", "operacao_id", "folder", "ativo", "entry_node_id", "nodes", "edges"]) {
       if ((data as any)[k] !== undefined) patch[k] = (data as any)[k];
@@ -332,14 +482,14 @@ export const saveFlow = createServerFn({ method: "POST" })
     if (typeof patch.folder === "string") patch.folder = patch.folder.trim() || null;
     if (typeof patch.nome === "string" && patch.nome.trim()) {
       const novoNome = patch.nome.trim();
-      const { data: dup } = await context.supabase
-        .from("wa_flows" as any).select("id").ilike("nome", novoNome).neq("id", data.id).limit(1);
-      if (dup && dup.length > 0) {
+      if (await flowNameExists(db, novoNome, data.id, context)) {
         throw new Error(`Já existe outro fluxo com o nome "${novoNome}".`);
       }
       patch.nome = novoNome;
     }
-    const { error } = await context.supabase
+    if ("operacao_id" in patch) patch.operacao_id = await coerceVendorOperacaoId(context, db, patch.operacao_id);
+    if ((context as any)?.vendor) return vendorUpdateFlowViaRpc(context, db, data.id, patch);
+    const { error } = await db
       .from("wa_flows" as any).update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -349,7 +499,17 @@ export const deleteFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
-    const { error } = await context.supabase.from("wa_flows" as any).delete().eq("id", data.id);
+    const db = await dbFor(context);
+    await assertVendorFlowAccess(context, db, data.id);
+    if ((context as any)?.vendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+      const { data: ok, error } = await db.rpc("vendor_delete_wa_flow" as any, { ...rpcArgs, _flow_id: data.id });
+      if (error) throw new Error(error.message);
+      if (ok === false) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+      return { ok: true };
+    }
+    const { error } = await db.from("wa_flows" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -389,17 +549,42 @@ export const duplicateFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
-    const { data: src, error } = await context.supabase
-      .from("wa_flows" as any)
-      .select("*, wa_flow_triggers(*)")
-      .eq("id", data.id).single();
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any)?.vendor);
+    let src: any;
+    let error: any = null;
+    if (isVendor) {
+      src = await assertVendorFlowAccess(context, db, data.id);
+      src = (await attachFlowTriggers(db, [src], context))[0];
+    } else {
+      const res = await db
+        .from("wa_flows" as any)
+        .select("*, wa_flow_triggers(*)")
+        .eq("id", data.id).single();
+      src = res.data;
+      error = res.error;
+    }
     if (error || !src) throw new Error(error?.message ?? "Fluxo não encontrado");
-    const newName = await uniqueFlowName(context.supabase, (src as any).nome);
-    const { data: row, error: insErr } = await context.supabase
+    const newName = await uniqueFlowName(db, (src as any).nome, null, context);
+    const operacaoId = await coerceVendorOperacaoId(context, db, (src as any).operacao_id);
+    let row: any;
+    let insErr: any = null;
+    if (isVendor) {
+      row = await createVendorFlowViaRpc(context, db, {
+        nome: newName,
+        operacao_id: operacaoId,
+        folder: (src as any).folder ?? null,
+        ativo: false,
+        entry_node_id: (src as any).entry_node_id,
+        nodes: (src as any).nodes ?? [],
+        edges: (src as any).edges ?? [],
+      });
+    } else {
+      const res = await db
       .from("wa_flows" as any)
       .insert({
         nome: newName,
-        operacao_id: (src as any).operacao_id,
+        operacao_id: operacaoId,
         ativo: false,
         entry_node_id: (src as any).entry_node_id,
         nodes: (src as any).nodes ?? [],
@@ -407,6 +592,9 @@ export const duplicateFlow = createServerFn({ method: "POST" })
         created_by: context.userId,
       })
       .select("id").single();
+      row = res.data;
+      insErr = res.error;
+    }
     if (insErr) throw new Error(insErr.message);
     const triggers = ((src as any).wa_flow_triggers ?? []) as any[];
     if (triggers.length > 0) {
@@ -417,7 +605,8 @@ export const duplicateFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      await context.supabase.from("wa_flow_triggers" as any).insert(rows);
+      if (isVendor) await vendorReplaceTriggers(context, db, (row as any).id, rows);
+      else await db.from("wa_flow_triggers" as any).insert(rows);
     }
     return { id: (row as any).id, nome: newName };
   });
@@ -426,10 +615,21 @@ export const exportFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
-    const { data: src, error } = await context.supabase
-      .from("wa_flows" as any)
-      .select("nome, entry_node_id, nodes, edges, wa_flow_triggers(tipo, valor, match_mode, ativo)")
-      .eq("id", data.id).single();
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any)?.vendor);
+    let src: any;
+    let error: any = null;
+    if (isVendor) {
+      src = await assertVendorFlowAccess(context, db, data.id);
+      src = (await attachFlowTriggers(db, [src], context))[0];
+    } else {
+      const res = await db
+        .from("wa_flows" as any)
+        .select("nome, entry_node_id, nodes, edges, wa_flow_triggers(tipo, valor, match_mode, ativo)")
+        .eq("id", data.id).single();
+      src = res.data;
+      error = res.error;
+    }
     if (error || !src) throw new Error(error?.message ?? "Fluxo não encontrado");
     const payload = {
       version: 1,
@@ -458,19 +658,35 @@ export const importFlow = createServerFn({ method: "POST" })
     const isVendor = Boolean((context as any)?.vendor);
     const payload = decodeFlowCode(data.code);
     const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString();
-    const finalName = await uniqueFlowName(db, desired);
-    const { data: row, error } = await db
-      .from("wa_flows" as any)
-      .insert({
+    const finalName = await uniqueFlowName(db, desired, null, context);
+    const operacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
+    let row: any;
+    let error: any = null;
+    if (isVendor) {
+      row = await createVendorFlowViaRpc(context, db, {
         nome: finalName,
-        operacao_id: data.operacao_id,
+        operacao_id: operacaoId,
         ativo: false,
         entry_node_id: payload.entry_node_id ?? null,
         nodes: payload.nodes ?? [],
         edges: payload.edges ?? [],
-        created_by: isVendor ? null : context.userId,
-      })
-      .select("id").single();
+      });
+    } else {
+      const res = await db
+        .from("wa_flows" as any)
+        .insert({
+          nome: finalName,
+          operacao_id: operacaoId,
+          ativo: false,
+          entry_node_id: payload.entry_node_id ?? null,
+          nodes: payload.nodes ?? [],
+          edges: payload.edges ?? [],
+          created_by: context.userId,
+        })
+        .select("id").single();
+      row = res.data;
+      error = res.error;
+    }
     if (error) throw new Error(error.message);
     const triggers = Array.isArray(payload.triggers) ? payload.triggers : [];
     if (triggers.length > 0) {
@@ -481,7 +697,8 @@ export const importFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      await db.from("wa_flow_triggers" as any).insert(rows);
+      if (isVendor) await vendorReplaceTriggers(context, db, (row as any).id, rows);
+      else await db.from("wa_flow_triggers" as any).insert(rows);
     }
     return { id: (row as any).id, nome: finalName };
   });
@@ -494,7 +711,10 @@ export const saveTriggers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { flow_id: string; triggers: Array<{ tipo: string; valor?: string; match_mode?: string; channel_id?: string | null; ativo?: boolean }> }) => d)
   .handler(async ({ context, data }) => {
-    await context.supabase.from("wa_flow_triggers" as any).delete().eq("flow_id", data.flow_id);
+    const db = await dbFor(context);
+    await assertVendorFlowAccess(context, db, data.flow_id);
+    if ((context as any)?.vendor) return vendorReplaceTriggers(context, db, data.flow_id, data.triggers ?? []);
+    await db.from("wa_flow_triggers" as any).delete().eq("flow_id", data.flow_id);
     if (data.triggers.length === 0) return { ok: true };
     const rows = data.triggers.map((t) => ({
       flow_id: data.flow_id,
@@ -504,7 +724,7 @@ export const saveTriggers = createServerFn({ method: "POST" })
       channel_id: t.channel_id ?? null,
       ativo: t.ativo ?? true,
     }));
-    const { error } = await context.supabase.from("wa_flow_triggers" as any).insert(rows);
+    const { error } = await db.from("wa_flow_triggers" as any).insert(rows);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

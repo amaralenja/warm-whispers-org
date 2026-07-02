@@ -95,6 +95,29 @@ function zvTypeToNodeType(t: string): "send_text" | "send_image" | "send_video" 
   }
 }
 
+function vendorRpcArgs(context: any) {
+  const id = Number(context?.vendor?.id);
+  const codigo = String(context?.vendor?.codigo ?? "").trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
+}
+
+async function createVendorZapVoiceFlow(context: any, db: any, payload: any) {
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+  const { error } = await db.rpc("vendor_create_wa_flow" as any, {
+    ...rpcArgs,
+    _nome: payload.nome,
+    _operacao_id: payload.operacao_id ?? null,
+    _folder: null,
+    _ativo: payload.ativo ?? true,
+    _entry_node_id: payload.entry_node_id ?? null,
+    _nodes: payload.nodes ?? [],
+    _edges: payload.edges ?? [],
+    _descricao: payload.descricao ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export const importZapVoiceBackup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
@@ -308,7 +331,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         }
 
         const nome = `[ZV] ${f.name ?? "Funil"}`.slice(0, 120);
-        const { error: insErr } = await db.from("wa_flows").insert({
+        const flowPayload = {
           nome,
           operacao_id: data.operacao_id,
           ativo: true,
@@ -317,8 +340,13 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
           edges,
           created_by: isVendor ? null : context.userId,
           descricao: `Importado do ZapVoice (id original: ${f.id})${f.isFavorite ? " · ⭐" : ""}`,
-        });
-        if (insErr) throw new Error(insErr.message);
+        };
+        if (isVendor) {
+          await createVendorZapVoiceFlow(context, db, flowPayload);
+        } else {
+          const { error: insErr } = await db.from("wa_flows").insert(flowPayload);
+          if (insErr) throw new Error(insErr.message);
+        }
         summary.funnels += 1;
       } catch (e: any) {
         summary.errors.push({ funnel: f.name ?? f.id, message: e?.message ?? String(e) });
