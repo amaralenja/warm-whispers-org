@@ -270,7 +270,15 @@ function PreviewStatusTick({ status }: { status: string | null }) {
 
 function ChatPage() {
   const qc = useQueryClient();
-  const { workspace } = useWorkspace();
+  const { workspace, workspaces } = useWorkspace();
+  const opBadgeFor = (opId: string | null | undefined) => {
+    if (!opId) return null;
+    const key = String(opId).toLowerCase();
+    const ws = workspaces.find((w) => String(w.id).toLowerCase() === key && w.id !== "all");
+    if (!ws) return null;
+    return { nome: ws.nome, hex: ws.accent.hex };
+  };
+
   const listConvFn = useServerFn(listConversations);
   const listMsgFn = useServerFn(listMessages);
   const markReadFn = useServerFn(markConversationRead);
@@ -703,7 +711,20 @@ function ChatPage() {
                             <span className="truncate text-[15px] font-semibold tracking-normal">
                               {contactName || contactWaId}
                             </span>
+                            {(() => {
+                              const b = opBadgeFor((c as any).operacao_id);
+                              return b ? (
+                                <span
+                                  className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                  style={{ color: b.hex, borderColor: `${b.hex}55`, backgroundColor: `${b.hex}1a` }}
+                                  title={`Operação: ${b.nome}`}
+                                >
+                                  {b.nome}
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
+
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             {c.last_message_direction === "out" && (
                               <PreviewStatusTick status={c.last_message_status} />
@@ -776,6 +797,19 @@ function ChatPage() {
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
+                      {(() => {
+                        const b = opBadgeFor((active as any).operacao_id);
+                        return b ? (
+                          <span
+                            className="inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                            style={{ color: b.hex, borderColor: `${b.hex}66`, backgroundColor: `${b.hex}1f` }}
+                            title={`Operação: ${b.nome}`}
+                          >
+                            {b.nome}
+                          </span>
+                        ) : null;
+                      })()}
+
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
                     {(() => {
