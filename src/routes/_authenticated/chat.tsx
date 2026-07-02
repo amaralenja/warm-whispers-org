@@ -1186,7 +1186,9 @@ function FlowInlineBar({
     const list = asArray<any>(flows).filter((f) => {
       if (f?.ativo === false) return false;
       if (!f.operacao_id) return true;
-      if (!op) return false;
+      // Quando a conversa antiga está sem operacao_id, o vendedor já recebeu
+      // apenas fluxos permitidos pelo backend; não esconde tudo no frontend.
+      if (!op) return true;
       return f.operacao_id === op;
     });
     const term = q.trim().toLowerCase();
@@ -1210,7 +1212,7 @@ function FlowInlineBar({
         },
       }),
     )
-      .catch((e: any) => toast.error(e?.message ?? "Erro ao disparar fluxo"))
+      .catch((e: any) => toast.error(errorToText(e, "Erro ao disparar fluxo")))
       .finally(() => setFiring(null));
   }
 
@@ -1282,7 +1284,7 @@ function FlowDispatcher({
       if (f?.ativo === false) return false;
       // Coerente com a operação: fluxo sem operação roda em qualquer; com operação só na mesma
       if (!f.operacao_id) return true;
-      if (!op) return false;
+      if (!op) return true;
       return f.operacao_id === op;
     });
   }, [flows, conversation.operacao_id]);
@@ -1303,7 +1305,7 @@ function FlowDispatcher({
       }),
     )
       .catch((e: any) => {
-        toast.error(e?.message ?? "Erro ao disparar fluxo");
+        toast.error(errorToText(e, "Erro ao disparar fluxo"));
       })
       .finally(() => setFiring(null));
   }
@@ -1372,7 +1374,7 @@ function ConversationActionsMenu({
       toast.success(vendorId ? "Lead transferido" : "Lead liberado");
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     } catch (e: any) {
-      toast.error(`Falha ao transferir: ${e?.message ?? "erro"}`);
+      toast.error(`Falha ao transferir: ${errorToText(e, "erro")}`);
     } finally {
       setOpen(false);
     }
@@ -1405,7 +1407,7 @@ function ConversationActionsMenu({
               onSelect={(e) => { e.preventDefault(); transfer(v.id); }}
               className="rounded-xl"
             >
-              {v.nome}
+              {toText(v.nome)}
               {v.id === currentVendorId && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
             </DropdownMenuItem>
           ))
