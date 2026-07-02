@@ -727,11 +727,12 @@ function ChatPage() {
                 <div className="flex min-w-0 items-center gap-4">
                   <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
                     <AvatarFallback
-                      className="rounded-2xl text-base font-bold"
-                      style={avatarStyle(active.contact_name, active.contact_wa_id)}
+                      className="rounded-2xl"
+                      style={avatarStyle()}
                     >
-                      {initials(active.contact_name, active.contact_wa_id)}
+                      <User className="h-7 w-7 opacity-80" />
                     </AvatarFallback>
+
                   </Avatar>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
