@@ -3,26 +3,33 @@ import { Component, type ReactNode } from "react";
 type Props = { children: ReactNode };
 type State = { error: unknown | null };
 
-function safeErrorText(error: unknown, fallback: string) {
-  if (error == null) return fallback;
-  if (typeof error === "string") return error || fallback;
-  if (error instanceof Error) return error.message || fallback;
-  if (typeof error === "object") {
-    const value = error as Record<string, unknown>;
-    const message = value.message ?? value.error ?? value.reason;
-    if (typeof message === "string" && message.trim()) return message;
-    try {
-      const json = JSON.stringify(value);
-      return json && json !== "{}" ? json : fallback;
-    } catch {
-      return fallback;
+function safeErrorText(error: unknown, fallback: string): string {
+  try {
+    if (error == null) return fallback;
+    if (typeof error === "string") return error || fallback;
+    if (typeof error === "number" || typeof error === "boolean") return String(error);
+    if (error instanceof Error) return error.message || fallback;
+    if (typeof error === "object") {
+      const value = error as Record<string, unknown>;
+      const message = value.message ?? value.error ?? value.reason;
+      if (typeof message === "string" && message.trim()) return message;
+      try {
+        const json = JSON.stringify(value);
+        return json && json !== "{}" ? json : fallback;
+      } catch {
+        return fallback;
+      }
     }
+    return fallback;
+  } catch {
+    return fallback;
   }
-  return String(error) || fallback;
 }
 
 function safeStackText(error: unknown): string {
-  if (error instanceof Error && typeof error.stack === "string" && error.stack) return error.stack;
+  try {
+    if (error instanceof Error && typeof error.stack === "string" && error.stack) return error.stack;
+  } catch {}
   return safeErrorText(error, "Sem detalhes técnicos disponíveis.");
 }
 

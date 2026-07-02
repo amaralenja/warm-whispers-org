@@ -19,7 +19,6 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [],
   serverFns: { fetch: fetchWithSupabaseAuth },
   requestMiddleware: [errorMiddleware],
 }));
