@@ -67,11 +67,29 @@ function decodeVendorHeader(value: string | null): { id: number; codigo: string 
 
 async function validateVendorSession(supabase: any, request: Request): Promise<VendorContext | null> {
   const decoded = decodeVendorHeader(request.headers.get('x-vendor-session'));
-  if (!decoded) return null;
+  if (!decoded) {
+    console.info('[vendor-session] no vendor header on server request');
+    return null;
+  }
   const { data, error } = await supabase.rpc('login_vendedor_by_codigo', { _codigo: decoded.codigo });
-  if (error || !data) return null;
+  if (error || !data) {
+    console.warn('[vendor-session] invalid vendor code on server', {
+      vendorId: decoded.id,
+      hasData: Boolean(data),
+      error: error?.message ?? null,
+    });
+    return null;
+  }
   const vendor = data as VendorContext;
-  if (Number(vendor.id) !== decoded.id) return null;
+  if (Number(vendor.id) !== decoded.id) {
+    console.warn('[vendor-session] vendor id mismatch', { expected: decoded.id, received: Number(vendor.id) });
+    return null;
+  }
+  console.info('[vendor-session] validated vendor on server', {
+    vendorId: Number(vendor.id),
+    expert: vendor.expert ?? null,
+    channelCount: Array.isArray(vendor.wa_channel_ids) ? vendor.wa_channel_ids.length : 0,
+  });
   return {
     ...vendor,
     id: Number(vendor.id),

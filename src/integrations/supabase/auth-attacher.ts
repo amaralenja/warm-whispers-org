@@ -3,8 +3,16 @@ import { encodeVendorSessionHeader, getVendorSession } from '@/lib/vendor-sessio
 
 function buildAuthHeaders(existing?: HeadersInit): Headers {
   const headers = new Headers(existing)
-  const vendorHeader = encodeVendorSessionHeader(getVendorSession())
+  const vendorSession = getVendorSession()
+  const vendorHeader = encodeVendorSessionHeader(vendorSession)
   if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
+  if (vendorSession?.id) {
+    console.info('[vendor-session] attaching vendor header', {
+      vendorId: vendorSession.id,
+      expert: vendorSession.expert ?? null,
+      hasCodigo: Boolean(vendorSession.codigo),
+    })
+  }
   return headers
 }
 
