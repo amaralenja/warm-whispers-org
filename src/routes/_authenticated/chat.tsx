@@ -26,6 +26,10 @@ import {
   Trash2,
   Ban,
   User,
+  Reply,
+  X,
+} from "lucide-react";
+
 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
