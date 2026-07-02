@@ -657,11 +657,12 @@ function ChatPage() {
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback
-                            className="rounded-full text-sm font-bold"
-                            style={avatarStyle(contactName, contactWaId)}
+                            className="rounded-full"
+                            style={avatarStyle()}
                           >
-                            {initials(contactName, contactWaId)}
+                            <User className="h-6 w-6 opacity-80" />
                           </AvatarFallback>
+
                         </Avatar>
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
