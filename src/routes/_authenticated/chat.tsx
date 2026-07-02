@@ -825,7 +825,22 @@ function ChatPage() {
               </div>
 
               <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
+                {replyTo && (
+                  <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
+                    <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-chat-accent">
+                        Respondendo a {replyTo.direction === "out" ? "você" : "cliente"}
+                      </div>
+                      <div className="truncate text-xs text-muted-foreground">{msgQuotePreview(replyTo)}</div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:bg-chat-soft" onClick={() => setReplyTo(null)} aria-label="Cancelar resposta">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
                 <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
+
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
