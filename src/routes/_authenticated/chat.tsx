@@ -460,6 +460,19 @@ function ChatPage() {
     },
   });
 
+  const deleteFn = useServerFn(deleteWhatsappMessage);
+  const deleteMut = useMutation({
+    mutationFn: (messageId: string) => deleteFn({ data: { messageId } }),
+    onSuccess: (res: any) => {
+      toast.success(res?.waRemoved ? "Mensagem apagada para todos" : "Mensagem apagada do sistema");
+      qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+    },
+    onError: (e: any) => toast.error(errorToText(e, "Erro ao apagar")),
+  });
+  const handleDeleteMessage = (id: string) => deleteMut.mutate(id);
+
+
   async function handleSendText() {
     if (!active || !draft.trim()) return;
     const text = draft.trim();
