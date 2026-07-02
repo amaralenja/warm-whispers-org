@@ -32,9 +32,9 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error?: Error; reset?: () => void }) {
-  const safeError = error ?? new Error("Erro desconhecido");
-  console.error(error);
+function ErrorComponent(props?: { error?: Error; reset?: () => void }) {
+  const safeError = props?.error ?? new Error("Erro desconhecido");
+  console.error(props?.error);
   reportLovableError(safeError, { boundary: "tanstack_root_error_component" });
 
   return (
@@ -47,7 +47,7 @@ function ErrorComponent({ error, reset }: { error?: Error; reset?: () => void })
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              reset?.();
+              props?.reset?.();
               window.location.reload();
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"

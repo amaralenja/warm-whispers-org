@@ -55,6 +55,34 @@ function normalizeBrWhatsappNumber(raw: string): string {
   return digits;
 }
 
+function normalizeText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function sameWorkspace(a: unknown, b: unknown) {
+  return normalizeText(a) === normalizeText(b);
+}
+
+async function resolveStageFromTags(db: any, tags: string[], operation?: unknown) {
+  const tagNames = [...new Set(tags.map((t) => String(t ?? "").trim()).filter(Boolean))];
+  if (tagNames.length === 0) return null;
+  const { data: tagRows } = await db
+    .from("crm_tags" as any)
+    .select("nome,stage_id,operacao")
+    .in("nome", tagNames);
+  const rows = ((tagRows ?? []) as any[]).filter((r) => r?.stage_id);
+  if (rows.length === 0) return null;
+  const op = String(operation ?? "").trim();
+  const match = op
+    ? rows.find((r) => sameWorkspace(r?.operacao, op) || sameWorkspace(r?.operacao, "all")) ?? rows[0]
+    : rows[0];
+  return match?.stage_id ? String(match.stage_id) : null;
+}
+
 function interpolate(tpl: string, ctx: Ctx): string {
   if (!tpl) return tpl;
   return tpl
@@ -605,14 +633,18 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       if (!phone) return { log: { skipped: "no phone" } };
       const tail = phone.slice(-10);
       const { data: leads } = await ctx.db
-        .from("crm_leads" as any).select("id,tags,telefone").ilike("telefone", `%${tail}%`).limit(5);
+        .from("crm_leads" as any).select("id,tags,telefone,expert,status").ilike("telefone", `%${tail}%`).limit(5);
 
       for (const l of leads ?? []) {
         const cur: string[] = Array.isArray((l as any).tags) ? (l as any).tags : [];
         const next = new Set(cur);
         for (const n of addNames) next.add(n);
         for (const n of removeNames) next.delete(n);
-        await ctx.db.from("crm_leads" as any).update({ tags: Array.from(next) }).eq("id", (l as any).id);
+        const tags = Array.from(next);
+        const patch: Record<string, any> = { tags, updated_at: new Date().toISOString() };
+        const autoStatus = await resolveStageFromTags(ctx.db, tags, (l as any).expert);
+        if (autoStatus) patch.status = autoStatus;
+        await ctx.db.from("crm_leads" as any).update(patch).eq("id", (l as any).id);
       }
       return { log: { added: addNames, removed: removeNames, leads: leads?.length ?? 0 } };
     }

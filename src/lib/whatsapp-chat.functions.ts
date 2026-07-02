@@ -193,6 +193,10 @@ function normalizeText(value: unknown): string {
     .trim();
 }
 
+function sameWorkspace(a: unknown, b: unknown) {
+  return normalizeText(a) === normalizeText(b);
+}
+
 function vendorRpcArgs(context: any) {
   const id = Number(context?.vendor?.id);
   const codigo = String(context?.vendor?.codigo ?? "").trim();
@@ -686,6 +690,79 @@ function whatsappNumberVariants(raw: string): string[] {
   return Array.from(variants).filter(Boolean);
 }
 
+async function resolveStageFromTags(db: any, tags: string[], operation?: unknown) {
+  const tagNames = [...new Set(tags.map((t) => String(t ?? "").trim()).filter(Boolean))];
+  if (tagNames.length === 0) return null;
+
+  const { data: tagRows } = await db
+    .from("crm_tags" as any)
+    .select("nome,stage_id,operacao")
+    .in("nome", tagNames);
+  const rows = ((tagRows ?? []) as any[]).filter((r) => r?.stage_id);
+  if (rows.length === 0) return null;
+
+  const op = String(operation ?? "").trim();
+  const match = op
+    ? rows.find((r) => sameWorkspace(r?.operacao, op) || sameWorkspace(r?.operacao, "all")) ?? rows[0]
+    : rows[0];
+
+  return match?.stage_id ? String(match.stage_id) : null;
+}
+
+async function syncConversationTagsToCrmLead(db: any, conversationId: string, oldTags: string[], nextTags: string[]) {
+  const { data: conv, error: convError } = await db
+    .from("wa_conversations" as any)
+    .select("id,contact_wa_id,operacao_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (convError) throw new Error(convError.message);
+  if (!conv?.contact_wa_id) return { updated: 0 };
+
+  const added = nextTags.filter((t) => !oldTags.some((o) => o.toLowerCase() === t.toLowerCase()));
+  const removed = oldTags.filter((t) => !nextTags.some((n) => n.toLowerCase() === t.toLowerCase()));
+  if (added.length === 0 && removed.length === 0) return { updated: 0 };
+
+  const variants = whatsappNumberVariants(String(conv.contact_wa_id));
+  const tails = [...new Set(
+    variants
+      .flatMap((n) => [n.slice(-13), n.slice(-12), n.slice(-11), n.slice(-10), n.slice(-8)])
+      .filter((n) => n.length >= 8),
+  )];
+  const byId = new Map<string, any>();
+
+  for (const tail of tails) {
+    const { data: rows } = await db
+      .from("crm_leads" as any)
+      .select("id,tags,telefone,expert,status")
+      .ilike("telefone", `%${tail}%`)
+      .limit(20);
+    for (const row of (rows ?? []) as any[]) byId.set(String(row.id), row);
+  }
+
+  const operation = String(conv.operacao_id ?? "").trim();
+  let updated = 0;
+  for (const lead of byId.values()) {
+    if (operation && operation !== "__notificador__" && lead?.expert && !sameWorkspace(lead.expert, operation)) continue;
+
+    const current = Array.isArray(lead.tags) ? lead.tags.map((t: unknown) => String(t)).filter(Boolean) : [];
+    const lowerRemoved = new Set(removed.map((t) => t.toLowerCase()));
+    const merged = current.filter((t: string) => !lowerRemoved.has(t.toLowerCase()));
+    for (const tag of added) {
+      if (!merged.some((t: string) => t.toLowerCase() === tag.toLowerCase())) merged.push(tag);
+    }
+
+    const patch: Record<string, any> = { tags: merged, updated_at: new Date().toISOString() };
+    const autoStatus = await resolveStageFromTags(db, merged, lead.expert ?? operation);
+    if (autoStatus) patch.status = autoStatus;
+
+    const { error } = await db.from("crm_leads" as any).update(patch).eq("id", lead.id);
+    if (error) throw new Error(error.message);
+    updated++;
+  }
+
+  return { updated };
+}
+
 export const sendWhatsappMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: SendInput) => ({
@@ -1057,6 +1134,14 @@ export const updateConversationTags = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!data.conversationId) throw new Error("Conversa não informada");
     const db = await dbFor(context);
+    const { data: currentConv } = await db
+      .from("wa_conversations" as any)
+      .select("tags")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    const oldTags = Array.isArray((currentConv as any)?.tags)
+      ? ((currentConv as any).tags as unknown[]).map(String).filter(Boolean)
+      : [];
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
       const { error } = await db.rpc("vendor_update_conversation_tags" as any, {
@@ -1065,14 +1150,16 @@ export const updateConversationTags = createServerFn({ method: "POST" })
         _tags: data.tags,
       });
       if (error) throw new Error(error.message);
-      return { ok: true };
+      const sync = await syncConversationTagsToCrmLead(db, data.conversationId, oldTags, data.tags);
+      return { ok: true, crmUpdated: sync.updated };
     }
     const { error } = await db
       .from("wa_conversations" as any)
       .update({ tags: data.tags, updated_at: new Date().toISOString() })
       .eq("id", data.conversationId);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    const sync = await syncConversationTagsToCrmLead(db, data.conversationId, oldTags, data.tags);
+    return { ok: true, crmUpdated: sync.updated };
   });
 
 export const updateConversationNotes = createServerFn({ method: "POST" })
