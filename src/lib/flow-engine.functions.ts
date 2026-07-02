@@ -354,7 +354,7 @@ export const listFlows = createServerFn({ method: "GET" })
     if (rpcArgs) {
       const { data, error } = await db.rpc("vendor_list_flows" as any, rpcArgs);
       if (error) throw new Error(error.message);
-      return attachFlowTriggers(db, (data ?? []) as any[]);
+      return attachFlowTriggers(db, (data ?? []) as any[], context);
     }
     const { data, error } = await db
       .from("wa_flows" as any)
@@ -375,7 +375,7 @@ export const getFlow = createServerFn({ method: "GET" })
       if (error) throw new Error(error.message);
       const flow = Array.isArray(rows) ? rows[0] : rows;
       if (!flow) throw new Error("Fluxo não encontrado");
-      return (await attachFlowTriggers(db, [flow]))[0];
+      return (await attachFlowTriggers(db, [flow], context))[0];
     }
     const { data: flow, error } = await db
       .from("wa_flows" as any)
@@ -391,9 +391,10 @@ async function uniqueFlowName(
   supabase: any,
   desired: string,
   excludeId: string | null = null,
+  context?: any,
 ): Promise<string> {
   const base = (desired || "").trim() || "Novo Fluxo";
-  const { data: rows } = await supabase.from("wa_flows" as any).select("id, nome");
+  const rows = await listFlowsForNameCheck(supabase, context);
   const taken = new Set<string>(
     ((rows ?? []) as any[])
       .filter((r) => !excludeId || r.id !== excludeId)
@@ -421,9 +422,7 @@ export const createFlow = createServerFn({ method: "POST" })
     const startId = "n-trigger";
     const nome = data.nome.trim();
     const operacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
-    const { data: dup } = await db
-      .from("wa_flows" as any).select("id").ilike("nome", nome).limit(1);
-    if (dup && dup.length > 0) {
+    if (await flowNameExists(db, nome, null, context)) {
       throw new Error(`Já existe um fluxo com o nome "${nome}". Escolha outro nome.`);
     }
     if (isVendor) {
@@ -482,14 +481,13 @@ export const saveFlow = createServerFn({ method: "POST" })
     if (typeof patch.folder === "string") patch.folder = patch.folder.trim() || null;
     if (typeof patch.nome === "string" && patch.nome.trim()) {
       const novoNome = patch.nome.trim();
-      const { data: dup } = await db
-        .from("wa_flows" as any).select("id").ilike("nome", novoNome).neq("id", data.id).limit(1);
-      if (dup && dup.length > 0) {
+      if (await flowNameExists(db, novoNome, data.id, context)) {
         throw new Error(`Já existe outro fluxo com o nome "${novoNome}".`);
       }
       patch.nome = novoNome;
     }
     if ("operacao_id" in patch) patch.operacao_id = await coerceVendorOperacaoId(context, db, patch.operacao_id);
+    if ((context as any)?.vendor) return vendorUpdateFlowViaRpc(context, db, data.id, patch);
     const { error } = await db
       .from("wa_flows" as any).update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -502,6 +500,14 @@ export const deleteFlow = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     await assertVendorFlowAccess(context, db, data.id);
+    if ((context as any)?.vendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+      const { data: ok, error } = await db.rpc("vendor_delete_wa_flow" as any, { ...rpcArgs, _flow_id: data.id });
+      if (error) throw new Error(error.message);
+      if (ok === false) throw new Error("Fluxo não encontrado ou indisponível para esta operação");
+      return { ok: true };
+    }
     const { error } = await db.from("wa_flows" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -543,14 +549,22 @@ export const duplicateFlow = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    await assertVendorFlowAccess(context, db, data.id);
     const isVendor = Boolean((context as any)?.vendor);
-    const { data: src, error } = await db
-      .from("wa_flows" as any)
-      .select("*, wa_flow_triggers(*)")
-      .eq("id", data.id).single();
+    let src: any;
+    let error: any = null;
+    if (isVendor) {
+      src = await assertVendorFlowAccess(context, db, data.id);
+      src = (await attachFlowTriggers(db, [src], context))[0];
+    } else {
+      const res = await db
+        .from("wa_flows" as any)
+        .select("*, wa_flow_triggers(*)")
+        .eq("id", data.id).single();
+      src = res.data;
+      error = res.error;
+    }
     if (error || !src) throw new Error(error?.message ?? "Fluxo não encontrado");
-    const newName = await uniqueFlowName(db, (src as any).nome);
+    const newName = await uniqueFlowName(db, (src as any).nome, null, context);
     const operacaoId = await coerceVendorOperacaoId(context, db, (src as any).operacao_id);
     let row: any;
     let insErr: any = null;
@@ -600,11 +614,20 @@ export const exportFlow = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    await assertVendorFlowAccess(context, db, data.id);
-    const { data: src, error } = await db
-      .from("wa_flows" as any)
-      .select("nome, entry_node_id, nodes, edges, wa_flow_triggers(tipo, valor, match_mode, ativo)")
-      .eq("id", data.id).single();
+    const isVendor = Boolean((context as any)?.vendor);
+    let src: any;
+    let error: any = null;
+    if (isVendor) {
+      src = await assertVendorFlowAccess(context, db, data.id);
+      src = (await attachFlowTriggers(db, [src], context))[0];
+    } else {
+      const res = await db
+        .from("wa_flows" as any)
+        .select("nome, entry_node_id, nodes, edges, wa_flow_triggers(tipo, valor, match_mode, ativo)")
+        .eq("id", data.id).single();
+      src = res.data;
+      error = res.error;
+    }
     if (error || !src) throw new Error(error?.message ?? "Fluxo não encontrado");
     const payload = {
       version: 1,
@@ -633,7 +656,7 @@ export const importFlow = createServerFn({ method: "POST" })
     const isVendor = Boolean((context as any)?.vendor);
     const payload = decodeFlowCode(data.code);
     const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString();
-    const finalName = await uniqueFlowName(db, desired);
+    const finalName = await uniqueFlowName(db, desired, null, context);
     const operacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
     let row: any;
     let error: any = null;
@@ -687,6 +710,7 @@ export const saveTriggers = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     await assertVendorFlowAccess(context, db, data.flow_id);
+    if ((context as any)?.vendor) return vendorReplaceTriggers(context, db, data.flow_id, data.triggers ?? []);
     await db.from("wa_flow_triggers" as any).delete().eq("flow_id", data.flow_id);
     if (data.triggers.length === 0) return { ok: true };
     const rows = data.triggers.map((t) => ({
