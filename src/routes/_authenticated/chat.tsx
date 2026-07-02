@@ -824,7 +824,7 @@ function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onDelete={handleDeleteMessage} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} isAdmin={!vendorId} />
                       </div>
                     );
                   })}
@@ -994,7 +994,7 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete, onReply, quotedFrom, isAdmin }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onDelete?: (id: string) => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null; isAdmin?: boolean }) {
   const isOut = msg.direction === "out";
   const isDeleted = Boolean(msg.deleted_at);
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
@@ -1048,9 +1048,20 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete,
             </div>
           )}
           {isDeleted ? (
-            <p className="flex items-center gap-2 text-[15px] leading-relaxed">
-              <Ban className="h-4 w-4" /> Esta mensagem foi apagada
-            </p>
+            isAdmin ? (
+              <>
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-destructive/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                  <Ban className="h-3 w-3" /> Apagada • visível só para admin
+                </div>
+                <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
+                {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed line-through opacity-70">{body}</p>}
+                {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed line-through opacity-70">{caption}</p>}
+              </>
+            ) : (
+              <p className="flex items-center gap-2 text-[15px] leading-relaxed">
+                <Ban className="h-4 w-4" /> Esta mensagem foi apagada
+              </p>
+            )
           ) : (
             <>
               <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
@@ -1058,6 +1069,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onDelete,
               {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
 
             </>
+
           )}
           <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
             <span>{formatTime(msg.created_at)}</span>
