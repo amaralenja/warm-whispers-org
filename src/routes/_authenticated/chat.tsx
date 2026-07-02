@@ -23,6 +23,8 @@ import {
   Loader2,
   MoreVertical,
   UserCog,
+  Trash2,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
