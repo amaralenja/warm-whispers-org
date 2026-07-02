@@ -300,6 +300,30 @@ function timeAgo(iso: string): string {
   return `${d}d`;
 }
 
+// Alguns campos podem chegar como objeto/array vindos da API externa —
+// coage tudo pra string pra não estourar "Objects are not valid as a React child".
+function safeStr(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+}
+const STRING_FIELDS: (keyof Lead)[] = [
+  "nome", "email", "whatsapp", "instagram",
+  "utm_source", "utm_medium", "utm_campaign", "utm_content",
+  "fbc", "fbp", "fbclid", "gclid",
+  "caixa_letra", "caixa_label", "faturamento", "momento", "momento_letra",
+  "situacao", "renda", "objetivo", "socio", "investir", "porque",
+  "comprometimento", "minicurso", "funil", "last_step", "referrer",
+  "user_agent", "status", "crm_status", "origem",
+];
+function sanitizeLead(raw: unknown): Lead {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...r };
+  for (const k of STRING_FIELDS) out[k as string] = safeStr(r[k as string]);
+  return out as Lead;
+}
+
 function QuizPage() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();
@@ -347,7 +371,7 @@ function QuizPage() {
       if (toIso) q = q.lt("data_criacao", toIso);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Lead[];
+      return (data ?? []).map(sanitizeLead) as Lead[];
     },
     refetchInterval: 30000,
   });
