@@ -208,11 +208,10 @@ const AVATAR_PALETTE: Record<string, { bg: string; text: string }> = {
 };
 const AVATAR_DEFAULT = { bg: "linear-gradient(135deg,#1f2937,#0f172a)", text: "#cbd5e1" };
 
-function avatarStyle(name: unknown, fallback: unknown): CSSProperties {
-  const key = initials(name, fallback).charAt(0).toUpperCase();
-  const c = AVATAR_PALETTE[key] ?? AVATAR_DEFAULT;
-  return { background: c.bg, color: c.text };
+function avatarStyle(_name?: unknown, _fallback?: unknown): CSSProperties {
+  return { background: AVATAR_DEFAULT.bg, color: AVATAR_DEFAULT.text };
 }
+
 
 
 function toSafeDate(value: unknown) {
