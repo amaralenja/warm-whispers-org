@@ -946,7 +946,7 @@ function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
