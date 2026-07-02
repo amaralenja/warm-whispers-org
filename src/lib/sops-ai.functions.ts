@@ -121,7 +121,13 @@ export const transcribeSopAudio = createServerFn({ method: "POST" })
     });
     if (!res.ok) {
       const t = await res.text();
-      throw new Error(`STT ${res.status}: ${t.slice(0, 300)}`);
+      if (res.status === 429) {
+        throw new Error("Muitas requisições agora, espera 1 minutinho e tenta de novo (ou adiciona créditos no Lovable AI).");
+      }
+      if (res.status === 402) {
+        throw new Error("Créditos do Lovable AI esgotados. Adicione créditos na workspace pra continuar usando transcrição.");
+      }
+      throw new Error(`Falha na transcrição (${res.status}): ${t.slice(0, 200)}`);
     }
     const json: any = await res.json();
     return { text: String(json?.text ?? "").trim() };
