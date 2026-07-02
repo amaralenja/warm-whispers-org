@@ -6,19 +6,10 @@ function buildAuthHeaders(existing?: HeadersInit): Headers {
   const vendorSession = getVendorSession()
   const vendorHeader = encodeVendorSessionHeader(vendorSession)
   if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
-  if (vendorSession?.id) {
-    console.info('[vendor-session] attaching vendor header', {
-      vendorId: vendorSession.id,
-      expert: vendorSession.expert ?? null,
-      hasCodigo: Boolean(vendorSession.codigo),
-    })
-  }
   return headers
 }
 
 // Custom fetch used by TanStack Start server functions.
-// Keeping auth/header attachment here avoids the fragile global functionMiddleware path
-// that can be evaluated by React during HMR and crash with "undefined.map".
 export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: RequestInit) {
   const headers = buildAuthHeaders(
     typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
@@ -38,10 +29,3 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
 
   return fetch(input, { ...init, headers })
 }
-
-// Legacy no-op middleware kept for backward compatibility with auto-generated start.ts.
-// Real auth attachment happens via `fetchWithSupabaseAuth` above.
-import { createMiddleware } from '@tanstack/react-start'
-export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(async ({ next }) => next())
-
-
