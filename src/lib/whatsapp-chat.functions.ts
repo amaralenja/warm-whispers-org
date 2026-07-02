@@ -212,7 +212,7 @@ async function vendorChannelIds(context: any, db?: any): Promise<string[]> {
   // Fallback: qualquer canal da operação do vendedor.
   const { data } = await db
     .from("wa_channels" as any)
-    .select("id")
+    .select("id,operacao_id,kind")
     .neq("operacao_id", "__notificador__")
     .neq("kind", "notification");
   return ((data ?? []) as any[])
