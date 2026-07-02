@@ -296,6 +296,25 @@ function ChatPage() {
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
+  const listAllTagsFn = useServerFn(listCrmTags);
+  const { data: allCrmTags = [] } = useQuery<any[]>({
+    queryKey: ["chat", "crm-tags", "all"],
+    queryFn: async () => {
+      const res = await listAllTagsFn({ data: { operacao: "all" } });
+      return Array.isArray(res) ? res : [];
+    },
+    staleTime: 60_000,
+  });
+  const tagColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of (allCrmTags as any[])) {
+      const nome = String(t?.nome ?? "").trim().toLowerCase();
+      const cor = String(t?.cor ?? "");
+      if (nome && cor) m.set(nome, cor);
+    }
+    return m;
+  }, [allCrmTags]);
+  const tagColorFor = (name: string) => tagColorMap.get(String(name || "").trim().toLowerCase()) || "";
 
   const handleReact = async (m: Msg, emoji: string) => {
     if (!active) return;
