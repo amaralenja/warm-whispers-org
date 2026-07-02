@@ -294,6 +294,25 @@ function ChatPage() {
   const triggerFlowFn = useServerFn(triggerFlowManually);
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
+  const reactFn = useServerFn(reactToWhatsappMessage);
+
+  const handleReact = async (m: Msg, emoji: string) => {
+    if (!active) return;
+    // optimistic
+    qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
+      asArray<Msg>(old).map((x) =>
+        x.id === m.id
+          ? { ...x, raw: { ...(x.raw as any || {}), reactions: { ...((x.raw as any)?.reactions || {}), mine: emoji || null } } }
+          : x,
+      ),
+    );
+    try {
+      await reactFn({ data: { conversationId: String(active.id), messageId: String(m.id), emoji } });
+    } catch (e: any) {
+      toast.error(errorToText(e, "Falha ao reagir"));
+      qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
+    }
+  };
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
