@@ -53,17 +53,28 @@ function pickFirstEnv(...names: string[]): { key: string; value: string } | null
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const secret = pickFirstEnv('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEYS', 'SUPABASE_SECRET_KEY');
+  // Fallback pra chave publishable/anon quando service role não está injetada
+  // (ex: preview/dev sandbox). Não bypassa RLS, mas evita crash e permite RPCs
+  // SECURITY DEFINER funcionarem.
+  const fallback = !secret
+    ? pickFirstEnv('SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY')
+    : null;
+  const chosen = secret ?? fallback;
 
-  if (!SUPABASE_URL || !secret) {
+  if (!SUPABASE_URL || !chosen) {
     const missing = [
       ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!secret ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
+      ...(!chosen ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
     ];
     const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
-  const SUPABASE_SERVICE_ROLE_KEY = secret.value;
+  if (!secret) {
+    console.warn('[Supabase] SUPABASE_SERVICE_ROLE_KEY ausente — usando chave publishable/anon como fallback (RLS aplicada).');
+  }
+  const SUPABASE_SERVICE_ROLE_KEY = chosen.value;
+
 
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
