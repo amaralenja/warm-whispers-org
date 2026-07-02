@@ -270,7 +270,15 @@ function PreviewStatusTick({ status }: { status: string | null }) {
 
 function ChatPage() {
   const qc = useQueryClient();
-  const { workspace } = useWorkspace();
+  const { workspace, workspaces } = useWorkspace();
+  const opBadgeFor = (opId: string | null | undefined) => {
+    if (!opId) return null;
+    const key = String(opId).toLowerCase();
+    const ws = workspaces.find((w) => String(w.id).toLowerCase() === key && w.id !== "all");
+    if (!ws) return null;
+    return { nome: ws.nome, hex: ws.accent.hex };
+  };
+
   const listConvFn = useServerFn(listConversations);
   const listMsgFn = useServerFn(listMessages);
   const markReadFn = useServerFn(markConversationRead);
