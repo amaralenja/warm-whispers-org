@@ -2033,6 +2033,29 @@ export type Database = {
         Args: { _from?: string; _to?: string; _utm: string }
         Returns: Json
       }
+      load_wa_flow: {
+        Args: { _flow_id: string }
+        Returns: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          edges: Json
+          entry_node_id: string | null
+          folder: string | null
+          id: string
+          nodes: Json
+          nome: string
+          operacao_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_flows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
       vendor_allowed_channel_ids: {
         Args: { _codigo: string; _vendor_id: number }
