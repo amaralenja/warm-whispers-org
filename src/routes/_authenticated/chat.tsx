@@ -1116,13 +1116,41 @@ function ChatPage() {
 
 type MediaState = { url?: string; mime?: string; loading?: boolean; error?: string };
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; quotedFrom?: Msg | null }) {
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; quotedFrom?: Msg | null }) {
   const isOut = msg.direction === "out";
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
   const caption = toText(msg.caption);
   const quotedPreview = toText((msg.raw as any)?.reply_preview);
   const quotedFromOut = quotedFrom ? quotedFrom.direction === "out" : undefined;
+  const myReaction = toText((msg.raw as any)?.reactions?.mine);
+  const theirReaction = toText((msg.raw as any)?.reactions?.theirs);
+
+  const reactionBar = onReact ? (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 self-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-chat-soft" aria-label="Reagir">
+          <Smile className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align={isOut ? "end" : "start"} side="top" className="w-auto rounded-full border-chat-line bg-popover p-1">
+        <div className="flex items-center gap-1">
+          {QUICK_REACTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onReact(msg, myReaction === e ? "" : e)}
+              className={`rounded-full px-2 py-1 text-xl transition hover:bg-chat-soft ${myReaction === e ? "bg-chat-soft" : ""}`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  ) : null;
 
   const menu = onReply ? (
     <DropdownMenu>
@@ -1144,37 +1172,50 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
   return (
     <div className={`group flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div className="relative flex items-start gap-1">
-        {isOut && menu}
-        <div
-          className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
-            isOut
-              ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
-              : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
-          }`}
-        >
-          {(quotedPreview || quotedFrom) && (
-            <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
-              <div className="font-semibold opacity-80">
-                {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
+        {isOut && (<>{menu}{reactionBar}</>)}
+        <div className="relative">
+          <div
+            className={`max-w-[min(74%,760px)] overflow-hidden rounded-2xl border px-4 py-3 ${
+              isOut
+                ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
+                : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
+            }`}
+          >
+            {(quotedPreview || quotedFrom) && (
+              <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
+                <div className="font-semibold opacity-80">
+                  {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
+                </div>
+                <div className="mt-0.5 truncate opacity-90">
+                  {quotedPreview || (quotedFrom ? (quotedFrom.text_body || quotedFrom.caption || quotedFrom.msg_type) : "")}
+                </div>
               </div>
-              <div className="mt-0.5 truncate opacity-90">
-                {quotedPreview || (quotedFrom ? (quotedFrom.text_body || quotedFrom.caption || quotedFrom.msg_type) : "")}
-              </div>
+            )}
+            <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
+            {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
+            {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
+            <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
+              <span>{formatTime(msg.created_at)}</span>
+              {isOut && <StatusTick status={msg.status} />}
+            </div>
+          </div>
+          {(myReaction || theirReaction) && (
+            <div className={`absolute -bottom-3 ${isOut ? "right-3" : "left-3"} flex gap-1`}>
+              {theirReaction && (
+                <span className="rounded-full border border-chat-line bg-chat-panel px-2 py-0.5 text-sm shadow">{theirReaction}</span>
+              )}
+              {myReaction && (
+                <span className="rounded-full border border-chat-line bg-chat-panel px-2 py-0.5 text-sm shadow">{myReaction}</span>
+              )}
             </div>
           )}
-          <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
-          {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
-          {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
-          <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
-            <span>{formatTime(msg.created_at)}</span>
-            {isOut && <StatusTick status={msg.status} />}
-          </div>
         </div>
-        {!isOut && menu}
+        {!isOut && (<>{reactionBar}{menu}</>)}
       </div>
     </div>
   );
 }
+
 
 function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; outgoing?: boolean }) {
   if (msg.msg_type === "text") return null;
