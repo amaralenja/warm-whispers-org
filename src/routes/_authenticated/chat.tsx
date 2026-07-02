@@ -25,6 +25,8 @@ import {
   UserCog,
   Trash2,
   Ban,
+  User,
+
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,11 +210,10 @@ const AVATAR_PALETTE: Record<string, { bg: string; text: string }> = {
 };
 const AVATAR_DEFAULT = { bg: "linear-gradient(135deg,#1f2937,#0f172a)", text: "#cbd5e1" };
 
-function avatarStyle(name: unknown, fallback: unknown): CSSProperties {
-  const key = initials(name, fallback).charAt(0).toUpperCase();
-  const c = AVATAR_PALETTE[key] ?? AVATAR_DEFAULT;
-  return { background: c.bg, color: c.text };
+function avatarStyle(_name?: unknown, _fallback?: unknown): CSSProperties {
+  return { background: AVATAR_DEFAULT.bg, color: AVATAR_DEFAULT.text };
 }
+
 
 
 function toSafeDate(value: unknown) {
@@ -656,11 +657,12 @@ function ChatPage() {
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback
-                            className="rounded-full text-sm font-bold"
-                            style={avatarStyle(contactName, contactWaId)}
+                            className="rounded-full"
+                            style={avatarStyle()}
                           >
-                            {initials(contactName, contactWaId)}
+                            <User className="h-6 w-6 opacity-80" />
                           </AvatarFallback>
+
                         </Avatar>
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
@@ -725,11 +727,12 @@ function ChatPage() {
                 <div className="flex min-w-0 items-center gap-4">
                   <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
                     <AvatarFallback
-                      className="rounded-2xl text-base font-bold"
-                      style={avatarStyle(active.contact_name, active.contact_wa_id)}
+                      className="rounded-2xl"
+                      style={avatarStyle()}
                     >
-                      {initials(active.contact_name, active.contact_wa_id)}
+                      <User className="h-7 w-7 opacity-80" />
                     </AvatarFallback>
+
                   </Avatar>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
