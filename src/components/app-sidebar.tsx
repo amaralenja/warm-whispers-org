@@ -22,6 +22,7 @@ import {
   User,
   BookOpenText,
   CheckSquare,
+  BarChart3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
