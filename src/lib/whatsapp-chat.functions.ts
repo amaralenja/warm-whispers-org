@@ -590,7 +590,6 @@ export const uploadWhatsappMedia = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    await assertVendorChannel(context, data.channelId, db);
     const conv = await assertConversationAccess(context, db, data.conversationId);
     if (String(conv.channel_id) !== String(data.channelId)) throw new Error("Canal não pertence a esta conversa");
     if (!data.base64) throw new Error("Arquivo vazio");
@@ -671,7 +670,6 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    await assertVendorChannel(context, data.channelId, db);
     const conv = await assertConversationAccess(context, db, data.conversationId, {
       channelId: data.channelId,
       contactWaId: data.to,
