@@ -519,15 +519,35 @@ function Lista({
             return (
               <tr key={l.id} className="border-t border-border/40 hover:bg-card/60">
                 <td className="px-4 py-3">
-                  <button onClick={() => onEdit(l)} className="text-left font-semibold hover:text-accent">
-                    {l.nome}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                      style={{ background: colorFromName(l.nome) }}
+                    >
+                      {initialsOf(l.nome)}
+                    </div>
+                    <button onClick={() => onEdit(l)} className="text-left font-semibold hover:text-accent">
+                      {l.nome}
+                    </button>
+                  </div>
                   {l.tags && l.tags.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {l.tags.map((t) => <Badge key={t} variant="outline" className="px-1.5 py-0 text-[9px]">{t}</Badge>)}
+                    <div className="mt-1 flex flex-wrap gap-1 pl-9">
+                      {l.tags.map((t) => {
+                        const c = tagColors.get(t.toLowerCase()) ?? colorFromName(t);
+                        return (
+                          <span
+                            key={t}
+                            className="rounded-md border px-1.5 py-0 text-[9px] font-semibold"
+                            style={{ borderColor: hexToRgba(c, 0.6), background: hexToRgba(c, 0.15), color: c }}
+                          >
+                            {t}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </td>
+
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {l.telefone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{l.telefone}</div>}
                   {l.email && <div className="flex items-center gap-1 truncate"><Mail className="h-3 w-3" />{l.email}</div>}
