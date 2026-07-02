@@ -706,7 +706,10 @@ function ChatPage() {
               <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
                 <div className="flex min-w-0 items-center gap-4">
                   <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
-                    <AvatarFallback className="rounded-2xl bg-chat-soft text-base font-bold text-chat-accent">
+                    <AvatarFallback
+                      className="rounded-2xl text-base font-bold"
+                      style={avatarStyle(active.contact_name, active.contact_wa_id)}
+                    >
                       {initials(active.contact_name, active.contact_wa_id)}
                     </AvatarFallback>
                   </Avatar>
