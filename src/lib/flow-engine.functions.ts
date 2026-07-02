@@ -120,7 +120,35 @@ async function assertVendorConversationAccess(
   fallback?: { channelId?: string | null; contactWaId?: string | null },
 ) {
   if (!context?.vendor) return;
-  if (!conversationId) return;
+  if (!conversationId && (!fallback?.channelId || !fallback?.contactWaId)) return;
+
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+
+  const channelId = String(fallback?.channelId ?? "").trim() || null;
+  const contactWaId = String(fallback?.contactWaId ?? "").trim() || null;
+  const { data: rpcData, error: rpcError } = await db.rpc("vendor_resolve_wa_conversation" as any, {
+    ...rpcArgs,
+    _conversation_id: conversationId || null,
+    _channel_id: channelId,
+    _contact_wa_id: contactWaId,
+  });
+
+  if (rpcError) {
+    console.error("[flow-engine] vendor_resolve_wa_conversation failed", {
+      error: rpcError,
+      vendorId: rpcArgs._vendor_id,
+      conversationId,
+      channelId,
+      contactWaId,
+    });
+    throw new Error("Conversa não encontrada");
+  }
+
+  const resolved = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+  if (resolved?.id) return resolved as any;
+  if (!conversationId) throw new Error("Conversa não encontrada");
+
   const conv = await findVendorConversation(db, conversationId, fallback);
   if (!conv) throw new Error("Conversa não encontrada");
   const assigned = (conv as any).assigned_vendor_id;
@@ -489,13 +517,11 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
     const db = await dbFor(context);
     if ((context as any).vendor) {
       if (!(await vendorAllowedChannelIds(context, db)).includes(String(data.channel_id))) throw new Error("Inautorizado: vendedor sem acesso a este número");
-      if (data.conversation_id) {
-        const conv = await assertVendorConversationAccess(context, db, data.conversation_id, {
-          channelId: data.channel_id,
-          contactWaId: data.contact_wa_id,
-        });
-        if (conv?.id) data.conversation_id = String(conv.id);
-      }
+      const conv = await assertVendorConversationAccess(context, db, data.conversation_id ?? "", {
+        channelId: data.channel_id,
+        contactWaId: data.contact_wa_id,
+      });
+      if (conv?.id) data.conversation_id = String(conv.id);
     }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");
     return runFlowAdmin({
