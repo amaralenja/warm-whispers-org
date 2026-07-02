@@ -596,7 +596,15 @@ function ChatPage() {
                             </span>
                           </div>
                           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                            {c.last_message_direction === "out" && <CheckCheck className="h-3.5 w-3.5 shrink-0" />}
+                            {c.last_message_direction === "out" && (
+                              (c as any).last_message_status === "read" ? (
+                                <CheckCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "#7ec8ff" }} strokeWidth={3} />
+                              ) : (c as any).last_message_status === "delivered" ? (
+                                <CheckCheck className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5 shrink-0" />
+                              )
+                            )}
                             <span className="truncate">{preview || "Sem prévia"}</span>
                           </div>
                         </div>
