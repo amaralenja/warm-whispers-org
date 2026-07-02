@@ -289,7 +289,7 @@ function X1AnalyticsPage() {
         {/* Chart mensagens/vendas por dia */}
         <Card className="border-border/60">
           <CardHeader>
-            <CardTitle className="text-base">Mensagens e vendas por dia</CardTitle>
+            <CardTitle className="text-base">{isHoje ? "Mensagens e vendas por hora (hoje)" : "Mensagens e vendas por dia"}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72 w-full">
