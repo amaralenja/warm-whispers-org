@@ -691,7 +691,11 @@ function ChatPage() {
                 className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-6 py-6 scrollbar-fancy"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-                  {messageList.map((m, i, arr) => {
+                  {messagesError ? (
+                    <div className="my-8 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-center text-sm font-semibold text-destructive">
+                      {errorToText(messagesError, "Falha ao carregar mensagens desta conversa")}
+                    </div>
+                  ) : messageList.map((m, i, arr) => {
                     const prev = arr[i - 1];
                     const showDate = !prev || toSafeDate(prev.created_at).toDateString() !== toSafeDate(m.created_at).toDateString();
                     return (
