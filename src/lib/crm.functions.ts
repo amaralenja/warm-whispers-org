@@ -125,18 +125,40 @@ export const upsertCrmLead = createServerFn({ method: "POST" })
   .inputValidator((d: any) => d ?? {})
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+
+    // Se veio lista de tags, resolve stage_id da primeira tag vinculada a coluna
+    // e força status = stage_id (automação "tag -> coluna").
+    let autoStatus: string | null = null;
+    if (Array.isArray(data?.tags) && data.tags.length > 0) {
+      const tagNames = data.tags.map((t: any) => String(t ?? "").trim()).filter(Boolean);
+      if (tagNames.length > 0) {
+        const opFilter = data?.expert ? String(data.expert) : null;
+        let q = db.from("crm_tags" as any).select("nome, stage_id, operacao").in("nome", tagNames);
+        const { data: tagRows } = await q;
+        const rows = (tagRows as any[]) ?? [];
+        const match = rows.find((r) => r?.stage_id && (!opFilter || r.operacao === opFilter || r.operacao === "all"))
+          ?? rows.find((r) => r?.stage_id);
+        if (match?.stage_id) autoStatus = String(match.stage_id);
+      }
+    }
+
     if (data.id) {
       await assertLeadAccess(context, db, String(data.id));
       if (data.expert !== undefined) assertPayloadWorkspace(context, data);
-      const { error } = await db.from("crm_leads" as any).update(data).eq("id", data.id);
+      const patch = { ...data };
+      if (autoStatus) patch.status = autoStatus;
+      const { error } = await db.from("crm_leads" as any).update(patch).eq("id", data.id);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
     assertPayloadWorkspace(context, data);
-    const { data: ins, error } = await db.from("crm_leads" as any).insert(data).select("id").single();
+    const insertPayload = { ...data };
+    if (autoStatus) insertPayload.status = autoStatus;
+    const { data: ins, error } = await db.from("crm_leads" as any).insert(insertPayload).select("id").single();
     if (error) throw new Error(error.message);
     return ins;
   });
+
 
 export const deleteCrmLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
