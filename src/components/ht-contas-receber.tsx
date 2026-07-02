@@ -35,14 +35,14 @@ type Conta = {
 const fmtBRL = (n: number) =>
   (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function safeText(value: unknown, fallback = "—") {
+function safeText(value: unknown, fallback = "—"): string {
   if (value == null) return fallback;
   if (["string", "number", "boolean"].includes(typeof value)) {
     const text = String(value).trim();
     return text || fallback;
   }
   if (Array.isArray(value)) {
-    const text = value.map((v) => safeText(v, "")).filter(Boolean).join(", ").trim();
+    const text: string = value.map((v: unknown) => safeText(v, "")).filter(Boolean).join(", ").trim();
     return text || fallback;
   }
   if (typeof value === "object") {
