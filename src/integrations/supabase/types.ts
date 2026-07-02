@@ -2016,6 +2016,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _vendor_norm: { Args: { value: string }; Returns: string }
       assign_vendor_for_channel: {
         Args: { _channel_id: string }
         Returns: number
@@ -2032,6 +2033,242 @@ export type Database = {
         Returns: Json
       }
       login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
+      vendor_allowed_channel_ids: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: string[]
+      }
+      vendor_allowed_workspace_ids: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: string[]
+      }
+      vendor_get_flow: {
+        Args: { _codigo: string; _flow_id: string; _vendor_id: number }
+        Returns: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          edges: Json
+          entry_node_id: string | null
+          folder: string | null
+          id: string
+          nodes: Json
+          nome: string
+          operacao_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_flows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_crm_experts: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          ativo: boolean | null
+          created_at: string | null
+          crm_api_key: string | null
+          drive_url: string | null
+          foto_url: string | null
+          id: number
+          meta_mensal: number
+          meta_nivel1: number
+          meta_nivel2: number
+          meta_nivel3: number
+          nome: string
+          quiz_api_key: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "experts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_crm_leads: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          created_at: string
+          dados: Json | null
+          email: string | null
+          expert: string | null
+          fonte: string | null
+          id: string
+          nome: string
+          notas: string | null
+          ordem: number | null
+          responsavel_nome: string | null
+          responsavel_utm: string | null
+          status: string
+          tags: string[] | null
+          telefone: string | null
+          ultima_interacao: string | null
+          updated_at: string
+          valor_estimado: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "crm_leads"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_crm_stages: {
+        Args: { _codigo: string; _operacao?: string; _vendor_id: number }
+        Returns: {
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+          operacao: string
+          ordem: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "crm_stages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_crm_tags: {
+        Args: { _codigo: string; _operacao?: string; _vendor_id: number }
+        Returns: {
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+          operacao: string
+          stage_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "crm_tags"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_flows: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          edges: Json
+          entry_node_id: string | null
+          folder: string | null
+          id: string
+          nodes: Json
+          nome: string
+          operacao_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_flows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_wa_channels: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          app_source: string
+          connect_url: string | null
+          created_at: string | null
+          display_phone_number: string | null
+          id: string
+          kind: string
+          metadata: Json
+          name: string
+          operacao_id: string | null
+          phone_number_id: string | null
+          quality_rating: string | null
+          status: string | null
+          synced_at: string
+          token: string | null
+          type: string
+          updated_at: string
+          verified_name: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_channels"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_wa_conversations: {
+        Args: { _codigo: string; _operacao_id?: string; _vendor_id: number }
+        Returns: {
+          assigned_vendor_id: number | null
+          channel_id: string
+          contact_name: string | null
+          contact_wa_id: string
+          created_at: string
+          id: string
+          last_message_at: string
+          last_message_direction: string | null
+          last_message_preview: string | null
+          operacao_id: string | null
+          phone_number_id: string | null
+          unread_count: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_conversations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_wa_messages: {
+        Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
+        Returns: {
+          caption: string | null
+          channel_id: string
+          conversation_id: string
+          created_at: string
+          direction: string
+          error_message: string | null
+          from_wa_id: string | null
+          id: string
+          media_filename: string | null
+          media_id: string | null
+          media_mime: string | null
+          media_url: string | null
+          msg_type: string
+          raw: Json | null
+          reply_to: string | null
+          sent_by: string | null
+          status: string | null
+          text_body: string | null
+          to_wa_id: string | null
+          wa_message_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_messages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_mark_conversation_read: {
+        Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
+        Returns: boolean
+      }
+      vendor_update_crm_lead_stage: {
+        Args: {
+          _codigo: string
+          _lead_id: string
+          _status: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
