@@ -2017,6 +2017,7 @@ export type Database = {
     }
     Functions: {
       _vendor_norm: { Args: { value: string }; Returns: string }
+      _wa_contact_variants: { Args: { _raw: string }; Returns: string[] }
       assign_vendor_for_channel: {
         Args: { _channel_id: string }
         Returns: number
@@ -2063,6 +2064,26 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      vendor_insert_wa_message: {
+        Args: {
+          _caption?: string
+          _channel_id: string
+          _codigo: string
+          _conversation_id: string
+          _direction?: string
+          _from_wa_id?: string
+          _media_filename?: string
+          _media_url?: string
+          _msg_type?: string
+          _raw?: Json
+          _status?: string
+          _text_body?: string
+          _to_wa_id?: string
+          _vendor_id: number
+          _wa_message_id?: string
+        }
+        Returns: string
       }
       vendor_list_crm_experts: {
         Args: { _codigo: string; _vendor_id: number }
@@ -2260,12 +2281,63 @@ export type Database = {
         Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
         Returns: boolean
       }
+      vendor_resolve_wa_conversation: {
+        Args: {
+          _channel_id?: string
+          _codigo: string
+          _contact_wa_id?: string
+          _conversation_id?: string
+          _vendor_id: number
+        }
+        Returns: {
+          assigned_vendor_id: number | null
+          channel_id: string
+          contact_name: string | null
+          contact_wa_id: string
+          created_at: string
+          id: string
+          last_message_at: string
+          last_message_direction: string | null
+          last_message_preview: string | null
+          operacao_id: string | null
+          phone_number_id: string | null
+          unread_count: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_conversations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_touch_wa_conversation: {
+        Args: {
+          _codigo: string
+          _conversation_id: string
+          _direction?: string
+          _preview?: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
       vendor_update_crm_lead_stage: {
         Args: {
           _codigo: string
           _lead_id: string
           _status: string
           _vendor_id: number
+        }
+        Returns: boolean
+      }
+      vendor_update_wa_message_status: {
+        Args: {
+          _codigo: string
+          _message_id: string
+          _raw?: Json
+          _status?: string
+          _vendor_id: number
+          _wa_message_id?: string
         }
         Returns: boolean
       }
