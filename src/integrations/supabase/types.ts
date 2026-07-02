@@ -2065,6 +2065,39 @@ export type Database = {
         Args: { _codigo: string; _vendor_id: number }
         Returns: string[]
       }
+      vendor_create_wa_flow_run: {
+        Args: {
+          _channel_id?: string
+          _codigo: string
+          _contact_wa_id?: string
+          _context?: Json
+          _conversation_id?: string
+          _current_node_id?: string
+          _flow_id: string
+          _vendor_id: number
+        }
+        Returns: {
+          channel_id: string
+          contact_wa_id: string
+          context: Json
+          conversation_id: string | null
+          created_at: string
+          current_node_id: string | null
+          error: string | null
+          expires_at: string | null
+          flow_id: string
+          id: string
+          status: string
+          updated_at: string
+          waiting_for: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_flow_runs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       vendor_get_flow: {
         Args: { _codigo: string; _flow_id: string; _vendor_id: number }
         Returns: {
@@ -2088,6 +2121,20 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_insert_wa_flow_execution: {
+        Args: {
+          _codigo: string
+          _duration_ms?: number
+          _error?: string
+          _node_id: string
+          _node_type: string
+          _output?: Json
+          _run_id: string
+          _status: string
+          _vendor_id: number
+        }
+        Returns: string
+      }
       vendor_insert_wa_message: {
         Args: {
           _caption?: string
@@ -2107,6 +2154,19 @@ export type Database = {
           _wa_message_id?: string
         }
         Returns: string
+      }
+      vendor_list_active_wa_flow_runs: {
+        Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
+        Returns: {
+          current_node_id: string
+          error: string
+          flow_id: string
+          flow_nome: string
+          id: string
+          status: string
+          updated_at: string
+          waiting_for: string
+        }[]
       }
       vendor_list_crm_experts: {
         Args: { _codigo: string; _vendor_id: number }
@@ -2349,6 +2409,15 @@ export type Database = {
           _codigo: string
           _lead_id: string
           _status: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
+      vendor_update_wa_flow_run: {
+        Args: {
+          _codigo: string
+          _patch?: Json
+          _run_id: string
           _vendor_id: number
         }
         Returns: boolean

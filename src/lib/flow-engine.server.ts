@@ -13,14 +13,22 @@ type Ctx = {
   db: any;
   variables: Record<string, any>;
   lastInput?: { text?: string | null; buttonId?: string | null; messageType?: string | null };
+  vendor?: VendorRunContext | null;
 };
 
 type Node = { id: string; type: string; data: any };
 type Edge = { id: string; source: string; target: string; sourceHandle?: string | null };
+type VendorRunContext = { id: number; codigo: string };
 
 async function getAdminDb() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
+}
+
+function vendorRpcArgs(vendor?: VendorRunContext | null) {
+  const id = Number(vendor?.id);
+  const codigo = String(vendor?.codigo ?? "").trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
 }
 
 async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS) {
@@ -177,6 +185,41 @@ function nextFlowCreatedAt(): string {
 
 async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
   if (!ctx.conversationId) return;
+  const textBody = body?.text?.body ?? body?.interactive?.body?.text ?? null;
+  const mediaUrl = body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null;
+  const mediaFilename = body?.document?.filename ?? null;
+  const caption = body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null;
+  const toNormalized = toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId);
+  const preview = type === "text" ? String(textBody ?? "").slice(0, 120) : `[${type}]`;
+
+  const rpcArgs = vendorRpcArgs(ctx.vendor);
+  if (rpcArgs) {
+    const { error } = await ctx.db.rpc("vendor_insert_wa_message" as any, {
+      ...rpcArgs,
+      _conversation_id: ctx.conversationId,
+      _channel_id: ctx.channelId,
+      _wa_message_id: waMsgId,
+      _direction: "out",
+      _msg_type: type,
+      _text_body: textBody,
+      _media_url: mediaUrl,
+      _media_filename: mediaFilename,
+      _caption: caption,
+      _from_wa_id: phoneNumberId,
+      _to_wa_id: toNormalized,
+      _status: "sent",
+      _raw: body,
+    });
+    if (error) throw new Error(error.message);
+    await ctx.db.rpc("vendor_touch_wa_conversation" as any, {
+      ...rpcArgs,
+      _conversation_id: ctx.conversationId,
+      _preview: preview,
+      _direction: "out",
+    });
+    return;
+  }
+
   const createdAt = nextFlowCreatedAt();
   await ctx.db.from("wa_messages" as any).insert({
     conversation_id: ctx.conversationId,
@@ -184,25 +227,40 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     wa_message_id: waMsgId,
     direction: "out",
     msg_type: type,
-    text_body: body?.text?.body ?? body?.interactive?.body?.text ?? null,
-    media_url: body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null,
-    media_filename: body?.document?.filename ?? null,
-    caption: body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null,
+    text_body: textBody,
+    media_url: mediaUrl,
+    media_filename: mediaFilename,
+    caption,
     from_wa_id: phoneNumberId,
-    to_wa_id: toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId),
+    to_wa_id: toNormalized,
     status: "sent",
     raw: body,
     created_at: createdAt,
   });
   await ctx.db.from("wa_conversations" as any).update({
     last_message_at: createdAt,
-    last_message_preview: type === "text" ? (body?.text?.body ?? "").slice(0, 120) : `[${type}]`,
+    last_message_preview: preview,
     last_message_direction: "out",
   }).eq("id", ctx.conversationId);
 }
 
 
-async function logExecution(db: any, runId: string, node: Node, status: string, output?: any, error?: string, started?: number) {
+async function logExecution(db: any, runId: string, node: Node, status: string, output?: any, error?: string, started?: number, vendor?: VendorRunContext | null) {
+  const rpcArgs = vendorRpcArgs(vendor);
+  if (rpcArgs) {
+    const { error: rpcError } = await db.rpc("vendor_insert_wa_flow_execution" as any, {
+      ...rpcArgs,
+      _run_id: runId,
+      _node_id: node.id,
+      _node_type: node.type,
+      _status: status,
+      _output: output ?? null,
+      _error: error ?? null,
+      _duration_ms: started ? Date.now() - started : null,
+    });
+    if (rpcError) throw new Error(rpcError.message);
+    return;
+  }
   await db.from("wa_flow_executions" as any).insert({
     run_id: runId,
     node_id: node.id,
@@ -212,6 +270,64 @@ async function logExecution(db: any, runId: string, node: Node, status: string, 
     error: error ?? null,
     duration_ms: started ? Date.now() - started : null,
   });
+}
+
+async function createFlowRun(db: any, args: {
+  flowId: string;
+  conversationId: string | null;
+  channelId: string;
+  contactWaId: string;
+  currentNodeId: string | null;
+  triggerContext?: any;
+  vendor?: VendorRunContext | null;
+}) {
+  const rpcArgs = vendorRpcArgs(args.vendor);
+  if (rpcArgs) {
+    const { data, error } = await db.rpc("vendor_create_wa_flow_run" as any, {
+      ...rpcArgs,
+      _flow_id: args.flowId,
+      _conversation_id: args.conversationId,
+      _channel_id: args.channelId,
+      _contact_wa_id: args.contactWaId,
+      _current_node_id: args.currentNodeId,
+      _context: { trigger: args.triggerContext ?? {} },
+    });
+    const run = Array.isArray(data) ? data[0] : data;
+    if (error || !run) throw new Error(error?.message ?? "Não foi possível criar a execução");
+    return run as any;
+  }
+
+  const { data: run, error } = await db
+    .from("wa_flow_runs" as any)
+    .insert({
+      flow_id: args.flowId,
+      conversation_id: args.conversationId,
+      channel_id: args.channelId,
+      contact_wa_id: args.contactWaId,
+      current_node_id: args.currentNodeId,
+      status: "running",
+      context: { trigger: args.triggerContext ?? {} },
+    })
+    .select("id")
+    .single();
+  if (error || !run) throw new Error(error?.message ?? "Não foi possível criar a execução");
+  return run as any;
+}
+
+async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
+  const rpcArgs = vendorRpcArgs(ctx.vendor);
+  if (rpcArgs) {
+    const { data, error } = await ctx.db.rpc("vendor_update_wa_flow_run" as any, {
+      ...rpcArgs,
+      _run_id: ctx.runId,
+      _patch: patch,
+    });
+    if (error) throw new Error(error.message);
+    if (data === false) throw new Error("Execução não encontrada");
+    return;
+  }
+  const { error } = await ctx.db.from("wa_flow_runs" as any).update(patch).eq("id", ctx.runId);
+  if (error) throw new Error(error.message);
 }
 
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
@@ -271,37 +387,37 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
       const result = await runNode(node, ctx);
 
       // Update run pointer
-      await ctx.db.from("wa_flow_runs" as any).update({
+      await updateFlowRun(ctx, {
         current_node_id: node.id,
         context: ctx.variables,
         status: result.pause ? "waiting" : "running",
         waiting_for: result.waitingFor ?? null,
         expires_at: result.expiresAt ?? null,
-      }).eq("id", ctx.runId);
+      });
 
-      await logExecution(ctx.db, ctx.runId, node, "ok", result.log ?? null, undefined, started);
+      await logExecution(ctx.db, ctx.runId, node, "ok", result.log ?? null, undefined, started, ctx.vendor);
 
       if (result.pause) return;
       if (result.end) {
-        await ctx.db.from("wa_flow_runs" as any).update({
+        await updateFlowRun(ctx, {
           status: "completed", waiting_for: null,
-        }).eq("id", ctx.runId);
+        });
         return;
       }
       currentId = nextNodeId(edges, node.id, result.handle);
     } catch (e: any) {
-      await logExecution(ctx.db, ctx.runId, node, "error", null, String(e?.message ?? e), started);
-      await ctx.db.from("wa_flow_runs" as any).update({
+      await logExecution(ctx.db, ctx.runId, node, "error", null, String(e?.message ?? e), started, ctx.vendor);
+      await updateFlowRun(ctx, {
         status: "failed", error: String(e?.message ?? e),
-      }).eq("id", ctx.runId);
+      });
       return;
     }
   }
 
   if (!currentId) {
-    await ctx.db.from("wa_flow_runs" as any).update({
+    await updateFlowRun(ctx, {
       status: "completed", waiting_for: null,
-    }).eq("id", ctx.runId);
+    });
   }
 }
 
@@ -566,6 +682,7 @@ export async function runFlowAdmin(args: {
   conversationId: string | null;
   triggerContext?: any;
   db?: any;
+  vendor?: VendorRunContext | null;
 }) {
   const db = args.db ?? await getAdminDb();
   const flow = await loadFlow(args.flowId, db);
@@ -590,33 +707,29 @@ export async function runFlowAdmin(args: {
   const startId =
     entryNode?.type === "trigger" ? nextNodeId(edges, entryId!) : entryId;
 
-  const { data: run, error } = await db
-    .from("wa_flow_runs" as any)
-    .insert({
-      flow_id: args.flowId,
-      conversation_id: args.conversationId,
-      channel_id: args.channelId,
-      contact_wa_id: args.contactWaId,
-      current_node_id: startId ?? entryId,
-      status: "running",
-      context: { trigger: args.triggerContext ?? {} },
-    })
-    .select("id")
-    .single();
-  if (error || !run) throw new Error(error?.message ?? "Não foi possível criar a execução");
+  const run = await createFlowRun(db, {
+    flowId: args.flowId,
+    conversationId: args.conversationId,
+    channelId: args.channelId,
+    contactWaId: args.contactWaId,
+    currentNodeId: startId ?? entryId,
+    triggerContext: args.triggerContext,
+    vendor: args.vendor,
+  });
 
   const ctx: Ctx = {
     runId: (run as any).id,
     flowId: args.flowId,
     channelId: args.channelId,
     contactWaId: args.contactWaId,
-    conversationId: args.conversationId,
+    conversationId: (run as any).conversation_id ?? args.conversationId,
     db,
     variables: { trigger: args.triggerContext ?? {} },
+    vendor: args.vendor ?? null,
   };
 
   if (!startId) {
-    await db.from("wa_flow_runs" as any).update({ status: "completed" }).eq("id", ctx.runId);
+    await updateFlowRun(ctx, { status: "completed" });
     return { runId: ctx.runId, completed: true, reason: "no_next_node" };
   }
   await executeFrom(ctx, startId);

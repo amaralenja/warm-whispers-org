@@ -530,6 +530,9 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       contactWaId: data.contact_wa_id,
       conversationId: data.conversation_id ?? null,
       db,
+      vendor: (context as any).vendor
+        ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
+        : null,
       triggerContext: { manual: true },
     });
   });
@@ -544,6 +547,16 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
       await assertVendorConversationAccess(context, db, data.conversationId);
     } catch {
       return [];
+    }
+
+    const rpcArgs = vendorRpcArgs(context);
+    if (rpcArgs) {
+      const { data: vendorRuns, error: vendorError } = await db.rpc(
+        "vendor_list_active_wa_flow_runs" as any,
+        { ...rpcArgs, _conversation_id: data.conversationId },
+      );
+      if (vendorError) throw new Error(vendorError.message);
+      return (vendorRuns ?? []) as any[];
     }
 
     const { data: runs, error } = await db
