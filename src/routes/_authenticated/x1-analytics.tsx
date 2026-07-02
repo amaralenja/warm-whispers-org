@@ -65,18 +65,36 @@ function fmtDur(seconds: number) {
   return `${h}h ${m}m`;
 }
 
-function defaultRange() {
+function todayRange() {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  return { from: iso(now), to: iso(now) };
+}
+
+type Preset = "hoje" | "7d" | "30d" | "mes";
+
+function presetRange(p: Preset) {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
   const to = new Date();
   const from = new Date();
-  from.setDate(from.getDate() - 30);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: iso(from), to: iso(to) };
+  if (p === "hoje") return { from: iso(to), to: iso(to) };
+  if (p === "7d") { from.setDate(from.getDate() - 6); return { from: iso(from), to: iso(to) }; }
+  if (p === "30d") { from.setDate(from.getDate() - 29); return { from: iso(from), to: iso(to) }; }
+  const first = new Date(to.getFullYear(), to.getMonth(), 1);
+  return { from: iso(first), to: iso(to) };
 }
+
 
 function X1AnalyticsPage() {
   const fetchFn = useServerFn(getX1Analytics);
-  const [range, setRange] = useState(defaultRange);
+  const [preset, setPreset] = useState<Preset>("hoje");
+  const [range, setRange] = useState<{ from: string; to: string }>(() => todayRange());
   const [operacao, setOperacao] = useState<string>("all");
+
+  const applyPreset = (p: Preset) => {
+    setPreset(p);
+    setRange(presetRange(p));
+  };
 
   const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ["x1-analytics", range.from, range.to, operacao],
@@ -88,6 +106,7 @@ function X1AnalyticsPage() {
   const payload = (data ?? null) as X1AnalyticsPayload | null;
 
   const chartMsgs = useMemo(() => payload?.serieDiaria ?? [], [payload]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-6">
@@ -105,29 +124,45 @@ function X1AnalyticsPage() {
               Métricas completas de leads, mensagens, conversão e faturamento por operação e vendedor.
             </p>
           </div>
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-card p-1">
+              {(["hoje", "7d", "30d", "mes"] as Preset[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => applyPreset(p)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                    preset === p
+                      ? "bg-primary text-primary-foreground shadow"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {p === "hoje" ? "Hoje" : p === "7d" ? "7 dias" : p === "30d" ? "30 dias" : "Mês"}
+                </button>
+              ))}
+            </div>
             <div>
-              <Label className="text-xs">De</Label>
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">De</Label>
               <Input
                 type="date"
                 value={range.from}
-                onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-                className="h-9 w-40"
+                onChange={(e) => { setPreset("hoje"); setRange((r) => ({ ...r, from: e.target.value })); }}
+                className="h-9 w-40 bg-card"
               />
             </div>
             <div>
-              <Label className="text-xs">Até</Label>
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Até</Label>
               <Input
                 type="date"
                 value={range.to}
-                onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-                className="h-9 w-40"
+                onChange={(e) => { setPreset("hoje"); setRange((r) => ({ ...r, to: e.target.value })); }}
+                className="h-9 w-40 bg-card"
               />
             </div>
             <div>
-              <Label className="text-xs">Operação</Label>
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Operação</Label>
               <Select value={operacao} onValueChange={setOperacao}>
-                <SelectTrigger className="h-9 w-44">
+                <SelectTrigger className="h-9 w-44 bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -143,6 +178,7 @@ function X1AnalyticsPage() {
             </Button>
           </div>
         </div>
+
 
         {error ? (
           <Card><CardContent className="p-6 text-sm text-destructive">
@@ -234,8 +270,8 @@ function X1AnalyticsPage() {
               <ResponsiveContainer>
                 <LineChart data={chartMsgs}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-                  <XAxis dataKey="data" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <XAxis dataKey="data" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
                   <Tooltip
                     contentStyle={{
                       background: "hsl(var(--popover))",
@@ -244,7 +280,7 @@ function X1AnalyticsPage() {
                       fontSize: 12,
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }} />
                   <Line type="monotone" dataKey="msgsIn" name="Recebidas" stroke="#10b981" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="msgsOut" name="Enviadas" stroke="#8b5cf6" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="vendas" name="Vendas" stroke="#f59e0b" strokeWidth={2} dot={false} />
@@ -264,10 +300,10 @@ function X1AnalyticsPage() {
               <ResponsiveContainer>
                 <BarChart data={payload?.porOperacao ?? []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-                  <XAxis dataKey="operacao" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <XAxis dataKey="operacao" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }} />
                   <Bar dataKey="leads" name="Leads" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="vendas" name="Vendas" fill="#f59e0b" radius={[6, 6, 0, 0]} />
                 </BarChart>
