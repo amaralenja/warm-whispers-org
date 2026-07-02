@@ -943,3 +943,69 @@ export const setConversationOperacao = createServerFn({ method: "POST" })
       .eq("id", data.conversationId);
     return { ok: true };
   });
+
+// Delete an outgoing message. Soft-deletes in DB (message shown as "apagada")
+// and best-effort attempts to delete on WhatsApp side via Meta Graph API.
+export const deleteWhatsappMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { messageId: string }) => ({ messageId: String(d?.messageId ?? "") }))
+  .handler(async ({ context, data }) => {
+    if (!data.messageId) throw new Error("messageId obrigatório");
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any).vendor);
+
+    let waMessageId: string | null = null;
+    let channelId: string | null = null;
+
+    if (isVendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+      const { data: rows, error } = await db.rpc("vendor_delete_wa_message" as any, {
+        ...rpcArgs,
+        _message_id: data.messageId,
+      });
+      if (error) throw new Error(error.message);
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (!row) throw new Error("Mensagem não encontrada ou não é sua");
+      waMessageId = row.wa_message_id ?? null;
+      channelId = row.channel_id ?? null;
+    } else {
+      const { data: msg, error: fetchErr } = await db
+        .from("wa_messages" as any)
+        .select("id,wa_message_id,channel_id,direction,deleted_at")
+        .eq("id", data.messageId)
+        .maybeSingle();
+      if (fetchErr) throw new Error(fetchErr.message);
+      if (!msg) throw new Error("Mensagem não encontrada");
+      if ((msg as any).direction !== "out") throw new Error("Só é possível apagar mensagens enviadas por você");
+      waMessageId = (msg as any).wa_message_id ?? null;
+      channelId = (msg as any).channel_id ?? null;
+      const { error: upErr } = await db
+        .from("wa_messages" as any)
+        .update({
+          deleted_at: new Date().toISOString(),
+          text_body: null,
+          media_url: null,
+          media_id: null,
+          media_filename: null,
+          caption: null,
+        })
+        .eq("id", data.messageId);
+      if (upErr) throw new Error(upErr.message);
+    }
+
+    // Best-effort: pedir pro WhatsApp remover pra todos.
+    let waRemoved = false;
+    if (waMessageId && channelId) {
+      try {
+        const ch = await findChannel(channelId, db);
+        await metaProxyForChannel(ch, `/${encodeURIComponent(waMessageId)}`, { method: "DELETE" }, db);
+        waRemoved = true;
+      } catch (e) {
+        console.warn("Falha ao apagar mensagem no WhatsApp (mantida como apagada no sistema):", (e as any)?.message ?? e);
+      }
+    }
+
+    return { ok: true, waRemoved };
+  });
+
