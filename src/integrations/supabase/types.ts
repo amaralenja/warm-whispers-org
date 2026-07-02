@@ -1797,6 +1797,7 @@ export type Database = {
           channel_id: string
           conversation_id: string
           created_at: string
+          deleted_at: string | null
           direction: string
           error_message: string | null
           from_wa_id: string | null
@@ -1819,6 +1820,7 @@ export type Database = {
           channel_id: string
           conversation_id: string
           created_at?: string
+          deleted_at?: string | null
           direction: string
           error_message?: string | null
           from_wa_id?: string | null
@@ -1841,6 +1843,7 @@ export type Database = {
           channel_id?: string
           conversation_id?: string
           created_at?: string
+          deleted_at?: string | null
           direction?: string
           error_message?: string | null
           from_wa_id?: string | null
@@ -2110,6 +2113,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_delete_wa_message: {
+        Args: { _codigo: string; _message_id: string; _vendor_id: number }
+        Returns: {
+          channel_id: string
+          direction: string
+          id: string
+          wa_message_id: string
+        }[]
+      }
       vendor_get_flow: {
         Args: { _codigo: string; _flow_id: string; _vendor_id: number }
         Returns: {
@@ -2349,6 +2361,7 @@ export type Database = {
           channel_id: string
           conversation_id: string
           created_at: string
+          deleted_at: string | null
           direction: string
           error_message: string | null
           from_wa_id: string | null
