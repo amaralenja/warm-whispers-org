@@ -62,6 +62,7 @@ async function attachFlowTriggers(db: any, flows: any[]) {
 
 async function assertVendorConversationAccess(context: any, db: any, conversationId: string) {
   if (!context?.vendor) return;
+  if (!conversationId) return;
   const { data: conv, error } = await db
     .from("wa_conversations" as any)
     .select("id,channel_id,assigned_vendor_id")
@@ -70,8 +71,21 @@ async function assertVendorConversationAccess(context: any, db: any, conversatio
   if (error) throw new Error(error.message);
   if (!conv) throw new Error("Conversa não encontrada");
   const allowed = await vendorAllowedChannelIds(context, db);
-  if (!allowed.includes(String((conv as any).channel_id)) || Number((conv as any).assigned_vendor_id) !== Number(context.vendor.id)) {
-    throw new Error("Inautorizado: este lead não está liberado para este vendedor");
+  if (!allowed.includes(String((conv as any).channel_id))) {
+    throw new Error("Inautorizado: vendedor sem acesso a este número");
+  }
+  const assigned = (conv as any).assigned_vendor_id;
+  const assignedId = assigned == null ? null : Number(assigned);
+  if (assignedId == null) {
+    await db
+      .from("wa_conversations" as any)
+      .update({ assigned_vendor_id: Number(context.vendor.id) })
+      .eq("id", conversationId)
+      .is("assigned_vendor_id", null);
+    return;
+  }
+  if (assignedId !== Number(context.vendor.id)) {
+    throw new Error("Inautorizado: este lead está com outro vendedor");
   }
 }
 
