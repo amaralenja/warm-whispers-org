@@ -1805,18 +1805,27 @@ function ConversationMetaControls({
 }) {
   const initialTags = Array.isArray(conv.tags) ? conv.tags.filter(Boolean) : [];
   const [tags, setTags] = useState<string[]>(initialTags);
-  const [tagInput, setTagInput] = useState("");
+  const [tagSearch, setTagSearch] = useState("");
   const [notes, setNotes] = useState<string>(conv.notes ?? "");
   const [savingTags, setSavingTags] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
 
-  const addTag = async (raw: string) => {
-    const t = raw.trim();
+  const listTagsFn = useServerFn(listCrmTags);
+  const operacao = (conv as any)?.operacao_id || "all";
+  const { data: crmTags = [] } = useQuery<any[]>({
+    queryKey: ["chat", "crm-tags", operacao],
+    queryFn: async () => {
+      const res = await listTagsFn({ data: { operacao } });
+      return Array.isArray(res) ? res : [];
+    },
+    staleTime: 60_000,
+  });
+
+  const toggleTag = async (name: string) => {
+    const t = String(name || "").trim();
     if (!t) return;
-    if (tags.includes(t)) { setTagInput(""); return; }
-    const next = [...tags, t].slice(0, 50);
+    const next = tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t].slice(0, 50);
     setTags(next);
-    setTagInput("");
     setSavingTags(true);
     try { await onSaveTags(next); } finally { setSavingTags(false); }
   };
@@ -1830,6 +1839,12 @@ function ConversationMetaControls({
     setSavingNotes(true);
     try { await onSaveNotes(notes); } finally { setSavingNotes(false); }
   };
+
+  const q = tagSearch.trim().toLowerCase();
+  const filteredCrmTags = (crmTags || []).filter((t: any) => {
+    const nome = String(t?.nome ?? "");
+    return !q || nome.toLowerCase().includes(q);
+  });
 
   return (
     <div className="flex shrink-0 items-center gap-2">
@@ -1861,28 +1876,39 @@ function ConversationMetaControls({
               </span>
             ))}
           </div>
-          <div className="flex gap-2">
-            <Input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); void addTag(tagInput); }
-              }}
-              placeholder="Nova etiqueta (Enter)"
-              className="h-9 border-chat-line bg-chat-soft text-sm"
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void addTag(tagInput)}
-              disabled={savingTags || !tagInput.trim()}
-              className="h-9"
-            >
-              Adicionar
-            </Button>
+          <Input
+            value={tagSearch}
+            onChange={(e) => setTagSearch(e.target.value)}
+            placeholder="Buscar etiqueta..."
+            className="h-9 border-chat-line bg-chat-soft text-sm"
+          />
+          <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+            {filteredCrmTags.length === 0 ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                Nenhuma etiqueta cadastrada. Crie etiquetas na aba CRM Leads X1.
+              </div>
+            ) : filteredCrmTags.map((t: any) => {
+              const nome = String(t?.nome ?? "");
+              const cor = String(t?.cor ?? "#3b82f6");
+              const active = tags.includes(nome);
+              return (
+                <button
+                  key={String(t?.id ?? nome)}
+                  type="button"
+                  onClick={() => void toggleTag(nome)}
+                  disabled={savingTags}
+                  className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${active ? "border-chat-accent/60 bg-chat-accent/10" : "border-chat-line hover:bg-chat-soft"}`}
+                >
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cor }} />
+                  <span className="flex-1 truncate">{nome}</span>
+                  {active ? <span className="text-[10px] font-semibold text-chat-accent">✓</span> : null}
+                </button>
+              );
+            })}
           </div>
         </PopoverContent>
       </Popover>
+
 
       <Popover>
         <PopoverTrigger asChild>
