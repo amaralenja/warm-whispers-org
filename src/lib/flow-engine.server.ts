@@ -225,14 +225,28 @@ function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): 
 }
 
 async function loadFlow(flowId: string, db: any) {
-  const { data, error } = await db
+  let { data, error } = await db
     .from("wa_flows" as any)
     .select("*")
     .eq("id", flowId)
-    .single();
+    .maybeSingle();
+  if (!data) {
+    // Fallback to admin client (RLS may hide the flow from vendor sessions)
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const res = await supabaseAdmin
+        .from("wa_flows" as any)
+        .select("*")
+        .eq("id", flowId)
+        .maybeSingle();
+      data = res.data;
+      error = res.error;
+    } catch {}
+  }
   if (error || !data) throw new Error(`Flow ${flowId} não encontrado`);
   return data as any;
 }
+
 
 async function executeFrom(ctx: Ctx, startNodeId: string) {
   const flow = await loadFlow(ctx.flowId, ctx.db);
