@@ -721,7 +721,9 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       messaging_product: "whatsapp",
       to: toNormalized,
       type: data.type,
+      ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId } } : {}),
     };
+
     if (data.type === "text") {
       if (!data.text) throw new Error("Texto vazio");
       body.text = { body: data.text };
