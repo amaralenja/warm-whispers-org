@@ -283,14 +283,16 @@ export const createFlow = createServerFn({ method: "POST" })
     folder: d?.folder ? String(d.folder).trim() || null : null,
   }))
   .handler(async ({ context, data }) => {
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any)?.vendor);
     const startId = "n-trigger";
     const nome = data.nome.trim();
-    const { data: dup } = await context.supabase
+    const { data: dup } = await db
       .from("wa_flows" as any).select("id").ilike("nome", nome).limit(1);
     if (dup && dup.length > 0) {
       throw new Error(`Já existe um fluxo com o nome "${nome}". Escolha outro nome.`);
     }
-    const { data: row, error } = await context.supabase
+    const { data: row, error } = await db
       .from("wa_flows" as any)
       .insert({
         nome,
@@ -302,7 +304,7 @@ export const createFlow = createServerFn({ method: "POST" })
           { id: startId, type: "trigger", position: { x: 100, y: 100 }, data: { label: "Início" } },
         ],
         edges: [],
-        created_by: context.userId,
+        created_by: isVendor ? null : context.userId,
       })
       .select("id")
       .single();
@@ -452,10 +454,12 @@ export const importFlow = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     if (!data.code.trim()) throw new Error("Cole um código de fluxo.");
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any)?.vendor);
     const payload = decodeFlowCode(data.code);
     const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString();
-    const finalName = await uniqueFlowName(context.supabase, desired);
-    const { data: row, error } = await context.supabase
+    const finalName = await uniqueFlowName(db, desired);
+    const { data: row, error } = await db
       .from("wa_flows" as any)
       .insert({
         nome: finalName,
@@ -464,7 +468,7 @@ export const importFlow = createServerFn({ method: "POST" })
         entry_node_id: payload.entry_node_id ?? null,
         nodes: payload.nodes ?? [],
         edges: payload.edges ?? [],
-        created_by: context.userId,
+        created_by: isVendor ? null : context.userId,
       })
       .select("id").single();
     if (error) throw new Error(error.message);
@@ -477,7 +481,7 @@ export const importFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      await context.supabase.from("wa_flow_triggers" as any).insert(rows);
+      await db.from("wa_flow_triggers" as any).insert(rows);
     }
     return { id: (row as any).id, nome: finalName };
   });

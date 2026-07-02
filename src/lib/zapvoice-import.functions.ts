@@ -117,13 +117,18 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       if (!Array.isArray((b as any)[k])) throw new Error(`Backup inválido: '${k}' precisa ser array.`);
     }
 
-    const db = context.supabase as any;
+    const isVendor = Boolean((context as any)?.vendor);
+    let db: any = context.supabase as any;
+    if (isVendor) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      db = supabaseAdmin as any;
+    }
 
     const summary: Summary = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
     // Substituir: apaga só os fluxos importados deste usuário com prefixo [ZV]
     // (apenas no primeiro chunk — se funnelIds vier, NÃO apaga pra não destruir os já criados)
-    if (data.replace && !data.funnelIds) {
+    if (data.replace && !data.funnelIds && !isVendor) {
       await db
         .from("wa_flows")
         .delete()
@@ -310,7 +315,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
           entry_node_id: triggerId,
           nodes,
           edges,
-          created_by: context.userId,
+          created_by: isVendor ? null : context.userId,
           descricao: `Importado do ZapVoice (id original: ${f.id})${f.isFavorite ? " · ⭐" : ""}`,
         });
         if (insErr) throw new Error(insErr.message);
