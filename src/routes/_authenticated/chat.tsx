@@ -296,6 +296,25 @@ function ChatPage() {
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
+  const listAllTagsFn = useServerFn(listCrmTags);
+  const { data: allCrmTags = [] } = useQuery<any[]>({
+    queryKey: ["chat", "crm-tags", "all"],
+    queryFn: async () => {
+      const res = await listAllTagsFn({ data: { operacao: "all" } });
+      return Array.isArray(res) ? res : [];
+    },
+    staleTime: 60_000,
+  });
+  const tagColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of (allCrmTags as any[])) {
+      const nome = String(t?.nome ?? "").trim().toLowerCase();
+      const cor = String(t?.cor ?? "");
+      if (nome && cor) m.set(nome, cor);
+    }
+    return m;
+  }, [allCrmTags]);
+  const tagColorFor = (name: string) => tagColorMap.get(String(name || "").trim().toLowerCase()) || "";
 
   const handleReact = async (m: Msg, emoji: string) => {
     if (!active) return;
@@ -776,11 +795,17 @@ function ChatPage() {
                             const extra = tags.length - shown.length;
                             return (
                               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
-                                {shown.map((t) => (
-                                  <span key={t} className="max-w-[110px] truncate rounded-full border border-chat-accent/40 bg-chat-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-chat-accent">
-                                    {t}
-                                  </span>
-                                ))}
+                                {shown.map((t) => {
+                                  const cor = tagColorFor(t);
+                                  const style: CSSProperties = cor
+                                    ? { backgroundColor: `${cor}1a`, borderColor: `${cor}66`, color: cor }
+                                    : {};
+                                  return (
+                                    <span key={t} style={style} className={`max-w-[110px] truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${cor ? "" : "border-chat-accent/40 bg-chat-accent/10 text-chat-accent"}`}>
+                                      {t}
+                                    </span>
+                                  );
+                                })}
                                 {extra > 0 ? (
                                   <span className="rounded-full border border-chat-line px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                     +{extra}
@@ -1862,19 +1887,24 @@ function ConversationMetaControls({
           <div className="mb-3 flex flex-wrap gap-1.5">
             {tags.length === 0 ? (
               <span className="text-xs text-muted-foreground">Nenhuma etiqueta ainda.</span>
-            ) : tags.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 rounded-full border border-chat-accent/40 bg-chat-accent/10 px-2 py-0.5 text-xs font-medium text-chat-accent">
-                {t}
-                <button
-                  type="button"
-                  onClick={() => removeTag(t)}
-                  className="ml-0.5 rounded-full p-0.5 hover:bg-chat-accent/20"
-                  aria-label={`Remover ${t}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+            ) : tags.map((t) => {
+              const found = (crmTags as any[]).find((x: any) => String(x?.nome ?? "").toLowerCase() === t.toLowerCase());
+              const cor = String(found?.cor ?? "");
+              const style = cor ? { backgroundColor: `${cor}1a`, borderColor: `${cor}66`, color: cor } : undefined;
+              return (
+                <span key={t} style={style} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${cor ? "" : "border-chat-accent/40 bg-chat-accent/10 text-chat-accent"}`}>
+                  {t}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(t)}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-black/10"
+                    aria-label={`Remover ${t}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              );
+            })}
           </div>
           <Input
             value={tagSearch}
