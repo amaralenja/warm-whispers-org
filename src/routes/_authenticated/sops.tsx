@@ -161,6 +161,7 @@ function SopsPage() {
     setDraft(found ? { ...found } : null);
     initialRef.current = found ? JSON.stringify(found) : "";
     setHistoryOpen(false);
+    setEditing(false);
   }, [selectedId, sops]);
 
   const dirty = !!draft && JSON.stringify(draft) !== initialRef.current;
