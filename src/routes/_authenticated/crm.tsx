@@ -6,8 +6,9 @@ import {
   User, MoreVertical, Tag as TagIcon, Columns3,
 } from "lucide-react";
 import {
-  TagsManagerDialog, StagesManagerDialog, useCrmStages, DEFAULT_STAGES, useHiddenDefaultStages,
+  TagsManagerDialog, StagesManagerDialog, useCrmStages, useCrmTags, DEFAULT_STAGES, useHiddenDefaultStages,
 } from "@/components/tags-manager-dialog";
+
 
 import { useServerFn } from "@tanstack/react-start";
 import { fireNewLeadTrigger } from "@/lib/flow-engine.functions";
@@ -38,28 +39,39 @@ export const Route = createFileRoute("/_authenticated/crm")({
   component: CRMPage,
 });
 
-type StageView = { id: string; label: string; color: string; soft: string; border: string; text: string };
+type StageView = { id: string; label: string; cor: string };
 
-function hexToSoft(hex: string, alpha = 0.1) {
-  const h = hex.replace("#", "");
+function stageView(id: string, nome: string, cor: string): StageView {
+  return { id, label: nome, cor: cor || "#64748b" };
+}
+
+function hexToRgba(hex: string, alpha = 0.15) {
+  const h = (hex || "#64748b").replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function stageView(id: string, nome: string, cor: string): StageView {
-  return {
-    id, label: nome,
-    color: "",
-    soft: "",
-    border: "",
-    text: "",
-    // we'll inline styles via cor in render
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...({ cor } as any),
-  };
+// Deterministic color from a string (name → hue)
+const AVATAR_PALETTE = [
+  "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e",
+  "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
+  "#8b5cf6", "#a855f7", "#d946ef", "#ec4899", "#f43f5e",
+];
+function colorFromName(name: string): string {
+  const s = (name || "?").trim();
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }
+function initialsOf(name: string): string {
+  const parts = (name || "?").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 
 type Lead = {
   id: string;
@@ -126,6 +138,14 @@ function CRMPage() {
       ...customStages.map((s) => stageView(s.id, s.nome, s.cor)),
     ];
   }, [customStages, hiddenDefaults]);
+
+  const { data: crmTags = [] } = useCrmTags(stageOperacao);
+  const tagColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of crmTags) m.set(t.nome.toLowerCase(), t.cor);
+    return m;
+  }, [crmTags]);
+
 
 
   // Filters
@@ -255,9 +275,10 @@ function CRMPage() {
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Carregando leads…</div>
       ) : view === "kanban" ? (
-        <Kanban stages={stages} leads={filtered} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} />
+        <Kanban stages={stages} leads={filtered} tagColors={tagColorMap} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} />
       ) : (
-        <Lista stages={stages} leads={filtered} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
+        <Lista stages={stages} leads={filtered} tagColors={tagColorMap} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
+
       )}
 
       <LeadDialog
@@ -281,13 +302,15 @@ function CRMPage() {
 
 // ---------- Kanban ----------
 function Kanban({
-  stages, leads, onMove, onEdit,
+  stages, leads, tagColors, onMove, onEdit,
 }: {
   stages: StageView[];
   leads: Lead[];
+  tagColors: Map<string, string>;
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
 }) {
+
   const [dragOver, setDragOver] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
@@ -333,12 +356,14 @@ function Kanban({
             onDragOver={(e) => { e.preventDefault(); setDragOver(s.id); }}
             onDragLeave={() => setDragOver((p) => (p === s.id ? null : p))}
             onDrop={(e) => onDrop(e, s.id)}
-            className={`flex min-h-0 w-72 shrink-0 flex-col rounded-xl border ${s.border} ${isOver ? "bg-card" : "bg-card/40"} transition-colors`}
+            style={{ borderColor: hexToRgba(s.cor, 0.4), background: isOver ? hexToRgba(s.cor, 0.08) : undefined }}
+            className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card/40 transition-colors"
           >
-            <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
+            <div className="h-1 w-full" style={{ background: s.cor }} />
+            <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5" style={{ background: hexToRgba(s.cor, 0.12) }}>
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${s.color}`} />
-                <span className={`text-xs font-semibold uppercase tracking-wider ${s.text}`}>{s.label}</span>
+                <span className="h-2 w-2 rounded-full" style={{ background: s.cor }} />
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: s.cor }}>{s.label}</span>
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                   {items.length}
                 </span>
@@ -347,6 +372,7 @@ function Kanban({
                 <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
               )}
             </div>
+
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
               {items.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border/40 py-6 text-center text-[11px] text-muted-foreground">
@@ -354,8 +380,9 @@ function Kanban({
                 </div>
               )}
               {items.slice(0, shown).map((lead) => (
-                <KanbanCard key={lead.id} lead={lead} onClick={() => onEdit(lead)} onDragStart={onDragStart} />
+                <KanbanCard key={lead.id} lead={lead} stageColor={s.cor} tagColors={tagColors} onClick={() => onEdit(lead)} onDragStart={onDragStart} />
               ))}
+
               {items.length > shown && (
                 <button
                   type="button"
@@ -375,33 +402,48 @@ function Kanban({
 
 
 function KanbanCard({
-  lead, onClick, onDragStart,
+  lead, stageColor, tagColors, onClick, onDragStart,
 }: {
   lead: Lead;
+  stageColor: string;
+  tagColors: Map<string, string>;
   onClick: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
 }) {
+  const avatarColor = colorFromName(lead.nome);
+  const initials = initialsOf(lead.nome);
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, lead)}
       onClick={onClick}
-      className="group cursor-pointer rounded-lg border border-border bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
+      style={{ borderLeftColor: stageColor }}
+      className="group cursor-pointer rounded-lg border border-border border-l-4 bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">{lead.nome}</p>
-          {lead.expert && (
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {lead.expert}
-            </p>
-          )}
+      <div className="flex items-start gap-2.5">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
+          style={{ background: avatarColor, boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
+        >
+          {initials}
         </div>
-        {(lead.valor_estimado ?? 0) > 0 && (
-          <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-            {BRL(lead.valor_estimado ?? 0)}
-          </span>
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">{lead.nome}</p>
+              {lead.expert && (
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {lead.expert}
+                </p>
+              )}
+            </div>
+            {(lead.valor_estimado ?? 0) > 0 && (
+              <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                {BRL(lead.valor_estimado ?? 0)}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
       {(lead.telefone || lead.email) && (
         <div className="mt-2 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
@@ -411,9 +453,21 @@ function KanbanCard({
       )}
       {lead.tags && lead.tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {lead.tags.slice(0, 3).map((t) => (
-            <Badge key={t} variant="outline" className="px-1.5 py-0 text-[9px]">{t}</Badge>
-          ))}
+          {lead.tags.slice(0, 3).map((t) => {
+            const c = tagColors.get(t.toLowerCase()) ?? colorFromName(t);
+            return (
+              <span
+                key={t}
+                className="rounded-md border px-1.5 py-0 text-[9px] font-semibold"
+                style={{ borderColor: hexToRgba(c, 0.6), background: hexToRgba(c, 0.15), color: c }}
+              >
+                {t}
+              </span>
+            );
+          })}
+          {lead.tags.length > 3 && (
+            <span className="rounded-md border border-border px-1.5 py-0 text-[9px] font-semibold text-muted-foreground">+{lead.tags.length - 3}</span>
+          )}
         </div>
       )}
       <div className="mt-2 flex items-center justify-between border-t border-border/40 pt-2 text-[10px] text-muted-foreground">
@@ -426,14 +480,17 @@ function KanbanCard({
   );
 }
 
+
 // ---------- Lista ----------
 function Lista({
-  stages, leads, onEdit, onRemove,
+  stages, leads, tagColors, onEdit, onRemove,
 }: {
   stages: StageView[];
   leads: Lead[];
+  tagColors: Map<string, string>;
   onEdit: (l: Lead) => void;
   onRemove: (id: string) => void;
+
 }) {
   return (
     <div className="flex-1 overflow-auto rounded-xl border border-border bg-card/40">
@@ -462,15 +519,35 @@ function Lista({
             return (
               <tr key={l.id} className="border-t border-border/40 hover:bg-card/60">
                 <td className="px-4 py-3">
-                  <button onClick={() => onEdit(l)} className="text-left font-semibold hover:text-accent">
-                    {l.nome}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                      style={{ background: colorFromName(l.nome) }}
+                    >
+                      {initialsOf(l.nome)}
+                    </div>
+                    <button onClick={() => onEdit(l)} className="text-left font-semibold hover:text-accent">
+                      {l.nome}
+                    </button>
+                  </div>
                   {l.tags && l.tags.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {l.tags.map((t) => <Badge key={t} variant="outline" className="px-1.5 py-0 text-[9px]">{t}</Badge>)}
+                    <div className="mt-1 flex flex-wrap gap-1 pl-9">
+                      {l.tags.map((t) => {
+                        const c = tagColors.get(t.toLowerCase()) ?? colorFromName(t);
+                        return (
+                          <span
+                            key={t}
+                            className="rounded-md border px-1.5 py-0 text-[9px] font-semibold"
+                            style={{ borderColor: hexToRgba(c, 0.6), background: hexToRgba(c, 0.15), color: c }}
+                          >
+                            {t}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </td>
+
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {l.telefone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{l.telefone}</div>}
                   {l.email && <div className="flex items-center gap-1 truncate"><Mail className="h-3 w-3" />{l.email}</div>}
@@ -479,10 +556,14 @@ function Lista({
                 <td className="px-4 py-3 text-xs text-muted-foreground">{l.fonte ?? "—"}</td>
                 <td className="px-4 py-3 text-xs">{l.responsavel_nome ?? "—"}</td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex items-center gap-1.5 rounded-md border ${stage.border} ${stage.soft} px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${stage.text}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${stage.color}`} />{stage.label}
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                    style={{ borderColor: hexToRgba(stage.cor, 0.5), background: hexToRgba(stage.cor, 0.12), color: stage.cor }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: stage.cor }} />{stage.label}
                   </span>
                 </td>
+
                 <td className="px-4 py-3 text-right text-xs font-bold tabular-nums">
                   {(l.valor_estimado ?? 0) > 0 ? BRL(l.valor_estimado ?? 0) : <span className="text-muted-foreground">—</span>}
                 </td>
