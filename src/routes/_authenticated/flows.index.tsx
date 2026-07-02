@@ -695,10 +695,16 @@ function FolderBlock({
             <button
               type="button"
               onClick={() => setShowAll((v) => !v)}
-              className="text-xs font-medium hover:underline"
-              style={{ color: hex }}
+              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm sm:text-base font-bold border-2 border-dashed hover:scale-[1.01] active:scale-[0.99] transition-transform"
+              style={{
+                color: hex,
+                borderColor: `${hex}66`,
+                backgroundColor: `${hex}12`,
+              }}
             >
-              {showAll ? "Ver menos" : `Ver mais ${hidden} fluxo${hidden === 1 ? "" : "s"} →`}
+              {showAll
+                ? "▲  Ver menos"
+                : `▼  Ver mais ${hidden} fluxo${hidden === 1 ? "" : "s"}`}
             </button>
           )}
         </>
