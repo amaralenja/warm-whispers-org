@@ -514,7 +514,12 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     if (!data.conversationId) return [];
     const db = await dbFor(context);
-    await assertVendorConversationAccess(context, db, data.conversationId);
+    try {
+      await assertVendorConversationAccess(context, db, data.conversationId);
+    } catch {
+      return [];
+    }
+
     const { data: runs, error } = await db
       .from("wa_flow_runs" as any)
       .select("id, flow_id, status, current_node_id, waiting_for, error, updated_at")
