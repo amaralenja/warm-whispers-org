@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   Workflow, Plus, Trash2, Power, PowerOff, Pencil,
@@ -60,6 +60,14 @@ function FlowsListPage() {
   const [zvReplace, setZvReplace] = useState(false);
   const [zvFile, setZvFile] = useState<File | null>(null);
   const [zvSummary, setZvSummary] = useState<any>(null);
+
+  useEffect(() => {
+    const allowedOps = new Set(workspaces.filter((o) => o.id !== "all").map((o) => o.id));
+    const preferred = workspace.id !== "all" ? workspace.id : "";
+    if (preferred && (!op || !allowedOps.has(op))) setOp(preferred);
+    if (preferred && (!importOp || !allowedOps.has(importOp))) setImportOp(preferred);
+    if (preferred && (!zvOp || !allowedOps.has(zvOp))) setZvOp(preferred);
+  }, [workspace.id, workspaces, op, importOp, zvOp]);
 
   // Export
   const [exportOpen, setExportOpen] = useState(false);
