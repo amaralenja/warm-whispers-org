@@ -484,18 +484,36 @@ function ChatPage() {
   const handleDeleteMessage = (id: string) => deleteMut.mutate(id);
 
 
+  function msgQuotePreview(m: Msg): string {
+    if (m.text_body) return String(m.text_body).slice(0, 140);
+    if (m.caption) return String(m.caption).slice(0, 140);
+    switch (m.msg_type) {
+      case "image": return "📷 Imagem";
+      case "audio": return "🎤 Áudio";
+      case "video": return "🎬 Vídeo";
+      case "document": return `📄 ${m.media_filename || "Documento"}`;
+      case "sticker": return "🎭 Figurinha";
+      default: return "Mensagem";
+    }
+  }
+
   async function handleSendText() {
     if (!active || !draft.trim()) return;
     const text = draft.trim();
+    const reply = replyTo;
     setDraft("");
+    setReplyTo(null);
     await sendMut.mutateAsync({
       channelId: active.channel_id,
       conversationId: active.id,
       to: active.contact_wa_id,
       type: "text",
       text,
+      contextWaMessageId: reply?.wa_message_id ?? undefined,
+      replyPreview: reply ? msgQuotePreview(reply) : undefined,
     }).catch(() => undefined);
   }
+
 
   async function handleFileUpload(file: File, opts?: { type?: typeof pendingType; caption?: string }) {
     if (!active) return;
