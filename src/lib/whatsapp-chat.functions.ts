@@ -282,11 +282,7 @@ async function getConversationByIdOrContact(
   const rawContact = String(fallback?.contactWaId ?? "").trim();
   if (!channelId || !rawContact) return null;
 
-  const contactIds = Array.from(new Set([
-    rawContact,
-    rawContact.replace(/\D/g, ""),
-    normalizeBrWhatsappNumber(rawContact),
-  ].map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const contactIds = whatsappNumberVariants(rawContact);
   if (contactIds.length === 0) return null;
 
   const { data: fallbackConv, error: fallbackError } = await db
