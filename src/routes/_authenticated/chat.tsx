@@ -1537,6 +1537,31 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   );
 }
 
+function flowOrderStorageKey(vendorId: number | string | null | undefined, op: string | null | undefined) {
+  const v = vendorId == null || vendorId === "" ? "admin" : String(vendorId);
+  const o = op == null || op === "" ? "all" : String(op);
+  return `chat:flow-order:${v}:${o}`;
+}
+
+function loadFlowOrder(vendorId: number | string | null | undefined, op: string | null | undefined): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(flowOrderStorageKey(vendorId, op));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFlowOrder(vendorId: number | string | null | undefined, op: string | null | undefined, ids: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(flowOrderStorageKey(vendorId, op), JSON.stringify(ids));
+  } catch {}
+}
+
 function FlowInlineBar({
   conversation,
   listFlowsFn,
@@ -1549,6 +1574,16 @@ function FlowInlineBar({
   const [q, setQ] = useState("");
   const [firing, setFiring] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ id: string; nome: string } | null>(null);
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const vendorSession = useMemo(() => getVendorSession(), []);
+  const vendorKey = vendorSession?.id ?? "admin";
+  const opKey = conversation.operacao_id ?? "all";
+
+  const [orderIds, setOrderIds] = useState<string[]>(() => loadFlowOrder(vendorKey, opKey));
+
+  useEffect(() => {
+    setOrderIds(loadFlowOrder(vendorKey, opKey));
+  }, [vendorKey, opKey]);
 
   const { data: flows = [] } = useQuery({
     queryKey: ["flows-for-dispatch"],
@@ -1556,21 +1591,35 @@ function FlowInlineBar({
     staleTime: 30_000,
   });
 
-  const compatible = useMemo(() => {
+  const compatibleAll = useMemo(() => {
     const op = conversation.operacao_id;
-    const list = asArray<any>(flows).filter((f) => {
+    return asArray<any>(flows).filter((f) => {
       if (f?.ativo === false) return false;
       if (!f.operacao_id) return true;
       if (!op) return true;
       return f.operacao_id === op;
     });
+  }, [flows, conversation.operacao_id]);
+
+  const sortedCompatible = useMemo(() => {
+    const idx = new Map<string, number>();
+    orderIds.forEach((id, i) => idx.set(id, i));
+    return [...compatibleAll].sort((a, b) => {
+      const ai = idx.has(String(a.id)) ? (idx.get(String(a.id)) as number) : Number.MAX_SAFE_INTEGER;
+      const bi = idx.has(String(b.id)) ? (idx.get(String(b.id)) as number) : Number.MAX_SAFE_INTEGER;
+      if (ai !== bi) return ai - bi;
+      return toText(a.nome).localeCompare(toText(b.nome));
+    });
+  }, [compatibleAll, orderIds]);
+
+  const compatible = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return list;
-    return list.filter((f) =>
+    if (!term) return sortedCompatible;
+    return sortedCompatible.filter((f) =>
       toText(f.nome).toLowerCase().includes(term) ||
       toText(f.folder).toLowerCase().includes(term)
     );
-  }, [flows, conversation.operacao_id, q]);
+  }, [sortedCompatible, q]);
 
   function fire(flowId: string) {
     setFiring(flowId);
@@ -1589,6 +1638,12 @@ function FlowInlineBar({
       .finally(() => setFiring(null));
   }
 
+  function handleSaveOrder(newIds: string[]) {
+    setOrderIds(newIds);
+    saveFlowOrder(vendorKey, opKey, newIds);
+    toast.success("Ordem dos fluxos salva");
+  }
+
   return (
     <div className="mx-auto mt-3 w-full max-w-5xl space-y-2">
       <div className="flex items-center gap-2 rounded-2xl border border-chat-line bg-chat-thread p-2">
@@ -1601,9 +1656,21 @@ function FlowInlineBar({
             className="h-10 rounded-xl border-0 bg-transparent pl-9 text-sm shadow-none focus-visible:ring-0"
           />
         </div>
-        <span className="shrink-0 px-2 text-[11px] text-muted-foreground">
+        <span className="shrink-0 px-1 text-[11px] text-muted-foreground">
           {compatible.length} fluxo{compatible.length === 1 ? "" : "s"}
         </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setReorderOpen(true)}
+          disabled={compatibleAll.length < 2}
+          className="h-9 shrink-0 gap-1.5 rounded-xl border border-chat-line px-3 text-xs"
+          title="Reordenar fluxos (só pra você)"
+        >
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          Ordenar
+        </Button>
       </div>
       {compatible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-chat-line bg-chat-panel/50 px-3 py-4 text-center text-xs text-muted-foreground">
@@ -1638,9 +1705,9 @@ function FlowInlineBar({
               <Zap className="h-3.5 w-3.5 shrink-0 text-chat-accent" />
               <div className="min-w-0 max-w-[200px]">
                 <div className="truncate text-xs font-medium">{toText(f.nome) || "Fluxo sem nome"}</div>
-                {f.folder && (
+                {f.folder ? (
                   <div className="truncate text-[10px] text-muted-foreground">📁 {toText(f.folder)}</div>
-                )}
+                ) : null}
               </div>
               {firing === f.id && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />}
             </button>
@@ -1653,7 +1720,7 @@ function FlowInlineBar({
           <AlertDialogHeader>
             <AlertDialogTitle>Disparar fluxo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja disparar o fluxo <span className="font-semibold text-foreground">"{confirm?.nome}"</span> nesta conversa?
+              Tem certeza que deseja disparar o fluxo <span className="font-semibold text-foreground">"{toText(confirm?.nome)}"</span> nesta conversa?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1669,9 +1736,197 @@ function FlowInlineBar({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FlowReorderDialog
+        open={reorderOpen}
+        onOpenChange={setReorderOpen}
+        flows={sortedCompatible}
+        onSave={handleSaveOrder}
+      />
     </div>
   );
 }
+
+function FlowReorderDialog({
+  open,
+  onOpenChange,
+  flows,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  flows: any[];
+  onSave: (ids: string[]) => void;
+}) {
+  const [items, setItems] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setItems(flows.map((f) => ({ ...f, _id: String(f.id) })));
+      setSearch("");
+    }
+  }, [open, flows]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const filteredIds = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items.map((f) => f._id);
+    return items
+      .filter((f) => toText(f.nome).toLowerCase().includes(term) || toText(f.folder).toLowerCase().includes(term))
+      .map((f) => f._id);
+  }, [items, search]);
+
+  function move(fromId: string, toIndex: number) {
+    setItems((prev) => {
+      const from = prev.findIndex((f) => f._id === fromId);
+      if (from < 0) return prev;
+      const clamped = Math.max(0, Math.min(toIndex, prev.length - 1));
+      return arrayMove(prev, from, clamped);
+    });
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setItems((prev) => {
+      const from = prev.findIndex((f) => f._id === String(active.id));
+      const to = prev.findIndex((f) => f._id === String(over.id));
+      if (from < 0 || to < 0) return prev;
+      return arrayMove(prev, from, to);
+    });
+  }
+
+  const visibleSet = new Set(filteredIds);
+  const displayed = items.filter((f) => visibleSet.has(f._id));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Reordenar fluxos</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Arraste pela alça <GripVertical className="inline h-3 w-3" /> ou use os botões de posição. Essa ordem é só sua — não afeta outros atendentes.
+          </p>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar fluxo…"
+            className="h-9 rounded-xl"
+          />
+          <div className="max-h-[55vh] overflow-y-auto scrollbar-fancy rounded-xl border border-chat-line bg-chat-panel/40 p-2">
+            {displayed.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">Nenhum fluxo</div>
+            ) : (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={displayed.map((f) => f._id)} strategy={verticalListSortingStrategy}>
+                  <ul className="space-y-1">
+                    {displayed.map((f, i) => (
+                      <SortableFlowRow
+                        key={f._id}
+                        id={f._id}
+                        index={items.findIndex((x) => x._id === f._id)}
+                        total={items.length}
+                        nome={toText(f.nome) || "Fluxo sem nome"}
+                        folder={toText(f.folder)}
+                        onTop={() => move(f._id, 0)}
+                        onBottom={() => move(f._id, items.length - 1)}
+                        onUp={() => {
+                          const idx = items.findIndex((x) => x._id === f._id);
+                          if (idx > 0) move(f._id, idx - 1);
+                        }}
+                        onDown={() => {
+                          const idx = items.findIndex((x) => x._id === f._id);
+                          if (idx < items.length - 1) move(f._id, idx + 1);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            onClick={() => {
+              onSave(items.map((f) => f._id));
+              onOpenChange(false);
+            }}
+          >
+            Salvar ordem
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SortableFlowRow({
+  id,
+  index,
+  total,
+  nome,
+  folder,
+  onTop,
+  onBottom,
+  onUp,
+  onDown,
+}: {
+  id: string;
+  index: number;
+  total: number;
+  nome: string;
+  folder: string;
+  onTop: () => void;
+  onBottom: () => void;
+  onUp: () => void;
+  onDown: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 rounded-lg border border-chat-line bg-chat-thread px-2 py-1.5"
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-chat-soft active:cursor-grabbing"
+        title="Arrastar"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <span className="w-8 shrink-0 text-center text-[10px] text-muted-foreground">#{index + 1}</span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{nome}</div>
+        {folder ? <div className="truncate text-[10px] text-muted-foreground">📁 {folder}</div> : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={onTop} disabled={index === 0}>Topo</Button>
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={onUp} disabled={index === 0}>↑</Button>
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={onDown} disabled={index === total - 1}>↓</Button>
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={onBottom} disabled={index === total - 1}>Fim</Button>
+      </div>
+    </li>
+  );
+}
+
+
 
 
 
