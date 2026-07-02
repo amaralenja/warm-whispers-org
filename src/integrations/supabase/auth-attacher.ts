@@ -1,5 +1,7 @@
+import { createMiddleware } from '@tanstack/react-start'
 import { supabase } from './client'
 import { encodeVendorSessionHeader, getVendorSession } from '@/lib/vendor-session'
+
 
 function buildAuthHeaders(existing?: HeadersInit): Headers {
   const headers = new Headers(existing)
@@ -29,3 +31,20 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
 
   return fetch(input, { ...init, headers })
 }
+
+// Client-side function middleware that attaches Supabase bearer token + vendor session
+// to server-fn requests. Kept for compatibility with src/start.ts auto-injection.
+export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(async ({ next }) => {
+  const headers: Record<string, string> = {}
+  try {
+    const vendorSession = getVendorSession()
+    const vendorHeader = encodeVendorSessionHeader(vendorSession)
+    if (vendorHeader) headers['x-vendor-session'] = vendorHeader
+  } catch {}
+  try {
+    const result = await supabase.auth.getSession()
+    const token = result?.data?.session?.access_token
+    if (token) headers['Authorization'] = `Bearer ${token}`
+  } catch {}
+  return next({ headers })
+})
