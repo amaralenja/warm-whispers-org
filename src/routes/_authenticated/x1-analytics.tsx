@@ -280,7 +280,7 @@ function X1AnalyticsPage() {
                       fontSize: 12,
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }} />
                   <Line type="monotone" dataKey="msgsIn" name="Recebidas" stroke="#10b981" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="msgsOut" name="Enviadas" stroke="#8b5cf6" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="vendas" name="Vendas" stroke="#f59e0b" strokeWidth={2} dot={false} />
@@ -302,8 +302,8 @@ function X1AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                   <XAxis dataKey="operacao" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
                   <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }} />
                   <Bar dataKey="leads" name="Leads" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="vendas" name="Vendas" fill="#f59e0b" radius={[6, 6, 0, 0]} />
                 </BarChart>
