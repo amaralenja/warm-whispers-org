@@ -88,6 +88,8 @@ type Conv = {
   last_message_direction: string | null;
   last_message_status: string | null;
   unread_count: number;
+  tags?: string[] | null;
+  notes?: string | null;
 };
 
 type Msg = {
