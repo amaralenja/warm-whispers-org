@@ -1007,12 +1007,28 @@ export const deleteWhatsappMessage = createServerFn({ method: "POST" })
     if (waMessageId && channelId) {
       try {
         const ch = await findChannel(channelId, db);
-        await metaProxyForChannel(ch, `/${encodeURIComponent(waMessageId)}`, { method: "DELETE" }, db);
+        if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
+        // WhatsApp Cloud API: para apagar pra todos, POST no endpoint de messages com status=deleted
+        await metaProxyForChannel(
+          ch,
+          `/${ch.phoneNumberId}/messages`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              status: "deleted",
+              message_id: waMessageId,
+            }),
+          },
+          db,
+        );
         waRemoved = true;
       } catch (e) {
         console.warn("Falha ao apagar mensagem no WhatsApp (mantida como apagada no sistema):", (e as any)?.message ?? e);
       }
     }
+
 
     return { ok: true, waRemoved };
   });
