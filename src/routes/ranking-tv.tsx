@@ -571,8 +571,8 @@ function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
             ))}
           </div>
 
-          {/* Pills de nível (3 níveis absolutos) — mostram % que falta pra bater */}
-          <div className="mb-2 grid grid-cols-3 gap-1.5">
+          {/* Níveis empilhados — legíveis de longe (TV) */}
+          <div className="mb-2 flex flex-col gap-1.5">
             {niveis.map((n) => {
               const ativo = n.batida;
               const atual = !bateu && proxNivel?.nivel === n.nivel;
@@ -581,17 +581,21 @@ function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
               return (
                 <div
                   key={n.nivel}
-                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-2 text-[9px] font-black uppercase tracking-wider transition ${
-                    ativo ? `${p.bg} text-black` : "bg-white/5 text-white/60"
+                  className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 font-black uppercase tracking-wider transition ${
+                    ativo ? `${p.bg} text-black` : "bg-white/5 text-white/70"
                   } ${atual ? `ring-2 ${p.ring}` : ""}`}
                 >
-                  <span className="text-[10px]">N{n.nivel}</span>
-                  <span className="text-[8px] font-bold opacity-80">{n.meta > 0 ? BRL(n.meta) : "—"}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base leading-none">N{n.nivel}</span>
+                    <span className="text-[11px] font-bold opacity-80 truncate">
+                      {n.meta > 0 ? BRL(n.meta) : "—"}
+                    </span>
+                  </div>
                   {n.meta > 0 && (
                     ativo ? (
-                      <span className="text-[8px] font-black">✓ BATIDO</span>
+                      <span className="text-sm font-black">✓ BATIDO</span>
                     ) : (
-                      <span className={`text-[9px] font-black ${atual ? p.txt : "text-white/70"}`}>
+                      <span className={`text-base font-black tracking-tighter ${atual ? p.txt : "text-white"}`}>
                         falta {pctFalta.toFixed(0)}%
                       </span>
                     )
