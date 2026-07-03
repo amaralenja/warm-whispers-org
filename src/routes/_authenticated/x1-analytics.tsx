@@ -54,10 +54,12 @@ export const Route = createFileRoute("/_authenticated/x1-analytics")({
 });
 
 function fmtBRL(n: number) {
-  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  const value = Number(n);
+  return (Number.isFinite(value) ? value : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 function fmtPct(n: number) {
-  return `${(n * 100).toFixed(1)}%`;
+  const value = Number(n);
+  return `${((Number.isFinite(value) ? value : 0) * 100).toFixed(1)}%`;
 }
 function fmtDur(seconds: number) {
   if (!seconds || !Number.isFinite(seconds)) return "—";
@@ -66,6 +68,18 @@ function fmtDur(seconds: number) {
   const h = Math.floor(seconds / 3600);
   const m = Math.round((seconds % 3600) / 60);
   return `${h}h ${m}m`;
+}
+
+function safeText(value: unknown, fallback = "—") {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value || fallback;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+function safeNumber(value: unknown) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function todayRange() {
@@ -176,9 +190,11 @@ function X1AnalyticsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {(payload?.operacoesDisponiveis ?? []).map((op) => (
-                    <SelectItem key={op} value={op}>{op}</SelectItem>
-                  ))}
+                  {(payload?.operacoesDisponiveis ?? []).map((op, idx) => {
+                    const opText = safeText(op, "");
+                    if (!opText) return null;
+                    return <SelectItem key={`${opText}-${idx}`} value={opText}>{opText}</SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -216,70 +232,70 @@ function X1AnalyticsPage() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
           <KpiCard
             title="Novos Leads"
-            value={String(payload?.kpis.novosLeads ?? 0)}
+            value={String(safeNumber(payload?.kpis.novosLeads))}
             icon={<Users className="h-4 w-4" />}
             accent="from-blue-500/20 to-blue-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Contatos Únicos"
-            value={String(payload?.kpis.contatosUnicos ?? 0)}
+            value={String(safeNumber(payload?.kpis.contatosUnicos))}
             icon={<Users className="h-4 w-4" />}
             accent="from-cyan-500/20 to-cyan-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Mensagens Recebidas"
-            value={String(payload?.kpis.msgsIn ?? 0)}
+            value={String(safeNumber(payload?.kpis.msgsIn))}
             icon={<MessageSquare className="h-4 w-4" />}
             accent="from-emerald-500/20 to-emerald-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Mensagens Enviadas"
-            value={String(payload?.kpis.msgsOut ?? 0)}
+            value={String(safeNumber(payload?.kpis.msgsOut))}
             icon={<Send className="h-4 w-4" />}
             accent="from-violet-500/20 to-violet-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Vendas Fechadas"
-            value={String(payload?.kpis.vendas ?? 0)}
+            value={String(safeNumber(payload?.kpis.vendas))}
             icon={<ShoppingCart className="h-4 w-4" />}
             accent="from-amber-500/20 to-amber-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Faturamento"
-            value={fmtBRL(payload?.kpis.faturamento ?? 0)}
+            value={fmtBRL(safeNumber(payload?.kpis.faturamento))}
             icon={<DollarSign className="h-4 w-4" />}
             accent="from-green-500/20 to-green-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Ticket Médio"
-            value={fmtBRL(payload?.kpis.ticketMedio ?? 0)}
+            value={fmtBRL(safeNumber(payload?.kpis.ticketMedio))}
             icon={<TrendingUp className="h-4 w-4" />}
             accent="from-teal-500/20 to-teal-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Conversão"
-            value={fmtPct(payload?.kpis.conversao ?? 0)}
+            value={fmtPct(safeNumber(payload?.kpis.conversao))}
             icon={<Percent className="h-4 w-4" />}
             accent="from-pink-500/20 to-pink-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Tempo Médio Resposta"
-            value={fmtDur(payload?.kpis.tempoRespostaMedio ?? 0)}
+            value={fmtDur(safeNumber(payload?.kpis.tempoRespostaMedio))}
             icon={<Timer className="h-4 w-4" />}
             accent="from-orange-500/20 to-orange-500/5"
             loading={isLoading}
           />
           <KpiCard
             title="Conversas no Período"
-            value={String(payload?.kpis.conversas ?? 0)}
+            value={String(safeNumber(payload?.kpis.conversas))}
             icon={<MessageSquare className="h-4 w-4" />}
             accent="from-indigo-500/20 to-indigo-500/5"
             loading={isLoading}
