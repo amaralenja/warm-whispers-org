@@ -654,16 +654,32 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // canais + operações
     const { data: channels } = await supabase
       .from("wa_channels")
-      .select("id, operacao_id, verified_name, name")
+      .select("id, operacao_id, verified_name, name, display_phone_number, kind")
       .neq("operacao_id", "__notificador__");
     const channelToOp = new Map<string, string>();
     const operacoesSet = new Set<string>();
+    const canaisDisponiveis: X1CanalRow[] = [];
     for (const c of (channels ?? []) as any[]) {
       const op = String(c.operacao_id ?? "").trim();
       if (!op || op === "__notificador__") continue;
+      if (safeString(c?.kind, "chat") === "notification") continue;
       channelToOp.set(String(c.id), op);
       operacoesSet.add(op);
+      if (!opFilter || sameText(op, opFilter)) {
+        canaisDisponiveis.push({
+          id: safeString(c?.id).trim(),
+          name: safeString(c?.name, safeString(c?.verified_name, "Canal")),
+          displayPhone: safeNullableString(c?.display_phone_number),
+          verifiedName: safeNullableString(c?.verified_name),
+          operacao: op,
+        });
+      }
     }
+    canaisDisponiveis.sort((a, b) => a.name.localeCompare(b.name));
+    const channelAllowed = (channelId: unknown) => {
+      if (!channelFilterActive) return true;
+      return safeString(channelId).trim() === channelFilterActive;
+    };
 
     // Conversas (todas com created_at no período OU last_message_at no período)
     const convQuery = supabase
