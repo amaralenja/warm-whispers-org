@@ -501,7 +501,7 @@ export const listMessages = createServerFn({ method: "GET" })
       .eq("conversation_id", data.conversationId)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
-      .limit(500);
+      .limit(2000);
 
     if (error) throw new Error(error.message);
     return rows ?? [];
