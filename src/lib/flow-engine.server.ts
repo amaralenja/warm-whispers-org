@@ -548,10 +548,13 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (mediaType === "document" && filename) inner.filename = filename;
       }
       const body: any = { type: mediaType, [mediaType]: inner };
+      if (await isFlowRunCancelled(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
       return { log: { url: finalUrl } };
     }
+
+
 
     case "send_buttons": {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
