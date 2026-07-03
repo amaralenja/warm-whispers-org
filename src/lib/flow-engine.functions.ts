@@ -872,7 +872,7 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
 
     const { data: runs, error } = await db
       .from("wa_flow_runs" as any)
-      .select("id, flow_id, status, current_node_id, waiting_for, error, updated_at")
+      .select("id, flow_id, status, current_node_id, waiting_for, error, updated_at, expires_at")
       .eq("conversation_id", data.conversationId)
       .in("status", ["queued", "running", "waiting"])
       .order("updated_at", { ascending: false });
