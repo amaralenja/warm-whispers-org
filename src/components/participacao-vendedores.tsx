@@ -30,7 +30,10 @@ function initials(s: unknown) {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 function asStr(v: unknown) {
-  return typeof v === "string" ? v : v == null ? "" : String(v);
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return "";
 }
 
 type SafeVendor = { utm: string; faturamento: number; vendas: number; pctTotal: number };

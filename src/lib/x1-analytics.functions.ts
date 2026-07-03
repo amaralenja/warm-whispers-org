@@ -126,6 +126,283 @@ function operacaoFromUtm(utm: string | null | undefined): string | null {
   return null;
 }
 
+function safeString(value: unknown, fallback = ""): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+function safeNullableString(value: unknown): string | null {
+  const s = safeString(value).trim();
+  return s ? s : null;
+}
+
+function safeNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeText(value: unknown): string {
+  return safeString(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function sameText(a: unknown, b: unknown) {
+  return normalizeText(a) === normalizeText(b);
+}
+
+function vendorRpcArgs(context: any) {
+  const id = Number(context?.vendor?.id);
+  const codigo = safeString(context?.vendor?.codigo).trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
+}
+
+function vendorWorkspaceIds(context: any): string[] {
+  const ids = context?.vendor?.workspace_ids;
+  const expert = safeNullableString(context?.vendor?.expert);
+  if (Array.isArray(ids)) {
+    const list = ids.map((id) => safeString(id).trim()).filter(Boolean);
+    return list.length > 0 ? list : expert ? [expert] : [];
+  }
+  return expert ? [expert] : [];
+}
+
+function isWithinIso(raw: unknown, fromIso: string | null, toIso: string | null) {
+  const t = Date.parse(safeString(raw));
+  if (!Number.isFinite(t)) return false;
+  if (fromIso && t < Date.parse(fromIso)) return false;
+  if (toIso && t > Date.parse(toIso)) return false;
+  return true;
+}
+
+function opAllowed(op: unknown, allowed: string[]) {
+  if (allowed.length === 0) return true;
+  return allowed.some((a) => sameText(a, op));
+}
+
+async function getVendorX1Analytics(
+  context: any,
+  data: X1Filter,
+  opFilter: string | null,
+  fromIso: string | null,
+  toIso: string | null,
+): Promise<X1AnalyticsPayload> {
+  const db = context.supabase as any;
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) return EMPTY;
+
+  const allowedWorkspaces = vendorWorkspaceIds(context);
+  if (opFilter && !opAllowed(opFilter, allowedWorkspaces)) {
+    return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
+  }
+
+  const [channelsRes, conversationsRes] = await Promise.all([
+    db.rpc("vendor_list_wa_channels" as any, rpcArgs),
+    db.rpc("vendor_list_wa_conversations" as any, {
+      ...rpcArgs,
+      _operacao_id: opFilter ?? null,
+    }),
+  ]);
+  if (channelsRes.error) throw new Error(channelsRes.error.message);
+  if (conversationsRes.error) throw new Error(conversationsRes.error.message);
+
+  const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
+    const op = safeString(c?.operacao_id).trim();
+    if (!op || op === "__notificador__") return false;
+    if (opFilter && !sameText(op, opFilter)) return false;
+    return opAllowed(op, allowedWorkspaces);
+  });
+  const channelToOp = new Map<string, string>();
+  const channelIds = new Set<string>();
+  const operacoesSet = new Set<string>();
+  for (const c of channels) {
+    const id = safeString(c?.id).trim();
+    const op = safeString(c?.operacao_id).trim();
+    if (!id || !op) continue;
+    channelIds.add(id);
+    channelToOp.set(id, op);
+    operacoesSet.add(op);
+  }
+  for (const op of allowedWorkspaces) if (!opFilter || sameText(op, opFilter)) operacoesSet.add(op);
+
+  const allConversations = ((conversationsRes.data ?? []) as any[]).filter((c) => {
+    const channelId = safeString(c?.channel_id).trim();
+    const op = safeString(c?.operacao_id ?? channelToOp.get(channelId)).trim();
+    if (channelIds.size > 0 && !channelIds.has(channelId)) return false;
+    if (opFilter && !sameText(op, opFilter)) return false;
+    return opAllowed(op, allowedWorkspaces);
+  });
+  const conversations = allConversations.filter((c) => isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso));
+  const novosLeadsRows = allConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
+
+  const messageResults = await Promise.all(
+    allConversations.map((c) =>
+      db.rpc("vendor_list_wa_messages" as any, {
+        ...rpcArgs,
+        _conversation_id: c.id,
+      }),
+    ),
+  );
+  const messages = messageResults.flatMap((res) => {
+    if (res?.error) return [];
+    return Array.isArray(res?.data) ? res.data : [];
+  });
+  const msgsScoped = messages.filter((m: any) => {
+    if (m?.deleted_at) return false;
+    if (!isWithinIso(m?.created_at, fromIso, toIso)) return false;
+    const channelId = safeString(m?.channel_id).trim();
+    if (channelIds.size > 0 && !channelIds.has(channelId)) return false;
+    const op = channelToOp.get(channelId) ?? "";
+    if (opFilter && !sameText(op, opFilter)) return false;
+    return true;
+  });
+
+  const vendorUtm = safeNullableString(context?.vendor?.utm);
+  const primaryOp = safeNullableString(context?.vendor?.expert) ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
+  let vendorStats: any = null;
+  if (vendorUtm) {
+    const { data: stats, error } = await db.rpc("get_vendor_stats" as any, {
+      _utm: vendorUtm,
+      _from: data.from ?? null,
+      _to: data.to ?? null,
+    });
+    if (!error) vendorStats = stats;
+  }
+  const vendas = safeNumber(vendorStats?.vendas);
+  const faturamento = safeNumber(vendorStats?.faturamento);
+  const ticketMedio = safeNumber(vendorStats?.ticketMedio) || (vendas > 0 ? faturamento / vendas : 0);
+
+  const msgsIn = msgsScoped.filter((m: any) => safeString(m?.direction) === "in").length;
+  const msgsOut = msgsScoped.filter((m: any) => safeString(m?.direction) === "out").length;
+  const contatosUnicos = new Set(
+    conversations.map((c) => `${safeString(c?.channel_id)}|${safeString(c?.contact_wa_id)}`),
+  ).size;
+
+  const byConv: Record<string, any[]> = {};
+  for (const m of msgsScoped) {
+    const k = safeString(m?.conversation_id);
+    if (!k) continue;
+    (byConv[k] ??= []).push(m);
+  }
+  let respostas = 0;
+  let somaSeg = 0;
+  for (const arr of Object.values(byConv)) {
+    arr.sort((a, b) => Date.parse(safeString(a?.created_at)) - Date.parse(safeString(b?.created_at)));
+    let lastIn: number | null = null;
+    for (const m of arr) {
+      if (safeString(m?.direction) === "in") {
+        if (lastIn == null) lastIn = Date.parse(safeString(m?.created_at));
+      } else if (safeString(m?.direction) === "out" && lastIn != null) {
+        const dt = (Date.parse(safeString(m?.created_at)) - lastIn) / 1000;
+        if (dt >= 0 && dt < 86400 * 3) {
+          somaSeg += dt;
+          respostas += 1;
+        }
+        lastIn = null;
+      }
+    }
+  }
+  const tempoRespostaMedio = respostas > 0 ? somaSeg / respostas : 0;
+
+  const opRows: X1OperacaoRow[] = Array.from(operacoesSet).map((op) => {
+    const convOp = conversations.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+    const novosOp = novosLeadsRows.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+    const msgOp = msgsScoped.filter((m: any) => sameText(channelToOp.get(safeString(m?.channel_id)), op));
+    const opHasVendorSales = !primaryOp || sameText(primaryOp, op);
+    return {
+      operacao: op,
+      leads: novosOp.length,
+      conversas: convOp.length,
+      msgsIn: msgOp.filter((m: any) => safeString(m?.direction) === "in").length,
+      msgsOut: msgOp.filter((m: any) => safeString(m?.direction) === "out").length,
+      vendas: opHasVendorSales ? vendas : 0,
+      faturamento: opHasVendorSales ? faturamento : 0,
+      conversao: novosOp.length > 0 && opHasVendorSales ? vendas / novosOp.length : 0,
+      ticketMedio: opHasVendorSales ? ticketMedio : 0,
+    };
+  }).sort((a, b) => b.faturamento - a.faturamento || b.msgsOut - a.msgsOut);
+
+  const leadsAtribuidos = conversations.filter((c) => {
+    const assigned = c?.assigned_vendor_id;
+    return assigned == null || Number(assigned) === Number(context.vendor.id);
+  }).length;
+  const porVendedor: X1VendedorRow[] = [{
+    vendedorId: Number(context.vendor.id),
+    utm: vendorUtm,
+    nome: safeString(context.vendor.nome, vendorUtm ?? "Vendedor"),
+    expert: primaryOp,
+    fotoUrl: safeNullableString(context.vendor.foto_url),
+    leadsAtribuidos,
+    msgsEnviadas: msgsOut,
+    vendas,
+    faturamento,
+    conversao: leadsAtribuidos > 0 ? vendas / leadsAtribuidos : 0,
+    ticketMedio,
+  }];
+
+  const dayMap = new Map<string, X1SerieDia>();
+  for (const m of msgsScoped) {
+    const t = Date.parse(safeString(m?.created_at));
+    if (!Number.isFinite(t)) continue;
+    const iso = toIsoDay(new Date(t));
+    const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
+    if (safeString(m?.direction) === "in") e.msgsIn += 1;
+    else if (safeString(m?.direction) === "out") e.msgsOut += 1;
+    dayMap.set(iso, e);
+  }
+  for (const row of (Array.isArray(vendorStats?.serieDiaria) ? vendorStats.serieDiaria : [])) {
+    const iso = safeString(row?.data).slice(0, 10);
+    if (!iso) continue;
+    const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
+    e.vendas += safeNumber(row?.vendas);
+    dayMap.set(iso, e);
+  }
+  const serieDiaria = Array.from(dayMap.values()).sort((a, b) => a.data.localeCompare(b.data));
+
+  const hourMap = new Map<number, X1SerieHora>();
+  for (let h = 0; h < 24; h++) {
+    hourMap.set(h, { hora: `${String(h).padStart(2, "0")}h`, msgsIn: 0, msgsOut: 0, vendas: 0 });
+  }
+  const brHour = (ts: number) => (new Date(ts).getUTCHours() - 3 + 24) % 24;
+  for (const m of msgsScoped) {
+    const t = Date.parse(safeString(m?.created_at));
+    if (!Number.isFinite(t)) continue;
+    const e = hourMap.get(brHour(t))!;
+    if (safeString(m?.direction) === "in") e.msgsIn += 1;
+    else if (safeString(m?.direction) === "out") e.msgsOut += 1;
+  }
+  const todayIso = toIsoDay(new Date());
+  const todaySales = (Array.isArray(vendorStats?.serieDiaria) ? vendorStats.serieDiaria : [])
+    .filter((row: any) => safeString(row?.data).slice(0, 10) === todayIso)
+    .reduce((acc: number, row: any) => acc + safeNumber(row?.vendas), 0);
+  if (todaySales > 0) hourMap.get(brHour(Date.now()))!.vendas += todaySales;
+
+  const novosLeads = novosLeadsRows.length;
+  return {
+    kpis: {
+      novosLeads,
+      conversas: conversations.length,
+      msgsIn,
+      msgsOut,
+      vendas,
+      faturamento,
+      ticketMedio,
+      conversao: novosLeads > 0 ? vendas / novosLeads : 0,
+      contatosUnicos,
+      tempoRespostaMedio,
+    },
+    porOperacao: opRows,
+    porVendedor,
+    serieDiaria,
+    serieHoraria: Array.from(hourMap.values()),
+    operacoesDisponiveis: Array.from(operacoesSet).sort(),
+  };
+}
+
 async function dbFor(context: any) {
   if (context?.vendor) {
     try {
@@ -149,11 +426,16 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const context = opts?.context;
     const data = opts?.data ?? {};
     if (!context?.supabase) return EMPTY;
-    const supabase = await dbFor(context);
 
     const fromIso = data.from ? new Date(data.from + "T00:00:00Z").toISOString() : null;
     const toIso = data.to ? new Date(data.to + "T23:59:59Z").toISOString() : null;
     const opFilter = data.operacao && data.operacao !== "all" ? String(data.operacao) : null;
+
+    if (context?.vendor) {
+      return getVendorX1Analytics(context, data, opFilter, fromIso, toIso);
+    }
+
+    const supabase = await dbFor(context);
 
     async function pageAll<T = any>(build: (from: number, to: number) => any): Promise<T[]> {
       const PAGE = 1000;
