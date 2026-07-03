@@ -768,6 +768,7 @@ function ChatPage() {
                   const contactName = toText(c.contact_name);
                   const isActive = String(c.id) === activeId;
                   const preview = toText(c.last_message_preview);
+                  const hasActiveFlow = activeFlowConvIds.has(String(c.id));
                   return (
                     <div
                       key={String(c.id)}
