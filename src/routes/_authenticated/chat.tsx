@@ -1507,6 +1507,26 @@ function WindowCountdown({ lastInboundAt }: { lastInboundAt: string | null }) {
 }
 
 
+function TimerCountdown({ expiresAt }: { expiresAt: string | null | undefined }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  if (!expiresAt) return null;
+  const target = new Date(expiresAt).getTime();
+  if (!Number.isFinite(target)) return null;
+  const diff = Math.max(0, Math.floor((target - now) / 1000));
+  const mm = Math.floor(diff / 60);
+  const ss = diff % 60;
+  const label = mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`;
+  return (
+    <span className="font-mono text-[10px] font-semibold text-chat-accent">
+      {diff > 0 ? `⏱ ${label}` : "⏱ liberando…"}
+    </span>
+  );
+}
+
 function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   const qc = useQueryClient();
   const listActiveRunsFn = useServerFn(listActiveFlowRuns);
@@ -1540,8 +1560,13 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
         {asArray<any>(runs).map((r) => {
           const name = String(r.flow_nome ?? "Fluxo");
           const step = r.current_node_id ? String(r.current_node_id).slice(0, 8) : "início";
+          const isTimer = r.status === "waiting" && r.waiting_for === "timer";
           const statusLabel =
-            r.status === "queued" ? "na fila" : r.status === "waiting" ? `aguardando ${r.waiting_for ?? ""}` : "executando";
+            r.status === "queued"
+              ? "na fila"
+              : r.status === "waiting"
+                ? `aguardando ${r.waiting_for ?? ""}`
+                : "executando";
           return (
             <div
               key={String(r.id)}
@@ -1551,6 +1576,12 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
               <span className="font-semibold text-foreground">{name}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground">{statusLabel}</span>
+              {isTimer && r.expires_at ? (
+                <>
+                  <span className="text-muted-foreground">·</span>
+                  <TimerCountdown expiresAt={r.expires_at} />
+                </>
+              ) : null}
               <span className="text-muted-foreground">·</span>
               <span className="font-mono text-[10px] text-muted-foreground">etapa {step}</span>
             </div>
