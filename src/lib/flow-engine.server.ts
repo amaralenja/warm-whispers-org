@@ -418,7 +418,12 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
 
   while (currentId && safety++ < 50) {
     const node = nodes.find((n) => n.id === currentId);
-    if (!node) break;
+    if (!node) {
+      // Node não existe mais (fluxo editado). Não deixa o run preso em "running".
+      await updateFlowRun(ctx, { status: "completed", waiting_for: null, expires_at: null });
+      await logExecution(ctx.db, ctx.runId, { id: currentId, type: "missing", data: {} } as any, "error", null, `node ${currentId} não encontrado no fluxo`, Date.now(), ctx.vendor);
+      return;
+    }
     const started = Date.now();
 
     try {
