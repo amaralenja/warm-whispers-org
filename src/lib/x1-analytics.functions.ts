@@ -596,6 +596,7 @@ async function getVendorX1Analytics(
     serieDiaria,
     serieHoraria: Array.from(hourMap.values()),
     operacoesDisponiveis: Array.from(operacoesSet).sort(),
+    canaisDisponiveis,
   };
 }
 
