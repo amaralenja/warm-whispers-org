@@ -564,6 +564,14 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     if (opFilter) novoQuery = novoQuery.eq("operacao_id", opFilter);
     const novosLeadsRows = await pageAll<any>((from, to) => novoQuery.range(from, to));
 
+    let crmLeadQuery = supabase
+      .from("crm_leads" as any)
+      .select("id, telefone, expert, responsavel_utm, responsavel_nome, created_at");
+    if (fromIso) crmLeadQuery = crmLeadQuery.gte("created_at", fromIso);
+    if (toIso) crmLeadQuery = crmLeadQuery.lte("created_at", toIso);
+    if (opFilter) crmLeadQuery = crmLeadQuery.eq("expert", opFilter);
+    const crmLeadsRows = await pageAll<any>((from, to) => crmLeadQuery.range(from, to));
+
     // Mensagens do período
     let msgQuery = supabase
       .from("wa_messages")
@@ -599,6 +607,11 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const utm = normalizeUtm(v.utm);
       if (utm) utmToVendedor.set(utm, v);
     }
+    const vendedorById = new Map<number, any>();
+    for (const v of vendedores) {
+      const id = numericId(v?.id);
+      if (id) vendedorById.set(id, v);
+    }
     const produtoToOperacao = new Map<string, string>();
     for (const p of ((produtosMapRes.data ?? []) as any[])) {
       const produto = safeString(p?.nome_produto).trim().toLowerCase();
@@ -631,6 +644,30 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       if (opFilter) return op === opFilter;
       return true;
     });
+
+    const allLeadKeys = new Set<string>();
+    const vendorLeadKeys = new Map<string, Set<string>>();
+    const keyForVendor = (v: any) => `id:${v?.id ?? "?"}|utm:${v?.utm ?? "?"}`;
+    const addVendorLead = (v: any, key: string | null) => {
+      if (!v || !key) return;
+      allLeadKeys.add(key);
+      const vendorKey = keyForVendor(v);
+      const set = vendorLeadKeys.get(vendorKey) ?? new Set<string>();
+      set.add(key);
+      vendorLeadKeys.set(vendorKey, set);
+    };
+    for (const c of novosLeadsRows) {
+      const leadKey = contactLeadKey(c?.contact_wa_id, c?.id);
+      if (leadKey) allLeadKeys.add(leadKey);
+      const vend = vendedorById.get(Number(c?.assigned_vendor_id));
+      addVendorLead(vend, leadKey);
+    }
+    for (const lead of crmLeadsRows) {
+      const leadKey = contactLeadKey(lead?.telefone, lead?.id);
+      if (leadKey) allLeadKeys.add(leadKey);
+      const vend = vendedores.find((v: any) => vendedorMatchesLead(v, lead));
+      addVendorLead(vend, leadKey);
+    }
 
     // KPIs
     const msgsIn = msgsScoped.filter((m) => m.direction === "in").length;
@@ -672,12 +709,21 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       if (opFilter && op !== opFilter) continue;
       const convOp = conversations.filter((c) => (c.operacao_id ?? "") === op);
       const novosOp = novosLeadsRows.filter((c) => (c.operacao_id ?? "") === op);
+      const leadOpKeys = new Set<string>();
+      for (const c of novosOp) {
+        const key = contactLeadKey(c?.contact_wa_id, c?.id);
+        if (key) leadOpKeys.add(key);
+      }
+      for (const lead of crmLeadsRows.filter((l: any) => sameText(l?.expert, op))) {
+        const key = contactLeadKey(lead?.telefone, lead?.id);
+        if (key) leadOpKeys.add(key);
+      }
       const msgOp = msgsScoped.filter((m) => channelToOp.get(String(m.channel_id)) === op);
       const inC = msgOp.filter((m) => m.direction === "in").length;
       const outC = msgOp.filter((m) => m.direction === "out").length;
       const vdsOp = vendasPeriodo.filter((v: any) => sameText(vendaOperacao(v), op));
       const fatOp = vdsOp.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
-      const leadsCount = novosOp.length;
+      const leadsCount = leadOpKeys.size;
       opRows.push({
         operacao: op,
         leads: leadsCount,
@@ -694,7 +740,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
 
     // Por vendedor
     const vRows = new Map<string, X1VendedorRow>();
-    const keyFor = (v: any) => `id:${v?.id ?? "?"}|utm:${v?.utm ?? "?"}`;
+    const keyFor = keyForVendor;
     for (const v of vendedores) {
       vRows.set(keyFor(v), {
         vendedorId: v.id ?? null,
@@ -710,14 +756,10 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         ticketMedio: 0,
       });
     }
-    // leads atribuídos (conversas com assigned_vendor_id)
-    for (const c of conversations) {
-      const vid = c.assigned_vendor_id;
-      if (!vid) continue;
-      const v = vendedores.find((x) => Number(x.id) === Number(vid));
-      if (!v) continue;
-      const row = vRows.get(keyFor(v));
-      if (row) row.leadsAtribuidos += 1;
+    // Leads atribuídos: une CRM (responsavel_utm/nome) + WhatsApp (assigned_vendor_id), deduplicando por telefone.
+    for (const [vendorKey, keys] of vendorLeadKeys.entries()) {
+      const row = vRows.get(vendorKey);
+      if (row) row.leadsAtribuidos = keys.size;
     }
     // msgs enviadas por vendedor
     for (const m of msgsScoped) {
