@@ -409,8 +409,10 @@ function ChatPage() {
   const { data: convs = [], error: convsError } = useQuery({
     queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin"],
     queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
-    refetchInterval: 5000,
-    refetchOnWindowFocus: true,
+    // Realtime cuida das atualizações incrementais; polling só de segurança.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
   });
 
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
