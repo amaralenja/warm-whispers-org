@@ -196,7 +196,7 @@ async function getVendorX1Analytics(
   fromIso: string | null,
   toIso: string | null,
 ): Promise<X1AnalyticsPayload> {
-  const db = await dbFor(context);
+  const db = context.supabase as any;
   const rpcArgs = vendorRpcArgs(context);
   if (!rpcArgs) return EMPTY;
 
@@ -213,27 +213,22 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const explicitChannelIds = vendorChannelIdsFromContext(context);
   const [channelsRes, conversationsRes] = await Promise.all([
-    db
-      .from("wa_channels" as any)
-      .select("id, operacao_id, verified_name, name, kind")
-      .neq("operacao_id", "__notificador__"),
-    db
-      .from("wa_conversations" as any)
-      .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id")
-      .neq("operacao_id", "__notificador__")
-      .limit(5000),
+    db.rpc("vendor_list_wa_channels" as any, rpcArgs),
+    db.rpc("vendor_list_x1_wa_conversations" as any, {
+      ...rpcArgs,
+      _operacao_id: opFilter ?? null,
+      _from: fromIso,
+      _to: toIso,
+    }),
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
 
   const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
-    const id = safeString(c?.id).trim();
     const op = safeString(c?.operacao_id).trim();
     if (!op || op === "__notificador__") return false;
     if (safeString(c?.kind, "chat") === "notification") return false;
-    if (explicitChannelIds.length > 0 && !explicitChannelIds.includes(id)) return false;
     if (opFilter && !sameText(op, opFilter)) return false;
     return opAllowed(op, allowedWorkspaces);
   });
@@ -260,14 +255,12 @@ async function getVendorX1Analytics(
   const conversations = allConversations.filter((c) => isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso));
   const novosLeadsRows = allConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
 
-  let msgQuery = db
-    .from("wa_messages" as any)
-    .select("id, conversation_id, channel_id, direction, created_at, sent_by, deleted_at")
-    .is("deleted_at", null)
-    .in("channel_id", Array.from(channelIds));
-  if (fromIso) msgQuery = msgQuery.gte("created_at", fromIso);
-  if (toIso) msgQuery = msgQuery.lte("created_at", toIso);
-  const { data: messagesRaw, error: messagesError } = await msgQuery.limit(10000);
+  const { data: messagesRaw, error: messagesError } = await db.rpc("vendor_list_x1_wa_messages" as any, {
+    ...rpcArgs,
+    _operacao_id: opFilter ?? null,
+    _from: fromIso,
+    _to: toIso,
+  });
   if (messagesError) throw new Error(messagesError.message);
   const messages = (messagesRaw ?? []) as any[];
   const msgsScoped = messages.filter((m: any) => {
