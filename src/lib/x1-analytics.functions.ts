@@ -171,11 +171,6 @@ function vendorWorkspaceIds(context: any): string[] {
   return expert ? [expert] : [];
 }
 
-function vendorChannelIdsFromContext(context: any): string[] {
-  const ids = context?.vendor?.wa_channel_ids;
-  return Array.isArray(ids) ? ids.map((id) => safeString(id).trim()).filter(Boolean) : [];
-}
-
 function isWithinIso(raw: unknown, fromIso: string | null, toIso: string | null) {
   const t = Date.parse(safeString(raw));
   if (!Number.isFinite(t)) return false;
