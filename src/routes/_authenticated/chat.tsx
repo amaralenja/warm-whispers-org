@@ -1537,6 +1537,48 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   );
 }
 
+function useActiveFlowConversationIds(): Set<string> {
+  const [ids, setIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      try {
+        const { data } = await supabase
+          .from("wa_flow_runs" as any)
+          .select("conversation_id, status")
+          .in("status", ["queued", "running", "waiting"])
+          .limit(500);
+        if (cancelled) return;
+        const next = new Set<string>();
+        for (const r of (data as any[]) ?? []) {
+          if (r?.conversation_id) next.add(String(r.conversation_id));
+        }
+        setIds(next);
+      } catch {
+        // ignore — RLS may block for some roles
+      }
+    }
+    refresh();
+    const ch = supabase
+      .channel("chat-list-active-flows")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wa_flow_runs" },
+        () => refresh(),
+      )
+      .subscribe();
+    const iv = setInterval(refresh, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      supabase.removeChannel(ch);
+    };
+  }, []);
+
+  return ids;
+}
+
 function flowOrderStorageKey(vendorId: number | string | null | undefined, op: string | null | undefined) {
   const v = vendorId == null || vendorId === "" ? "admin" : String(vendorId);
   const o = op == null || op === "" ? "all" : String(op);
