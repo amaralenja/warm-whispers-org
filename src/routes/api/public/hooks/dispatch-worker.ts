@@ -20,13 +20,14 @@ export const Route = createFileRoute("/api/public/hooks/dispatch-worker")({
           });
         }
         try {
-          const { processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningDelayRuns } = await import("@/lib/flow-engine.server");
+          const { processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningDelayRuns, processExpiredWaitingRuns } = await import("@/lib/flow-engine.server");
           const stale = await processStaleRunningDelayRuns(10, 20);
-          const [queued, timers] = await Promise.all([
+          const [queued, timers, expiredWaiting] = await Promise.all([
             processQueuedFlowRuns(20),
             processExpiredTimerRuns(20),
+            processExpiredWaitingRuns(60, 100),
           ]);
-          return new Response(JSON.stringify({ ok: true, stale, queued, timers }), {
+          return new Response(JSON.stringify({ ok: true, stale, queued, timers, expiredWaiting }), {
             headers: { "Content-Type": "application/json" },
           });
 

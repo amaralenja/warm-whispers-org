@@ -954,6 +954,26 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
   };
 }
 
+// Clears flows that were waiting for a user reply/button and already expired.
+// Timer delays are handled by processExpiredTimerRuns; do not cancel them here.
+export async function processExpiredWaitingRuns(olderThanSeconds = 60, limit = 100) {
+  const db = await getAdminDb();
+  const { data: expired, error } = await db.rpc("cancel_expired_waiting_flow_runs" as any, {
+    _older_than_seconds: olderThanSeconds,
+    _limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  const rows = Array.isArray(expired) ? expired : [];
+  return {
+    cancelled: rows.length,
+    results: rows.map((run: any) => ({
+      runId: String(run.id),
+      waitingFor: run.waiting_for,
+      expiresAt: run.expires_at,
+    })),
+  };
+}
+
 
 export async function advanceWaitingRun(args: {
   conversationId: string;
