@@ -264,7 +264,7 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const [channelsRes, conversationsRes, crmLeadsRes] = await Promise.all([
+  const [channelsRes, conversationsRes, crmLeadsRes, produtosMapRes, vendasRows] = await Promise.all([
     db.rpc("vendor_list_wa_channels" as any, rpcArgs),
     db.rpc("vendor_list_x1_wa_conversations" as any, {
       ...rpcArgs,
@@ -273,10 +273,25 @@ async function getVendorX1Analytics(
       _to: toIso,
     }),
     db.rpc("vendor_list_crm_leads" as any, rpcArgs),
+    db.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
+    pageAllWithDb<any>(db, (from, to) =>
+      db
+        .from("vendas")
+        .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
+        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+        .range(from, to),
+    ),
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
   if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
+
+  const produtoToOperacao = new Map<string, string>();
+  for (const p of ((produtosMapRes.data ?? []) as any[])) {
+    const produto = safeString(p?.nome_produto).trim().toLowerCase();
+    const expert = safeString(p?.nome_expert).trim();
+    if (produto && expert) produtoToOperacao.set(produto, expert);
+  }
 
   const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
     const op = safeString(c?.operacao_id).trim();
@@ -313,6 +328,7 @@ async function getVendorX1Analytics(
   ));
   const novosLeadsRows = assignedConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
   const vendorUtm = safeNullableString(context?.vendor?.utm);
+  const vendorUtmNorm = normalizeUtm(vendorUtm);
   const crmLeads = ((crmLeadsRes.data ?? []) as any[]).filter((lead) => {
     if (!isWithinIso(lead?.created_at, fromIso, toIso)) return false;
     if (opFilter && !sameText(lead?.expert, opFilter)) return false;
@@ -351,18 +367,22 @@ async function getVendorX1Analytics(
   });
 
   const primaryOp = safeNullableString(context?.vendor?.expert) ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
-  let vendorStats: any = null;
-  if (vendorUtm) {
-    const { data: stats, error } = await db.rpc("get_vendor_stats" as any, {
-      _utm: vendorUtm,
-      _from: data.from ?? null,
-      _to: data.to ?? null,
-    });
-    if (!error) vendorStats = stats;
-  }
-  const vendas = safeNumber(vendorStats?.vendas);
-  const faturamento = safeNumber(vendorStats?.faturamento);
-  const ticketMedio = safeNumber(vendorStats?.ticketMedio) || (vendas > 0 ? faturamento / vendas : 0);
+  const inDay = (t: number | null) => {
+    if (!t) return false;
+    if (fromIso && t < Date.parse(fromIso)) return false;
+    if (toIso && t > Date.parse(toIso)) return false;
+    return true;
+  };
+  const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
+    if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
+    if (!inDay(parseDataField(v?.Data))) return false;
+    const op = resolveVendaOperacao(v, produtoToOperacao);
+    if (opFilter && !sameText(op, opFilter)) return false;
+    return !op || opAllowed(op, allowedWorkspaces);
+  });
+  const vendas = vendorSales.length;
+  const faturamento = vendorSales.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
+  const ticketMedio = vendas > 0 ? faturamento / vendas : 0;
 
   const msgsIn = msgsScoped.filter((m: any) => safeString(m?.direction) === "in").length;
   const msgsOut = msgsScoped.filter((m: any) => safeString(m?.direction) === "out").length;
@@ -409,6 +429,8 @@ async function getVendorX1Analytics(
       if (key) leadOpKeys.add(key);
     }
     const msgOp = msgsScoped.filter((m: any) => sameText(channelToOp.get(safeString(m?.channel_id)), op));
+    const vdsOp = vendorSales.filter((v: any) => sameText(resolveVendaOperacao(v, produtoToOperacao), op));
+    const fatOp = vdsOp.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
     const opHasVendorSales = !primaryOp || sameText(primaryOp, op);
     return {
       operacao: op,
@@ -416,10 +438,10 @@ async function getVendorX1Analytics(
       conversas: convOp.length,
       msgsIn: msgOp.filter((m: any) => safeString(m?.direction) === "in").length,
       msgsOut: msgOp.filter((m: any) => safeString(m?.direction) === "out").length,
-      vendas: opHasVendorSales ? vendas : 0,
-      faturamento: opHasVendorSales ? faturamento : 0,
-      conversao: leadOpKeys.size > 0 && opHasVendorSales ? vendas / leadOpKeys.size : 0,
-      ticketMedio: opHasVendorSales ? ticketMedio : 0,
+      vendas: vdsOp.length || opHasVendorSales ? vdsOp.length : 0,
+      faturamento: fatOp,
+      conversao: leadOpKeys.size > 0 ? vdsOp.length / leadOpKeys.size : 0,
+      ticketMedio: vdsOp.length > 0 ? fatOp / vdsOp.length : 0,
     };
   }).sort((a, b) => b.faturamento - a.faturamento || b.msgsOut - a.msgsOut);
 
@@ -448,11 +470,13 @@ async function getVendorX1Analytics(
     else if (safeString(m?.direction) === "out") e.msgsOut += 1;
     dayMap.set(iso, e);
   }
-  for (const row of (Array.isArray(vendorStats?.serieDiaria) ? vendorStats.serieDiaria : [])) {
-    const iso = safeString(row?.data).slice(0, 10);
+  for (const row of vendorSales) {
+    const t = parseDataField(row?.Data);
+    if (!t) continue;
+    const iso = toIsoDay(new Date(t));
     if (!iso) continue;
     const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
-    e.vendas += safeNumber(row?.vendas);
+    e.vendas += 1;
     dayMap.set(iso, e);
   }
   const serieDiaria = Array.from(dayMap.values()).sort((a, b) => a.data.localeCompare(b.data));
@@ -469,11 +493,11 @@ async function getVendorX1Analytics(
     if (safeString(m?.direction) === "in") e.msgsIn += 1;
     else if (safeString(m?.direction) === "out") e.msgsOut += 1;
   }
-  const todayIso = toIsoDay(new Date());
-  const todaySales = (Array.isArray(vendorStats?.serieDiaria) ? vendorStats.serieDiaria : [])
-    .filter((row: any) => safeString(row?.data).slice(0, 10) === todayIso)
-    .reduce((acc: number, row: any) => acc + safeNumber(row?.vendas), 0);
-  if (todaySales > 0) hourMap.get(brHour(Date.now()))!.vendas += todaySales;
+  for (const row of vendorSales) {
+    const t = parseDataField(row?.Data);
+    if (!t) continue;
+    hourMap.get(brHour(t))!.vendas += 1;
+  }
 
   const novosLeads = leadKeys.size;
   return {
