@@ -376,7 +376,7 @@ function X1AnalyticsPage() {
           <CardContent className="space-y-4">
             <div className="h-64 w-full">
               <ResponsiveContainer>
-                <BarChart data={payload?.porOperacao ?? []}>
+                <BarChart data={porOperacao}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
                   <XAxis dataKey="operacao" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} stroke="var(--muted-foreground)" />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} stroke="var(--muted-foreground)" />
@@ -403,7 +403,7 @@ function X1AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payload?.porOperacao ?? []).map((r, idx) => (
+                  {porOperacao.map((r, idx) => (
                     <tr key={`${safeText(r.operacao, "op")}-${idx}`} className="border-b border-border/40 hover:bg-muted/30">
                       <td className="py-2 pr-4 font-semibold">{safeText(r.operacao)}</td>
                       <td className="py-2 pr-4">{safeNumber(r.leads)}</td>
@@ -418,7 +418,7 @@ function X1AnalyticsPage() {
                       </td>
                     </tr>
                   ))}
-                  {(payload?.porOperacao ?? []).length === 0 && !isLoading ? (
+                  {porOperacao.length === 0 && !isLoading ? (
                     <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">Sem dados no período</td></tr>
                   ) : null}
                 </tbody>
@@ -449,7 +449,7 @@ function X1AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payload?.porVendedor ?? []).map((r, idx) => {
+                  {porVendedor.map((r, idx) => {
                     const nome = safeText(r.nome, safeText(r.utm, "Vendedor"));
                     const fotoUrl = safeText(r.fotoUrl, "");
                     return (
@@ -479,7 +479,7 @@ function X1AnalyticsPage() {
                     </tr>
                     );
                   })}
-                  {(payload?.porVendedor ?? []).length === 0 && !isLoading ? (
+                  {porVendedor.length === 0 && !isLoading ? (
                     <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">Sem dados no período</td></tr>
                   ) : null}
                 </tbody>
