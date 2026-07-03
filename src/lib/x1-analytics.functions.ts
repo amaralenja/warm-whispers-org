@@ -226,8 +226,7 @@ function resolveVendaOperacao(venda: any, produtoToOperacao: Map<string, string>
 function qualifiedVendaOperacao(venda: any, produtoToOperacao: Map<string, string>): string | null {
   const produto = safeString(venda?.Produto).trim().toLowerCase();
   const mapped = produto ? produtoToOperacao.get(produto) : null;
-  if (mapped) return mapped;
-  return safeNullableString(venda?.nome_expert);
+  return mapped ?? null;
 }
 
 function normalizeText(value: unknown): string {
