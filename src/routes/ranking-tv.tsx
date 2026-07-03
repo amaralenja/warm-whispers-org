@@ -571,20 +571,31 @@ function ColetivaCard({ m, idx }: { m: ColetivaItem; idx: number }) {
             ))}
           </div>
 
-          {/* Pills de nível (3 níveis absolutos) */}
-          <div className="mb-2 grid grid-cols-3 gap-1">
+          {/* Pills de nível (3 níveis absolutos) — mostram % que falta pra bater */}
+          <div className="mb-2 grid grid-cols-3 gap-1.5">
             {niveis.map((n) => {
               const ativo = n.batida;
               const atual = !bateu && proxNivel?.nivel === n.nivel;
+              const pctNivel = n.meta > 0 ? Math.min(100, (m.faturamento / n.meta) * 100) : 0;
+              const pctFalta = Math.max(0, 100 - pctNivel);
               return (
                 <div
                   key={n.nivel}
-                  className={`flex flex-col items-center justify-center rounded-md px-1 py-1 text-[9px] font-black uppercase tracking-wider transition ${
-                    ativo ? `${p.bg} text-black` : "bg-white/5 text-white/40"
+                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-2 text-[9px] font-black uppercase tracking-wider transition ${
+                    ativo ? `${p.bg} text-black` : "bg-white/5 text-white/60"
                   } ${atual ? `ring-2 ${p.ring}` : ""}`}
                 >
-                  <span>N{n.nivel}</span>
+                  <span className="text-[10px]">N{n.nivel}</span>
                   <span className="text-[8px] font-bold opacity-80">{n.meta > 0 ? BRL(n.meta) : "—"}</span>
+                  {n.meta > 0 && (
+                    ativo ? (
+                      <span className="text-[8px] font-black">✓ BATIDO</span>
+                    ) : (
+                      <span className={`text-[9px] font-black ${atual ? p.txt : "text-white/70"}`}>
+                        falta {pctFalta.toFixed(0)}%
+                      </span>
+                    )
+                  )}
                 </div>
               );
             })}
