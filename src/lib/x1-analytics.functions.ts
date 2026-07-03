@@ -45,6 +45,11 @@ function parseFilterDay(raw: unknown): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+function toBrIsoDay(ts: number) {
+  const d = new Date(ts - 3 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
 function brStartIso(day: unknown): string | null {
   const s = safeString(day).trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T03:00:00.000Z` : null;
@@ -510,7 +515,7 @@ async function getVendorX1Analytics(
   for (const m of msgsScoped) {
     const t = Date.parse(safeString(m?.created_at));
     if (!Number.isFinite(t)) continue;
-    const iso = toIsoDay(new Date(t));
+    const iso = toBrIsoDay(t);
     const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
     if (safeString(m?.direction) === "in") e.msgsIn += 1;
     else if (safeString(m?.direction) === "out") e.msgsOut += 1;
@@ -897,7 +902,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     for (const m of msgsScoped) {
       const t = Date.parse(m.created_at);
       if (!Number.isFinite(t)) continue;
-      const iso = toIsoDay(new Date(t));
+      const iso = toBrIsoDay(t);
       const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
       if (m.direction === "in") e.msgsIn += 1;
       else if (m.direction === "out") e.msgsOut += 1;
