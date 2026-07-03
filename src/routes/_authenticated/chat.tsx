@@ -455,16 +455,25 @@ function ChatPage() {
 
   const conversationList = useMemo(() => asArray<Conv>(convs), [convs]);
 
+  const unreadTotal = useMemo(
+    () => conversationList.reduce((acc, c) => acc + (Number((c as any).unread_count ?? 0) > 0 ? 1 : 0), 0),
+    [conversationList],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = conversationList;
+    let list = conversationList;
+    if (listFilter === "unread") list = list.filter((c) => Number((c as any).unread_count ?? 0) > 0);
+    else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
+    else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
     if (!q) return list;
     return list.filter((c) =>
       toText(c.contact_name).toLowerCase().includes(q) ||
       toText(c.contact_wa_id).includes(q) ||
       toText(c.last_message_preview).toLowerCase().includes(q)
     );
-  }, [conversationList, search]);
+  }, [conversationList, search, listFilter, activeFlowConvIds]);
+
 
   const active = conversationList.find((c) => String(c.id) === activeId) ?? null;
 
