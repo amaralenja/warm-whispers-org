@@ -2,8 +2,6 @@
 // notification channel after a call-reminder button is pressed.
 // Uses OpenAI directly (already configured) with tool calling.
 
-import { sendWA } from "@/lib/flow-engine.server";
-
 const EVOHUB_BASE = "https://api.evohub.ai";
 
 type AnyDb = any;
@@ -202,6 +200,11 @@ async function saveSession(db: AnyDb, sess: SessionRow) {
       last_button: sess.last_button,
     })
     .eq("id", sess.id);
+}
+
+async function sendWhatsapp(channelId: string, contactWa: string, body: any, db: AnyDb) {
+  const { sendWA } = await import("@/lib/flow-engine.server");
+  return sendWA(channelId, contactWa, body, db);
 }
 
 async function callOpenAI(messages: ChatMsg[]) {
@@ -660,7 +663,7 @@ export async function startNotificationSession(opts: {
 
   // Send a deterministic opener (avoids cold-start LLM call) and store it
   const opener = openerForButton(buttonId, inserted as SessionRow);
-  await sendWA(channelId, contactWa, { type: "text", text: { body: opener, preview_url: false } }, db);
+  await sendWhatsapp(channelId, contactWa, { type: "text", text: { body: opener, preview_url: false } }, db);
 
   const msgs = [...initialMsgs, { role: "assistant" as const, content: opener }];
   await db
@@ -739,7 +742,7 @@ export async function continueNotificationSession(opts: {
       // final text reply
       const reply = String(choice.content || "").trim();
       if (reply) {
-        await sendWA(channelId, contactWa, { type: "text", text: { body: reply, preview_url: false } }, db);
+        await sendWhatsapp(channelId, contactWa, { type: "text", text: { body: reply, preview_url: false } }, db);
       }
       await saveSession(db, sess);
       return;
@@ -845,7 +848,7 @@ export async function continueNotificationSession(opts: {
       const last = wrap?.choices?.[0]?.message?.content;
       if (last) {
         sess.messages.push({ role: "assistant", content: last });
-        await sendWA(channelId, contactWa, { type: "text", text: { body: last, preview_url: false } }, db);
+        await sendWhatsapp(channelId, contactWa, { type: "text", text: { body: last, preview_url: false } }, db);
       }
       await saveSession(db, sess);
       return;

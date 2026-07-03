@@ -361,7 +361,10 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
       _patch: patch,
     });
     if (error) throw new Error(error.message);
-    if (data === false) throw new Error("Execução não encontrada");
+    if (data === false) {
+      if (await isFlowRunCancelled(ctx)) return;
+      throw new Error("Execução não encontrada");
+    }
     return;
   }
   const { data, error } = await ctx.db.rpc("update_wa_flow_run" as any, {
@@ -369,7 +372,19 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
     _patch: patch,
   });
   if (error) throw new Error(error.message);
-  if (data === false) throw new Error("Execução não encontrada");
+  if (data === false) {
+    if (await isFlowRunCancelled(ctx)) return;
+    throw new Error("Execução não encontrada");
+  }
+}
+
+async function isFlowRunCancelled(ctx: Ctx): Promise<boolean> {
+  const { data } = await ctx.db
+    .from("wa_flow_runs" as any)
+    .select("status")
+    .eq("id", ctx.runId)
+    .maybeSingle();
+  return String((data as any)?.status ?? "") === "cancelled";
 }
 
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
@@ -421,6 +436,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
   let safety = 0;
 
   while (currentId && safety++ < 50) {
+    if (await isFlowRunCancelled(ctx)) return;
     const node = nodes.find((n) => n.id === currentId);
     if (!node) {
       // Node não existe mais (fluxo editado). Não deixa o run preso em "running".
@@ -432,6 +448,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
 
     try {
       const result = await runNode(node, ctx);
+      if (await isFlowRunCancelled(ctx)) return;
 
       // Update run pointer
       await updateFlowRun(ctx, {
@@ -931,6 +948,26 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
     results: runs.map((run: any) => ({
       runId: String(run.id),
       status: run.status,
+      waitingFor: run.waiting_for,
+      expiresAt: run.expires_at,
+    })),
+  };
+}
+
+// Clears flows that were waiting for a user reply/button and already expired.
+// Timer delays are handled by processExpiredTimerRuns; do not cancel them here.
+export async function processExpiredWaitingRuns(olderThanSeconds = 60, limit = 100) {
+  const db = await getAdminDb();
+  const { data: expired, error } = await db.rpc("cancel_expired_waiting_flow_runs" as any, {
+    _older_than_seconds: olderThanSeconds,
+    _limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  const rows = Array.isArray(expired) ? expired : [];
+  return {
+    cancelled: rows.length,
+    results: rows.map((run: any) => ({
+      runId: String(run.id),
       waitingFor: run.waiting_for,
       expiresAt: run.expires_at,
     })),
