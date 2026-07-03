@@ -387,8 +387,16 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         }
         summary.funnels += 1;
       } catch (e: any) {
+        console.error("[zapvoice-import] funnel failed", {
+          isVendor,
+          vendorId: (context as any)?.vendor?.id ?? null,
+          funnelId: f?.id,
+          funnelName: f?.name,
+          error: e?.message ?? String(e),
+        });
         summary.errors.push({ funnel: f.name ?? f.id, message: e?.message ?? String(e) });
       }
+
     }
 
     return summary;
