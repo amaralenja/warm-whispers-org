@@ -361,7 +361,10 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
       _patch: patch,
     });
     if (error) throw new Error(error.message);
-    if (data === false) throw new Error("Execução não encontrada");
+    if (data === false) {
+      if (await isFlowRunCancelled(ctx)) return;
+      throw new Error("Execução não encontrada");
+    }
     return;
   }
   const { data, error } = await ctx.db.rpc("update_wa_flow_run" as any, {
@@ -369,7 +372,10 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
     _patch: patch,
   });
   if (error) throw new Error(error.message);
-  if (data === false) throw new Error("Execução não encontrada");
+  if (data === false) {
+    if (await isFlowRunCancelled(ctx)) return;
+    throw new Error("Execução não encontrada");
+  }
 }
 
 async function isFlowRunCancelled(ctx: Ctx): Promise<boolean> {
