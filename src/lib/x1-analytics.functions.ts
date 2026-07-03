@@ -519,7 +519,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // Mensagens do período
     let msgQuery = supabase
       .from("wa_messages")
-      .select("id, conversation_id, channel_id, direction, created_at, sent_by")
+      .select("id, conversation_id, channel_id, direction, created_at, sent_by, raw")
       .is("deleted_at", null);
     if (fromIso) msgQuery = msgQuery.gte("created_at", fromIso);
     if (toIso) msgQuery = msgQuery.lte("created_at", toIso);
@@ -534,7 +534,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     });
 
     // Vendas & vendedores (para conversão e faturamento por operação)
-    const [vendedoresRes, vendasAll] = await Promise.all([
+    const [vendedoresRes, produtosMapRes, vendasAll] = await Promise.all([
       supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       pageAll<any>((from, to) =>
@@ -577,8 +577,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       if (toIso && t > Date.parse(toIso)) return false;
       return true;
     };
-    const vendasPeriodo = vendasAll.filter((v) => inDay(parseDataField(v.Data)));
-    const vendasScoped = vendasPeriodo.filter((v) => {
+    const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)));
+    const vendasScoped = vendasPeriodo.filter((v: any) => {
       const op = vendaOperacao(v);
       if (opFilter) return op === opFilter;
       return true;
@@ -587,7 +587,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // KPIs
     const msgsIn = msgsScoped.filter((m) => m.direction === "in").length;
     const msgsOut = msgsScoped.filter((m) => m.direction === "out").length;
-    const faturamento = vendasScoped.reduce((a, v) => a + parseTicket(v.Ticket), 0);
+    const faturamento = vendasScoped.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
     const contatosUnicos = new Set(
       conversations.map((c) => `${c.channel_id}|${c.contact_wa_id}`),
     ).size;
@@ -627,8 +627,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const msgOp = msgsScoped.filter((m) => channelToOp.get(String(m.channel_id)) === op);
       const inC = msgOp.filter((m) => m.direction === "in").length;
       const outC = msgOp.filter((m) => m.direction === "out").length;
-      const vdsOp = vendasPeriodo.filter((v) => sameText(vendaOperacao(v), op));
-      const fatOp = vdsOp.reduce((a, v) => a + parseTicket(v.Ticket), 0);
+      const vdsOp = vendasPeriodo.filter((v: any) => sameText(vendaOperacao(v), op));
+      const fatOp = vdsOp.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
       const leadsCount = novosOp.length;
       opRows.push({
         operacao: op,
