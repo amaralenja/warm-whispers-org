@@ -409,8 +409,10 @@ function ChatPage() {
   const { data: convs = [], error: convsError } = useQuery({
     queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin"],
     queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
-    refetchInterval: 5000,
-    refetchOnWindowFocus: true,
+    // Realtime cuida das atualizações incrementais; polling só de segurança.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
   });
 
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
@@ -509,15 +511,22 @@ function ChatPage() {
   }, [conversationList, search, listFilter, activeFlowConvIds]);
 
 
-  const active = conversationList.find((c) => String(c.id) === activeId) ?? null;
+  // Estabiliza a referência de `active`: mantém o último objeto conhecido enquanto
+  // o refetch estiver em andamento, evitando desmontar a coluna do chat (e o textarea).
+  const activeRef = useRef<any>(null);
+  const activeCandidate = conversationList.find((c) => String(c.id) === activeId) ?? null;
+  if (activeCandidate) activeRef.current = activeCandidate;
+  const active = activeCandidate ?? (activeId && activeRef.current && String(activeRef.current.id) === activeId ? activeRef.current : null);
 
 
   const { data: messages = [], error: messagesError } = useQuery({
     queryKey: ["wa-messages", activeId],
     queryFn: () => activeId ? listMsgFn({ data: { conversationId: activeId } }) : Promise.resolve([]),
     enabled: !!activeId,
-    refetchInterval: activeId ? 3000 : false,
-    refetchOnWindowFocus: true,
+    // Realtime empurra novas mensagens; polling só de fallback lento pra não travar o textarea.
+    refetchInterval: activeId ? 20_000 : false,
+    refetchOnWindowFocus: false,
+    staleTime: 10_000,
   });
 
   const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
