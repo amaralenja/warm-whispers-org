@@ -92,9 +92,13 @@ const CAIO_UTMS = ["GC", "BP"];
 const GUSTAVO_UTMS = ["LS", "LF"];
 
 async function dbFor(context: any) {
-  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    return supabaseAdmin as any;
+  if (context?.vendor) {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      return supabaseAdmin as any;
+    } catch (err) {
+      console.warn("[operacoes] supabaseAdmin indisponível — usando client autenticado", err);
+    }
   }
   return context.supabase as any;
 }

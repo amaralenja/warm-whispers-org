@@ -33,6 +33,28 @@ function asStr(v: unknown) {
   return typeof v === "string" ? v : v == null ? "" : String(v);
 }
 
+type SafeVendor = { utm: string; faturamento: number; vendas: number; pctTotal: number };
+
+function toSafeVendors(input: unknown): SafeVendor[] {
+  if (!Array.isArray(input)) return [];
+  const out: SafeVendor[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const v = raw as Record<string, unknown>;
+    const utm = asStr(v.utm);
+    const faturamento = Number(v.faturamento);
+    const vendas = Number(v.vendas);
+    const pctTotal = Number(v.pctTotal);
+    out.push({
+      utm,
+      faturamento: Number.isFinite(faturamento) ? faturamento : 0,
+      vendas: Number.isFinite(vendas) ? vendas : 0,
+      pctTotal: Number.isFinite(pctTotal) ? pctTotal : 0,
+    });
+  }
+  return out;
+}
+
 export function ParticipacaoVendedores({
   vendedores: vendedoresProp,
   loading,
@@ -40,8 +62,8 @@ export function ParticipacaoVendedores({
   vendedores?: VendedorStat[] | null;
   loading?: boolean;
 }) {
-  const vendedores: VendedorStat[] = Array.isArray(vendedoresProp) ? vendedoresProp : [];
-  const total = vendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0);
+  const vendedores = toSafeVendors(vendedoresProp);
+  const total = vendedores.reduce((acc, v) => acc + v.faturamento, 0);
 
   // Donut: top 6, agrupa o resto como "Outros"
   const top = vendedores.slice(0, 6);
@@ -112,12 +134,11 @@ export function ParticipacaoVendedores({
             <div className="space-y-1.5">
               {vendedores.slice(0, 10).map((v, i) => {
                 const color = colorFor(i);
-                const fat = Number((v as any)?.faturamento) || 0;
-                const vendas = Number((v as any)?.vendas) || 0;
-                const pctTotal = Number((v as any)?.pctTotal) || 0;
-                const pct = pctTotal * 100;
+                const fat = v.faturamento;
+                const vendas = v.vendas;
+                const pct = v.pctTotal * 100;
                 const isTop = i === 0;
-                const utmStr = asStr((v as any)?.utm);
+                const utmStr = v.utm;
                 return (
                   <div
                     key={utmStr || i}
