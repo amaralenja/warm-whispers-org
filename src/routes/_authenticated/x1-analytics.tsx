@@ -240,6 +240,12 @@ function X1AnalyticsPage() {
             <Button onClick={() => refetch()} disabled={isFetching} className="h-9">
               {isFetching ? "Atualizando…" : "Atualizar"}
             </Button>
+            {dataUpdatedAt ? (
+              <span className="self-center text-[10px] text-muted-foreground">
+                Atualizado {new Date(dataUpdatedAt).toLocaleTimeString("pt-BR")}
+              </span>
+            ) : null}
+
             <Button
               onClick={() => {
                 if (!payload) { toast.error("Aguarde os dados carregarem"); return; }
