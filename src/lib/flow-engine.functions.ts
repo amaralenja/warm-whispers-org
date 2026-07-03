@@ -916,23 +916,74 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
     // Se o dispatcher duplicou, um clique no X mata tudo, sem deixar cópia rodando.
     const { data: target } = await db
       .from("wa_flow_runs" as any)
-      .select("id, flow_id, channel_id, contact_wa_id")
+      .select("id, flow_id, channel_id, contact_wa_id, conversation_id")
       .eq("id", data.runId)
       .maybeSingle();
 
     const rpcArgs = vendorRpcArgs(context);
+    let cancelledTotal = 0;
     if (rpcArgs) {
       const { data: cancelled, error } = await db.rpc("vendor_cancel_wa_flow_run" as any, {
         ...rpcArgs,
         _run_id: data.runId,
       });
       if (error) throw new Error(error.message);
-      return { ok: true, cancelled: Number(cancelled ?? 0) };
+      cancelledTotal += Number(cancelled ?? 0);
+    } else {
+      const { data: cancelled, error } = await db.rpc("cancel_active_wa_flow_runs" as any, {
+        _run_id: data.runId,
+      });
+      if (error) throw new Error(error.message);
+      cancelledTotal += Number(cancelled ?? 0);
     }
 
-    const { data: cancelled, error } = await db.rpc("cancel_active_wa_flow_runs" as any, {
-      _run_id: data.runId,
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true, cancelled: Number(cancelled ?? 0), targetFound: Boolean(target) };
+    // Fallback agressivo: se o worker já trocou o status entre a listagem e o clique,
+    // ou se existe uma duplicata ativa no mesmo atendimento, cancela pelo contexto da conversa.
+    // A permissão já foi validada acima; usar admin evita RLS/política antiga bloquear o X.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const cancelPatch = {
+      status: "cancelled",
+      waiting_for: null,
+      expires_at: null,
+      error: "Cancelado manualmente",
+      updated_at: new Date().toISOString(),
+    };
+
+    const activeStatuses = ["queued", "running", "waiting"];
+    const fallbackIds = new Set<string>();
+
+    if (target?.id) fallbackIds.add(String(target.id));
+    if (data.runId) fallbackIds.add(String(data.runId));
+
+    if (target?.flow_id && (target?.conversation_id || data.conversationId)) {
+      const { data: siblings, error: siblingError } = await supabaseAdmin
+        .from("wa_flow_runs" as any)
+        .select("id")
+        .eq("conversation_id", String(target.conversation_id ?? data.conversationId))
+        .eq("flow_id", String(target.flow_id))
+        .in("status", activeStatuses);
+      if (siblingError) throw new Error(siblingError.message);
+      for (const row of (siblings ?? []) as any[]) fallbackIds.add(String(row.id));
+    } else if (data.conversationId) {
+      const { data: activeRows, error: activeError } = await supabaseAdmin
+        .from("wa_flow_runs" as any)
+        .select("id")
+        .eq("conversation_id", data.conversationId)
+        .in("status", activeStatuses);
+      if (activeError) throw new Error(activeError.message);
+      for (const row of (activeRows ?? []) as any[]) fallbackIds.add(String(row.id));
+    }
+
+    if (fallbackIds.size > 0) {
+      const { data: forceRows, error: forceError } = await supabaseAdmin
+        .from("wa_flow_runs" as any)
+        .update(cancelPatch)
+        .in("id", Array.from(fallbackIds))
+        .in("status", activeStatuses)
+        .select("id");
+      if (forceError) throw new Error(forceError.message);
+      cancelledTotal += Array.isArray(forceRows) ? forceRows.length : 0;
+    }
+
+    return { ok: true, cancelled: cancelledTotal, targetFound: Boolean(target) };
   });
