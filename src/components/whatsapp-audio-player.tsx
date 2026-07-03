@@ -216,9 +216,9 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
         <div className="mt-2 flex items-center justify-between text-[11px] font-medium tabular-nums text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Volume2 className="h-3.5 w-3.5" />
-            {formatTime(current)}
+            {safeText(formatTime(current))}
           </span>
-          <span>{formatTime(duration)}</span>
+          <span>{safeText(formatTime(duration))}</span>
         </div>
         {error && <p className="text-[10px] text-destructive mt-0.5">{safeText(error)}</p>}
       </div>
@@ -234,7 +234,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
         )}
         aria-label="Mudar velocidade"
       >
-        {speed}x
+        {safeText(speed)}x
       </button>
     </div>
   );
