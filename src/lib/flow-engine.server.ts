@@ -364,8 +364,12 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
     if (data === false) throw new Error("Execução não encontrada");
     return;
   }
-  const { error } = await ctx.db.from("wa_flow_runs" as any).update(patch).eq("id", ctx.runId);
+  const { data, error } = await ctx.db.rpc("update_wa_flow_run" as any, {
+    _run_id: ctx.runId,
+    _patch: patch,
+  });
   if (error) throw new Error(error.message);
+  if (data === false) throw new Error("Execução não encontrada");
 }
 
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
