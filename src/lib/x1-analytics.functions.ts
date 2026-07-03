@@ -72,6 +72,15 @@ export type X1Filter = {
   from?: string | null;
   to?: string | null;
   operacao?: string | null; // "all" | operacao_id
+  channelId?: string | null; // "all" | wa_channels.id
+};
+
+export type X1CanalRow = {
+  id: string;
+  name: string;
+  displayPhone: string | null;
+  verifiedName: string | null;
+  operacao: string;
 };
 
 export type X1OperacaoRow = {
