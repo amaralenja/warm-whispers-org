@@ -265,6 +265,19 @@ function formatTime(iso: unknown) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatListStamp(iso: unknown) {
+  const d = toSafeDate(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Ontem";
+  const sameYear = d.getFullYear() === today.getFullYear();
+  return d.toLocaleDateString("pt-BR", sameYear ? { day: "2-digit", month: "2-digit" } : { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
 function formatDateLabel(iso: unknown) {
   const d = toSafeDate(iso);
   const today = new Date();
@@ -855,7 +868,7 @@ function ChatPage() {
                         </div>
                         <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
                           <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-                            {formatTime(c.last_message_at)}
+                            {formatListStamp(c.last_message_at)}
                           </span>
                           {Number(c.unread_count ?? 0) > 0 ? (
                             <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">

@@ -426,8 +426,7 @@ export const listConversations = createServerFn({ method: "GET" })
         throw new Error(error.message);
       }
       const result = ((rows ?? []) as any[])
-        .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime())
-        .slice(0, 200);
+        .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime());
       console.info("[whatsapp-chat] vendor listConversations", {
         vendorId,
         operacaoId: data.operacaoId ?? null,
