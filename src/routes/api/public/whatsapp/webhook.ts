@@ -54,9 +54,15 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
         const raw = await request.text();
         const sig = request.headers.get("x-hub-signature-256");
 
+        console.log("[wa-webhook] hit", {
+          bytes: raw.length,
+          hasSig: Boolean(sig),
+          hasSecret: Boolean(secret),
+        });
+
         // Allow if no secret configured (dev only), otherwise enforce.
         if (secret && !verifySignature(raw, sig, secret)) {
-          console.warn("[wa-webhook] invalid signature");
+          console.warn("[wa-webhook] invalid signature", { hasSig: Boolean(sig), sigPrefix: sig?.slice(0, 12) ?? null });
           return new Response("Invalid signature", { status: 401 });
         }
 
