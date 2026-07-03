@@ -854,7 +854,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     }
     const serieHoraria = Array.from(hourMap.values());
 
-    const novosLeads = novosLeadsRows.length;
+    const novosLeads = allLeadKeys.size;
     return {
       kpis: {
         novosLeads,
