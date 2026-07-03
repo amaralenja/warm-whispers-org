@@ -199,7 +199,7 @@ function X1AnalyticsPage() {
             />
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Operação</Label>
-              <Select value={operacao} onValueChange={setOperacao}>
+              <Select value={operacao} onValueChange={(v) => { setOperacao(v); setChannelId("all"); }}>
                 <SelectTrigger className="h-9 w-44 bg-card">
                   <SelectValue />
                 </SelectTrigger>
@@ -210,6 +210,25 @@ function X1AnalyticsPage() {
                     if (!opText) return null;
                     return <SelectItem key={`${opText}-${idx}`} value={opText}>{opText}</SelectItem>;
                   })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Canal / WhatsApp</Label>
+              <Select value={channelId} onValueChange={setChannelId}>
+                <SelectTrigger className="h-9 w-64 bg-card">
+                  <SelectValue placeholder="Todos os canais" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os canais</SelectItem>
+                  {(payload?.canaisDisponiveis ?? [])
+                    .filter((c) => operacao === "all" || c.operacao === operacao)
+                    .map((c) => {
+                      const phone = safeText(c.displayPhone, "");
+                      const label = phone ? `${safeText(c.name, "Canal")} · ${phone}` : safeText(c.name, "Canal");
+                      return <SelectItem key={c.id} value={c.id}>{label}</SelectItem>;
+                    })}
                 </SelectContent>
               </Select>
             </div>
