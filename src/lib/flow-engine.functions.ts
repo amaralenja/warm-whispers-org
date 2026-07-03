@@ -657,20 +657,41 @@ export const importFlow = createServerFn({ method: "POST" })
     const db = await dbFor(context);
     const isVendor = Boolean((context as any)?.vendor);
     const payload = decodeFlowCode(data.code);
-    const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString();
+    const desired = (data.nome?.trim() || payload.nome || "Fluxo Importado").toString().trim() || "Fluxo Importado";
     const finalName = await uniqueFlowName(db, desired, null, context);
-    const operacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
+    let operacaoId: string | null;
+    try {
+      operacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
+    } catch (e: any) {
+      console.error("[flow-engine] importFlow coerce operação falhou", {
+        vendor: !!(context as any)?.vendor,
+        vendorId: (context as any)?.vendor?.id,
+        requested: data.operacao_id,
+        error: e?.message,
+      });
+      throw e;
+    }
     let row: any;
     let error: any = null;
     if (isVendor) {
-      row = await createVendorFlowViaRpc(context, db, {
-        nome: finalName,
-        operacao_id: operacaoId,
-        ativo: false,
-        entry_node_id: payload.entry_node_id ?? null,
-        nodes: payload.nodes ?? [],
-        edges: payload.edges ?? [],
-      });
+      try {
+        row = await createVendorFlowViaRpc(context, db, {
+          nome: finalName,
+          operacao_id: operacaoId,
+          ativo: false,
+          entry_node_id: payload.entry_node_id ?? null,
+          nodes: payload.nodes ?? [],
+          edges: payload.edges ?? [],
+        });
+      } catch (e: any) {
+        console.error("[flow-engine] importFlow vendor RPC falhou", {
+          vendorId: (context as any)?.vendor?.id,
+          finalName,
+          operacaoId,
+          error: e?.message,
+        });
+        throw e;
+      }
     } else {
       const res = await db
         .from("wa_flows" as any)
@@ -697,8 +718,20 @@ export const importFlow = createServerFn({ method: "POST" })
         channel_id: null,
         ativo: t.ativo ?? true,
       }));
-      if (isVendor) await vendorReplaceTriggers(context, db, (row as any).id, rows);
-      else await db.from("wa_flow_triggers" as any).insert(rows);
+      if (isVendor) {
+        try {
+          await vendorReplaceTriggers(context, db, (row as any).id, rows);
+        } catch (e: any) {
+          console.error("[flow-engine] importFlow vendorReplaceTriggers falhou", {
+            vendorId: (context as any)?.vendor?.id,
+            flowId: (row as any).id,
+            error: e?.message,
+          });
+          // Não bloqueia o import — fluxo já foi criado; vendedor pode reeditar triggers depois.
+        }
+      } else {
+        await db.from("wa_flow_triggers" as any).insert(rows);
+      }
     }
     return { id: (row as any).id, nome: finalName };
   });

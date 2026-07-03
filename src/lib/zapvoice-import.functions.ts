@@ -101,12 +101,35 @@ function vendorRpcArgs(context: any) {
   return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
 }
 
+async function vendorAllowedWorkspaceIds(context: any, db: any): Promise<string[]> {
+  const explicit = context?.vendor?.workspace_ids;
+  if (Array.isArray(explicit) && explicit.length > 0) return explicit.map(String).filter(Boolean);
+  const expert = context?.vendor?.expert ? String(context.vendor.expert).trim() : "";
+  if (expert) return [expert];
+  const rpcArgs = vendorRpcArgs(context);
+  if (!rpcArgs) return [];
+  const { data } = await db.rpc("vendor_allowed_workspace_ids" as any, rpcArgs);
+  return Array.isArray(data) ? data.map(String).filter(Boolean) : [];
+}
+
+async function coerceVendorOperacaoId(context: any, db: any, operacaoId?: string | null): Promise<string | null> {
+  if (!context?.vendor) return operacaoId ?? null;
+  const allowed = await vendorAllowedWorkspaceIds(context, db);
+  if (allowed.length === 0) throw new Error("Sessão de vendedor sem operação liberada");
+  const desired = String(operacaoId ?? "").trim();
+  if (!desired) return allowed[0];
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const ok = allowed.some((op) => norm(op) === norm(desired));
+  if (!ok) throw new Error("Inautorizado: vendedor sem acesso a esta operação");
+  return desired;
+}
+
 async function createVendorZapVoiceFlow(context: any, db: any, payload: any) {
   const rpcArgs = vendorRpcArgs(context);
   if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
   const { error } = await db.rpc("vendor_create_wa_flow" as any, {
     ...rpcArgs,
-    _nome: payload.nome,
+    _nome: String(payload.nome ?? "").trim() || "Fluxo ZapVoice",
     _operacao_id: payload.operacao_id ?? null,
     _folder: null,
     _ativo: payload.ativo ?? true,
@@ -115,7 +138,15 @@ async function createVendorZapVoiceFlow(context: any, db: any, payload: any) {
     _edges: payload.edges ?? [],
     _descricao: payload.descricao ?? null,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("[zapvoice-import] vendor_create_wa_flow failed", {
+      vendorId: rpcArgs._vendor_id,
+      nome: payload.nome,
+      operacao_id: payload.operacao_id,
+      error: error.message,
+    });
+    throw new Error(error.message);
+  }
 }
 
 export const importZapVoiceBackup = createServerFn({ method: "POST" })
@@ -146,6 +177,10 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       db = supabaseAdmin as any;
     }
+
+    // Vendedor: garante que a operação escolhida está liberada pra ele
+    // (evita "Inautorizado" enigmático no meio do loop e normaliza null → workspace default).
+    const effectiveOperacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
 
     const summary: Summary = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
@@ -333,7 +368,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         const nome = `[ZV] ${f.name ?? "Funil"}`.slice(0, 120);
         const flowPayload = {
           nome,
-          operacao_id: data.operacao_id,
+          operacao_id: effectiveOperacaoId,
           ativo: true,
           entry_node_id: triggerId,
           nodes,
