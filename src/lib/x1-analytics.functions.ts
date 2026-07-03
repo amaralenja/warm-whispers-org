@@ -715,6 +715,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
       if (!op) return false;
       if (opFilter && !sameText(op, opFilter)) return false;
+      if (!channelAllowed(c?.channel_id)) return false;
       return true;
     });
 
