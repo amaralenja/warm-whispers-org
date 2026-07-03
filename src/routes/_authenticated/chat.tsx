@@ -868,7 +868,7 @@ function ChatPage() {
                         </div>
                         <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
                           <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-                            {formatTime(c.last_message_at)}
+                            {formatListStamp(c.last_message_at)}
                           </span>
                           {Number(c.unread_count ?? 0) > 0 ? (
                             <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">
