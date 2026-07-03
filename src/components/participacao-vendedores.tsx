@@ -1,7 +1,7 @@
 import type { VendedorStat } from "@/lib/operacoes.functions";
 
 const BRL = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  (Number.isFinite(Number(n)) ? Number(n) : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 // Paleta refinada — verde como dominante, com acentos contrastantes
 const PALETTE = [
@@ -22,15 +22,40 @@ function colorFor(i: number) {
 }
 
 function initials(s: unknown) {
-  const str = typeof s === "string" ? s : s == null ? "" : String(s);
+  const str = asStr(s);
   const t = str.replace(/[^a-zA-Z0-9 ]/g, "").trim();
   if (!t) return "?";
   const parts = t.split(/\s+/);
   if (parts.length === 1) return t.slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
-function asStr(v: unknown) {
-  return typeof v === "string" ? v : v == null ? "" : String(v);
+function asStr(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) return v.map(asStr).filter(Boolean).join(", ");
+  if (typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    return asStr(obj.nome ?? obj.name ?? obj.utm ?? obj.label ?? obj.value ?? "");
+  }
+  return "";
+}
+
+function asNum(v: unknown): number {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const cleaned = v.replace(/R\$\s?/g, "").replace(/\s/g, "").trim();
+    const normalized = cleaned.includes(",")
+      ? cleaned.replace(/\./g, "").replace(",", ".")
+      : cleaned;
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (v && typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    return asNum(obj.value ?? obj.valor ?? obj.total ?? obj.amount ?? 0);
+  }
+  return 0;
 }
 
 type SafeVendor = { utm: string; faturamento: number; vendas: number; pctTotal: number };
@@ -41,15 +66,15 @@ function toSafeVendors(input: unknown): SafeVendor[] {
   for (const raw of input) {
     if (!raw || typeof raw !== "object") continue;
     const v = raw as Record<string, unknown>;
-    const utm = asStr(v.utm);
-    const faturamento = Number(v.faturamento);
-    const vendas = Number(v.vendas);
-    const pctTotal = Number(v.pctTotal);
+    const utm = asStr(v.utm ?? v.nome ?? v.name ?? v.label) || "Vendedor";
+    const faturamento = asNum(v.faturamento);
+    const vendas = asNum(v.vendas);
+    const pctTotal = asNum(v.pctTotal);
     out.push({
       utm,
-      faturamento: Number.isFinite(faturamento) ? faturamento : 0,
-      vendas: Number.isFinite(vendas) ? vendas : 0,
-      pctTotal: Number.isFinite(pctTotal) ? pctTotal : 0,
+      faturamento,
+      vendas,
+      pctTotal,
     });
   }
   return out;

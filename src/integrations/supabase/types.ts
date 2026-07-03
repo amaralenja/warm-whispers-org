@@ -2449,6 +2449,77 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_list_x1_wa_conversations: {
+        Args: {
+          _codigo: string
+          _from?: string
+          _operacao_id?: string
+          _to?: string
+          _vendor_id: number
+        }
+        Returns: {
+          assigned_vendor_id: number | null
+          channel_id: string
+          contact_name: string | null
+          contact_wa_id: string
+          created_at: string
+          id: string
+          last_message_at: string
+          last_message_direction: string | null
+          last_message_preview: string | null
+          last_message_status: string | null
+          notes: string | null
+          operacao_id: string | null
+          phone_number_id: string | null
+          tags: string[]
+          unread_count: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_conversations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_x1_wa_messages: {
+        Args: {
+          _codigo: string
+          _from?: string
+          _operacao_id?: string
+          _to?: string
+          _vendor_id: number
+        }
+        Returns: {
+          caption: string | null
+          channel_id: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          direction: string
+          error_message: string | null
+          from_wa_id: string | null
+          id: string
+          media_filename: string | null
+          media_id: string | null
+          media_mime: string | null
+          media_url: string | null
+          msg_type: string
+          raw: Json | null
+          reply_to: string | null
+          sent_by: string | null
+          status: string | null
+          text_body: string | null
+          to_wa_id: string | null
+          wa_message_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_messages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       vendor_mark_conversation_read: {
         Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
         Returns: boolean
