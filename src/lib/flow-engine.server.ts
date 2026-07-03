@@ -364,8 +364,12 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
     if (data === false) throw new Error("Execução não encontrada");
     return;
   }
-  const { error } = await ctx.db.from("wa_flow_runs" as any).update(patch).eq("id", ctx.runId);
+  const { data, error } = await ctx.db.rpc("update_wa_flow_run" as any, {
+    _run_id: ctx.runId,
+    _patch: patch,
+  });
   if (error) throw new Error(error.message);
+  if (data === false) throw new Error("Execução não encontrada");
 }
 
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
@@ -888,6 +892,15 @@ export async function processExpiredTimerRuns(limit = 20) {
         return { runId: ctx.runId, completed: true };
       }
       try {
+        // Move the pointer off the delay before executing the next node. If the
+        // worker is interrupted while sending media, the run will not be
+        // recovered as the same delay again and duplicate the message.
+        await updateFlowRun(ctx, {
+          status: "running",
+          waiting_for: null,
+          expires_at: null,
+          current_node_id: nextId,
+        });
         await executeFrom(ctx, nextId);
         return { runId: ctx.runId, ok: true };
       } catch (err: any) {
@@ -913,40 +926,14 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
   });
   if (error) throw new Error(error.message);
   const runs = Array.isArray(stale) ? stale : [];
-  if (runs.length === 0) return { recovered: 0, results: [] };
-
-  const results = await Promise.allSettled(
-    runs.map(async (run: any) => {
-      const flow = await loadFlow(String(run.flow_id), db);
-      const edges: Edge[] = (flow.edges as Edge[]) ?? [];
-      const nextId = run.current_node_id ? nextNodeId(edges, String(run.current_node_id)) : null;
-      const ctx: Ctx = {
-        runId: String(run.id),
-        flowId: String(run.flow_id),
-        channelId: String(run.channel_id),
-        contactWaId: String(run.contact_wa_id),
-        conversationId: run.conversation_id ?? null,
-        db,
-        variables: { trigger: (run.context && (run.context as any).trigger) ?? {} },
-        vendor: null,
-      };
-      if (!nextId) {
-        await updateFlowRun(ctx, { status: "completed" });
-        return { runId: ctx.runId, completed: true };
-      }
-      try {
-        await executeFrom(ctx, nextId);
-        return { runId: ctx.runId, ok: true };
-      } catch (err: any) {
-        await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
-        return { runId: ctx.runId, error: String(err?.message ?? err) };
-      }
-    }),
-  );
-
   return {
     recovered: runs.length,
-    results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
+    results: runs.map((run: any) => ({
+      runId: String(run.id),
+      status: run.status,
+      waitingFor: run.waiting_for,
+      expiresAt: run.expires_at,
+    })),
   };
 }
 

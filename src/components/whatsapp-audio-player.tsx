@@ -3,7 +3,7 @@ import { Play, Pause, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WhatsappAudioPlayerProps {
-  url: unknown;
+  url?: unknown;
   outgoing?: boolean;
 }
 
@@ -37,8 +37,9 @@ function safeText(value: unknown): string {
   return String(value);
 }
 
-export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps) {
-  const safeUrl = safeText(url);
+export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
+  const safeUrl = safeText(props?.url).trim();
+  const outgoing = Boolean(props?.outgoing);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,10 +54,11 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
     setDuration(0);
     setCurrent(0);
     setError(null);
-    if (!safeUrl || safeUrl.length === 0) {
+    if (!safeUrl) {
       audioRef.current = null;
       return;
     }
+    if (typeof Audio === "undefined") return;
     const audio = new Audio();
     audio.preload = "metadata";
     audio.src = safeUrl;
@@ -135,6 +137,20 @@ export function WhatsappAudioPlayer({ url, outgoing }: WhatsappAudioPlayerProps)
   }
 
   const progress = duration > 0 ? (current / duration) * 100 : 0;
+
+  if (!safeUrl) {
+    return (
+      <div
+        className={cn(
+          "mb-2 flex min-w-[280px] items-center gap-3 rounded-[22px] border px-4 py-3 text-sm text-muted-foreground",
+          outgoing ? "border-chat-accent/30 bg-background/15" : "border-chat-line bg-background/25",
+        )}
+      >
+        <Volume2 className="h-4 w-4" />
+        Áudio indisponível
+      </div>
+    );
+  }
 
   return (
     <div
