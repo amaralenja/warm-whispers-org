@@ -550,15 +550,17 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     let convQuery = supabase
       .from("wa_conversations")
       .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id");
-    if (fromIso) convQuery = convQuery.gte("last_message_at", fromIso);
-    if (toIso) convQuery = convQuery.lte("last_message_at", toIso);
     if (opFilter) convQuery = convQuery.eq("operacao_id", opFilter);
-    const conversations = await pageAll<any>((from, to) => convQuery.range(from, to));
+    const allConversations = await pageAll<any>((from, to) => convQuery.range(from, to));
+    const conversations = allConversations.filter((c: any) => (
+      isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
+      || isWithinIso(c?.created_at, fromIso, toIso)
+    ));
 
     // Novos leads (created_at no período)
     let novoQuery = supabase
       .from("wa_conversations")
-      .select("id, operacao_id, created_at, contact_wa_id, channel_id");
+      .select("id, operacao_id, created_at, contact_wa_id, channel_id, assigned_vendor_id");
     if (fromIso) novoQuery = novoQuery.gte("created_at", fromIso);
     if (toIso) novoQuery = novoQuery.lte("created_at", toIso);
     if (opFilter) novoQuery = novoQuery.eq("operacao_id", opFilter);
