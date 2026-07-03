@@ -669,7 +669,7 @@ function ChatPage() {
 
   async function downloadMedia(msg: Msg) {
     if (!msg.media_id) throw new Error("Mídia sem ID");
-    const res = await downloadMediaFn({ data: { channelId: msg.channel_id, mediaId: msg.media_id } });
+    const res = await downloadMediaFn({ data: { channelId: msg.channel_id, conversationId: msg.conversation_id, mediaId: msg.media_id } });
     return {
       url: `data:${res.mime};base64,${res.base64}`,
       mime: res.mime,
