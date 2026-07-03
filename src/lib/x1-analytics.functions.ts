@@ -314,11 +314,18 @@ async function getVendorX1Analytics(
   const fromDay = parseFilterDay(data.from);
   const toDay = parseFilterDay(data.to);
 
+  const opFilterLocal = opFilter;
+  const channelFilter = safeString(data.channelId).trim();
+  const channelFilterActive = channelFilter && channelFilter !== "all" ? channelFilter : null;
+  const fromDay2 = fromDay;
+  const toDay2 = toDay;
+  void opFilterLocal; void fromDay2; void toDay2;
+
   let allowedWorkspaces = vendorWorkspaceIds(context);
   try {
     const { data: rpcWorkspaces } = await (context.supabase as any).rpc("vendor_allowed_workspace_ids" as any, rpcArgs);
     if (Array.isArray(rpcWorkspaces) && rpcWorkspaces.length > 0) {
-      allowedWorkspaces = rpcWorkspaces.map((x) => safeString(x).trim()).filter(Boolean);
+      allowedWorkspaces = rpcWorkspaces.map((x: unknown) => safeString(x).trim()).filter(Boolean);
     }
   } catch {
     // usa o contexto local como fallback
