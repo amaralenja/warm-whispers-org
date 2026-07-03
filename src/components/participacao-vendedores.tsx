@@ -29,7 +29,7 @@ function initials(s: unknown) {
   if (parts.length === 1) return t.slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
-function asStr(v: unknown) {
+function asStr(v: unknown): string {
   if (v == null) return "";
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
@@ -41,7 +41,7 @@ function asStr(v: unknown) {
   return "";
 }
 
-function asNum(v: unknown) {
+function asNum(v: unknown): number {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
   if (typeof v === "string") {
     const cleaned = v.replace(/R\$\s?/g, "").replace(/\s/g, "").trim();
