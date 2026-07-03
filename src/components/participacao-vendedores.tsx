@@ -1,7 +1,7 @@
 import type { VendedorStat } from "@/lib/operacoes.functions";
 
-const BRL = (n: number) =>
-  (Number.isFinite(Number(n)) ? Number(n) : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const BRL = (n: unknown) =>
+  asNum(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 // Paleta refinada — verde como dominante, com acentos contrastantes
 const PALETTE = [
@@ -18,7 +18,8 @@ const PALETTE = [
 ];
 
 function colorFor(i: number) {
-  return PALETTE[i % PALETTE.length];
+  const idx = Number.isFinite(Number(i)) ? Math.abs(Math.trunc(Number(i))) : 0;
+  return PALETTE[idx % PALETTE.length] ?? PALETTE[0];
 }
 
 function initials(s: unknown) {
@@ -36,7 +37,15 @@ function asStr(v: unknown): string {
   if (Array.isArray(v)) return v.map(asStr).filter(Boolean).join(", ");
   if (typeof v === "object") {
     const obj = v as Record<string, unknown>;
-    return asStr(obj.nome ?? obj.name ?? obj.utm ?? obj.label ?? obj.value ?? "");
+    const nested = obj.nome ?? obj.name ?? obj.utm ?? obj.label ?? obj.value ?? obj.text ?? obj.title ?? "";
+    const text = asStr(nested);
+    if (text) return text;
+    try {
+      const json = JSON.stringify(obj);
+      return json && json !== "{}" ? json : "";
+    } catch {
+      return "";
+    }
   }
   return "";
 }
@@ -53,7 +62,7 @@ function asNum(v: unknown): number {
   }
   if (v && typeof v === "object") {
     const obj = v as Record<string, unknown>;
-    return asNum(obj.value ?? obj.valor ?? obj.total ?? obj.amount ?? 0);
+    return asNum(obj.value ?? obj.valor ?? obj.total ?? obj.amount ?? obj.count ?? 0);
   }
   return 0;
 }
@@ -66,7 +75,7 @@ function toSafeVendors(input: unknown): SafeVendor[] {
   for (const raw of input) {
     if (!raw || typeof raw !== "object") continue;
     const v = raw as Record<string, unknown>;
-    const utm = asStr(v.utm ?? v.nome ?? v.name ?? v.label) || "Vendedor";
+    const utm = asStr(v.utm ?? v.nome ?? v.name ?? v.label).trim() || "Vendedor";
     const faturamento = asNum(v.faturamento);
     const vendas = asNum(v.vendas);
     const pctTotal = asNum(v.pctTotal);
@@ -74,7 +83,7 @@ function toSafeVendors(input: unknown): SafeVendor[] {
       utm,
       faturamento,
       vendas,
-      pctTotal,
+      pctTotal: Number.isFinite(pctTotal) ? Math.max(0, pctTotal) : 0,
     });
   }
   return out;
@@ -161,9 +170,9 @@ export function ParticipacaoVendedores({
                 const color = colorFor(i);
                 const fat = v.faturamento;
                 const vendas = v.vendas;
-                const pct = v.pctTotal * 100;
+                const pct = Number.isFinite(v.pctTotal) ? Math.max(0, v.pctTotal * 100) : 0;
                 const isTop = i === 0;
-                const utmStr = v.utm;
+                const utmStr = asStr(v.utm).trim() || "Vendedor";
                 return (
                   <div
                     key={utmStr || i}

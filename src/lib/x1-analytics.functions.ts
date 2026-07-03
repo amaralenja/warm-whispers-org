@@ -37,6 +37,37 @@ function parseDataField(raw: unknown): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+function parseFilterDay(raw: unknown): number | null {
+  const s = safeString(raw).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  return Number.isFinite(t) ? t : null;
+}
+
+function toBrIsoDay(ts: number) {
+  const d = new Date(ts - 3 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+function brStartIso(day: unknown): string | null {
+  const s = safeString(day).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T03:00:00.000Z` : null;
+}
+
+function brEndIso(day: unknown): string | null {
+  const start = parseFilterDay(day);
+  if (start == null) return null;
+  return new Date(start + 27 * 60 * 60 * 1000 - 1).toISOString();
+}
+
+function isWithinDayField(t: number | null, fromDay: number | null, toDay: number | null) {
+  if (t == null) return false;
+  if (fromDay != null && t < fromDay) return false;
+  if (toDay != null && t > toDay) return false;
+  return true;
+}
+
 export type X1Filter = {
   from?: string | null;
   to?: string | null;
@@ -143,6 +174,66 @@ function safeNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeUtm(value: unknown): string {
+  return safeString(value).trim().toUpperCase();
+}
+
+function numericId(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function messageVendorId(message: any): number | null {
+  const raw = message?.raw && typeof message.raw === "object" ? message.raw as Record<string, unknown> : null;
+  return numericId(message?.sent_by_vendor_id)
+    ?? numericId(raw?.sent_by_vendor_id)
+    ?? numericId((raw?.request as any)?.sent_by_vendor_id);
+}
+
+function messageSentByVendor(message: any, vendorId: number) {
+  return messageVendorId(message) === vendorId;
+}
+
+function contactLeadKey(...values: unknown[]): string | null {
+  for (const value of values) {
+    const digits = safeString(value).replace(/\D/g, "");
+    if (!digits) continue;
+    return `phone:${digits.length > 11 ? digits.slice(-11) : digits}`;
+  }
+  for (const value of values) {
+    const s = safeString(value).trim();
+    if (s) return `id:${s}`;
+  }
+  return null;
+}
+
+function vendedorMatchesLead(vendedor: any, lead: any) {
+  const leadUtm = normalizeUtm(lead?.responsavel_utm);
+  const vendedorUtm = normalizeUtm(vendedor?.utm);
+  if (leadUtm && vendedorUtm && leadUtm === vendedorUtm) return true;
+  const respNome = safeNullableString(lead?.responsavel_nome);
+  const vendedorNome = safeNullableString(vendedor?.nome);
+  return !!respNome && !!vendedorNome && sameText(respNome, vendedorNome);
+}
+
+function resolveVendaOperacao(venda: any, produtoToOperacao: Map<string, string>, utmToVendedor?: Map<string, any>): string | null {
+  const produto = safeString(venda?.Produto).trim().toLowerCase();
+  const mapped = produto ? produtoToOperacao.get(produto) : null;
+  if (mapped) return mapped;
+  const explicit = safeNullableString(venda?.nome_expert);
+  if (explicit) return explicit;
+  const utm = normalizeUtm(venda?.UTM);
+  const vendorExpert = safeNullableString(utmToVendedor?.get(utm)?.expert);
+  if (vendorExpert) return vendorExpert;
+  return operacaoFromUtm(utm);
+}
+
+function qualifiedVendaOperacao(venda: any, produtoToOperacao: Map<string, string>): string | null {
+  const produto = safeString(venda?.Produto).trim().toLowerCase();
+  const mapped = produto ? produtoToOperacao.get(produto) : null;
+  return mapped ?? null;
+}
+
 function normalizeText(value: unknown): string {
   return safeString(value)
     .normalize("NFD")
@@ -153,6 +244,19 @@ function normalizeText(value: unknown): string {
 
 function sameText(a: unknown, b: unknown) {
   return normalizeText(a) === normalizeText(b);
+}
+
+async function pageAllWithDb<T = any>(build: (from: number, to: number) => any): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let i = 0; i < 40; i++) {
+    const { data: rows, error } = await build(i * PAGE, i * PAGE + PAGE - 1);
+    if (error) throw error;
+    const arr = (rows ?? []) as T[];
+    out.push(...arr);
+    if (arr.length < PAGE) break;
+  }
+  return out;
 }
 
 function vendorRpcArgs(context: any) {
@@ -191,9 +295,13 @@ async function getVendorX1Analytics(
   fromIso: string | null,
   toIso: string | null,
 ): Promise<X1AnalyticsPayload> {
-  const db = context.supabase as any;
+  const db = await dbFor(context);
   const rpcArgs = vendorRpcArgs(context);
   if (!rpcArgs) return EMPTY;
+  const vendorId = Number(context.vendor.id);
+  if (!Number.isFinite(vendorId) || vendorId <= 0) return EMPTY;
+  const fromDay = parseFilterDay(data.from);
+  const toDay = parseFilterDay(data.to);
 
   let allowedWorkspaces = vendorWorkspaceIds(context);
   try {
@@ -208,7 +316,7 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const [channelsRes, conversationsRes] = await Promise.all([
+  const [channelsRes, conversationsRes, crmLeadsRes, produtosMapRes, vendasRows] = await Promise.all([
     db.rpc("vendor_list_wa_channels" as any, rpcArgs),
     db.rpc("vendor_list_x1_wa_conversations" as any, {
       ...rpcArgs,
@@ -216,9 +324,27 @@ async function getVendorX1Analytics(
       _from: fromIso,
       _to: toIso,
     }),
+    db.rpc("vendor_list_crm_leads" as any, rpcArgs),
+    db.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
+    pageAllWithDb<any>((from, to) =>
+      db
+        .from("vendas")
+        .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
+        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+        .range(from, to),
+    ),
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
+  if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
+  if (produtosMapRes.error) throw new Error(produtosMapRes.error.message);
+
+  const produtoToOperacao = new Map<string, string>();
+  for (const p of ((produtosMapRes.data ?? []) as any[])) {
+    const produto = safeString(p?.nome_produto).trim().toLowerCase();
+    const expert = safeString(p?.nome_expert).trim();
+    if (produto && expert) produtoToOperacao.set(produto, expert);
+  }
 
   const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
     const op = safeString(c?.operacao_id).trim();
@@ -247,11 +373,30 @@ async function getVendorX1Analytics(
     if (opFilter && !sameText(op, opFilter)) return false;
     return opAllowed(op, allowedWorkspaces);
   });
-  const conversations = allConversations.filter((c) => (
+  const assignedConversations = allConversations.filter((c) => Number(c?.assigned_vendor_id) === vendorId);
+  const assignedConversationIds = new Set(assignedConversations.map((c) => safeString(c?.id)).filter(Boolean));
+  const conversations = assignedConversations.filter((c) => (
     isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
     || isWithinIso(c?.created_at, fromIso, toIso)
   ));
-  const novosLeadsRows = allConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
+  const novosLeadsRows = assignedConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
+  const vendorUtm = safeNullableString(context?.vendor?.utm);
+  const vendorUtmNorm = normalizeUtm(vendorUtm);
+  const crmLeads = ((crmLeadsRes.data ?? []) as any[]).filter((lead) => {
+    if (!isWithinIso(lead?.created_at, fromIso, toIso)) return false;
+    if (opFilter && !sameText(lead?.expert, opFilter)) return false;
+    if (!opAllowed(lead?.expert, allowedWorkspaces)) return false;
+    return vendedorMatchesLead(context.vendor, lead);
+  });
+  const leadKeys = new Set<string>();
+  for (const c of novosLeadsRows) {
+    const key = contactLeadKey(c?.contact_wa_id, c?.id);
+    if (key) leadKeys.add(key);
+  }
+  for (const lead of crmLeads) {
+    const key = contactLeadKey(lead?.telefone, lead?.id);
+    if (key) leadKeys.add(key);
+  }
 
   const { data: messagesRaw, error: messagesError } = await db.rpc("vendor_list_x1_wa_messages" as any, {
     ...rpcArgs,
@@ -264,27 +409,32 @@ async function getVendorX1Analytics(
   const msgsScoped = messages.filter((m: any) => {
     if (m?.deleted_at) return false;
     if (!isWithinIso(m?.created_at, fromIso, toIso)) return false;
+    const conversationId = safeString(m?.conversation_id).trim();
+    if (!assignedConversationIds.has(conversationId)) return false;
     const channelId = safeString(m?.channel_id).trim();
     if (channelIds.size > 0 && !channelIds.has(channelId)) return false;
     const op = channelToOp.get(channelId) ?? "";
     if (opFilter && !sameText(op, opFilter)) return false;
+    if (safeString(m?.direction) === "out") {
+      const explicitVendorId = messageVendorId(m);
+      if (explicitVendorId && explicitVendorId !== vendorId) return false;
+    }
     return true;
   });
 
-  const vendorUtm = safeNullableString(context?.vendor?.utm);
   const primaryOp = safeNullableString(context?.vendor?.expert) ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
-  let vendorStats: any = null;
-  if (vendorUtm) {
-    const { data: stats, error } = await db.rpc("get_vendor_stats" as any, {
-      _utm: vendorUtm,
-      _from: data.from ?? null,
-      _to: data.to ?? null,
-    });
-    if (!error) vendorStats = stats;
-  }
-  const vendas = safeNumber(vendorStats?.vendas);
-  const faturamento = safeNumber(vendorStats?.faturamento);
-  const ticketMedio = safeNumber(vendorStats?.ticketMedio) || (vendas > 0 ? faturamento / vendas : 0);
+  const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
+  const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
+    if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
+    if (!inDay(parseDataField(v?.Data))) return false;
+    if (!qualifiedVendaOperacao(v, produtoToOperacao)) return false;
+    const op = resolveVendaOperacao(v, produtoToOperacao);
+    if (opFilter && !sameText(op, opFilter)) return false;
+    return !op || opAllowed(op, allowedWorkspaces);
+  });
+  const vendas = vendorSales.length;
+  const faturamento = vendorSales.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
+  const ticketMedio = vendas > 0 ? faturamento / vendas : 0;
 
   const msgsIn = msgsScoped.filter((m: any) => safeString(m?.direction) === "in").length;
   const msgsOut = msgsScoped.filter((m: any) => safeString(m?.direction) === "out").length;
@@ -321,27 +471,34 @@ async function getVendorX1Analytics(
   const opRows: X1OperacaoRow[] = Array.from(operacoesSet).map((op) => {
     const convOp = conversations.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
     const novosOp = novosLeadsRows.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+    const leadOpKeys = new Set<string>();
+    for (const c of novosOp) {
+      const key = contactLeadKey(c?.contact_wa_id, c?.id);
+      if (key) leadOpKeys.add(key);
+    }
+    for (const lead of crmLeads.filter((l) => sameText(l?.expert, op))) {
+      const key = contactLeadKey(lead?.telefone, lead?.id);
+      if (key) leadOpKeys.add(key);
+    }
     const msgOp = msgsScoped.filter((m: any) => sameText(channelToOp.get(safeString(m?.channel_id)), op));
-    const opHasVendorSales = !primaryOp || sameText(primaryOp, op);
+    const vdsOp = vendorSales.filter((v: any) => sameText(resolveVendaOperacao(v, produtoToOperacao), op));
+    const fatOp = vdsOp.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
     return {
       operacao: op,
-      leads: novosOp.length,
+      leads: leadOpKeys.size,
       conversas: convOp.length,
       msgsIn: msgOp.filter((m: any) => safeString(m?.direction) === "in").length,
       msgsOut: msgOp.filter((m: any) => safeString(m?.direction) === "out").length,
-      vendas: opHasVendorSales ? vendas : 0,
-      faturamento: opHasVendorSales ? faturamento : 0,
-      conversao: novosOp.length > 0 && opHasVendorSales ? vendas / novosOp.length : 0,
-      ticketMedio: opHasVendorSales ? ticketMedio : 0,
+      vendas: vdsOp.length,
+      faturamento: fatOp,
+      conversao: leadOpKeys.size > 0 ? vdsOp.length / leadOpKeys.size : 0,
+      ticketMedio: vdsOp.length > 0 ? fatOp / vdsOp.length : 0,
     };
   }).sort((a, b) => b.faturamento - a.faturamento || b.msgsOut - a.msgsOut);
 
-  const leadsAtribuidos = conversations.filter((c) => {
-    const assigned = c?.assigned_vendor_id;
-    return assigned == null || Number(assigned) === Number(context.vendor.id);
-  }).length;
+  const leadsAtribuidos = leadKeys.size;
   const porVendedor: X1VendedorRow[] = [{
-    vendedorId: Number(context.vendor.id),
+    vendedorId: vendorId,
     utm: vendorUtm,
     nome: safeString(context.vendor.nome, vendorUtm ?? "Vendedor"),
     expert: primaryOp,
@@ -358,17 +515,19 @@ async function getVendorX1Analytics(
   for (const m of msgsScoped) {
     const t = Date.parse(safeString(m?.created_at));
     if (!Number.isFinite(t)) continue;
-    const iso = toIsoDay(new Date(t));
+    const iso = toBrIsoDay(t);
     const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
     if (safeString(m?.direction) === "in") e.msgsIn += 1;
     else if (safeString(m?.direction) === "out") e.msgsOut += 1;
     dayMap.set(iso, e);
   }
-  for (const row of (Array.isArray(vendorStats?.serieDiaria) ? vendorStats.serieDiaria : [])) {
-    const iso = safeString(row?.data).slice(0, 10);
+  for (const row of vendorSales) {
+    const t = parseDataField(row?.Data);
+    if (!t) continue;
+    const iso = toIsoDay(new Date(t));
     if (!iso) continue;
     const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
-    e.vendas += safeNumber(row?.vendas);
+    e.vendas += 1;
     dayMap.set(iso, e);
   }
   const serieDiaria = Array.from(dayMap.values()).sort((a, b) => a.data.localeCompare(b.data));
@@ -385,13 +544,13 @@ async function getVendorX1Analytics(
     if (safeString(m?.direction) === "in") e.msgsIn += 1;
     else if (safeString(m?.direction) === "out") e.msgsOut += 1;
   }
-  const todayIso = toIsoDay(new Date());
-  const todaySales = (Array.isArray(vendorStats?.serieDiaria) ? vendorStats.serieDiaria : [])
-    .filter((row: any) => safeString(row?.data).slice(0, 10) === todayIso)
-    .reduce((acc: number, row: any) => acc + safeNumber(row?.vendas), 0);
-  if (todaySales > 0) hourMap.get(brHour(Date.now()))!.vendas += todaySales;
+  for (const row of vendorSales) {
+    const t = parseDataField(row?.Data);
+    if (!t) continue;
+    hourMap.get(brHour(t))!.vendas += 1;
+  }
 
-  const novosLeads = novosLeadsRows.length;
+  const novosLeads = leadKeys.size;
   return {
     kpis: {
       novosLeads,
@@ -437,8 +596,10 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const data = opts?.data ?? {};
     if (!context?.supabase) return EMPTY;
 
-    const fromIso = data.from ? new Date(data.from + "T00:00:00Z").toISOString() : null;
-    const toIso = data.to ? new Date(data.to + "T23:59:59Z").toISOString() : null;
+    const fromIso = brStartIso(data.from);
+    const toIso = brEndIso(data.to);
+    const fromDay = parseFilterDay(data.from);
+    const toDay = parseFilterDay(data.to);
     const opFilter = data.operacao && data.operacao !== "all" ? String(data.operacao) : null;
 
     if (context?.vendor) {
@@ -475,27 +636,53 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     }
 
     // Conversas (todas com created_at no período OU last_message_at no período)
-    let convQuery = supabase
+    const convQuery = supabase
       .from("wa_conversations")
       .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id");
-    if (fromIso) convQuery = convQuery.gte("last_message_at", fromIso);
-    if (toIso) convQuery = convQuery.lte("last_message_at", toIso);
-    if (opFilter) convQuery = convQuery.eq("operacao_id", opFilter);
-    const conversations = await pageAll<any>((from, to) => convQuery.range(from, to));
+    const allConversationsRaw = await pageAll<any>((from, to) => convQuery.range(from, to));
+    const allConversations = allConversationsRaw.filter((c: any) => {
+      const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
+      if (!op) return false;
+      if (opFilter && !sameText(op, opFilter)) return false;
+      return true;
+    });
+    const conversationToVendorId = new Map<string, number>();
+    for (const c of allConversations) {
+      const id = safeString(c?.id).trim();
+      const vendorId = numericId(c?.assigned_vendor_id);
+      if (id && vendorId) conversationToVendorId.set(id, vendorId);
+    }
+    const conversations = allConversations.filter((c: any) => (
+      isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
+      || isWithinIso(c?.created_at, fromIso, toIso)
+    ));
 
     // Novos leads (created_at no período)
     let novoQuery = supabase
       .from("wa_conversations")
-      .select("id, operacao_id, created_at, contact_wa_id, channel_id");
+      .select("id, operacao_id, created_at, contact_wa_id, channel_id, assigned_vendor_id");
     if (fromIso) novoQuery = novoQuery.gte("created_at", fromIso);
     if (toIso) novoQuery = novoQuery.lte("created_at", toIso);
-    if (opFilter) novoQuery = novoQuery.eq("operacao_id", opFilter);
-    const novosLeadsRows = await pageAll<any>((from, to) => novoQuery.range(from, to));
+    const novosLeadsRowsRaw = await pageAll<any>((from, to) => novoQuery.range(from, to));
+    const novosLeadsRows = novosLeadsRowsRaw.filter((c: any) => {
+      const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
+      if (!op) return false;
+      if (opFilter && !sameText(op, opFilter)) return false;
+      return true;
+    });
+
+    let crmLeadQuery = supabase
+      .from("crm_leads" as any)
+      .select("id, telefone, expert, responsavel_utm, responsavel_nome, created_at");
+    if (fromIso) crmLeadQuery = crmLeadQuery.gte("created_at", fromIso);
+    if (toIso) crmLeadQuery = crmLeadQuery.lte("created_at", toIso);
+    if (opFilter) crmLeadQuery = crmLeadQuery.eq("expert", opFilter);
+    const crmLeadsRows = await pageAll<any>((from, to) => crmLeadQuery.range(from, to));
 
     // Mensagens do período
     let msgQuery = supabase
       .from("wa_messages")
-      .select("id, conversation_id, channel_id, direction, created_at, sent_by")
+      .select("id, conversation_id, channel_id, direction, created_at, sent_by, raw")
       .is("deleted_at", null);
     if (fromIso) msgQuery = msgQuery.gte("created_at", fromIso);
     if (toIso) msgQuery = msgQuery.lte("created_at", toIso);
@@ -510,37 +697,73 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     });
 
     // Vendas & vendedores (para conversão e faturamento por operação)
-    const [vendedoresRes, vendasAll] = await Promise.all([
+    const [vendedoresRes, produtosMapRes, vendasAll] = await Promise.all([
       supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo"),
+      supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       pageAll<any>((from, to) =>
         supabase
           .from("vendas")
-          .select('"Ticket","Data","UTM","Evento"')
+          .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
           .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
           .range(from, to),
       ),
     ]);
     const vendedores = (vendedoresRes.data ?? []) as any[];
     const utmToVendedor = new Map<string, any>();
-    for (const v of vendedores) if (v.utm) utmToVendedor.set(String(v.utm).toUpperCase(), v);
+    for (const v of vendedores) {
+      const utm = normalizeUtm(v.utm);
+      if (utm) utmToVendedor.set(utm, v);
+    }
+    const vendedorById = new Map<number, any>();
+    for (const v of vendedores) {
+      const id = numericId(v?.id);
+      if (id) vendedorById.set(id, v);
+    }
+    const produtoToOperacao = new Map<string, string>();
+    for (const p of ((produtosMapRes.data ?? []) as any[])) {
+      const produto = safeString(p?.nome_produto).trim().toLowerCase();
+      const expert = safeString(p?.nome_expert).trim();
+      if (produto && expert) produtoToOperacao.set(produto, expert);
+    }
 
-    const inDay = (t: number | null) => {
-      if (!t) return false;
-      if (fromIso && t < Date.parse(fromIso)) return false;
-      if (toIso && t > Date.parse(toIso)) return false;
-      return true;
-    };
-    const vendasPeriodo = vendasAll.filter((v) => inDay(parseDataField(v.Data)));
-    const vendasScoped = vendasPeriodo.filter((v) => {
-      const op = operacaoFromUtm(v.UTM);
-      if (opFilter) return op === opFilter;
+    const vendaOperacao = (venda: any): string | null => resolveVendaOperacao(venda, produtoToOperacao, utmToVendedor);
+
+    const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
+    const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)) && !!qualifiedVendaOperacao(v, produtoToOperacao));
+    const vendasScoped = vendasPeriodo.filter((v: any) => {
+      const op = vendaOperacao(v);
+      if (opFilter) return sameText(op, opFilter);
       return true;
     });
+
+    const allLeadKeys = new Set<string>();
+    const vendorLeadKeys = new Map<string, Set<string>>();
+    const keyForVendor = (v: any) => `id:${v?.id ?? "?"}|utm:${v?.utm ?? "?"}`;
+    const addVendorLead = (v: any, key: string | null) => {
+      if (!v || !key) return;
+      allLeadKeys.add(key);
+      const vendorKey = keyForVendor(v);
+      const set = vendorLeadKeys.get(vendorKey) ?? new Set<string>();
+      set.add(key);
+      vendorLeadKeys.set(vendorKey, set);
+    };
+    for (const c of novosLeadsRows) {
+      const leadKey = contactLeadKey(c?.contact_wa_id, c?.id);
+      if (leadKey) allLeadKeys.add(leadKey);
+      const vend = vendedorById.get(Number(c?.assigned_vendor_id));
+      addVendorLead(vend, leadKey);
+    }
+    for (const lead of crmLeadsRows) {
+      const leadKey = contactLeadKey(lead?.telefone, lead?.id);
+      if (leadKey) allLeadKeys.add(leadKey);
+      const vend = vendedores.find((v: any) => vendedorMatchesLead(v, lead));
+      addVendorLead(vend, leadKey);
+    }
 
     // KPIs
     const msgsIn = msgsScoped.filter((m) => m.direction === "in").length;
     const msgsOut = msgsScoped.filter((m) => m.direction === "out").length;
-    const faturamento = vendasScoped.reduce((a, v) => a + parseTicket(v.Ticket), 0);
+    const faturamento = vendasScoped.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
     const contatosUnicos = new Set(
       conversations.map((c) => `${c.channel_id}|${c.contact_wa_id}`),
     ).size;
@@ -575,14 +798,23 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const opRows: X1OperacaoRow[] = [];
     for (const op of operacoesSet) {
       if (opFilter && op !== opFilter) continue;
-      const convOp = conversations.filter((c) => (c.operacao_id ?? "") === op);
-      const novosOp = novosLeadsRows.filter((c) => (c.operacao_id ?? "") === op);
+      const convOp = conversations.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+      const novosOp = novosLeadsRows.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+      const leadOpKeys = new Set<string>();
+      for (const c of novosOp) {
+        const key = contactLeadKey(c?.contact_wa_id, c?.id);
+        if (key) leadOpKeys.add(key);
+      }
+      for (const lead of crmLeadsRows.filter((l: any) => sameText(l?.expert, op))) {
+        const key = contactLeadKey(lead?.telefone, lead?.id);
+        if (key) leadOpKeys.add(key);
+      }
       const msgOp = msgsScoped.filter((m) => channelToOp.get(String(m.channel_id)) === op);
       const inC = msgOp.filter((m) => m.direction === "in").length;
       const outC = msgOp.filter((m) => m.direction === "out").length;
-      const vdsOp = vendasPeriodo.filter((v) => operacaoFromUtm(v.UTM) === op);
-      const fatOp = vdsOp.reduce((a, v) => a + parseTicket(v.Ticket), 0);
-      const leadsCount = novosOp.length;
+      const vdsOp = vendasPeriodo.filter((v: any) => sameText(vendaOperacao(v), op));
+      const fatOp = vdsOp.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
+      const leadsCount = leadOpKeys.size;
       opRows.push({
         operacao: op,
         leads: leadsCount,
@@ -599,7 +831,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
 
     // Por vendedor
     const vRows = new Map<string, X1VendedorRow>();
-    const keyFor = (v: any) => `id:${v?.id ?? "?"}|utm:${v?.utm ?? "?"}`;
+    const keyFor = keyForVendor;
     for (const v of vendedores) {
       vRows.set(keyFor(v), {
         vendedorId: v.id ?? null,
@@ -615,26 +847,24 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         ticketMedio: 0,
       });
     }
-    // leads atribuídos (conversas com assigned_vendor_id)
-    for (const c of conversations) {
-      const vid = c.assigned_vendor_id;
-      if (!vid) continue;
-      const v = vendedores.find((x) => Number(x.id) === Number(vid));
-      if (!v) continue;
-      const row = vRows.get(keyFor(v));
-      if (row) row.leadsAtribuidos += 1;
+    // Leads atribuídos: une CRM (responsavel_utm/nome) + WhatsApp (assigned_vendor_id), deduplicando por telefone.
+    for (const [vendorKey, keys] of vendorLeadKeys.entries()) {
+      const row = vRows.get(vendorKey);
+      if (row) row.leadsAtribuidos = keys.size;
     }
     // msgs enviadas por vendedor
     for (const m of msgsScoped) {
-      if (m.direction !== "out" || !m.sent_by) continue;
-      const v = vendedores.find((x) => String(x.id) === String(m.sent_by));
+      if (m.direction !== "out") continue;
+      const msgVendorId = messageVendorId(m) ?? conversationToVendorId.get(safeString(m?.conversation_id).trim()) ?? null;
+      if (!msgVendorId) continue;
+      const v = vendedores.find((x) => Number(x.id) === msgVendorId);
       if (!v) continue;
       const row = vRows.get(keyFor(v));
       if (row) row.msgsEnviadas += 1;
     }
     // vendas por UTM
     for (const v of vendasScoped) {
-      const utm = String(v.UTM ?? "").toUpperCase();
+      const utm = normalizeUtm(v.UTM);
       if (!utm) continue;
       const vend = utmToVendedor.get(utm);
       const key = vend ? keyFor(vend) : `utm-only:${utm}`;
@@ -644,7 +874,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
           vendedorId: vend?.id ?? null,
           utm,
           nome: vend?.nome ?? utm,
-          expert: vend?.expert ?? operacaoFromUtm(utm),
+          expert: vend?.expert ?? vendaOperacao(v),
           fotoUrl: vend?.foto_url ?? null,
           leadsAtribuidos: 0,
           msgsEnviadas: 0,
@@ -672,7 +902,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     for (const m of msgsScoped) {
       const t = Date.parse(m.created_at);
       if (!Number.isFinite(t)) continue;
-      const iso = toIsoDay(new Date(t));
+      const iso = toBrIsoDay(t);
       const e = dayMap.get(iso) ?? { data: iso, msgsIn: 0, msgsOut: 0, vendas: 0 };
       if (m.direction === "in") e.msgsIn += 1;
       else if (m.direction === "out") e.msgsOut += 1;
@@ -715,7 +945,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     }
     const serieHoraria = Array.from(hourMap.values());
 
-    const novosLeads = novosLeadsRows.length;
+    const novosLeads = allLeadKeys.size;
     return {
       kpis: {
         novosLeads,
