@@ -130,6 +130,7 @@ export type X1AnalyticsPayload = {
   serieDiaria: X1SerieDia[];
   serieHoraria: X1SerieHora[];
   operacoesDisponiveis: string[];
+  canaisDisponiveis: X1CanalRow[];
 };
 
 const EMPTY: X1AnalyticsPayload = {
@@ -150,6 +151,7 @@ const EMPTY: X1AnalyticsPayload = {
   serieDiaria: [],
   serieHoraria: [],
   operacoesDisponiveis: [],
+  canaisDisponiveis: [],
 };
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
