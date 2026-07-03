@@ -265,6 +265,19 @@ function formatTime(iso: unknown) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatListStamp(iso: unknown) {
+  const d = toSafeDate(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Ontem";
+  const sameYear = d.getFullYear() === today.getFullYear();
+  return d.toLocaleDateString("pt-BR", sameYear ? { day: "2-digit", month: "2-digit" } : { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
 function formatDateLabel(iso: unknown) {
   const d = toSafeDate(iso);
   const today = new Date();
