@@ -116,12 +116,13 @@ function X1AnalyticsPage() {
   const fetchFn = useServerFn(getX1Analytics);
   const [dateRange, setDateRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [operacao, setOperacao] = useState<string>("all");
+  const [channelId, setChannelId] = useState<string>("all");
 
   const range = { from: dateRange.from ?? "", to: dateRange.to ?? dateRange.from ?? "" };
 
   const { data, isLoading, isFetching, refetch, error } = useQuery({
-    queryKey: ["x1-analytics", range.from, range.to, operacao],
-    queryFn: () => fetchFn({ data: { from: range.from, to: range.to, operacao } }),
+    queryKey: ["x1-analytics", range.from, range.to, operacao, channelId],
+    queryFn: () => fetchFn({ data: { from: range.from, to: range.to, operacao, channelId } }),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     enabled: Boolean(range.from && range.to),
