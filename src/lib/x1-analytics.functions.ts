@@ -252,7 +252,7 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const [channelsRes, conversationsRes] = await Promise.all([
+  const [channelsRes, conversationsRes, crmLeadsRes] = await Promise.all([
     db.rpc("vendor_list_wa_channels" as any, rpcArgs),
     db.rpc("vendor_list_x1_wa_conversations" as any, {
       ...rpcArgs,
@@ -260,9 +260,11 @@ async function getVendorX1Analytics(
       _from: fromIso,
       _to: toIso,
     }),
+    db.rpc("vendor_list_crm_leads" as any, rpcArgs),
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
+  if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
 
   const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
     const op = safeString(c?.operacao_id).trim();
@@ -298,6 +300,22 @@ async function getVendorX1Analytics(
     || isWithinIso(c?.created_at, fromIso, toIso)
   ));
   const novosLeadsRows = assignedConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
+  const vendorUtm = safeNullableString(context?.vendor?.utm);
+  const crmLeads = ((crmLeadsRes.data ?? []) as any[]).filter((lead) => {
+    if (!isWithinIso(lead?.created_at, fromIso, toIso)) return false;
+    if (opFilter && !sameText(lead?.expert, opFilter)) return false;
+    if (!opAllowed(lead?.expert, allowedWorkspaces)) return false;
+    return vendedorMatchesLead(context.vendor, lead);
+  });
+  const leadKeys = new Set<string>();
+  for (const c of novosLeadsRows) {
+    const key = contactLeadKey(c?.contact_wa_id, c?.id);
+    if (key) leadKeys.add(key);
+  }
+  for (const lead of crmLeads) {
+    const key = contactLeadKey(lead?.telefone, lead?.id);
+    if (key) leadKeys.add(key);
+  }
 
   const { data: messagesRaw, error: messagesError } = await db.rpc("vendor_list_x1_wa_messages" as any, {
     ...rpcArgs,
@@ -320,7 +338,6 @@ async function getVendorX1Analytics(
     return true;
   });
 
-  const vendorUtm = safeNullableString(context?.vendor?.utm);
   const primaryOp = safeNullableString(context?.vendor?.expert) ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
   let vendorStats: any = null;
   if (vendorUtm) {
@@ -370,22 +387,31 @@ async function getVendorX1Analytics(
   const opRows: X1OperacaoRow[] = Array.from(operacoesSet).map((op) => {
     const convOp = conversations.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
     const novosOp = novosLeadsRows.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+    const leadOpKeys = new Set<string>();
+    for (const c of novosOp) {
+      const key = contactLeadKey(c?.contact_wa_id, c?.id);
+      if (key) leadOpKeys.add(key);
+    }
+    for (const lead of crmLeads.filter((l) => sameText(l?.expert, op))) {
+      const key = contactLeadKey(lead?.telefone, lead?.id);
+      if (key) leadOpKeys.add(key);
+    }
     const msgOp = msgsScoped.filter((m: any) => sameText(channelToOp.get(safeString(m?.channel_id)), op));
     const opHasVendorSales = !primaryOp || sameText(primaryOp, op);
     return {
       operacao: op,
-      leads: novosOp.length,
+      leads: leadOpKeys.size,
       conversas: convOp.length,
       msgsIn: msgOp.filter((m: any) => safeString(m?.direction) === "in").length,
       msgsOut: msgOp.filter((m: any) => safeString(m?.direction) === "out").length,
       vendas: opHasVendorSales ? vendas : 0,
       faturamento: opHasVendorSales ? faturamento : 0,
-      conversao: novosOp.length > 0 && opHasVendorSales ? vendas / novosOp.length : 0,
+      conversao: leadOpKeys.size > 0 && opHasVendorSales ? vendas / leadOpKeys.size : 0,
       ticketMedio: opHasVendorSales ? ticketMedio : 0,
     };
   }).sort((a, b) => b.faturamento - a.faturamento || b.msgsOut - a.msgsOut);
 
-  const leadsAtribuidos = conversations.length;
+  const leadsAtribuidos = leadKeys.size;
   const porVendedor: X1VendedorRow[] = [{
     vendedorId: vendorId,
     utm: vendorUtm,
@@ -437,7 +463,7 @@ async function getVendorX1Analytics(
     .reduce((acc: number, row: any) => acc + safeNumber(row?.vendas), 0);
   if (todaySales > 0) hourMap.get(brHour(Date.now()))!.vendas += todaySales;
 
-  const novosLeads = novosLeadsRows.length;
+  const novosLeads = leadKeys.size;
   return {
     kpis: {
       novosLeads,
