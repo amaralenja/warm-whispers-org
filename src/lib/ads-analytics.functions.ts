@@ -1,8 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sendWA } from "@/lib/flow-engine.server";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
+
+async function sendWhatsapp(channelId: string, phone: string, body: any, db: any) {
+  const { sendWA } = await import("@/lib/flow-engine.server");
+  return sendWA(channelId, phone, body, db);
+}
 
 function renderTemplate(tpl: string, vars: Record<string, string>) {
   return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
@@ -282,7 +286,7 @@ async function computeAndSendAds(db: any, opts: { preset?: string } = {}) {
     const phone = normalizeBrPhone(r.telefone);
     if (!phone) continue;
     try {
-      await sendWA(channelId, phone, body, db);
+      await sendWhatsapp(channelId, phone, body, db);
       sent++;
     } catch (e: any) {
       errors.push(`${r.telefone}: ${e?.message ?? "erro"}`);
