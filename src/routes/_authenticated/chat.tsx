@@ -434,24 +434,58 @@ function ChatPage() {
 
   // Realtime: refresh conv list when new conversation/message lands
   useEffect(() => {
+    const bump = (convId?: string | null) => {
+      qc.invalidateQueries({ queryKey: ["wa-conversations"], refetchType: "active" });
+      if (convId) qc.invalidateQueries({ queryKey: ["wa-messages", String(convId)], refetchType: "active" });
+    };
+    const applyMessageToCaches = (m: any) => {
+      if (!m?.conversation_id) return;
+      const convId = String(m.conversation_id);
+      // Empurra a mensagem no cache da thread ativa pra aparecer imediatamente,
+      // sem esperar o refetch de 3s.
+      qc.setQueriesData({ queryKey: ["wa-messages", convId] }, (old: unknown) => {
+        const list = Array.isArray(old) ? [...old] : [];
+        const idx = list.findIndex((x: any) => String(x?.id) === String(m.id));
+        if (idx >= 0) list[idx] = { ...list[idx], ...m };
+        else list.push(m);
+        return list;
+      });
+      // Atualiza o preview da conversa na sidebar sem esperar refetch.
+      qc.setQueriesData({ queryKey: ["wa-conversations"] }, (old: unknown) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((c: any) => {
+          if (String(c?.id) !== convId) return c;
+          const preview = String(m?.text_body ?? m?.caption ?? (m?.msg_type ? `[${m.msg_type}]` : "")).slice(0, 120);
+          return {
+            ...c,
+            last_message_at: m?.created_at ?? c?.last_message_at,
+            last_message_preview: preview || c?.last_message_preview,
+            last_message_direction: m?.direction ?? c?.last_message_direction,
+            last_message_status: m?.status ?? c?.last_message_status,
+          };
+        });
+      });
+    };
     const ch = supabase
       .channel("wa-conv-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, () => {
-        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, (payload) => {
+        const row: any = (payload as any).new ?? (payload as any).old;
+        bump(row?.id ?? null);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "wa_messages" }, (payload) => {
         const m = payload.new as any;
-        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-        qc.invalidateQueries({ queryKey: ["wa-messages", m.conversation_id] });
+        applyMessageToCaches(m);
+        bump(m?.conversation_id);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wa_messages" }, (payload) => {
         const m = payload.new as any;
-        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-        if (m?.conversation_id) qc.invalidateQueries({ queryKey: ["wa-messages", m.conversation_id] });
+        applyMessageToCaches(m);
+        bump(m?.conversation_id);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
+
 
   const conversationList = useMemo(() => asArray<Conv>(convs), [convs]);
 
