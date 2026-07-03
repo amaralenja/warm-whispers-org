@@ -197,6 +197,13 @@ function resolveVendaOperacao(venda: any, produtoToOperacao: Map<string, string>
   return operacaoFromUtm(utm);
 }
 
+function qualifiedVendaOperacao(venda: any, produtoToOperacao: Map<string, string>): string | null {
+  const produto = safeString(venda?.Produto).trim().toLowerCase();
+  const mapped = produto ? produtoToOperacao.get(produto) : null;
+  if (mapped) return mapped;
+  return safeNullableString(venda?.nome_expert);
+}
+
 function normalizeText(value: unknown): string {
   return safeString(value)
     .normalize("NFD")
@@ -258,7 +265,7 @@ async function getVendorX1Analytics(
   fromIso: string | null,
   toIso: string | null,
 ): Promise<X1AnalyticsPayload> {
-  const db = context.supabase as any;
+  const db = await dbFor(context);
   const rpcArgs = vendorRpcArgs(context);
   if (!rpcArgs) return EMPTY;
   const vendorId = Number(context.vendor.id);
@@ -390,6 +397,7 @@ async function getVendorX1Analytics(
   const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
     if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
     if (!inDay(parseDataField(v?.Data))) return false;
+    if (!qualifiedVendaOperacao(v, produtoToOperacao)) return false;
     const op = resolveVendaOperacao(v, produtoToOperacao);
     if (opFilter && !sameText(op, opFilter)) return false;
     return !op || opAllowed(op, allowedWorkspaces);
@@ -689,7 +697,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       if (toIso && t > Date.parse(toIso)) return false;
       return true;
     };
-    const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)));
+    const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)) && !!qualifiedVendaOperacao(v, produtoToOperacao));
     const vendasScoped = vendasPeriodo.filter((v: any) => {
       const op = vendaOperacao(v);
       if (opFilter) return op === opFilter;
