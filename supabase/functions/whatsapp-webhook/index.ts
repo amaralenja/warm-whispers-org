@@ -1040,6 +1040,16 @@ async function runNotificationAiEdge(opts: {
   console.log("[notif-ai edge] respondeu", { channelId, from, waMsgId });
 }
 
+function runInBackground(work: Promise<unknown>) {
+  const job = work.catch((e) => {
+    console.error("[wa-webhook] background processing error", e);
+  });
+  const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil;
+  if (typeof waitUntil === "function") {
+    waitUntil(job);
+  }
+}
+
 function stableHash(input: string) {
   let hash = 0;
   for (let i = 0; i < input.length; i++) hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
@@ -1241,6 +1251,8 @@ Deno.serve(async (req) => {
     return new Response("Bad JSON", { status: 400, headers: corsHeaders });
   }
 
+  const deliveryId = req.headers.get("x-hub-delivery-id") ?? payload?.delivery_id ?? payload?.id ?? null;
+  runInBackground((async () => {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -1253,7 +1265,6 @@ Deno.serve(async (req) => {
     const connected = await getConnectedChannels(supabase);
     const allowedByPhoneId = new Map(connected.filter((c) => c.phone_number_id).map((c) => [c.phone_number_id!, c]));
     const allowedByChannelId = new Map(connected.map((c) => [c.id, c]));
-    const deliveryId = req.headers.get("x-hub-delivery-id") ?? payload?.delivery_id ?? payload?.id ?? null;
     const normalizedChanges = extractNormalizedChanges(payload, deliveryId);
 
     console.log("[wa-webhook] payload recebido", {
@@ -1543,6 +1554,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("[wa-webhook] processing error", e);
   }
+  })());
 
   return new Response("ok", { status: 200, headers: corsHeaders });
 });
