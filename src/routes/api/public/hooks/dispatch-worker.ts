@@ -1,28 +1,32 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 // Called by pg_cron every ~10s to process queued flow runs in background.
-// Public endpoint (auth bypassed at edge) — protected by a shared secret header.
+// Public endpoint (auth bypassed at edge). pg_cron identifies itself with the
+// Supabase anon/publishable apikey header; no custom secret needed here.
 export const Route = createFileRoute("/api/public/hooks/dispatch-worker")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.DISPATCH_WORKER_SECRET;
-        if (secret) {
-          const provided = request.headers.get("x-worker-secret");
-          if (provided !== secret) {
-            return new Response(JSON.stringify({ error: "unauthorized" }), {
-              status: 401,
-              headers: { "Content-Type": "application/json" },
-            });
-          }
+        const providedKey = request.headers.get("apikey");
+        const expectedKeys = [
+          process.env.SUPABASE_PUBLISHABLE_KEY,
+          process.env.SUPABASE_ANON_KEY,
+          process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        ].filter(Boolean);
+        if (expectedKeys.length > 0 && (!providedKey || !expectedKeys.includes(providedKey))) {
+          return new Response(JSON.stringify({ error: "unauthorized" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         try {
-          const { processQueuedFlowRuns, processExpiredTimerRuns } = await import("@/lib/flow-engine.server");
-          const [queued, timers] = await Promise.all([
+          const { processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningDelayRuns } = await import("@/lib/flow-engine.server");
+          const [queued, timers, staleDelay] = await Promise.all([
             processQueuedFlowRuns(20),
             processExpiredTimerRuns(20),
+            processStaleRunningDelayRuns(90, 20),
           ]);
-          return new Response(JSON.stringify({ ok: true, queued, timers }), {
+          return new Response(JSON.stringify({ ok: true, queued, timers, staleDelay }), {
             headers: { "Content-Type": "application/json" },
           });
 

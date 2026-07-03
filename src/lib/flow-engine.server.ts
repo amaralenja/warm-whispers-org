@@ -756,15 +756,17 @@ export async function runFlowAdmin(args: {
 
   // Non-blocking mode: mark as queued and let the background worker execute it.
   if (args.queueOnly) {
-    try {
-      const adminDb = await getAdminDb();
-      await adminDb
-        .from("wa_flow_runs" as any)
-        .update({ status: "queued", updated_at: new Date().toISOString() })
-        .eq("id", (run as any).id);
-    } catch (e) {
-      console.warn("[flow-engine] failed to mark run as queued", e);
-    }
+    const queueCtx: Ctx = {
+      runId: String((run as any).id),
+      flowId: args.flowId,
+      channelId: args.channelId,
+      contactWaId: args.contactWaId,
+      conversationId: (run as any).conversation_id ?? args.conversationId,
+      db,
+      variables: { trigger: args.triggerContext ?? {} },
+      vendor: args.vendor ?? null,
+    };
+    await updateFlowRun(queueCtx, { status: "queued", waiting_for: null, expires_at: null });
     return { runId: (run as any).id, queued: true };
   }
 
@@ -832,30 +834,9 @@ export async function processQueuedFlowRuns(limit = 20) {
 // Advances to the next node and resumes execution.
 export async function processExpiredTimerRuns(limit = 20) {
   const db = await getAdminDb();
-  const nowIso = new Date().toISOString();
-  const { data: expired, error } = await db
-    .from("wa_flow_runs" as any)
-    .select("id, flow_id, channel_id, contact_wa_id, conversation_id, current_node_id, context")
-    .eq("status", "waiting")
-    .eq("waiting_for", "timer")
-    .lte("expires_at", nowIso)
-    .limit(limit);
+  const { data: expired, error } = await db.rpc("claim_expired_timer_flow_runs" as any, { _limit: limit });
   if (error) throw new Error(error.message);
-  const runs = Array.isArray(expired) ? expired : [];
-  if (runs.length === 0) return { resumed: 0, results: [] };
-
-  // Atomically claim each by flipping status to running so we don't double-fire.
-  const claimed: any[] = [];
-  for (const r of runs) {
-    const { data: upd } = await db
-      .from("wa_flow_runs" as any)
-      .update({ status: "running", waiting_for: null, expires_at: null, updated_at: new Date().toISOString() })
-      .eq("id", (r as any).id)
-      .eq("status", "waiting")
-      .select("id")
-      .maybeSingle();
-    if (upd) claimed.push(r);
-  }
+  const claimed = Array.isArray(expired) ? expired : [];
   if (claimed.length === 0) return { resumed: 0, results: [] };
 
   const results = await Promise.allSettled(
@@ -889,6 +870,53 @@ export async function processExpiredTimerRuns(limit = 20) {
 
   return {
     resumed: claimed.length,
+    results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
+  };
+}
+
+// Recovers delay nodes that were left as `running` before the worker could mark
+// them as queued/waiting. This prevents manual vendor triggers from staying stuck.
+export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit = 20) {
+  const db = await getAdminDb();
+  const { data: stale, error } = await db.rpc("claim_stale_running_delay_flow_runs" as any, {
+    _older_than_seconds: olderThanSeconds,
+    _limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  const runs = Array.isArray(stale) ? stale : [];
+  if (runs.length === 0) return { recovered: 0, results: [] };
+
+  const results = await Promise.allSettled(
+    runs.map(async (run: any) => {
+      const flow = await loadFlow(String(run.flow_id), db);
+      const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+      const nextId = run.current_node_id ? nextNodeId(edges, String(run.current_node_id)) : null;
+      const ctx: Ctx = {
+        runId: String(run.id),
+        flowId: String(run.flow_id),
+        channelId: String(run.channel_id),
+        contactWaId: String(run.contact_wa_id),
+        conversationId: run.conversation_id ?? null,
+        db,
+        variables: { trigger: (run.context && (run.context as any).trigger) ?? {} },
+        vendor: null,
+      };
+      if (!nextId) {
+        await updateFlowRun(ctx, { status: "completed" });
+        return { runId: ctx.runId, completed: true };
+      }
+      try {
+        await executeFrom(ctx, nextId);
+        return { runId: ctx.runId, ok: true };
+      } catch (err: any) {
+        await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
+        return { runId: ctx.runId, error: String(err?.message ?? err) };
+      }
+    }),
+  );
+
+  return {
+    recovered: runs.length,
     results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
   };
 }
