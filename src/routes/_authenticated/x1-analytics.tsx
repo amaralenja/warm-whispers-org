@@ -114,25 +114,22 @@ function presetRange(p: Preset) {
 
 function X1AnalyticsPage() {
   const fetchFn = useServerFn(getX1Analytics);
-  const [preset, setPreset] = useState<Preset>("hoje");
-  const [range, setRange] = useState<{ from: string; to: string }>(() => todayRange());
+  const [dateRange, setDateRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [operacao, setOperacao] = useState<string>("all");
 
-  const applyPreset = (p: Preset) => {
-    setPreset(p);
-    setRange(presetRange(p));
-  };
+  const range = { from: dateRange.from ?? "", to: dateRange.to ?? dateRange.from ?? "" };
 
   const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ["x1-analytics", range.from, range.to, operacao],
     queryFn: () => fetchFn({ data: { from: range.from, to: range.to, operacao } }),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
+    enabled: Boolean(range.from && range.to),
   });
 
   const payload = (data ?? null) as X1AnalyticsPayload | null;
 
-  const isHoje = preset === "hoje" || range.from === range.to;
+  const isHoje = dateRange.preset === "hoje" || range.from === range.to;
   const chartMsgs = useMemo(() => {
     if (!payload) return [];
     return isHoje
