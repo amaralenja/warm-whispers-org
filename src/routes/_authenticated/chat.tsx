@@ -334,6 +334,7 @@ function ChatPage() {
     return m;
   }, [allCrmTags]);
   const tagColorFor = (name: string) => tagColorMap.get(String(name || "").trim().toLowerCase()) || "";
+  const activeFlowConvIds = useActiveFlowConversationIds();
 
   const handleReact = async (m: Msg, emoji: string) => {
     if (!active) return;
@@ -767,6 +768,7 @@ function ChatPage() {
                   const contactName = toText(c.contact_name);
                   const isActive = String(c.id) === activeId;
                   const preview = toText(c.last_message_preview);
+                  const hasActiveFlow = activeFlowConvIds.has(String(c.id));
                   return (
                     <div
                       key={String(c.id)}
@@ -805,6 +807,15 @@ function ChatPage() {
                                 </span>
                               ) : null;
                             })()}
+                            {hasActiveFlow ? (
+                              <span
+                                title="Fluxo sendo disparado"
+                                className="relative inline-flex h-2.5 w-2.5 shrink-0"
+                              >
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-chat-accent opacity-75" />
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-chat-accent" />
+                              </span>
+                            ) : null}
                           </div>
 
                           {(() => {
@@ -1535,6 +1546,48 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
       </div>
     </div>
   );
+}
+
+function useActiveFlowConversationIds(): Set<string> {
+  const [ids, setIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      try {
+        const { data } = await supabase
+          .from("wa_flow_runs" as any)
+          .select("conversation_id, status")
+          .in("status", ["queued", "running", "waiting"])
+          .limit(500);
+        if (cancelled) return;
+        const next = new Set<string>();
+        for (const r of (data as any[]) ?? []) {
+          if (r?.conversation_id) next.add(String(r.conversation_id));
+        }
+        setIds(next);
+      } catch {
+        // ignore — RLS may block for some roles
+      }
+    }
+    refresh();
+    const ch = supabase
+      .channel("chat-list-active-flows")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wa_flow_runs" },
+        () => refresh(),
+      )
+      .subscribe();
+    const iv = setInterval(refresh, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      supabase.removeChannel(ch);
+    };
+  }, []);
+
+  return ids;
 }
 
 function flowOrderStorageKey(vendorId: number | string | null | undefined, op: string | null | undefined) {

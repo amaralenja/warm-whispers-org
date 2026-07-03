@@ -781,6 +781,7 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       if (conv?.id) data.conversation_id = String(conv.id);
     }
     const { runFlowAdmin } = await import("@/lib/flow-engine.server");
+    // Enqueue only — worker (pg_cron -> /api/public/hooks/dispatch-worker) executes in background.
     return runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
@@ -791,7 +792,60 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
         ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
         : null,
       triggerContext: { manual: true },
+      queueOnly: true,
     });
+  });
+
+export const triggerFlowBulk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    flow_id: string;
+    targets: Array<{ channel_id: string; contact_wa_id: string; conversation_id?: string }>;
+  }) => d)
+  .handler(async ({ context, data }) => {
+    if (!Array.isArray(data.targets) || data.targets.length === 0) return { enqueued: 0, results: [] };
+    const db = await dbFor(context);
+    const vendor = (context as any).vendor
+      ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
+      : null;
+    const allowedChannels = vendor ? await vendorAllowedChannelIds(context, db) : null;
+    const { runFlowAdmin } = await import("@/lib/flow-engine.server");
+
+    const results = await Promise.allSettled(
+      data.targets.map(async (t) => {
+        if (vendor && allowedChannels && !allowedChannels.includes(String(t.channel_id))) {
+          throw new Error("Vendedor sem acesso ao canal");
+        }
+        let conversationId = t.conversation_id ?? null;
+        if (vendor) {
+          const conv = await assertVendorConversationAccess(context, db, conversationId ?? "", {
+            channelId: t.channel_id,
+            contactWaId: t.contact_wa_id,
+          });
+          if (conv?.id) conversationId = String(conv.id);
+        }
+        return runFlowAdmin({
+          flowId: data.flow_id,
+          channelId: t.channel_id,
+          contactWaId: t.contact_wa_id,
+          conversationId,
+          db,
+          vendor,
+          triggerContext: { manual: true, bulk: true },
+          queueOnly: true,
+        });
+      }),
+    );
+
+    return {
+      enqueued: results.filter((r) => r.status === "fulfilled").length,
+      failed: results.filter((r) => r.status === "rejected").length,
+      results: results.map((r, i) => ({
+        target: data.targets[i],
+        ok: r.status === "fulfilled",
+        error: r.status === "rejected" ? String((r as any).reason?.message ?? r.reason) : undefined,
+      })),
+    };
   });
 
 export const listActiveFlowRuns = createServerFn({ method: "GET" })

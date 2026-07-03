@@ -725,6 +725,7 @@ export async function runFlowAdmin(args: {
   triggerContext?: any;
   db?: any;
   vendor?: VendorRunContext | null;
+  queueOnly?: boolean;
 }) {
   const db = args.db ?? await getAdminDb();
   const flow = await loadFlow(args.flowId, db);
@@ -732,11 +733,6 @@ export async function runFlowAdmin(args: {
   const edges: Edge[] = (flow.edges as Edge[]) ?? [];
   if (nodes.length === 0) throw new Error("Fluxo sem nós");
 
-  // Pick a sensible starting node:
-  // 1) entry_node_id if set (typically the trigger node)
-  // 2) otherwise the first trigger node
-  // 3) otherwise the first node with no incoming edges
-  // 4) otherwise the first node
   let entryId: string | null = flow.entry_node_id ?? null;
   if (!entryId) entryId = nodes.find((n) => n.type === "trigger")?.id ?? null;
   if (!entryId) {
@@ -745,7 +741,6 @@ export async function runFlowAdmin(args: {
   }
 
   const entryNode = nodes.find((n) => n.id === entryId);
-  // If the entry is a trigger node, skip to its next; otherwise start at the entry itself.
   const startId =
     entryNode?.type === "trigger" ? nextNodeId(edges, entryId!) : entryId;
 
@@ -758,6 +753,20 @@ export async function runFlowAdmin(args: {
     triggerContext: args.triggerContext,
     vendor: args.vendor,
   });
+
+  // Non-blocking mode: mark as queued and let the background worker execute it.
+  if (args.queueOnly) {
+    try {
+      const adminDb = await getAdminDb();
+      await adminDb
+        .from("wa_flow_runs" as any)
+        .update({ status: "queued", updated_at: new Date().toISOString() })
+        .eq("id", (run as any).id);
+    } catch (e) {
+      console.warn("[flow-engine] failed to mark run as queued", e);
+    }
+    return { runId: (run as any).id, queued: true };
+  }
 
   const ctx: Ctx = {
     runId: (run as any).id,
@@ -776,6 +785,47 @@ export async function runFlowAdmin(args: {
   }
   await executeFrom(ctx, startId);
   return { runId: ctx.runId };
+}
+
+// Background worker: claims up to `limit` queued runs and executes them in parallel.
+export async function processQueuedFlowRuns(limit = 20) {
+  const db = await getAdminDb();
+  const { data: claimed, error } = await db.rpc("claim_queued_flow_runs" as any, { _limit: limit });
+  if (error) throw new Error(error.message);
+  const runs = Array.isArray(claimed) ? claimed : [];
+  if (runs.length === 0) return { processed: 0, results: [] };
+
+  const results = await Promise.allSettled(
+    runs.map(async (run: any) => {
+      const ctx: Ctx = {
+        runId: String(run.id),
+        flowId: String(run.flow_id),
+        channelId: String(run.channel_id),
+        contactWaId: String(run.contact_wa_id),
+        conversationId: run.conversation_id ?? null,
+        db,
+        variables: { trigger: (run.context && (run.context as any).trigger) ?? {} },
+        vendor: null,
+      };
+      const startId = run.current_node_id ? String(run.current_node_id) : null;
+      if (!startId) {
+        await updateFlowRun(ctx, { status: "completed" });
+        return { runId: ctx.runId, completed: true };
+      }
+      try {
+        await executeFrom(ctx, startId);
+        return { runId: ctx.runId, ok: true };
+      } catch (err: any) {
+        await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
+        return { runId: ctx.runId, error: String(err?.message ?? err) };
+      }
+    }),
+  );
+
+  return {
+    processed: runs.length,
+    results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
+  };
 }
 
 export async function advanceWaitingRun(args: {
