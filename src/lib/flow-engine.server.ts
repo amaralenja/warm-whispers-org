@@ -736,6 +736,32 @@ export async function runFlowAdmin(args: {
   const edges: Edge[] = (flow.edges as Edge[]) ?? [];
   if (nodes.length === 0) throw new Error("Fluxo sem nós");
 
+  // Idempotency guard: se já existe uma run ativa (queued/running/waiting)
+  // pra mesma combinação flow + canal + contato, NÃO cria outra. Impede
+  // duplicação de disparos por triggers concorrentes (auto + manual,
+  // webhooks duplicados, retries do worker, etc.)
+  {
+    const contactNorm = normalizeBrWhatsappNumber(String(args.contactWaId ?? ""));
+    const contactCandidates = Array.from(new Set([String(args.contactWaId ?? ""), contactNorm].filter(Boolean)));
+    const { data: existingActive } = await db
+      .from("wa_flow_runs" as any)
+      .select("id, status, current_node_id, contact_wa_id")
+      .eq("flow_id", args.flowId)
+      .eq("channel_id", args.channelId)
+      .in("contact_wa_id", contactCandidates)
+      .in("status", ["queued", "running", "waiting"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingActive) {
+      console.log("[flow-engine] duplicate dispatch skipped", {
+        flowId: args.flowId, channelId: args.channelId, contactWaId: args.contactWaId,
+        existingRunId: (existingActive as any).id, status: (existingActive as any).status,
+      });
+      return { runId: (existingActive as any).id, deduped: true };
+    }
+  }
+
   let entryId: string | null = flow.entry_node_id ?? null;
   if (!entryId) entryId = nodes.find((n) => n.type === "trigger")?.id ?? null;
   if (!entryId) {
