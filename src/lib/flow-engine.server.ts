@@ -516,7 +516,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
       if (!text) return {};
       const body = { type: "text", text: { body: text } };
+      if (await isFlowRunCancelled(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+      if (await isFlowRunCancelled(ctx)) return {};
       await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized);
       return { log: { text } };
     }
@@ -550,6 +552,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const body: any = { type: mediaType, [mediaType]: inner };
       if (await isFlowRunCancelled(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+      if (await isFlowRunCancelled(ctx)) return {};
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
       return { log: { url: finalUrl } };
     }
@@ -578,7 +581,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
             },
           },
         };
+        if (await isFlowRunCancelled(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+        if (await isFlowRunCancelled(ctx)) return {};
         await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
       }
 
@@ -595,7 +600,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
             },
           },
         };
+        if (await isFlowRunCancelled(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+        if (await isFlowRunCancelled(ctx)) return {};
         await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
       }
 
