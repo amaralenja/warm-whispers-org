@@ -828,6 +828,72 @@ export async function processQueuedFlowRuns(limit = 20) {
   };
 }
 
+// Wakes up flow runs paused on a `delay` node whose timer has expired.
+// Advances to the next node and resumes execution.
+export async function processExpiredTimerRuns(limit = 20) {
+  const db = await getAdminDb();
+  const nowIso = new Date().toISOString();
+  const { data: expired, error } = await db
+    .from("wa_flow_runs" as any)
+    .select("id, flow_id, channel_id, contact_wa_id, conversation_id, current_node_id, context")
+    .eq("status", "waiting")
+    .eq("waiting_for", "timer")
+    .lte("expires_at", nowIso)
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  const runs = Array.isArray(expired) ? expired : [];
+  if (runs.length === 0) return { resumed: 0, results: [] };
+
+  // Atomically claim each by flipping status to running so we don't double-fire.
+  const claimed: any[] = [];
+  for (const r of runs) {
+    const { data: upd } = await db
+      .from("wa_flow_runs" as any)
+      .update({ status: "running", waiting_for: null, expires_at: null, updated_at: new Date().toISOString() })
+      .eq("id", (r as any).id)
+      .eq("status", "waiting")
+      .select("id")
+      .maybeSingle();
+    if (upd) claimed.push(r);
+  }
+  if (claimed.length === 0) return { resumed: 0, results: [] };
+
+  const results = await Promise.allSettled(
+    claimed.map(async (run: any) => {
+      const flow = await loadFlow(String(run.flow_id), db);
+      const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+      const nextId = nextNodeId(edges, String(run.current_node_id));
+      const ctx: Ctx = {
+        runId: String(run.id),
+        flowId: String(run.flow_id),
+        channelId: String(run.channel_id),
+        contactWaId: String(run.contact_wa_id),
+        conversationId: run.conversation_id ?? null,
+        db,
+        variables: { trigger: (run.context && (run.context as any).trigger) ?? {} },
+        vendor: null,
+      };
+      if (!nextId) {
+        await updateFlowRun(ctx, { status: "completed" });
+        return { runId: ctx.runId, completed: true };
+      }
+      try {
+        await executeFrom(ctx, nextId);
+        return { runId: ctx.runId, ok: true };
+      } catch (err: any) {
+        await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
+        return { runId: ctx.runId, error: String(err?.message ?? err) };
+      }
+    }),
+  );
+
+  return {
+    resumed: claimed.length,
+    results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
+  };
+}
+
+
 export async function advanceWaitingRun(args: {
   conversationId: string;
   input: { text?: string | null; buttonId?: string | null; messageType?: string | null };
