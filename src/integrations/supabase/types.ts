@@ -2355,6 +2355,7 @@ export type Database = {
         Returns: {
           current_node_id: string
           error: string
+          expires_at: string
           flow_id: string
           flow_nome: string
           id: string
