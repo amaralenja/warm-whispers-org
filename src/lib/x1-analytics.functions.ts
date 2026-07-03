@@ -37,6 +37,32 @@ function parseDataField(raw: unknown): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+function parseFilterDay(raw: unknown): number | null {
+  const s = safeString(raw).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  return Number.isFinite(t) ? t : null;
+}
+
+function brStartIso(day: unknown): string | null {
+  const s = safeString(day).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T03:00:00.000Z` : null;
+}
+
+function brEndIso(day: unknown): string | null {
+  const start = parseFilterDay(day);
+  if (start == null) return null;
+  return new Date(start + 27 * 60 * 60 * 1000 - 1).toISOString();
+}
+
+function isWithinDayField(t: number | null, fromDay: number | null, toDay: number | null) {
+  if (t == null) return false;
+  if (fromDay != null && t < fromDay) return false;
+  if (toDay != null && t > toDay) return false;
+  return true;
+}
+
 export type X1Filter = {
   from?: string | null;
   to?: string | null;
