@@ -72,6 +72,15 @@ export type X1Filter = {
   from?: string | null;
   to?: string | null;
   operacao?: string | null; // "all" | operacao_id
+  channelId?: string | null; // "all" | wa_channels.id
+};
+
+export type X1CanalRow = {
+  id: string;
+  name: string;
+  displayPhone: string | null;
+  verifiedName: string | null;
+  operacao: string;
 };
 
 export type X1OperacaoRow = {
@@ -121,6 +130,7 @@ export type X1AnalyticsPayload = {
   serieDiaria: X1SerieDia[];
   serieHoraria: X1SerieHora[];
   operacoesDisponiveis: string[];
+  canaisDisponiveis: X1CanalRow[];
 };
 
 const EMPTY: X1AnalyticsPayload = {
@@ -141,6 +151,7 @@ const EMPTY: X1AnalyticsPayload = {
   serieDiaria: [],
   serieHoraria: [],
   operacoesDisponiveis: [],
+  canaisDisponiveis: [],
 };
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
@@ -303,11 +314,15 @@ async function getVendorX1Analytics(
   const fromDay = parseFilterDay(data.from);
   const toDay = parseFilterDay(data.to);
 
+  const channelFilterRaw = safeString(data.channelId).trim();
+  const channelFilterActive = channelFilterRaw && channelFilterRaw !== "all" ? channelFilterRaw : null;
+
+
   let allowedWorkspaces = vendorWorkspaceIds(context);
   try {
     const { data: rpcWorkspaces } = await (context.supabase as any).rpc("vendor_allowed_workspace_ids" as any, rpcArgs);
     if (Array.isArray(rpcWorkspaces) && rpcWorkspaces.length > 0) {
-      allowedWorkspaces = rpcWorkspaces.map((x) => safeString(x).trim()).filter(Boolean);
+      allowedWorkspaces = rpcWorkspaces.map((x: unknown) => safeString(x).trim()).filter(Boolean);
     }
   } catch {
     // usa o contexto local como fallback
@@ -346,13 +361,23 @@ async function getVendorX1Analytics(
     if (produto && expert) produtoToOperacao.set(produto, expert);
   }
 
-  const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
+  const channelsAll = ((channelsRes.data ?? []) as any[]).filter((c) => {
     const op = safeString(c?.operacao_id).trim();
     if (!op || op === "__notificador__") return false;
     if (safeString(c?.kind, "chat") === "notification") return false;
     if (opFilter && !sameText(op, opFilter)) return false;
     return opAllowed(op, allowedWorkspaces);
   });
+  const canaisDisponiveis: X1CanalRow[] = channelsAll.map((c) => ({
+    id: safeString(c?.id).trim(),
+    name: safeString(c?.name, safeString(c?.verified_name, "Canal")),
+    displayPhone: safeNullableString(c?.display_phone_number),
+    verifiedName: safeNullableString(c?.verified_name),
+    operacao: safeString(c?.operacao_id).trim(),
+  })).filter((c) => c.id).sort((a, b) => a.name.localeCompare(b.name));
+  const channels = channelFilterActive
+    ? channelsAll.filter((c) => safeString(c?.id).trim() === channelFilterActive)
+    : channelsAll;
   const channelToOp = new Map<string, string>();
   const channelIds = new Set<string>();
   const operacoesSet = new Set<string>();
@@ -364,7 +389,9 @@ async function getVendorX1Analytics(
     channelToOp.set(id, op);
     operacoesSet.add(op);
   }
-  for (const op of allowedWorkspaces) if (!opFilter || sameText(op, opFilter)) operacoesSet.add(op);
+  if (!channelFilterActive) {
+    for (const op of allowedWorkspaces) if (!opFilter || sameText(op, opFilter)) operacoesSet.add(op);
+  }
 
   const allConversations = ((conversationsRes.data ?? []) as any[]).filter((c) => {
     const channelId = safeString(c?.channel_id).trim();
@@ -569,6 +596,7 @@ async function getVendorX1Analytics(
     serieDiaria,
     serieHoraria: Array.from(hourMap.values()),
     operacoesDisponiveis: Array.from(operacoesSet).sort(),
+    canaisDisponiveis,
   };
 }
 
@@ -601,6 +629,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const fromDay = parseFilterDay(data.from);
     const toDay = parseFilterDay(data.to);
     const opFilter = data.operacao && data.operacao !== "all" ? String(data.operacao) : null;
+    const channelFilterRaw = safeString(data.channelId).trim();
+    const channelFilterActive = channelFilterRaw && channelFilterRaw !== "all" ? channelFilterRaw : null;
 
     if (context?.vendor) {
       return getVendorX1Analytics(context, data, opFilter, fromIso, toIso);
@@ -624,16 +654,32 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // canais + operações
     const { data: channels } = await supabase
       .from("wa_channels")
-      .select("id, operacao_id, verified_name, name")
+      .select("id, operacao_id, verified_name, name, display_phone_number, kind")
       .neq("operacao_id", "__notificador__");
     const channelToOp = new Map<string, string>();
     const operacoesSet = new Set<string>();
+    const canaisDisponiveis: X1CanalRow[] = [];
     for (const c of (channels ?? []) as any[]) {
       const op = String(c.operacao_id ?? "").trim();
       if (!op || op === "__notificador__") continue;
+      if (safeString(c?.kind, "chat") === "notification") continue;
       channelToOp.set(String(c.id), op);
       operacoesSet.add(op);
+      if (!opFilter || sameText(op, opFilter)) {
+        canaisDisponiveis.push({
+          id: safeString(c?.id).trim(),
+          name: safeString(c?.name, safeString(c?.verified_name, "Canal")),
+          displayPhone: safeNullableString(c?.display_phone_number),
+          verifiedName: safeNullableString(c?.verified_name),
+          operacao: op,
+        });
+      }
     }
+    canaisDisponiveis.sort((a, b) => a.name.localeCompare(b.name));
+    const channelAllowed = (channelId: unknown) => {
+      if (!channelFilterActive) return true;
+      return safeString(channelId).trim() === channelFilterActive;
+    };
 
     // Conversas (todas com created_at no período OU last_message_at no período)
     const convQuery = supabase
@@ -644,6 +690,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
       if (!op) return false;
       if (opFilter && !sameText(op, opFilter)) return false;
+      if (!channelAllowed(c?.channel_id)) return false;
       return true;
     });
     const conversationToVendorId = new Map<string, number>();
@@ -668,6 +715,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
       if (!op) return false;
       if (opFilter && !sameText(op, opFilter)) return false;
+      if (!channelAllowed(c?.channel_id)) return false;
       return true;
     });
 
@@ -693,6 +741,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const op = channelToOp.get(String(m.channel_id)) ?? "";
       if (!op) return false;
       if (opFilter && op !== opFilter) return false;
+      if (!channelAllowed(m.channel_id)) return false;
       return true;
     });
 
@@ -964,5 +1013,6 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       serieDiaria,
       serieHoraria,
       operacoesDisponiveis: Array.from(operacoesSet).sort(),
+      canaisDisponiveis,
     };
   });
