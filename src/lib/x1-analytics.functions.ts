@@ -270,6 +270,44 @@ async function pageAllWithDb<T = any>(build: (from: number, to: number) => any):
   return out;
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
+async function fetchAnalyticsMessages(
+  db: any,
+  channelIds: string[],
+  fromIso: string | null,
+  toIso: string | null,
+): Promise<any[]> {
+  const ids = Array.from(new Set(channelIds.map((id) => safeString(id).trim()).filter(Boolean)));
+  if (ids.length === 0) return [];
+
+  const rows: any[] = [];
+  for (const chunk of chunkArray(ids, 50)) {
+    const chunkRows = await pageAllWithDb<any>((from, to) => {
+      let q = db
+        .from("wa_messages" as any)
+        .select("id, conversation_id, channel_id, direction, created_at, sent_by, raw, deleted_at")
+        .is("deleted_at", null)
+        .in("channel_id", chunk)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+      if (fromIso) q = q.gte("created_at", fromIso);
+      if (toIso) q = q.lte("created_at", toIso);
+      return q.range(from, to);
+    });
+    rows.push(...chunkRows);
+  }
+  rows.sort((a, b) => {
+    const dt = Date.parse(safeString(a?.created_at)) - Date.parse(safeString(b?.created_at));
+    return dt || safeString(a?.id).localeCompare(safeString(b?.id));
+  });
+  return rows;
+}
+
 function vendorRpcArgs(context: any) {
   const id = Number(context?.vendor?.id);
   const codigo = safeString(context?.vendor?.codigo).trim();
@@ -346,6 +384,7 @@ async function getVendorX1Analytics(
         .from("vendas")
         .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
         .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+        .order("id", { ascending: true })
         .range(from, to),
     ),
   ]);
@@ -425,14 +464,7 @@ async function getVendorX1Analytics(
     if (key) leadKeys.add(key);
   }
 
-  const { data: messagesRaw, error: messagesError } = await db.rpc("vendor_list_x1_wa_messages" as any, {
-    ...rpcArgs,
-    _operacao_id: opFilter ?? null,
-    _from: fromIso,
-    _to: toIso,
-  });
-  if (messagesError) throw new Error(messagesError.message);
-  const messages = (messagesRaw ?? []) as any[];
+  const messages = await fetchAnalyticsMessages(db, Array.from(channelIds), fromIso, toIso);
   const msgsScoped = messages.filter((m: any) => {
     if (m?.deleted_at) return false;
     if (!isWithinIso(m?.created_at, fromIso, toIso)) return false;
@@ -729,14 +761,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const crmLeadsRows = await pageAll<any>((from, to) => crmLeadQuery.range(from, to));
 
     // Mensagens do período
-    let msgQuery = supabase
-      .from("wa_messages")
-      .select("id, conversation_id, channel_id, direction, created_at, sent_by, raw")
-      .is("deleted_at", null)
-      .order("id", { ascending: true });
-    if (fromIso) msgQuery = msgQuery.gte("created_at", fromIso);
-    if (toIso) msgQuery = msgQuery.lte("created_at", toIso);
-    const messages = await pageAll<any>((from, to) => msgQuery.range(from, to));
+    const messageChannelIds = Array.from(channelToOp.keys()).filter((id) => channelAllowed(id));
+    const messages = await fetchAnalyticsMessages(supabase, messageChannelIds, fromIso, toIso);
 
     // filtra mensagens: só descarta se opFilter estiver ativo e o canal não pertencer.
     // Sem opFilter, contamos TODAS as mensagens do período (mesmo de canais sem operacao_id).
@@ -759,6 +785,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
           .from("vendas")
           .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
           .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+          .order("id", { ascending: true })
           .range(from, to),
       ),
     ]);
