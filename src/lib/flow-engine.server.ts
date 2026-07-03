@@ -607,11 +607,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      if (secs <= 30) {
-        await new Promise((r) => setTimeout(r, secs * 1000));
-        return {};
-      }
-      // Long delay: pause the run and let the timer worker resume it.
+      // Sempre pausa e delega ao worker de timer. Antes, delays ≤30s usavam
+      // setTimeout inline — se o worker terminava (Cloudflare kill), a run ficava
+      // em "running" no delay e podia ser reexecutada, enviando mensagens em duplicata.
       return {
         pause: true,
         waitingFor: "timer",
