@@ -163,6 +163,28 @@ function messageSentByVendor(message: any, vendorId: number) {
   return messageVendorId(message) === vendorId;
 }
 
+function contactLeadKey(...values: unknown[]): string | null {
+  for (const value of values) {
+    const digits = safeString(value).replace(/\D/g, "");
+    if (!digits) continue;
+    return `phone:${digits.length > 11 ? digits.slice(-11) : digits}`;
+  }
+  for (const value of values) {
+    const s = safeString(value).trim();
+    if (s) return `id:${s}`;
+  }
+  return null;
+}
+
+function vendedorMatchesLead(vendedor: any, lead: any) {
+  const leadUtm = normalizeUtm(lead?.responsavel_utm);
+  const vendedorUtm = normalizeUtm(vendedor?.utm);
+  if (leadUtm && vendedorUtm && leadUtm === vendedorUtm) return true;
+  const respNome = safeNullableString(lead?.responsavel_nome);
+  const vendedorNome = safeNullableString(vendedor?.nome);
+  return !!respNome && !!vendedorNome && sameText(respNome, vendedorNome);
+}
+
 function normalizeText(value: unknown): string {
   return safeString(value)
     .normalize("NFD")
