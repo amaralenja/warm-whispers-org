@@ -372,6 +372,15 @@ async function updateFlowRun(ctx: Ctx, patch: Record<string, any>) {
   if (data === false) throw new Error("Execução não encontrada");
 }
 
+async function isFlowRunCancelled(ctx: Ctx): Promise<boolean> {
+  const { data } = await ctx.db
+    .from("wa_flow_runs" as any)
+    .select("status")
+    .eq("id", ctx.runId)
+    .maybeSingle();
+  return String((data as any)?.status ?? "") === "cancelled";
+}
+
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
   const edge = edges.find((e) =>
     e.source === fromNodeId &&
@@ -421,6 +430,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
   let safety = 0;
 
   while (currentId && safety++ < 50) {
+    if (await isFlowRunCancelled(ctx)) return;
     const node = nodes.find((n) => n.id === currentId);
     if (!node) {
       // Node não existe mais (fluxo editado). Não deixa o run preso em "running".
@@ -432,6 +442,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
 
     try {
       const result = await runNode(node, ctx);
+      if (await isFlowRunCancelled(ctx)) return;
 
       // Update run pointer
       await updateFlowRun(ctx, {
