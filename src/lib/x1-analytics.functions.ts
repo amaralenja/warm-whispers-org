@@ -684,11 +684,11 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // Conversas (todas com created_at no período OU last_message_at no período)
     const convQuery = supabase
       .from("wa_conversations")
-      .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id");
+      .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id")
+      .order("id", { ascending: true });
     const allConversationsRaw = await pageAll<any>((from, to) => convQuery.range(from, to));
     const allConversations = allConversationsRaw.filter((c: any) => {
       const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
-      if (!op) return false;
       if (opFilter && !sameText(op, opFilter)) return false;
       if (!channelAllowed(c?.channel_id)) return false;
       return true;
@@ -707,13 +707,13 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // Novos leads (created_at no período)
     let novoQuery = supabase
       .from("wa_conversations")
-      .select("id, operacao_id, created_at, contact_wa_id, channel_id, assigned_vendor_id");
+      .select("id, operacao_id, created_at, contact_wa_id, channel_id, assigned_vendor_id")
+      .order("id", { ascending: true });
     if (fromIso) novoQuery = novoQuery.gte("created_at", fromIso);
     if (toIso) novoQuery = novoQuery.lte("created_at", toIso);
     const novosLeadsRowsRaw = await pageAll<any>((from, to) => novoQuery.range(from, to));
     const novosLeadsRows = novosLeadsRowsRaw.filter((c: any) => {
       const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
-      if (!op) return false;
       if (opFilter && !sameText(op, opFilter)) return false;
       if (!channelAllowed(c?.channel_id)) return false;
       return true;
@@ -721,7 +721,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
 
     let crmLeadQuery = supabase
       .from("crm_leads" as any)
-      .select("id, telefone, expert, responsavel_utm, responsavel_nome, created_at");
+      .select("id, telefone, expert, responsavel_utm, responsavel_nome, created_at")
+      .order("id", { ascending: true });
     if (fromIso) crmLeadQuery = crmLeadQuery.gte("created_at", fromIso);
     if (toIso) crmLeadQuery = crmLeadQuery.lte("created_at", toIso);
     if (opFilter) crmLeadQuery = crmLeadQuery.eq("expert", opFilter);
@@ -731,19 +732,23 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     let msgQuery = supabase
       .from("wa_messages")
       .select("id, conversation_id, channel_id, direction, created_at, sent_by, raw")
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .order("id", { ascending: true });
     if (fromIso) msgQuery = msgQuery.gte("created_at", fromIso);
     if (toIso) msgQuery = msgQuery.lte("created_at", toIso);
     const messages = await pageAll<any>((from, to) => msgQuery.range(from, to));
 
-    // filtra mensagens pela operação (via canal)
+    // filtra mensagens: só descarta se opFilter estiver ativo e o canal não pertencer.
+    // Sem opFilter, contamos TODAS as mensagens do período (mesmo de canais sem operacao_id).
     const msgsScoped = messages.filter((m) => {
-      const op = channelToOp.get(String(m.channel_id)) ?? "";
-      if (!op) return false;
-      if (opFilter && op !== opFilter) return false;
       if (!channelAllowed(m.channel_id)) return false;
+      if (opFilter) {
+        const op = channelToOp.get(String(m.channel_id)) ?? "";
+        if (op !== opFilter) return false;
+      }
       return true;
     });
+
 
     // Vendas & vendedores (para conversão e faturamento por operação)
     const [vendedoresRes, produtosMapRes, vendasAll] = await Promise.all([
