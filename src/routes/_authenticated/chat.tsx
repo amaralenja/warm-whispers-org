@@ -757,12 +757,26 @@ function ChatPage() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="truncate text-xl font-semibold tracking-normal">Chat ao Vivo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Conversas dos números conectados</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {unreadTotal > 0
+                      ? `${unreadTotal} não visualizada${unreadTotal > 1 ? "s" : ""}`
+                      : "Conversas dos números conectados"}
+                  </p>
                 </div>
               </div>
-              <Badge variant="outline" className="h-8 rounded-full border-chat-line px-3 text-xs">
-                {workspace.id === "all" ? "Geral" : workspace.nome}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {unreadTotal > 0 ? (
+                  <span
+                    className="grid h-8 min-w-8 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground"
+                    title="Leads não visualizados"
+                  >
+                    {unreadTotal}
+                  </span>
+                ) : null}
+                <Badge variant="outline" className="h-8 rounded-full border-chat-line px-3 text-xs">
+                  {workspace.id === "all" ? "Geral" : workspace.nome}
+                </Badge>
+              </div>
             </div>
 
             <div className="relative mt-5">
@@ -774,6 +788,37 @@ function ChatPage() {
                 className="h-12 rounded-2xl border-chat-line bg-chat-panel pl-11 text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
               />
             </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {([
+                { id: "all", label: "Todos", count: conversationList.length },
+                { id: "unread", label: "Não visualizados", count: unreadTotal },
+                { id: "flow", label: "Com fluxo", count: activeFlowConvIds.size },
+                { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null).length },
+              ] as const).map((f) => {
+                const active = listFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setListFilter(f.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      active
+                        ? "border-chat-accent bg-chat-accent text-chat-accent-foreground"
+                        : "border-chat-line bg-chat-panel text-muted-foreground hover:bg-chat-soft"
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    {f.count > 0 ? (
+                      <span className={`rounded-full px-1.5 text-[10px] font-bold tabular-nums ${active ? "bg-chat-accent-foreground/20" : "bg-chat-soft"}`}>
+                        {f.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy">
