@@ -190,13 +190,21 @@ function FlowsListPage() {
       }
       setZvSummary(acc);
       qc.invalidateQueries({ queryKey: ["wa-flows"] });
-      toast.success(`Importado: ${acc.funnels} funis · ${acc.steps} etapas · ${acc.uploads} arquivos`, { id: t });
+      if (acc.funnels === 0) {
+        const firstErr = acc.errors[0]?.message ?? "Nenhum funil foi importado";
+        toast.error(`Falhou: ${firstErr}${acc.errors.length > 1 ? ` (+${acc.errors.length - 1} erros)` : ""}`, { id: t });
+      } else if (acc.errors.length > 0) {
+        toast.success(`Importado: ${acc.funnels} funis · ${acc.steps} etapas · ${acc.uploads} arquivos — ${acc.errors.length} avisos`, { id: t });
+      } else {
+        toast.success(`Importado: ${acc.funnels} funis · ${acc.steps} etapas · ${acc.uploads} arquivos`, { id: t });
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao importar ZapVoice", { id: t });
     } finally {
       setZvProgress("");
     }
   }
+
 
 
   // Fluxos sem operação são considerados "globais" e aparecem em qualquer workspace
