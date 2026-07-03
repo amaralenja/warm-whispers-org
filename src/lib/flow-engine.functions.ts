@@ -895,3 +895,33 @@ export const fireNewLeadTrigger = createServerFn({ method: "POST" })
     const { dispatchNewLead } = await import("@/lib/flow-engine.server");
     return dispatchNewLead({ leadId: data.lead_id, db: context.supabase });
   });
+
+export const cancelFlowRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { runId: string; conversationId: string }) => ({
+    runId: String(d?.runId ?? ""),
+    conversationId: String(d?.conversationId ?? ""),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.runId) throw new Error("runId obrigatório");
+    const db = await dbFor(context);
+    if (data.conversationId) {
+      try {
+        await assertVendorConversationAccess(context, db, data.conversationId);
+      } catch (e) {
+        throw new Error("Sem acesso a esta conversa");
+      }
+    }
+    const { error } = await db
+      .from("wa_flow_runs" as any)
+      .update({
+        status: "cancelled",
+        waiting_for: null,
+        expires_at: null,
+        error: "Cancelado manualmente",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.runId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
