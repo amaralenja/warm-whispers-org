@@ -2194,6 +2194,10 @@ export type Database = {
         Args: { _codigo: string; _vendor_id: number }
         Returns: string[]
       }
+      vendor_cancel_wa_flow_run: {
+        Args: { _codigo: string; _run_id: string; _vendor_id: number }
+        Returns: number
+      }
       vendor_create_crm_tag: {
         Args: {
           _codigo: string
