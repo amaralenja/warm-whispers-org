@@ -82,23 +82,32 @@ function safeNumber(value: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function brDate(d: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 function todayRange() {
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
   const now = new Date();
-  return { from: iso(now), to: iso(now) };
+  return { from: brDate(now), to: brDate(now) };
 }
 
 type Preset = "hoje" | "7d" | "30d" | "mes";
 
 function presetRange(p: Preset) {
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
   const to = new Date();
   const from = new Date();
-  if (p === "hoje") return { from: iso(to), to: iso(to) };
-  if (p === "7d") { from.setDate(from.getDate() - 6); return { from: iso(from), to: iso(to) }; }
-  if (p === "30d") { from.setDate(from.getDate() - 29); return { from: iso(from), to: iso(to) }; }
+  if (p === "hoje") return { from: brDate(to), to: brDate(to) };
+  if (p === "7d") { from.setDate(from.getDate() - 6); return { from: brDate(from), to: brDate(to) }; }
+  if (p === "30d") { from.setDate(from.getDate() - 29); return { from: brDate(from), to: brDate(to) }; }
   const first = new Date(to.getFullYear(), to.getMonth(), 1);
-  return { from: iso(first), to: iso(to) };
+  return { from: brDate(first), to: brDate(to) };
 }
 
 
