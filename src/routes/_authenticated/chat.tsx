@@ -369,6 +369,8 @@ function ChatPage() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned">("all");
+
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
 
