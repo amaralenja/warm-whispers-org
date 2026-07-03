@@ -368,7 +368,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         const nome = `[ZV] ${f.name ?? "Funil"}`.slice(0, 120);
         const flowPayload = {
           nome,
-          operacao_id: data.operacao_id,
+          operacao_id: effectiveOperacaoId,
           ativo: true,
           entry_node_id: triggerId,
           nodes,
