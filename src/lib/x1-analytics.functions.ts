@@ -629,11 +629,16 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     }
 
     // Conversas (todas com created_at no período OU last_message_at no período)
-    let convQuery = supabase
+    const convQuery = supabase
       .from("wa_conversations")
       .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id");
-    if (opFilter) convQuery = convQuery.eq("operacao_id", opFilter);
-    const allConversations = await pageAll<any>((from, to) => convQuery.range(from, to));
+    const allConversationsRaw = await pageAll<any>((from, to) => convQuery.range(from, to));
+    const allConversations = allConversationsRaw.filter((c: any) => {
+      const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
+      if (!op) return false;
+      if (opFilter && !sameText(op, opFilter)) return false;
+      return true;
+    });
     const conversations = allConversations.filter((c: any) => (
       isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
       || isWithinIso(c?.created_at, fromIso, toIso)
@@ -645,8 +650,13 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       .select("id, operacao_id, created_at, contact_wa_id, channel_id, assigned_vendor_id");
     if (fromIso) novoQuery = novoQuery.gte("created_at", fromIso);
     if (toIso) novoQuery = novoQuery.lte("created_at", toIso);
-    if (opFilter) novoQuery = novoQuery.eq("operacao_id", opFilter);
-    const novosLeadsRows = await pageAll<any>((from, to) => novoQuery.range(from, to));
+    const novosLeadsRowsRaw = await pageAll<any>((from, to) => novoQuery.range(from, to));
+    const novosLeadsRows = novosLeadsRowsRaw.filter((c: any) => {
+      const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
+      if (!op) return false;
+      if (opFilter && !sameText(op, opFilter)) return false;
+      return true;
+    });
 
     let crmLeadQuery = supabase
       .from("crm_leads" as any)
@@ -703,24 +713,13 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       if (produto && expert) produtoToOperacao.set(produto, expert);
     }
 
-    const vendaOperacao = (venda: any): string | null => {
-      const explicit = safeNullableString(venda?.nome_expert);
-      if (explicit) return explicit;
-      const utm = normalizeUtm(venda?.UTM);
-      const vend = utmToVendedor.get(utm);
-      const vendorExpert = safeNullableString(vend?.expert);
-      if (vendorExpert) return vendorExpert;
-      const produto = safeString(venda?.Produto).trim().toLowerCase();
-      const mapped = produto ? produtoToOperacao.get(produto) : null;
-      if (mapped) return mapped;
-      return operacaoFromUtm(utm);
-    };
+    const vendaOperacao = (venda: any): string | null => resolveVendaOperacao(venda, produtoToOperacao, utmToVendedor);
 
     const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
     const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)) && !!qualifiedVendaOperacao(v, produtoToOperacao));
     const vendasScoped = vendasPeriodo.filter((v: any) => {
       const op = vendaOperacao(v);
-      if (opFilter) return op === opFilter;
+      if (opFilter) return sameText(op, opFilter);
       return true;
     });
 
@@ -786,8 +785,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const opRows: X1OperacaoRow[] = [];
     for (const op of operacoesSet) {
       if (opFilter && op !== opFilter) continue;
-      const convOp = conversations.filter((c) => (c.operacao_id ?? "") === op);
-      const novosOp = novosLeadsRows.filter((c) => (c.operacao_id ?? "") === op);
+      const convOp = conversations.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
+      const novosOp = novosLeadsRows.filter((c) => sameText(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id)), op));
       const leadOpKeys = new Set<string>();
       for (const c of novosOp) {
         const key = contactLeadKey(c?.contact_wa_id, c?.id);
