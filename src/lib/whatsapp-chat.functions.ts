@@ -453,7 +453,7 @@ export const listConversations = createServerFn({ method: "GET" })
       .from("wa_conversations" as any)
       .select("*")
       .order("last_message_at", { ascending: false })
-      .limit(200)
+      .limit(2000)
       .or("operacao_id.is.null,operacao_id.neq.__notificador__");
     if (notifIds.length) q = q.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
