@@ -209,6 +209,19 @@ function sameText(a: unknown, b: unknown) {
   return normalizeText(a) === normalizeText(b);
 }
 
+async function pageAllWithDb<T = any>(build: (from: number, to: number) => any): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let i = 0; i < 40; i++) {
+    const { data: rows, error } = await build(i * PAGE, i * PAGE + PAGE - 1);
+    if (error) throw error;
+    const arr = (rows ?? []) as T[];
+    out.push(...arr);
+    if (arr.length < PAGE) break;
+  }
+  return out;
+}
+
 function vendorRpcArgs(context: any) {
   const id = Number(context?.vendor?.id);
   const codigo = safeString(context?.vendor?.codigo).trim();
@@ -274,7 +287,7 @@ async function getVendorX1Analytics(
     }),
     db.rpc("vendor_list_crm_leads" as any, rpcArgs),
     db.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
-    pageAllWithDb<any>(db, (from, to) =>
+    pageAllWithDb<any>((from, to) =>
       db
         .from("vendas")
         .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
@@ -285,6 +298,7 @@ async function getVendorX1Analytics(
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
   if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
+  if (produtosMapRes.error) throw new Error(produtosMapRes.error.message);
 
   const produtoToOperacao = new Map<string, string>();
   for (const p of ((produtosMapRes.data ?? []) as any[])) {
@@ -431,14 +445,13 @@ async function getVendorX1Analytics(
     const msgOp = msgsScoped.filter((m: any) => sameText(channelToOp.get(safeString(m?.channel_id)), op));
     const vdsOp = vendorSales.filter((v: any) => sameText(resolveVendaOperacao(v, produtoToOperacao), op));
     const fatOp = vdsOp.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
-    const opHasVendorSales = !primaryOp || sameText(primaryOp, op);
     return {
       operacao: op,
       leads: leadOpKeys.size,
       conversas: convOp.length,
       msgsIn: msgOp.filter((m: any) => safeString(m?.direction) === "in").length,
       msgsOut: msgOp.filter((m: any) => safeString(m?.direction) === "out").length,
-      vendas: vdsOp.length || opHasVendorSales ? vdsOp.length : 0,
+      vendas: vdsOp.length,
       faturamento: fatOp,
       conversao: leadOpKeys.size > 0 ? vdsOp.length / leadOpKeys.size : 0,
       ticketMedio: vdsOp.length > 0 ? fatOp / vdsOp.length : 0,
