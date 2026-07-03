@@ -3,7 +3,7 @@ import { Play, Pause, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WhatsappAudioPlayerProps {
-  url: unknown;
+  url?: unknown;
   outgoing?: boolean;
 }
 
@@ -37,7 +37,7 @@ function safeText(value: unknown): string {
   return String(value);
 }
 
-export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps | null | undefined) {
+export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   const safeUrl = safeText(props?.url).trim();
   const outgoing = Boolean(props?.outgoing);
   const audioRef = useRef<HTMLAudioElement | null>(null);
