@@ -134,12 +134,11 @@ export function ParticipacaoVendedores({
             <div className="space-y-1.5">
               {vendedores.slice(0, 10).map((v, i) => {
                 const color = colorFor(i);
-                const fat = Number((v as any)?.faturamento) || 0;
-                const vendas = Number((v as any)?.vendas) || 0;
-                const pctTotal = Number((v as any)?.pctTotal) || 0;
-                const pct = pctTotal * 100;
+                const fat = v.faturamento;
+                const vendas = v.vendas;
+                const pct = v.pctTotal * 100;
                 const isTop = i === 0;
-                const utmStr = asStr((v as any)?.utm);
+                const utmStr = v.utm;
                 return (
                   <div
                     key={utmStr || i}
