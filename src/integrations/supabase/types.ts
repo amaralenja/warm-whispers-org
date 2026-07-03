@@ -2133,6 +2133,40 @@ export type Database = {
         }
         Returns: string
       }
+      vendor_create_wa_flow: {
+        Args: {
+          _ativo?: boolean
+          _codigo: string
+          _descricao?: string
+          _edges?: Json
+          _entry_node_id?: string
+          _folder?: string
+          _nodes?: Json
+          _nome: string
+          _operacao_id?: string
+          _vendor_id: number
+        }
+        Returns: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          edges: Json
+          entry_node_id: string | null
+          folder: string | null
+          id: string
+          nodes: Json
+          nome: string
+          operacao_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "wa_flows"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       vendor_create_wa_flow_run: {
         Args: {
           _channel_id?: string
@@ -2172,6 +2206,10 @@ export type Database = {
       }
       vendor_delete_crm_tag: {
         Args: { _codigo: string; _id: string; _vendor_id: number }
+        Returns: boolean
+      }
+      vendor_delete_wa_flow: {
+        Args: { _codigo: string; _flow_id: string; _vendor_id: number }
         Returns: boolean
       }
       vendor_delete_wa_message: {
@@ -2417,6 +2455,25 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_list_wa_flow_triggers: {
+        Args: { _codigo: string; _flow_id: string; _vendor_id: number }
+        Returns: {
+          ativo: boolean
+          channel_id: string | null
+          created_at: string
+          flow_id: string
+          id: string
+          match_mode: string
+          tipo: string
+          valor: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_flow_triggers"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       vendor_list_wa_messages: {
         Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
         Returns: {
@@ -2524,6 +2581,15 @@ export type Database = {
         Args: { _codigo: string; _conversation_id: string; _vendor_id: number }
         Returns: boolean
       }
+      vendor_replace_wa_flow_triggers: {
+        Args: {
+          _codigo: string
+          _flow_id: string
+          _triggers?: Json
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
       vendor_resolve_wa_conversation: {
         Args: {
           _channel_id?: string
@@ -2602,6 +2668,27 @@ export type Database = {
           _id: string
           _nome?: string
           _stage_id?: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
+      vendor_update_wa_flow: {
+        Args: {
+          _ativo?: boolean
+          _codigo: string
+          _edges?: Json
+          _entry_node_id?: string
+          _flow_id: string
+          _folder?: string
+          _nodes?: Json
+          _nome?: string
+          _operacao_id?: string
+          _set_ativo?: boolean
+          _set_edges?: boolean
+          _set_entry_node_id?: boolean
+          _set_folder?: boolean
+          _set_nodes?: boolean
+          _set_operacao?: boolean
           _vendor_id: number
         }
         Returns: boolean
