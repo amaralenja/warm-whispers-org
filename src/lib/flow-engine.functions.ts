@@ -920,14 +920,6 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       .eq("id", data.runId)
       .maybeSingle();
 
-    const patch = {
-      status: "cancelled",
-      waiting_for: null,
-      expires_at: null,
-      error: "Cancelado manualmente",
-      updated_at: new Date().toISOString(),
-    };
-
     const rpcArgs = vendorRpcArgs(context);
     if (rpcArgs) {
       const { data: cancelled, error } = await db.rpc("vendor_cancel_wa_flow_run" as any, {
@@ -938,17 +930,9 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       return { ok: true, cancelled: Number(cancelled ?? 0) };
     }
 
-    let q = db.from("wa_flow_runs" as any).update(patch).in("status", ["queued", "running", "waiting"]);
-    const t = target as any;
-    if (t?.flow_id && t?.channel_id && t?.contact_wa_id) {
-      q = q
-        .eq("flow_id", t.flow_id)
-        .eq("channel_id", t.channel_id)
-        .in("contact_wa_id", whatsappNumberVariants(String(t.contact_wa_id)));
-    } else {
-      q = q.eq("id", data.runId);
-    }
-    const { error } = await q;
+    const { data: cancelled, error } = await db.rpc("cancel_active_wa_flow_runs" as any, {
+      _run_id: data.runId,
+    });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, cancelled: Number(cancelled ?? 0), targetFound: Boolean(target) };
   });
