@@ -1,0 +1,2 @@
+ALTER TABLE public.wa_flow_runs DROP CONSTRAINT wa_flow_runs_status_check;
+ALTER TABLE public.wa_flow_runs ADD CONSTRAINT wa_flow_runs_status_check CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'completed'::text, 'failed'::text, 'cancelled'::text]));
