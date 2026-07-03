@@ -404,22 +404,6 @@ function RankingTV() {
               </div>
             </div>
 
-            <div className="my-2 h-px w-full bg-white/10" />
-
-            {/* Hall of Fame */}
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/20 to-amber-500/20 text-xl">🏆</div>
-                <div>
-                  <h2 className="text-sm font-black uppercase tracking-wider text-white">Hall of Fame</h2>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Destaques Individuais</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <HallCard kind="lobo" item={hallData?.lobo ?? null} meta={hallData?.metaLobo ?? 18000} />
-                <HallCard kind="rainha" item={hallData?.rainha ?? null} meta={hallData?.metaRainha ?? 20000} />
-              </div>
-            </div>
           </div>
         </aside>
 
