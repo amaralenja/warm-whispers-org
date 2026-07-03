@@ -495,7 +495,20 @@ type NodeResult = {
 };
 
 async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
+  // Última linha de defesa contra "mesmo após cancelar, ainda enviou".
+  // Checa cancelamento imediatamente antes de qualquer nó de envio de mídia/texto.
+  const isSendNode =
+    node.type === "send_text" ||
+    node.type === "send_image" ||
+    node.type === "send_video" ||
+    node.type === "send_audio" ||
+    node.type === "send_document" ||
+    node.type === "send_buttons";
+  if (isSendNode && (await isFlowRunCancelled(ctx))) {
+    return {};
+  }
   switch (node.type) {
+
     case "trigger":
       return {};
 
