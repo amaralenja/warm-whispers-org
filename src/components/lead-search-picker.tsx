@@ -74,7 +74,7 @@ export function LeadSearchPicker({
       else q = q.or(`nome.ilike.%${t}%,whatsapp.ilike.%${t}%,email.ilike.%${t}%`);
       const { data, error } = await q;
       if (error) throw error;
-      setResults((data ?? []) as PickedLead[]);
+      setResults(((data ?? []) as any[]).map(sanitizeLead));
     } catch (e: any) {
       toast.error("Erro ao buscar: " + e.message);
     } finally {
