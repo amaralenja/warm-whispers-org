@@ -495,7 +495,20 @@ type NodeResult = {
 };
 
 async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
+  // Última linha de defesa contra "mesmo após cancelar, ainda enviou".
+  // Checa cancelamento imediatamente antes de qualquer nó de envio de mídia/texto.
+  const isSendNode =
+    node.type === "send_text" ||
+    node.type === "send_image" ||
+    node.type === "send_video" ||
+    node.type === "send_audio" ||
+    node.type === "send_document" ||
+    node.type === "send_buttons";
+  if (isSendNode && (await isFlowRunCancelled(ctx))) {
+    return {};
+  }
   switch (node.type) {
+
     case "trigger":
       return {};
 
@@ -535,10 +548,13 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (mediaType === "document" && filename) inner.filename = filename;
       }
       const body: any = { type: mediaType, [mediaType]: inner };
+      if (await isFlowRunCancelled(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
       return { log: { url: finalUrl } };
     }
+
+
 
     case "send_buttons": {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
