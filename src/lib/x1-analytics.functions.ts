@@ -410,7 +410,10 @@ async function getVendorX1Analytics(
     if (channelIds.size > 0 && !channelIds.has(channelId)) return false;
     const op = channelToOp.get(channelId) ?? "";
     if (opFilter && !sameText(op, opFilter)) return false;
-    if (safeString(m?.direction) === "out" && !messageSentByVendor(m, vendorId)) return false;
+    if (safeString(m?.direction) === "out") {
+      const explicitVendorId = messageVendorId(m);
+      if (explicitVendorId && explicitVendorId !== vendorId) return false;
+    }
     return true;
   });
 
@@ -638,6 +641,12 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       if (opFilter && !sameText(op, opFilter)) return false;
       return true;
     });
+    const conversationToVendorId = new Map<string, number>();
+    for (const c of allConversations) {
+      const id = safeString(c?.id).trim();
+      const vendorId = numericId(c?.assigned_vendor_id);
+      if (id && vendorId) conversationToVendorId.set(id, vendorId);
+    }
     const conversations = allConversations.filter((c: any) => (
       isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
       || isWithinIso(c?.created_at, fromIso, toIso)
@@ -841,7 +850,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // msgs enviadas por vendedor
     for (const m of msgsScoped) {
       if (m.direction !== "out") continue;
-      const msgVendorId = messageVendorId(m);
+      const msgVendorId = messageVendorId(m) ?? conversationToVendorId.get(safeString(m?.conversation_id).trim()) ?? null;
       if (!msgVendorId) continue;
       const v = vendedores.find((x) => Number(x.id) === msgVendorId);
       if (!v) continue;
