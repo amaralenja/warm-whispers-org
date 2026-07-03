@@ -32,6 +32,11 @@ export type PickedLead = {
   whatsapp: string | null;
 };
 
+type LeadSearchPickerProps = {
+  onPick?: (lead: PickedLead) => void;
+  triggerLabel?: string;
+};
+
 function toStr(v: any): string | null {
   if (v == null) return null;
   if (typeof v === "string") return v;
@@ -50,10 +55,7 @@ function sanitizeLead(l: any): PickedLead {
 export function LeadSearchPicker({
   onPick,
   triggerLabel = "Buscar lead",
-}: {
-  onPick: (lead: PickedLead) => void;
-  triggerLabel?: string;
-}) {
+}: LeadSearchPickerProps = {}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PickedLead[]>([]);
@@ -76,14 +78,14 @@ export function LeadSearchPicker({
       if (error) throw error;
       setResults(((data ?? []) as any[]).map(sanitizeLead));
     } catch (e: any) {
-      toast.error("Erro ao buscar: " + e.message);
+      toast.error("Erro ao buscar: " + (toStr(e?.message) || toStr(e) || "erro interno"));
     } finally {
       setLoading(false);
     }
   }
 
   function pick(l: PickedLead) {
-    onPick(l);
+    onPick?.(l);
     setOpen(false);
     setQuery("");
     setResults([]);

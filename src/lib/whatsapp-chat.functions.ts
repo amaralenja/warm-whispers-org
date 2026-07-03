@@ -951,13 +951,19 @@ function previewForOut(d: SendInput): string {
 // Resolve a media_id returned in webhook → returns a download URL we can fetch via EvoHub.
 export const resolveIncomingMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { channelId: string; mediaId: string }) => ({
+  .inputValidator((d: { channelId: string; mediaId: string; conversationId?: string }) => ({
     channelId: String(d?.channelId ?? ""),
     mediaId: String(d?.mediaId ?? ""),
+    conversationId: d?.conversationId ? String(d.conversationId) : "",
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    await assertVendorChannel(context, data.channelId, db);
+    if (data.conversationId) {
+      const conv = await assertConversationAccess(context, db, data.conversationId, { channelId: data.channelId });
+      if (String(conv.channel_id) !== String(data.channelId)) throw new Error("Canal não pertence a esta conversa");
+    } else {
+      await assertVendorChannel(context, data.channelId, db);
+    }
     const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: resp } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
@@ -967,13 +973,19 @@ export const resolveIncomingMedia = createServerFn({ method: "POST" })
 // Download a media URL (proxied through EvoHub) and stream the bytes back as base64 so the browser can render it.
 export const downloadIncomingMediaBase64 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { channelId: string; mediaId: string }) => ({
+  .inputValidator((d: { channelId: string; mediaId: string; conversationId?: string }) => ({
     channelId: String(d?.channelId ?? ""),
     mediaId: String(d?.mediaId ?? ""),
+    conversationId: d?.conversationId ? String(d.conversationId) : "",
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
-    await assertVendorChannel(context, data.channelId, db);
+    if (data.conversationId) {
+      const conv = await assertConversationAccess(context, db, data.conversationId, { channelId: data.channelId });
+      if (String(conv.channel_id) !== String(data.channelId)) throw new Error("Canal não pertence a esta conversa");
+    } else {
+      await assertVendorChannel(context, data.channelId, db);
+    }
     const ch = await findChannel(data.channelId, db);
     const qs = ch.phoneNumberId ? `?phone_number_id=${ch.phoneNumberId}` : "";
     const { body: meta, token } = await metaProxyForChannel(ch, `/${data.mediaId}${qs}`, { method: "GET" });
