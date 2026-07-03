@@ -296,6 +296,8 @@ async function getVendorX1Analytics(
   if (!rpcArgs) return EMPTY;
   const vendorId = Number(context.vendor.id);
   if (!Number.isFinite(vendorId) || vendorId <= 0) return EMPTY;
+  const fromDay = parseFilterDay(data.from);
+  const toDay = parseFilterDay(data.to);
 
   let allowedWorkspaces = vendorWorkspaceIds(context);
   try {
@@ -414,12 +416,7 @@ async function getVendorX1Analytics(
   });
 
   const primaryOp = safeNullableString(context?.vendor?.expert) ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
-  const inDay = (t: number | null) => {
-    if (!t) return false;
-    if (fromIso && t < Date.parse(fromIso)) return false;
-    if (toIso && t > Date.parse(toIso)) return false;
-    return true;
-  };
+  const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
   const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
     if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
     if (!inDay(parseDataField(v?.Data))) return false;
@@ -592,8 +589,10 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const data = opts?.data ?? {};
     if (!context?.supabase) return EMPTY;
 
-    const fromIso = data.from ? new Date(data.from + "T00:00:00Z").toISOString() : null;
-    const toIso = data.to ? new Date(data.to + "T23:59:59Z").toISOString() : null;
+    const fromIso = brStartIso(data.from);
+    const toIso = brEndIso(data.to);
+    const fromDay = parseFilterDay(data.from);
+    const toDay = parseFilterDay(data.to);
     const opFilter = data.operacao && data.operacao !== "all" ? String(data.operacao) : null;
 
     if (context?.vendor) {
@@ -717,12 +716,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       return operacaoFromUtm(utm);
     };
 
-    const inDay = (t: number | null) => {
-      if (!t) return false;
-      if (fromIso && t < Date.parse(fromIso)) return false;
-      if (toIso && t > Date.parse(toIso)) return false;
-      return true;
-    };
+    const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
     const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)) && !!qualifiedVendaOperacao(v, produtoToOperacao));
     const vendasScoped = vendasPeriodo.filter((v: any) => {
       const op = vendaOperacao(v);
