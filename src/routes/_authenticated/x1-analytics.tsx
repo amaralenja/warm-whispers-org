@@ -367,18 +367,18 @@ function X1AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payload?.porOperacao ?? []).map((r) => (
-                    <tr key={r.operacao} className="border-b border-border/40 hover:bg-muted/30">
-                      <td className="py-2 pr-4 font-semibold">{r.operacao}</td>
-                      <td className="py-2 pr-4">{r.leads}</td>
-                      <td className="py-2 pr-4">{r.conversas}</td>
-                      <td className="py-2 pr-4">{r.msgsIn}</td>
-                      <td className="py-2 pr-4">{r.msgsOut}</td>
-                      <td className="py-2 pr-4">{r.vendas}</td>
-                      <td className="py-2 pr-4 font-medium">{fmtBRL(r.faturamento)}</td>
-                      <td className="py-2 pr-4">{fmtBRL(r.ticketMedio)}</td>
+                  {(payload?.porOperacao ?? []).map((r, idx) => (
+                    <tr key={`${safeText(r.operacao, "op")}-${idx}`} className="border-b border-border/40 hover:bg-muted/30">
+                      <td className="py-2 pr-4 font-semibold">{safeText(r.operacao)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.leads)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.conversas)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.msgsIn)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.msgsOut)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.vendas)}</td>
+                      <td className="py-2 pr-4 font-medium">{fmtBRL(safeNumber(r.faturamento))}</td>
+                      <td className="py-2 pr-4">{fmtBRL(safeNumber(r.ticketMedio))}</td>
                       <td className="py-2 pr-4">
-                        <Badge variant="outline">{fmtPct(r.conversao)}</Badge>
+                        <Badge variant="outline">{fmtPct(safeNumber(r.conversao))}</Badge>
                       </td>
                     </tr>
                   ))}
@@ -413,32 +413,36 @@ function X1AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payload?.porVendedor ?? []).map((r, idx) => (
-                    <tr key={`${r.vendedorId}-${r.utm}-${idx}`} className="border-b border-border/40 hover:bg-muted/30">
+                  {(payload?.porVendedor ?? []).map((r, idx) => {
+                    const nome = safeText(r.nome, safeText(r.utm, "Vendedor"));
+                    const fotoUrl = safeText(r.fotoUrl, "");
+                    return (
+                    <tr key={`${safeText(r.vendedorId, "v")}-${safeText(r.utm, "utm")}-${idx}`} className="border-b border-border/40 hover:bg-muted/30">
                       <td className="py-2 pr-4">
                         <div className="flex items-center gap-2">
-                          {r.fotoUrl ? (
-                            <img src={r.fotoUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                          {fotoUrl ? (
+                            <img src={fotoUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
                           ) : (
                             <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
-                              {(r.nome || "?").slice(0, 2).toUpperCase()}
+                              {nome.slice(0, 2).toUpperCase()}
                             </div>
                           )}
-                          <span className="font-medium">{r.nome}</span>
+                          <span className="font-medium">{nome}</span>
                         </div>
                       </td>
-                      <td className="py-2 pr-4 font-mono text-xs">{r.utm ?? "—"}</td>
-                      <td className="py-2 pr-4">{r.expert ?? "—"}</td>
-                      <td className="py-2 pr-4">{r.leadsAtribuidos}</td>
-                      <td className="py-2 pr-4">{r.msgsEnviadas}</td>
-                      <td className="py-2 pr-4">{r.vendas}</td>
-                      <td className="py-2 pr-4 font-medium">{fmtBRL(r.faturamento)}</td>
-                      <td className="py-2 pr-4">{fmtBRL(r.ticketMedio)}</td>
+                      <td className="py-2 pr-4 font-mono text-xs">{safeText(r.utm)}</td>
+                      <td className="py-2 pr-4">{safeText(r.expert)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.leadsAtribuidos)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.msgsEnviadas)}</td>
+                      <td className="py-2 pr-4">{safeNumber(r.vendas)}</td>
+                      <td className="py-2 pr-4 font-medium">{fmtBRL(safeNumber(r.faturamento))}</td>
+                      <td className="py-2 pr-4">{fmtBRL(safeNumber(r.ticketMedio))}</td>
                       <td className="py-2 pr-4">
-                        <Badge variant="outline">{fmtPct(r.conversao)}</Badge>
+                        <Badge variant="outline">{fmtPct(safeNumber(r.conversao))}</Badge>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {(payload?.porVendedor ?? []).length === 0 && !isLoading ? (
                     <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">Sem dados no período</td></tr>
                   ) : null}
