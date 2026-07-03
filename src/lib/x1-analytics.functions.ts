@@ -1013,5 +1013,6 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       serieDiaria,
       serieHoraria,
       operacoesDisponiveis: Array.from(operacoesSet).sort(),
+      canaisDisponiveis,
     };
   });
