@@ -120,13 +120,17 @@ function X1AnalyticsPage() {
 
   const range = { from: dateRange.from ?? "", to: dateRange.to ?? dateRange.from ?? "" };
 
-  const { data, isLoading, isFetching, refetch, error } = useQuery({
+  const { data, isLoading, isFetching, refetch, error, dataUpdatedAt } = useQuery({
     queryKey: ["x1-analytics", range.from, range.to, operacao, channelId],
     queryFn: () => fetchFn({ data: { from: range.from, to: range.to, operacao, channelId } }),
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
     enabled: Boolean(range.from && range.to),
   });
+
 
   const payload = (data ?? null) as X1AnalyticsPayload | null;
 
@@ -236,6 +240,12 @@ function X1AnalyticsPage() {
             <Button onClick={() => refetch()} disabled={isFetching} className="h-9">
               {isFetching ? "Atualizando…" : "Atualizar"}
             </Button>
+            {dataUpdatedAt ? (
+              <span className="self-center text-[10px] text-muted-foreground">
+                Atualizado {new Date(dataUpdatedAt).toLocaleTimeString("pt-BR")}
+              </span>
+            ) : null}
+
             <Button
               onClick={() => {
                 if (!payload) { toast.error("Aguarde os dados carregarem"); return; }
