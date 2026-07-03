@@ -334,6 +334,7 @@ function ChatPage() {
     return m;
   }, [allCrmTags]);
   const tagColorFor = (name: string) => tagColorMap.get(String(name || "").trim().toLowerCase()) || "";
+  const activeFlowConvIds = useActiveFlowConversationIds();
 
   const handleReact = async (m: Msg, emoji: string) => {
     if (!active) return;
