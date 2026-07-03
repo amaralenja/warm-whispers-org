@@ -232,7 +232,10 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       }
 
       const ext = extOf(extracted.mime, extracted.filename);
-      const path = `zapvoice/${context.userId}/${itemId}${ext}`;
+      // Sanitiza userId — vendedores têm id "vendor:13" (colon quebra alguns paths).
+      const safeUser = String(context.userId ?? "shared").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const path = `zapvoice/${safeUser}/${itemId}${ext}`;
+
       const { error: upErr } = await db.storage
         .from("wa-media")
         .upload(path, bytes, {
