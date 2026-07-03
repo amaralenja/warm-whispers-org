@@ -361,13 +361,23 @@ async function getVendorX1Analytics(
     if (produto && expert) produtoToOperacao.set(produto, expert);
   }
 
-  const channels = ((channelsRes.data ?? []) as any[]).filter((c) => {
+  const channelsAll = ((channelsRes.data ?? []) as any[]).filter((c) => {
     const op = safeString(c?.operacao_id).trim();
     if (!op || op === "__notificador__") return false;
     if (safeString(c?.kind, "chat") === "notification") return false;
     if (opFilter && !sameText(op, opFilter)) return false;
     return opAllowed(op, allowedWorkspaces);
   });
+  const canaisDisponiveis: X1CanalRow[] = channelsAll.map((c) => ({
+    id: safeString(c?.id).trim(),
+    name: safeString(c?.name, safeString(c?.verified_name, "Canal")),
+    displayPhone: safeNullableString(c?.display_phone_number),
+    verifiedName: safeNullableString(c?.verified_name),
+    operacao: safeString(c?.operacao_id).trim(),
+  })).filter((c) => c.id).sort((a, b) => a.name.localeCompare(b.name));
+  const channels = channelFilterActive
+    ? channelsAll.filter((c) => safeString(c?.id).trim() === channelFilterActive)
+    : channelsAll;
   const channelToOp = new Map<string, string>();
   const channelIds = new Set<string>();
   const operacoesSet = new Set<string>();
@@ -379,7 +389,9 @@ async function getVendorX1Analytics(
     channelToOp.set(id, op);
     operacoesSet.add(op);
   }
-  for (const op of allowedWorkspaces) if (!opFilter || sameText(op, opFilter)) operacoesSet.add(op);
+  if (!channelFilterActive) {
+    for (const op of allowedWorkspaces) if (!opFilter || sameText(op, opFilter)) operacoesSet.add(op);
+  }
 
   const allConversations = ((conversationsRes.data ?? []) as any[]).filter((c) => {
     const channelId = safeString(c?.channel_id).trim();
