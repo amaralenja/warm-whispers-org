@@ -80,7 +80,7 @@ import {
   updateConversationNotes,
   reactToWhatsappMessage,
 } from "@/lib/whatsapp-chat.functions";
-import { listFlows, listActiveFlowRuns, triggerFlowManually } from "@/lib/flow-engine.functions";
+import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags } from "@/lib/crm.functions";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
@@ -1530,11 +1530,13 @@ function TimerCountdown({ expiresAt }: { expiresAt: string | null | undefined })
 function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
   const qc = useQueryClient();
   const listActiveRunsFn = useServerFn(listActiveFlowRuns);
+  const cancelRunFn = useServerFn(cancelFlowRun);
   const { data: runs = [] } = useQuery({
     queryKey: ["flow-runs-active", conversationId],
     queryFn: () => listActiveRunsFn({ data: { conversationId } }),
     refetchInterval: 4000,
   });
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     const ch = supabase
@@ -1552,6 +1554,20 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     };
   }, [conversationId, qc]);
 
+  async function handleCancel(runId: string) {
+    if (!confirm("Parar este fluxo? O lead não vai receber as próximas mensagens.")) return;
+    setCancellingId(runId);
+    try {
+      await cancelRunFn({ data: { runId, conversationId } });
+      toast.success("Fluxo parado");
+      qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao parar fluxo");
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
   if (!asArray<any>(runs).length) return null;
 
   return (
@@ -1567,9 +1583,11 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
               : r.status === "waiting"
                 ? `aguardando ${r.waiting_for ?? ""}`
                 : "executando";
+          const runId = String(r.id);
+          const isCancelling = cancellingId === runId;
           return (
             <div
-              key={String(r.id)}
+              key={runId}
               className="inline-flex items-center gap-2 rounded-full border border-chat-line bg-chat-panel px-3 py-1 text-xs"
             >
               <Loader2 className="h-3 w-3 animate-spin text-chat-accent" />
@@ -1584,6 +1602,15 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
               ) : null}
               <span className="text-muted-foreground">·</span>
               <span className="font-mono text-[10px] text-muted-foreground">etapa {step}</span>
+              <button
+                type="button"
+                onClick={() => handleCancel(runId)}
+                disabled={isCancelling}
+                title="Parar fluxo"
+                className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+              >
+                {isCancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+              </button>
             </div>
           );
         })}
