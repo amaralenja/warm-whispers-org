@@ -33,6 +33,28 @@ function asStr(v: unknown) {
   return typeof v === "string" ? v : v == null ? "" : String(v);
 }
 
+type SafeVendor = { utm: string; faturamento: number; vendas: number; pctTotal: number };
+
+function toSafeVendors(input: unknown): SafeVendor[] {
+  if (!Array.isArray(input)) return [];
+  const out: SafeVendor[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const v = raw as Record<string, unknown>;
+    const utm = asStr(v.utm);
+    const faturamento = Number(v.faturamento);
+    const vendas = Number(v.vendas);
+    const pctTotal = Number(v.pctTotal);
+    out.push({
+      utm,
+      faturamento: Number.isFinite(faturamento) ? faturamento : 0,
+      vendas: Number.isFinite(vendas) ? vendas : 0,
+      pctTotal: Number.isFinite(pctTotal) ? pctTotal : 0,
+    });
+  }
+  return out;
+}
+
 export function ParticipacaoVendedores({
   vendedores: vendedoresProp,
   loading,
@@ -40,8 +62,8 @@ export function ParticipacaoVendedores({
   vendedores?: VendedorStat[] | null;
   loading?: boolean;
 }) {
-  const vendedores: VendedorStat[] = Array.isArray(vendedoresProp) ? vendedoresProp : [];
-  const total = vendedores.reduce((acc, v) => acc + (Number(v?.faturamento) || 0), 0);
+  const vendedores = toSafeVendors(vendedoresProp);
+  const total = vendedores.reduce((acc, v) => acc + v.faturamento, 0);
 
   // Donut: top 6, agrupa o resto como "Outros"
   const top = vendedores.slice(0, 6);
