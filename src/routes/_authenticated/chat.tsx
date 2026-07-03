@@ -260,6 +260,42 @@ function toSafeDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 
+function dateMs(value: unknown) {
+  const text = toText(value);
+  if (!text) return 0;
+  const ms = new Date(text).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function sortConversationsByLastInteraction<T extends Record<string, any>>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const byLast = dateMs(b?.last_message_at ?? b?.updated_at ?? b?.created_at) - dateMs(a?.last_message_at ?? a?.updated_at ?? a?.created_at);
+    if (byLast !== 0) return byLast;
+    return toText(b?.id).localeCompare(toText(a?.id));
+  });
+}
+
+function sortMessagesByCreatedAt<T extends Record<string, any>>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const byCreated = dateMs(a?.created_at) - dateMs(b?.created_at);
+    if (byCreated !== 0) return byCreated;
+    return toText(a?.id).localeCompare(toText(b?.id));
+  });
+}
+
+function previewForMessageRow(m: any) {
+  const body = toText(m?.text_body) || toText(m?.caption);
+  if (body) return body.slice(0, 120);
+  switch (toText(m?.msg_type)) {
+    case "image": return "📷 Imagem";
+    case "audio": return "🎤 Áudio";
+    case "video": return "🎬 Vídeo";
+    case "document": return `📄 ${toText(m?.media_filename) || "Documento"}`;
+    case "sticker": return "🎭 Figurinha";
+    default: return "Mensagem";
+  }
+}
+
 function formatTime(iso: unknown) {
   const d = toSafeDate(iso);
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -440,6 +476,18 @@ function ChatPage() {
       qc.invalidateQueries({ queryKey: ["wa-conversations"], refetchType: "active" });
       if (convId) qc.invalidateQueries({ queryKey: ["wa-messages", String(convId)], refetchType: "active" });
     };
+    const applyConversationToCaches = (row: any) => {
+      if (!row?.id) return;
+      qc.setQueriesData({ queryKey: ["wa-conversations"] }, (old: unknown) => {
+        const list = asArray<any>(old);
+        if (list.length === 0 && !Array.isArray(old)) return old;
+        const idx = list.findIndex((c: any) => String(c?.id) === String(row.id));
+        const next = list.slice();
+        if (idx >= 0) next[idx] = { ...next[idx], ...row };
+        else next.unshift(row);
+        return sortConversationsByLastInteraction(next);
+      });
+    };
     const applyMessageToCaches = (m: any) => {
       if (!m?.conversation_id) return;
       const convId = String(m.conversation_id);
@@ -450,14 +498,20 @@ function ChatPage() {
         const idx = list.findIndex((x: any) => String(x?.id) === String(m.id));
         if (idx >= 0) list[idx] = { ...list[idx], ...m };
         else list.push(m);
-        return list;
+        return sortMessagesByCreatedAt(list);
       });
       // Atualiza o preview da conversa na sidebar sem esperar refetch.
       qc.setQueriesData({ queryKey: ["wa-conversations"] }, (old: unknown) => {
         if (!Array.isArray(old)) return old;
-        return old.map((c: any) => {
+        const mapped = old.map((c: any) => {
           if (String(c?.id) !== convId) return c;
-          const preview = String(m?.text_body ?? m?.caption ?? (m?.msg_type ? `[${m.msg_type}]` : "")).slice(0, 120);
+          const messageTime = dateMs(m?.created_at);
+          const currentLastTime = dateMs(c?.last_message_at);
+          const shouldTouchLastInteraction = !currentLastTime || !messageTime || messageTime >= currentLastTime - 1000;
+          if (!shouldTouchLastInteraction) {
+            return m?.direction === "out" ? { ...c, last_message_status: m?.status ?? c?.last_message_status } : c;
+          }
+          const preview = previewForMessageRow(m);
           return {
             ...c,
             last_message_at: m?.created_at ?? c?.last_message_at,
@@ -466,12 +520,14 @@ function ChatPage() {
             last_message_status: m?.status ?? c?.last_message_status,
           };
         });
+        return sortConversationsByLastInteraction(mapped);
       });
     };
     const ch = supabase
       .channel("wa-conv-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversations" }, (payload) => {
         const row: any = (payload as any).new ?? (payload as any).old;
+        applyConversationToCaches(row);
         bump(row?.id ?? null);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "wa_messages" }, (payload) => {
@@ -489,7 +545,7 @@ function ChatPage() {
   }, [qc]);
 
 
-  const conversationList = useMemo(() => asArray<Conv>(convs), [convs]);
+  const conversationList = useMemo(() => sortConversationsByLastInteraction(asArray<Conv>(convs)), [convs]);
 
   const unreadTotal = useMemo(
     () => conversationList.reduce((acc, c) => acc + (Number((c as any).unread_count ?? 0) > 0 ? 1 : 0), 0),
@@ -651,8 +707,10 @@ function ChatPage() {
   });
 
   function msgQuotePreview(m: Msg): string {
-    if (m.text_body) return String(m.text_body).slice(0, 140);
-    if (m.caption) return String(m.caption).slice(0, 140);
+    const text = toText(m.text_body);
+    if (text) return text.slice(0, 140);
+    const caption = toText(m.caption);
+    if (caption) return caption.slice(0, 140);
     switch (m.msg_type) {
       case "image": return "📷 Imagem";
       case "audio": return "🎤 Áudio";
@@ -1355,7 +1413,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
                   {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
                 </div>
                 <div className="mt-0.5 truncate opacity-90">
-                  {quotedPreview || (quotedFrom ? (quotedFrom.text_body || quotedFrom.caption || quotedFrom.msg_type) : "")}
+                  {quotedPreview || (quotedFrom ? (toText(quotedFrom.text_body) || toText(quotedFrom.caption) || toText(quotedFrom.msg_type)) : "")}
                 </div>
               </div>
             )}
