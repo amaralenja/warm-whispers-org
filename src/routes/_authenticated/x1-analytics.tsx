@@ -42,6 +42,7 @@ import { getX1Analytics, type X1AnalyticsPayload } from "@/lib/x1-analytics.func
 import { generateX1AnalyticsPdf } from "@/lib/x1-analytics-pdf";
 import { FileDown } from "lucide-react";
 import { toast } from "sonner";
+import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
 
 export const Route = createFileRoute("/_authenticated/x1-analytics")({
   component: X1AnalyticsPage,
