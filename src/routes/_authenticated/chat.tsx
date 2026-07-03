@@ -707,8 +707,10 @@ function ChatPage() {
   });
 
   function msgQuotePreview(m: Msg): string {
-    if (m.text_body) return String(m.text_body).slice(0, 140);
-    if (m.caption) return String(m.caption).slice(0, 140);
+    const text = toText(m.text_body);
+    if (text) return text.slice(0, 140);
+    const caption = toText(m.caption);
+    if (caption) return caption.slice(0, 140);
     switch (m.msg_type) {
       case "image": return "📷 Imagem";
       case "audio": return "🎤 Áudio";
@@ -1411,7 +1413,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
                   {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
                 </div>
                 <div className="mt-0.5 truncate opacity-90">
-                  {quotedPreview || (quotedFrom ? (quotedFrom.text_body || quotedFrom.caption || quotedFrom.msg_type) : "")}
+                  {quotedPreview || (quotedFrom ? (toText(quotedFrom.text_body) || toText(quotedFrom.caption) || toText(quotedFrom.msg_type)) : "")}
                 </div>
               </div>
             )}
