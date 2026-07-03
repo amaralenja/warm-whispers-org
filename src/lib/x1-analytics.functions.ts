@@ -185,6 +185,18 @@ function vendedorMatchesLead(vendedor: any, lead: any) {
   return !!respNome && !!vendedorNome && sameText(respNome, vendedorNome);
 }
 
+function resolveVendaOperacao(venda: any, produtoToOperacao: Map<string, string>, utmToVendedor?: Map<string, any>): string | null {
+  const produto = safeString(venda?.Produto).trim().toLowerCase();
+  const mapped = produto ? produtoToOperacao.get(produto) : null;
+  if (mapped) return mapped;
+  const explicit = safeNullableString(venda?.nome_expert);
+  if (explicit) return explicit;
+  const utm = normalizeUtm(venda?.UTM);
+  const vendorExpert = safeNullableString(utmToVendedor?.get(utm)?.expert);
+  if (vendorExpert) return vendorExpert;
+  return operacaoFromUtm(utm);
+}
+
 function normalizeText(value: unknown): string {
   return safeString(value)
     .normalize("NFD")
