@@ -143,6 +143,26 @@ function safeNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeUtm(value: unknown): string {
+  return safeString(value).trim().toUpperCase();
+}
+
+function numericId(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function messageVendorId(message: any): number | null {
+  const raw = message?.raw && typeof message.raw === "object" ? message.raw as Record<string, unknown> : null;
+  return numericId(message?.sent_by_vendor_id)
+    ?? numericId(raw?.sent_by_vendor_id)
+    ?? numericId((raw?.request as any)?.sent_by_vendor_id);
+}
+
+function messageSentByVendor(message: any, vendorId: number) {
+  return messageVendorId(message) === vendorId;
+}
+
 function normalizeText(value: unknown): string {
   return safeString(value)
     .normalize("NFD")
@@ -194,6 +214,8 @@ async function getVendorX1Analytics(
   const db = context.supabase as any;
   const rpcArgs = vendorRpcArgs(context);
   if (!rpcArgs) return EMPTY;
+  const vendorId = Number(context.vendor.id);
+  if (!Number.isFinite(vendorId) || vendorId <= 0) return EMPTY;
 
   let allowedWorkspaces = vendorWorkspaceIds(context);
   try {
@@ -247,11 +269,13 @@ async function getVendorX1Analytics(
     if (opFilter && !sameText(op, opFilter)) return false;
     return opAllowed(op, allowedWorkspaces);
   });
-  const conversations = allConversations.filter((c) => (
+  const assignedConversations = allConversations.filter((c) => Number(c?.assigned_vendor_id) === vendorId);
+  const assignedConversationIds = new Set(assignedConversations.map((c) => safeString(c?.id)).filter(Boolean));
+  const conversations = assignedConversations.filter((c) => (
     isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
     || isWithinIso(c?.created_at, fromIso, toIso)
   ));
-  const novosLeadsRows = allConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
+  const novosLeadsRows = assignedConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
 
   const { data: messagesRaw, error: messagesError } = await db.rpc("vendor_list_x1_wa_messages" as any, {
     ...rpcArgs,
@@ -264,10 +288,13 @@ async function getVendorX1Analytics(
   const msgsScoped = messages.filter((m: any) => {
     if (m?.deleted_at) return false;
     if (!isWithinIso(m?.created_at, fromIso, toIso)) return false;
+    const conversationId = safeString(m?.conversation_id).trim();
+    if (!assignedConversationIds.has(conversationId)) return false;
     const channelId = safeString(m?.channel_id).trim();
     if (channelIds.size > 0 && !channelIds.has(channelId)) return false;
     const op = channelToOp.get(channelId) ?? "";
     if (opFilter && !sameText(op, opFilter)) return false;
+    if (safeString(m?.direction) === "out" && !messageSentByVendor(m, vendorId)) return false;
     return true;
   });
 
@@ -336,12 +363,9 @@ async function getVendorX1Analytics(
     };
   }).sort((a, b) => b.faturamento - a.faturamento || b.msgsOut - a.msgsOut);
 
-  const leadsAtribuidos = conversations.filter((c) => {
-    const assigned = c?.assigned_vendor_id;
-    return assigned == null || Number(assigned) === Number(context.vendor.id);
-  }).length;
+  const leadsAtribuidos = conversations.length;
   const porVendedor: X1VendedorRow[] = [{
-    vendedorId: Number(context.vendor.id),
+    vendedorId: vendorId,
     utm: vendorUtm,
     nome: safeString(context.vendor.nome, vendorUtm ?? "Vendedor"),
     expert: primaryOp,
@@ -512,17 +536,40 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // Vendas & vendedores (para conversão e faturamento por operação)
     const [vendedoresRes, vendasAll] = await Promise.all([
       supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo"),
+      supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       pageAll<any>((from, to) =>
         supabase
           .from("vendas")
-          .select('"Ticket","Data","UTM","Evento"')
+          .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
           .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
           .range(from, to),
       ),
     ]);
     const vendedores = (vendedoresRes.data ?? []) as any[];
     const utmToVendedor = new Map<string, any>();
-    for (const v of vendedores) if (v.utm) utmToVendedor.set(String(v.utm).toUpperCase(), v);
+    for (const v of vendedores) {
+      const utm = normalizeUtm(v.utm);
+      if (utm) utmToVendedor.set(utm, v);
+    }
+    const produtoToOperacao = new Map<string, string>();
+    for (const p of ((produtosMapRes.data ?? []) as any[])) {
+      const produto = safeString(p?.nome_produto).trim().toLowerCase();
+      const expert = safeString(p?.nome_expert).trim();
+      if (produto && expert) produtoToOperacao.set(produto, expert);
+    }
+
+    const vendaOperacao = (venda: any): string | null => {
+      const explicit = safeNullableString(venda?.nome_expert);
+      if (explicit) return explicit;
+      const utm = normalizeUtm(venda?.UTM);
+      const vend = utmToVendedor.get(utm);
+      const vendorExpert = safeNullableString(vend?.expert);
+      if (vendorExpert) return vendorExpert;
+      const produto = safeString(venda?.Produto).trim().toLowerCase();
+      const mapped = produto ? produtoToOperacao.get(produto) : null;
+      if (mapped) return mapped;
+      return operacaoFromUtm(utm);
+    };
 
     const inDay = (t: number | null) => {
       if (!t) return false;
@@ -532,7 +579,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     };
     const vendasPeriodo = vendasAll.filter((v) => inDay(parseDataField(v.Data)));
     const vendasScoped = vendasPeriodo.filter((v) => {
-      const op = operacaoFromUtm(v.UTM);
+      const op = vendaOperacao(v);
       if (opFilter) return op === opFilter;
       return true;
     });
@@ -580,7 +627,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const msgOp = msgsScoped.filter((m) => channelToOp.get(String(m.channel_id)) === op);
       const inC = msgOp.filter((m) => m.direction === "in").length;
       const outC = msgOp.filter((m) => m.direction === "out").length;
-      const vdsOp = vendasPeriodo.filter((v) => operacaoFromUtm(v.UTM) === op);
+      const vdsOp = vendasPeriodo.filter((v) => sameText(vendaOperacao(v), op));
       const fatOp = vdsOp.reduce((a, v) => a + parseTicket(v.Ticket), 0);
       const leadsCount = novosOp.length;
       opRows.push({
@@ -626,15 +673,17 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     }
     // msgs enviadas por vendedor
     for (const m of msgsScoped) {
-      if (m.direction !== "out" || !m.sent_by) continue;
-      const v = vendedores.find((x) => String(x.id) === String(m.sent_by));
+      if (m.direction !== "out") continue;
+      const msgVendorId = messageVendorId(m);
+      if (!msgVendorId) continue;
+      const v = vendedores.find((x) => Number(x.id) === msgVendorId);
       if (!v) continue;
       const row = vRows.get(keyFor(v));
       if (row) row.msgsEnviadas += 1;
     }
     // vendas por UTM
     for (const v of vendasScoped) {
-      const utm = String(v.UTM ?? "").toUpperCase();
+      const utm = normalizeUtm(v.UTM);
       if (!utm) continue;
       const vend = utmToVendedor.get(utm);
       const key = vend ? keyFor(vend) : `utm-only:${utm}`;
@@ -644,7 +693,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
           vendedorId: vend?.id ?? null,
           utm,
           nome: vend?.nome ?? utm,
-          expert: vend?.expert ?? operacaoFromUtm(utm),
+          expert: vend?.expert ?? vendaOperacao(v),
           fotoUrl: vend?.foto_url ?? null,
           leadsAtribuidos: 0,
           msgsEnviadas: 0,
