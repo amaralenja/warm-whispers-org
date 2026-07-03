@@ -1558,10 +1558,19 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     if (!confirm("Parar este fluxo? O lead não vai receber as próximas mensagens.")) return;
     setCancellingId(runId);
     try {
-      await cancelRunFn({ data: { runId, conversationId } });
+      qc.setQueryData(["flow-runs-active", conversationId], (old: unknown) =>
+        asArray<any>(old).filter((r) => String(r?.id) !== String(runId)),
+      );
+      const result = await cancelRunFn({ data: { runId, conversationId } });
       toast.success("Fluxo parado");
-      qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
+      if (Number((result as any)?.cancelled ?? 0) > 0) {
+        qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
+        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      } else {
+        qc.setQueryData(["flow-runs-active", conversationId], []);
+      }
     } catch (e: any) {
+      qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
       toast.error(e?.message ?? "Falha ao parar fluxo");
     } finally {
       setCancellingId(null);
