@@ -190,41 +190,12 @@ function X1AnalyticsPage() {
               Métricas completas de leads, mensagens, conversão e faturamento por operação e vendedor.
             </p>
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-card p-1">
-              {(["hoje", "7d", "30d", "mes"] as Preset[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => applyPreset(p)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                    preset === p
-                      ? "bg-primary text-primary-foreground shadow"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {p === "hoje" ? "Hoje" : p === "7d" ? "7 dias" : p === "30d" ? "30 dias" : "Mês"}
-                </button>
-              ))}
-            </div>
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">De</Label>
-              <Input
-                type="date"
-                value={range.from}
-                onChange={(e) => { setPreset("hoje"); setRange((r) => ({ ...r, from: e.target.value })); }}
-                className="h-9 w-40 bg-card"
-              />
-            </div>
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Até</Label>
-              <Input
-                type="date"
-                value={range.to}
-                onChange={(e) => { setPreset("hoje"); setRange((r) => ({ ...r, to: e.target.value })); }}
-                className="h-9 w-40 bg-card"
-              />
-            </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <DateRangeFilter
+              value={dateRange}
+              onChange={setDateRange}
+              presets={["hoje", "ontem", "7d", "15d", "30d", "mes"]}
+            />
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Operação</Label>
               <Select value={operacao} onValueChange={setOperacao}>
@@ -241,6 +212,7 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <Button onClick={() => refetch()} disabled={isFetching} className="h-9">
               {isFetching ? "Atualizando…" : "Atualizar"}
             </Button>
