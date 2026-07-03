@@ -2186,6 +2186,10 @@ export type Database = {
         }
       }
       login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
+      update_wa_flow_run: {
+        Args: { _patch?: Json; _run_id: string }
+        Returns: boolean
+      }
       vendor_allowed_channel_ids: {
         Args: { _codigo: string; _vendor_id: number }
         Returns: string[]
