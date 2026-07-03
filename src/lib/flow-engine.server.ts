@@ -1084,12 +1084,16 @@ export async function dispatchNewLead(args: { leadId: string; db?: any }) {
     .eq("tipo", "new_lead");
 
   let started = 0;
+  const seenFlowChannel = new Set<string>();
   for (const trg of (triggers ?? []) as any[]) {
     if (!trg.wa_flows?.ativo) continue;
-    // Optional operacao match
     const flowOp = trg.wa_flows?.operacao_id;
     if (flowOp && l.expert && String(flowOp) !== String(l.expert) && String(flowOp) !== String(l.operacao_id ?? "")) continue;
-    if (!trg.channel_id) continue; // requires a channel selected on the trigger
+    if (!trg.channel_id) continue;
+    // Dedupe múltiplos triggers apontando pro mesmo (flow, canal)
+    const key = `${trg.flow_id}::${trg.channel_id}`;
+    if (seenFlowChannel.has(key)) continue;
+    seenFlowChannel.add(key);
     await runFlowAdmin({
       flowId: trg.flow_id,
       channelId: trg.channel_id,
