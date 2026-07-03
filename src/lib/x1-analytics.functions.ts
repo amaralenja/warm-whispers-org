@@ -247,7 +247,10 @@ async function getVendorX1Analytics(
     if (opFilter && !sameText(op, opFilter)) return false;
     return opAllowed(op, allowedWorkspaces);
   });
-  const conversations = allConversations.filter((c) => isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso));
+  const conversations = allConversations.filter((c) => (
+    isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
+    || isWithinIso(c?.created_at, fromIso, toIso)
+  ));
   const novosLeadsRows = allConversations.filter((c) => isWithinIso(c?.created_at, fromIso, toIso));
 
   const { data: messagesRaw, error: messagesError } = await db.rpc("vendor_list_x1_wa_messages" as any, {
