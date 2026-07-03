@@ -32,6 +32,21 @@ export type PickedLead = {
   whatsapp: string | null;
 };
 
+function toStr(v: any): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+}
+function sanitizeLead(l: any): PickedLead {
+  return {
+    id: String(l?.id ?? ""),
+    nome: toStr(l?.nome),
+    email: toStr(l?.email),
+    whatsapp: toStr(l?.whatsapp),
+  };
+}
+
 export function LeadSearchPicker({
   onPick,
   triggerLabel = "Buscar lead",
@@ -59,7 +74,7 @@ export function LeadSearchPicker({
       else q = q.or(`nome.ilike.%${t}%,whatsapp.ilike.%${t}%,email.ilike.%${t}%`);
       const { data, error } = await q;
       if (error) throw error;
-      setResults((data ?? []) as PickedLead[]);
+      setResults(((data ?? []) as any[]).map(sanitizeLead));
     } catch (e: any) {
       toast.error("Erro ao buscar: " + e.message);
     } finally {
