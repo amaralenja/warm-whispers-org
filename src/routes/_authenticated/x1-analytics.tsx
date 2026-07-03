@@ -126,9 +126,45 @@ function X1AnalyticsPage() {
   const chartMsgs = useMemo(() => {
     if (!payload) return [];
     return isHoje
-      ? (payload.serieHoraria ?? []).map((r) => ({ ...r, data: r.hora }))
-      : (payload.serieDiaria ?? []);
+      ? (payload.serieHoraria ?? []).map((r) => ({
+        data: safeText(r.hora, ""),
+        msgsIn: safeNumber(r.msgsIn),
+        msgsOut: safeNumber(r.msgsOut),
+        vendas: safeNumber(r.vendas),
+      }))
+      : (payload.serieDiaria ?? []).map((r) => ({
+        data: safeText(r.data, ""),
+        msgsIn: safeNumber(r.msgsIn),
+        msgsOut: safeNumber(r.msgsOut),
+        vendas: safeNumber(r.vendas),
+      }));
   }, [payload, isHoje]);
+
+  const porOperacao = useMemo(() => (payload?.porOperacao ?? []).map((r) => ({
+    operacao: safeText(r.operacao),
+    leads: safeNumber(r.leads),
+    conversas: safeNumber(r.conversas),
+    msgsIn: safeNumber(r.msgsIn),
+    msgsOut: safeNumber(r.msgsOut),
+    vendas: safeNumber(r.vendas),
+    faturamento: safeNumber(r.faturamento),
+    ticketMedio: safeNumber(r.ticketMedio),
+    conversao: safeNumber(r.conversao),
+  })), [payload]);
+
+  const porVendedor = useMemo(() => (payload?.porVendedor ?? []).map((r) => ({
+    vendedorId: safeText(r.vendedorId, ""),
+    nome: safeText(r.nome, safeText(r.utm, "Vendedor")),
+    utm: safeText(r.utm),
+    expert: safeText(r.expert),
+    fotoUrl: safeText(r.fotoUrl, ""),
+    leadsAtribuidos: safeNumber(r.leadsAtribuidos),
+    msgsEnviadas: safeNumber(r.msgsEnviadas),
+    vendas: safeNumber(r.vendas),
+    faturamento: safeNumber(r.faturamento),
+    ticketMedio: safeNumber(r.ticketMedio),
+    conversao: safeNumber(r.conversao),
+  })), [payload]);
 
 
   return (
