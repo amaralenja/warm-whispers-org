@@ -178,6 +178,10 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       db = supabaseAdmin as any;
     }
 
+    // Vendedor: garante que a operação escolhida está liberada pra ele
+    // (evita "Inautorizado" enigmático no meio do loop e normaliza null → workspace default).
+    const effectiveOperacaoId = await coerceVendorOperacaoId(context, db, data.operacao_id);
+
     const summary: Summary = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
     // Substituir: apaga só os fluxos importados deste usuário com prefixo [ZV]
