@@ -741,6 +741,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const op = channelToOp.get(String(m.channel_id)) ?? "";
       if (!op) return false;
       if (opFilter && op !== opFilter) return false;
+      if (!channelAllowed(m.channel_id)) return false;
       return true;
     });
 
