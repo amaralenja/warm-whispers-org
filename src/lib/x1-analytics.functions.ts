@@ -314,12 +314,9 @@ async function getVendorX1Analytics(
   const fromDay = parseFilterDay(data.from);
   const toDay = parseFilterDay(data.to);
 
-  const opFilterLocal = opFilter;
-  const channelFilter = safeString(data.channelId).trim();
-  const channelFilterActive = channelFilter && channelFilter !== "all" ? channelFilter : null;
-  const fromDay2 = fromDay;
-  const toDay2 = toDay;
-  void opFilterLocal; void fromDay2; void toDay2;
+  const channelFilterRaw = safeString(data.channelId).trim();
+  const channelFilterActive = channelFilterRaw && channelFilterRaw !== "all" ? channelFilterRaw : null;
+
 
   let allowedWorkspaces = vendorWorkspaceIds(context);
   try {
