@@ -626,11 +626,18 @@ function ChannelCard({
               WhatsApp {state === "conectado" ? "conectado" : state === "aguardando" ? "aguardando" : "desconectado"}
             </span>
           </div>
-          {qPill && (
-            <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 ${qPill.cls}`}>
-              Qualidade {qPill.label}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            {metaPill && (
+              <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 ${metaPill.cls}`}>
+                {metaPill.label}
+              </span>
+            )}
+            {qPill && (
+              <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 ${qPill.cls}`}>
+                Qualidade {qPill.label}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
