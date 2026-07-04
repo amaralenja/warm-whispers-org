@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 
 import { Search, Zap, CheckCircle2, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
@@ -148,7 +149,7 @@ export function ShowUpDialog({
   defaultEmail?: string;
   defaultName?: string;
 }) {
-  // Chamamos sendMetaEvent direto — useServerFn estava quebrando o mount do dialog
+  const sendShowUpEvent = useServerFn(sendMetaEvent);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<QuizLead[]>([]);
   const [searching, setSearching] = useState(false);
@@ -229,7 +230,7 @@ export function ShowUpDialog({
       }
       const [firstName, ...rest] = form.nome.trim().split(/\s+/);
       const lastName = rest.join(" ");
-      return sendMetaEvent({
+      return sendShowUpEvent({
         data: {
           eventName: "ShowUp",
           email: form.email,
@@ -264,6 +265,8 @@ export function ShowUpDialog({
     matchScore >= 80 ? "bg-emerald-500/20 text-emerald-300"
     : matchScore >= 50 ? "bg-amber-500/20 text-amber-300"
     : "bg-rose-500/20 text-rose-300";
+
+  const safeResults = Array.isArray(results) ? results : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -301,9 +304,9 @@ export function ShowUpDialog({
               </Button>
             </div>
 
-            {results.length > 0 && (
+            {safeResults.length > 0 && (
               <div className="mt-2 max-h-48 overflow-auto rounded-md border border-border">
-                {results.map((r) => {
+                {safeResults.map((r) => {
                   const sel = selected?.id === r.id;
                   return (
                     <button
