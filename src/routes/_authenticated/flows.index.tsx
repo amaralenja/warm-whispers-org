@@ -169,30 +169,74 @@ function FlowsListPage() {
     }
 
     setZvSummary(null);
-    const allIds: string[] = parsed.funnels.map((f: any) => String(f?.id)).filter(Boolean);
-    const total = allIds.length;
-    const CHUNK = 25;
+    const allFunnels: any[] = parsed.funnels;
+    const total = allFunnels.length;
+    // Reduzido: cada request carrega o backup enxuto só dos funis do chunk (mídias base64 são pesadas)
+    const CHUNK = 3;
     const acc: any = { funnels: 0, steps: 0, uploads: 0, errors: [] };
+
+    // Index helpers para montar backup slim por chunk
+    const byId = (arr: any) => {
+      const m = new Map<string, any>();
+      if (Array.isArray(arr)) for (const it of arr) if (it?.id) m.set(String(it.id), it);
+      return m;
+    };
+    const messagesIdx = byId(parsed.messages);
+    const audiosIdx = byId(parsed.audios);
+    const mediasIdx = byId(parsed.medias);
+    const docsIdx = byId(parsed.docs);
+    const objectsIdx = byId(parsed.objectsList);
 
     toast.loading(`Importando 0 / ${total} funis…`, { id: t });
     try {
-      for (let i = 0; i < allIds.length; i += CHUNK) {
-        const slice = allIds.slice(i, i + CHUNK);
+      for (let i = 0; i < allFunnels.length; i += CHUNK) {
+        const chunkFunnels = allFunnels.slice(i, i + CHUNK);
         const chunkIdx = Math.floor(i / CHUNK);
         setZvProgress(`${i} / ${total}`);
         toast.loading(`Importando ${i} / ${total} funis…`, { id: t });
-        const r: any = await importZvFn({
-          data: {
-            backup: parsed,
-            operacao_id: zvOp || null,
-            replace: zvReplace && chunkIdx === 0,
-            funnelIds: slice,
-          },
-        });
-        acc.funnels += r?.funnels ?? 0;
-        acc.steps += r?.steps ?? 0;
-        acc.uploads += r?.uploads ?? 0;
-        if (Array.isArray(r?.errors)) acc.errors.push(...r.errors);
+
+        // Coleta apenas os itemIds referenciados pelos funis deste chunk
+        const itemIds = new Set<string>();
+        for (const f of chunkFunnels) {
+          const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
+          for (const s of seq) if (s?.itemId) itemIds.add(String(s.itemId));
+        }
+        const pick = (idx: Map<string, any>) => {
+          const out: any[] = [];
+          for (const id of itemIds) {
+            const v = idx.get(id);
+            if (v) out.push(v);
+          }
+          return out;
+        };
+        const slimBackup = {
+          funnels: chunkFunnels,
+          messages: pick(messagesIdx),
+          audios: pick(audiosIdx),
+          medias: pick(mediasIdx),
+          docs: pick(docsIdx),
+          objectsList: pick(objectsIdx),
+        };
+
+        try {
+          const r: any = await importZvFn({
+            data: {
+              backup: slimBackup,
+              operacao_id: zvOp || null,
+              replace: zvReplace && chunkIdx === 0,
+              funnelIds: null,
+            },
+          });
+          acc.funnels += r?.funnels ?? 0;
+          acc.steps += r?.steps ?? 0;
+          acc.uploads += r?.uploads ?? 0;
+          if (Array.isArray(r?.errors)) acc.errors.push(...r.errors);
+        } catch (chunkErr: any) {
+          console.error("[zv-import] chunk fail", { chunkIdx, error: chunkErr });
+          for (const f of chunkFunnels) {
+            acc.errors.push({ funnel: f?.name ?? f?.id, message: chunkErr?.message ?? String(chunkErr) });
+          }
+        }
       }
       setZvSummary(acc);
       qc.invalidateQueries({ queryKey: ["wa-flows"] });
@@ -211,6 +255,7 @@ function FlowsListPage() {
       setZvProgress("");
     }
   }
+
 
 
 
