@@ -553,6 +553,22 @@ function ChannelCard({
     quality === "YELLOW" ? { label: "Média", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" } :
     quality === "RED"    ? { label: "Baixa", cls: "bg-rose-500/15 text-rose-400 border-rose-500/30" } : null;
 
+  // Meta account/name/verification status — mostra se tá banido, restrito, pendente etc.
+  const nameStatus = q?.nameStatus?.toUpperCase() ?? null;
+  const verifStatus = q?.codeVerificationStatus?.toUpperCase() ?? null;
+  const metaPill =
+    nameStatus === "DECLINED" || nameStatus === "FLAGGED"
+      ? { label: "Banido/Restrito", cls: "bg-rose-500/15 text-rose-400 border-rose-500/30" }
+    : nameStatus === "APPROVED" && verifStatus === "VERIFIED"
+      ? { label: "Verificado", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" }
+    : nameStatus === "APPROVED"
+      ? { label: "Aprovado", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" }
+    : nameStatus === "PENDING_REVIEW" || verifStatus === "NOT_VERIFIED"
+      ? { label: "Pendente Meta", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" }
+    : nameStatus === "NONE" || !nameStatus
+      ? null
+      : { label: nameStatus, cls: "bg-muted text-muted-foreground border-border" };
+
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col transition hover:border-emerald-500/40">
       {/* Header: icon + status pill */}
@@ -610,11 +626,18 @@ function ChannelCard({
               WhatsApp {state === "conectado" ? "conectado" : state === "aguardando" ? "aguardando" : "desconectado"}
             </span>
           </div>
-          {qPill && (
-            <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 ${qPill.cls}`}>
-              Qualidade {qPill.label}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            {metaPill && (
+              <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 ${metaPill.cls}`}>
+                {metaPill.label}
+              </span>
+            )}
+            {qPill && (
+              <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 ${qPill.cls}`}>
+                Qualidade {qPill.label}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
