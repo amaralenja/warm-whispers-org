@@ -171,6 +171,7 @@ function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showUpEvent, setShowUpEvent] = useState<CalendarEvent | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
 
   const { data, isLoading, refetch, isFetching, error } = useQuery({
@@ -578,7 +579,7 @@ function CalendarPage() {
                   <EventRow
                     key={ev.id}
                     ev={ev}
-                    onSendShowUp={sendShowUpEvent}
+                    onShowUp={() => setShowUpEvent(ev)}
                     onEdit={() => openEdit(ev)}
                     onDelete={() => {
                       if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
@@ -665,7 +666,7 @@ function CalendarPage() {
                       <MonthEventChip
                         key={ev.id}
                         ev={ev}
-                        onSendShowUp={sendShowUpEvent}
+                        onShowUp={() => setShowUpEvent(ev)}
                         onEdit={() => openEdit(ev)}
                       />
                     ))}
@@ -699,7 +700,7 @@ function CalendarPage() {
                     <EventRow
                       key={ev.id}
                       ev={ev}
-                      onSendShowUp={sendShowUpEvent}
+                      onShowUp={() => setShowUpEvent(ev)}
                       onEdit={() => openEdit(ev)}
                       onDelete={() => {
                         if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
@@ -712,6 +713,17 @@ function CalendarPage() {
           )}
         </div>
       ) : null}
+
+      <ShowUpDialog
+        open={!!showUpEvent}
+        onOpenChange={(open) => {
+          if (!open) setShowUpEvent(null);
+        }}
+        eventId={showUpEvent?.id ?? ""}
+        defaultEmail={showUpEvent ? guestOf(showUpEvent)?.email : undefined}
+        defaultName={showUpEvent ? guestOf(showUpEvent)?.displayName : undefined}
+        onSendShowUp={sendShowUpEvent}
+      />
     </div>
   );
 }
@@ -781,8 +793,7 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
 
 
 
-function MonthEventChip({ ev, onEdit, onSendShowUp }: { ev: CalendarEvent; onEdit: () => void; onSendShowUp: SendShowUpEvent }) {
-  const [showUpOpen, setShowUpOpen] = useState(false);
+function MonthEventChip({ ev, onEdit, onShowUp }: { ev: CalendarEvent; onEdit: () => void; onShowUp: () => void }) {
   const [, force] = useState(0);
   const c = colorFor(ev);
   const time = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "";
@@ -790,9 +801,6 @@ function MonthEventChip({ ev, onEdit, onSendShowUp }: { ev: CalendarEvent; onEdi
   const title = ev.summary || "(sem título)";
   const link = getEventLink(ev.id);
   const noShow = getNoShow(ev.id);
-  const guest = guestOf(ev);
-  const attendeeEmail = guest?.email;
-  const attendeeName = guest?.displayName;
 
   return (
     <div
@@ -813,7 +821,7 @@ function MonthEventChip({ ev, onEdit, onSendShowUp }: { ev: CalendarEvent; onEdi
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setShowUpOpen(true);
+            onShowUp();
           }}
           className={`opacity-0 group-hover/chip:opacity-100 transition shrink-0 rounded p-0.5 hover:bg-black/30 ${link ? "text-emerald-300" : "text-amber-300"}`}
           title={link ? "Re-disparar ShowUp" : "Disparar ShowUp"}
@@ -842,14 +850,6 @@ function MonthEventChip({ ev, onEdit, onSendShowUp }: { ev: CalendarEvent; onEdi
       {link && (
         <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-background" />
       )}
-      <ShowUpDialog
-        open={showUpOpen}
-        onOpenChange={setShowUpOpen}
-        eventId={ev.id}
-        defaultEmail={attendeeEmail}
-        defaultName={attendeeName}
-        onSendShowUp={onSendShowUp}
-      />
     </div>
   );
 }
@@ -858,20 +858,16 @@ function EventRow({
   ev,
   onEdit,
   onDelete,
-  onSendShowUp,
+  onShowUp,
 }: {
   ev: CalendarEvent;
   onEdit: () => void;
   onDelete: () => void;
-  onSendShowUp: SendShowUpEvent;
+  onShowUp: () => void;
 }) {
-  const [showUpOpen, setShowUpOpen] = useState(false);
   const [, force] = useState(0);
   const start = ev.start.dateTime ? format(new Date(ev.start.dateTime), "HH:mm") : "dia todo";
   const end = ev.end.dateTime ? format(new Date(ev.end.dateTime), "HH:mm") : "";
-  const guest = guestOf(ev);
-  const attendeeEmail = guest?.email;
-  const attendeeName = guest?.displayName;
   const link = getEventLink(ev.id);
   const noShow = getNoShow(ev.id);
 
@@ -908,7 +904,7 @@ function EventRow({
       <div className="flex items-center gap-1">
         <Button
           size="sm"
-          onClick={() => setShowUpOpen(true)}
+          onClick={onShowUp}
           className="h-8 gap-1.5 bg-amber-500 px-2.5 text-black hover:bg-amber-400"
           title="Vincular lead e disparar ShowUp manualmente"
         >
@@ -942,14 +938,6 @@ function EventRow({
         </button>
       </div>
 
-      <ShowUpDialog
-        open={showUpOpen}
-        onOpenChange={setShowUpOpen}
-        eventId={ev.id}
-        defaultEmail={attendeeEmail}
-        defaultName={attendeeName}
-        onSendShowUp={onSendShowUp}
-      />
     </div>
   );
 }
