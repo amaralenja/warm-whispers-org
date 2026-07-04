@@ -74,6 +74,18 @@ export function saveEventLink(eventId: string, lead: QuizLead) {
   localStorage.setItem(LINK_KEY, JSON.stringify(all));
 }
 
+function saveManualEventLink(eventId: string, form: { nome: string; email: string; whatsapp: string; externalId: string }) {
+  if (!eventId) return;
+  const all = loadLinks();
+  all[eventId] = {
+    eventId,
+    leadId: form.externalId || form.email || form.whatsapp || eventId,
+    nome: form.nome || "",
+    email: form.email || "",
+  };
+  localStorage.setItem(LINK_KEY, JSON.stringify(all));
+}
+
 export function getEventLink(eventId: string): LinkRecord | undefined {
   return loadLinks()[eventId];
 }
@@ -257,6 +269,7 @@ export function ShowUpDialog({
     },
     onSuccess: () => {
       if (selected) saveEventLink(eventId, selected);
+      else saveManualEventLink(eventId, form);
       toast.success("ShowUp enviado pro Facebook! 🚀");
       onOpenChange(false);
     },
