@@ -1244,7 +1244,8 @@ function ChatPage() {
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      // Ignora Enter enquanto IME/autocomplete tá compondo (senão envia texto pela metade)
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (e as any).keyCode !== 229) {
                         e.preventDefault();
                         handleSendText();
                       }
