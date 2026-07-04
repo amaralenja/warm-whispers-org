@@ -454,7 +454,7 @@ function ChatPage() {
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
   const { data: channels = [], error: channelsError } = useQuery({
     queryKey: ["wa-channels-display", vendorId ?? "admin"],
-    queryFn: () => listChannelsFn(),
+    queryFn: () => listChannelsFn({ data: undefined }),
     staleTime: 60_000,
   });
   const channelList = useMemo(() => asArray<any>(channels), [channels]);
@@ -1877,7 +1877,7 @@ function FlowInlineBar({
 
   const { data: flows = [] } = useQuery({
     queryKey: ["flows-for-dispatch"],
-    queryFn: () => listFlowsFn(),
+    queryFn: () => listFlowsFn({ data: undefined }),
     staleTime: 30_000,
   });
 
@@ -2234,7 +2234,7 @@ function FlowDispatcher({
 
   const { data: flows = [] } = useQuery({
     queryKey: ["flows-for-dispatch"],
-    queryFn: () => listFlowsFn(),
+    queryFn: () => listFlowsFn({ data: undefined }),
     enabled: open,
   });
 
