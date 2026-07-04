@@ -1,16 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useMutation } from "@tanstack/react-query";
 
-import { Search, Zap, CheckCircle2, Loader2, User } from "lucide-react";
+import { Search, Zap, CheckCircle2, Loader2, User, X } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +64,8 @@ export function saveEventLink(eventId: string, lead: QuizLead) {
   const all = loadLinks();
   all[eventId] = { eventId, leadId: lead.id, nome: lead.nome ?? "", email: lead.email ?? "" };
   localStorage.setItem(LINK_KEY, JSON.stringify(all));
+  unmarkNoShow(eventId);
+  window.dispatchEvent(new Event("calendar-showup-updated"));
 }
 
 function saveManualEventLink(eventId: string, form: { nome: string; email: string; whatsapp: string; externalId: string }) {
@@ -84,6 +78,8 @@ function saveManualEventLink(eventId: string, form: { nome: string; email: strin
     email: form.email || "",
   };
   localStorage.setItem(LINK_KEY, JSON.stringify(all));
+  unmarkNoShow(eventId);
+  window.dispatchEvent(new Event("calendar-showup-updated"));
 }
 
 export function getEventLink(eventId: string): LinkRecord | undefined {
@@ -166,6 +162,7 @@ export function ShowUpDialog({
   defaultEmail,
   defaultName,
   onSendShowUp,
+  onSaved,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -173,11 +170,13 @@ export function ShowUpDialog({
   defaultEmail?: string;
   defaultName?: string;
   onSendShowUp: SendShowUpEvent;
+  onSaved?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<QuizLead[]>([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<QuizLead | null>(null);
+  const [sending, setSending] = useState(false);
 
   // Form editável — usado no disparo
   const [form, setForm] = useState({
@@ -247,13 +246,52 @@ export function ShowUpDialog({
     }
   }
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!form.email && !form.whatsapp) {
-        throw new Error("Informe pelo menos email ou whatsapp");
-      }
-      const [firstName, ...rest] = form.nome.trim().split(/\s+/);
-      const lastName = rest.join(" ");
+  async function handleSendShowUp() {
+    if (sending) return;
+    if (!form.email && !form.whatsapp) {
+      toast.error("Informe pelo menos email ou whatsapp");
+      return;
+    }
+
+    if (selected) saveEventLink(eventId, selected);
+    else saveManualEventLink(eventId, form);
+    onSaved?.();
+    onOpenChange(false);
+
+    setSending(true);
+    const [firstName, ...rest] = form.nome.trim().split(/\s+/);
+    const lastName = rest.join(" ");
+
+    const sendPromise = onSendShowUp({
+      data: {
+        eventName: "ShowUp",
+        email: form.email,
+        phone: form.whatsapp || undefined,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        externalId: form.externalId || form.email || undefined,
+        fbp: form.fbp || undefined,
+        fbc: form.fbc || undefined,
+      },
+    });
+    sendPromise.catch(() => undefined);
+
+    try {
+      await Promise.race([
+        sendPromise,
+        new Promise((_, reject) =>
+          window.setTimeout(() => reject(new Error("Tempo esgotado ao enviar para Meta")), 15000),
+        ),
+      ]);
+      toast.success("ShowUp marcado e enviado pro Facebook! 🚀");
+    } catch (e: any) {
+      toast.warning(`ShowUp marcado na agenda, mas o envio Meta falhou: ${e?.message || "erro desconhecido"}`);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  /*
       return onSendShowUp({
         data: {
           eventName: "ShowUp",
@@ -266,15 +304,7 @@ export function ShowUpDialog({
           fbc: form.fbc || undefined,
         },
       });
-    },
-    onSuccess: () => {
-      if (selected) saveEventLink(eventId, selected);
-      else saveManualEventLink(eventId, form);
-      toast.success("ShowUp enviado pro Facebook! 🚀");
-      onOpenChange(false);
-    },
-    onError: (e: any) => toast.error(e?.message || "Erro ao enviar"),
-  });
+  */
 
   const matchScore = useMemo(() => {
     let s = 10;
@@ -294,14 +324,22 @@ export function ShowUpDialog({
   const safeResults = Array.isArray(results) ? results : [];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <div className={open ? "fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" : "hidden"}>
+      <div className="relative grid max-h-[90vh] w-full max-w-3xl gap-4 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight">
             <Zap className="h-5 w-5 text-amber-400" />
             Conferir dados e disparar ShowUp
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
         <div className="space-y-4">
           {/* Busca de lead */}
@@ -435,22 +473,22 @@ export function ShowUpDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
-            onClick={() => mutation.mutate()}
-            disabled={(!form.email && !form.whatsapp) || mutation.isPending}
+            onClick={handleSendShowUp}
+            disabled={(!form.email && !form.whatsapp) || sending}
             className="bg-amber-500 text-black hover:bg-amber-400"
           >
-            {mutation.isPending ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando…</>
+            {sending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Disparando…</>
             ) : (
               <><Zap className="mr-2 h-4 w-4" /> Disparar ShowUp</>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 }
 
