@@ -46,7 +46,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 
-import { ShowUpDialog, getEventLink, getAllEventLinks, getNoShow, getAllNoShows, markNoShow, unmarkNoShow } from "@/components/showup-dialog";
+import { ShowUpDialog, getEventLink, getAllEventLinks, getNoShow, getAllNoShows, markNoShow, unmarkNoShow, type SendShowUpEvent } from "@/components/showup-dialog";
 import { UserX } from "lucide-react";
 import { LeadSearchPicker } from "@/components/lead-search-picker";
 import { DateRangeFilter, computeRange, type DateRangeValue } from "@/components/date-range-filter";
@@ -73,6 +73,7 @@ import {
   deleteEvent,
   type CalendarEvent,
 } from "@/lib/google-calendar.functions";
+import { sendMetaEvent } from "@/lib/meta-ads.functions";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -163,6 +164,7 @@ function CalendarPage() {
   const create = useServerFn(createEvent);
   const update = useServerFn(updateEvent);
   const del = useServerFn(deleteEvent);
+  const sendShowUpEvent = useServerFn(sendMetaEvent) as SendShowUpEvent;
 
   const [view, setView] = useState<"month" | "list" | "metrics">("month");
   const [cursor, setCursor] = useState<Date>(() => new Date());
@@ -576,6 +578,7 @@ function CalendarPage() {
                   <EventRow
                     key={ev.id}
                     ev={ev}
+                    onSendShowUp={sendShowUpEvent}
                     onEdit={() => openEdit(ev)}
                     onDelete={() => {
                       if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
@@ -662,6 +665,7 @@ function CalendarPage() {
                       <MonthEventChip
                         key={ev.id}
                         ev={ev}
+                        onSendShowUp={sendShowUpEvent}
                         onEdit={() => openEdit(ev)}
                       />
                     ))}
@@ -695,6 +699,7 @@ function CalendarPage() {
                     <EventRow
                       key={ev.id}
                       ev={ev}
+                      onSendShowUp={sendShowUpEvent}
                       onEdit={() => openEdit(ev)}
                       onDelete={() => {
                         if (confirm("Remover este evento?")) deleteMutation.mutate(ev.id);
@@ -776,7 +781,7 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
 
 
 
-function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void }) {
+function MonthEventChip({ ev, onEdit, onSendShowUp }: { ev: CalendarEvent; onEdit: () => void; onSendShowUp: SendShowUpEvent }) {
   const [showUpOpen, setShowUpOpen] = useState(false);
   const [, force] = useState(0);
   const c = colorFor(ev);
@@ -843,6 +848,7 @@ function MonthEventChip({ ev, onEdit }: { ev: CalendarEvent; onEdit: () => void 
         eventId={ev.id}
         defaultEmail={attendeeEmail}
         defaultName={attendeeName}
+        onSendShowUp={onSendShowUp}
       />
     </div>
   );
@@ -852,10 +858,12 @@ function EventRow({
   ev,
   onEdit,
   onDelete,
+  onSendShowUp,
 }: {
   ev: CalendarEvent;
   onEdit: () => void;
   onDelete: () => void;
+  onSendShowUp: SendShowUpEvent;
 }) {
   const [showUpOpen, setShowUpOpen] = useState(false);
   const [, force] = useState(0);
@@ -940,6 +948,7 @@ function EventRow({
         eventId={ev.id}
         defaultEmail={attendeeEmail}
         defaultName={attendeeName}
+        onSendShowUp={onSendShowUp}
       />
     </div>
   );
