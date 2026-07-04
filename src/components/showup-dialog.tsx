@@ -202,7 +202,7 @@ export function ShowUpDialog({
     setSearching(true);
     try {
       const isEmail = t.includes("@");
-      let q = quizSb
+      let q = getQuizSb()
         .from("leads")
         .select("id,nome,email,whatsapp,fbc,fbp,fbclid,utm_source,utm_campaign,caixa_letra")
         .order("data_criacao", { ascending: false })
