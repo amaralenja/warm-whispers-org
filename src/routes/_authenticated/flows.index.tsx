@@ -152,22 +152,29 @@ function FlowsListPage() {
 
   async function runZvImport() {
     if (!zvFile) return toast.error("Selecione o arquivo .json");
+    const t = toast.loading("Lendo arquivo…");
+    setZvProgress("lendo");
     let parsed: any;
     try {
-      parsed = JSON.parse(await zvFile.text());
+      const raw = await zvFile.text();
+      parsed = JSON.parse(raw);
     } catch (e: any) {
-      return toast.error("JSON inválido: " + (e?.message ?? e));
+      console.error("[zv-import] parse fail", e);
+      setZvProgress("");
+      return toast.error("JSON inválido: " + (e?.message ?? e), { id: t });
     }
-    if (!Array.isArray(parsed?.funnels)) return toast.error("JSON sem 'funnels[]'");
+    if (!Array.isArray(parsed?.funnels)) {
+      setZvProgress("");
+      return toast.error("JSON sem 'funnels[]'", { id: t });
+    }
 
     setZvSummary(null);
     const allIds: string[] = parsed.funnels.map((f: any) => String(f?.id)).filter(Boolean);
     const total = allIds.length;
-    // chunk pra evitar timeout do worker (cada chunk processa N funis com upload de mídia)
     const CHUNK = 25;
     const acc: any = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
-    const t = toast.loading(`Importando 0 / ${total} funis…`);
+    toast.loading(`Importando 0 / ${total} funis…`, { id: t });
     try {
       for (let i = 0; i < allIds.length; i += CHUNK) {
         const slice = allIds.slice(i, i + CHUNK);
@@ -178,7 +185,6 @@ function FlowsListPage() {
           data: {
             backup: parsed,
             operacao_id: zvOp || null,
-            // só apaga existentes no PRIMEIRO chunk
             replace: zvReplace && chunkIdx === 0,
             funnelIds: slice,
           },
@@ -199,11 +205,13 @@ function FlowsListPage() {
         toast.success(`Importado: ${acc.funnels} funis · ${acc.steps} etapas · ${acc.uploads} arquivos`, { id: t });
       }
     } catch (e: any) {
+      console.error("[zv-import] server fail", e);
       toast.error(e?.message ?? "Erro ao importar ZapVoice", { id: t });
     } finally {
       setZvProgress("");
     }
   }
+
 
 
 
