@@ -70,7 +70,6 @@ const operacaoX1Items: Item[] = [
 
 const highTicketItems: Item[] = [
   { title: "Analytics", url: "/ht-analytics", icon: LineChart },
-  { title: "Calendário Calls", url: "/calendar", icon: Calendar },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
 ];
