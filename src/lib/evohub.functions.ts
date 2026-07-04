@@ -465,10 +465,8 @@ export const getWhatsappQuality = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ data }): Promise<WhatsappQuality | null> => {
     if (!data.id) throw new Error("ID obrigatório");
-    // Load the channel to get its token + phone_number_id
-    const all = await evoFetch("/api/v1/channels");
-    const list: any[] = Array.isArray(all) ? all : all?.data ?? all?.channels ?? [];
-    const ch = list.find((c) => c.id === data.id);
+    // Fetch full channel detail — the list endpoint doesn't include meta_connection.
+    const ch = await evoFetch(`/api/v1/channels/${data.id}`).catch(() => null);
     if (!ch) return null;
     const metaConnection = getMetaConnection(ch);
     const pnid: string | undefined = metaConnection?.phone_number_id ?? metaConnection?.phone_numbers?.[0]?.id;
