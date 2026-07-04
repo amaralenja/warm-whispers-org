@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   format,
   parseISO,
@@ -172,6 +172,7 @@ function CalendarPage() {
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showUpEvent, setShowUpEvent] = useState<CalendarEvent | null>(null);
+  const [, refreshMarkers] = useState(0);
   const [form, setForm] = useState<FormState>(emptyForm());
 
   const { data, isLoading, refetch, isFetching, error } = useQuery({
@@ -181,6 +182,12 @@ function CalendarPage() {
   });
 
   const events = data?.items || [];
+
+  useEffect(() => {
+    const refresh = () => refreshMarkers((n) => n + 1);
+    window.addEventListener("calendar-showup-updated", refresh);
+    return () => window.removeEventListener("calendar-showup-updated", refresh);
+  }, []);
 
   const monthDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 });
@@ -723,6 +730,7 @@ function CalendarPage() {
         defaultEmail={showUpEvent ? guestOf(showUpEvent)?.email : undefined}
         defaultName={showUpEvent ? guestOf(showUpEvent)?.displayName : undefined}
         onSendShowUp={sendShowUpEvent}
+        onSaved={() => refreshMarkers((n) => n + 1)}
       />
     </div>
   );
