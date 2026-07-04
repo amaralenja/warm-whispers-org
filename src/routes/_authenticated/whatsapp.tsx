@@ -529,7 +529,7 @@ function ChannelCard({
   const { data: q } = useQuery({
     queryKey: ["wa-quality", ch.id],
     queryFn: () => qualityFn({ data: { id: ch.id } }),
-    enabled: isActive,
+    enabled: !!ch.id,
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
