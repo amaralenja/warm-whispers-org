@@ -158,7 +158,7 @@ function personLabel(ev: CalendarEvent): string {
   return att?.displayName || att?.email?.split("@")[0] || "";
 }
 
-function CalendarPage() {
+export function CalendarPage() {
   const qc = useQueryClient();
   const list = useServerFn(listEvents);
   const create = useServerFn(createEvent);

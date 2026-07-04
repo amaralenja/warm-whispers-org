@@ -15,6 +15,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { HTContasReceber } from "@/components/ht-contas-receber";
+import { CalendarPage } from "@/routes/_authenticated/calendar";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: HTAnalytics,
@@ -364,7 +365,19 @@ function HTAnalytics() {
       </div>
 
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
-      {tab === "closer" && <KanbanCloser leads={leads} vendas={vendas} loading={loading} />}
+      {tab === "closer" && (
+        <>
+          <KanbanCloser leads={leads} vendas={vendas} loading={loading} />
+          <div className="border-t border-border/50 mt-6">
+            <div className="px-6 md:px-10 pt-6 pb-2">
+              <h2 className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                Calendário de Calls
+              </h2>
+            </div>
+            <CalendarPage />
+          </div>
+        </>
+      )}
       {tab === "receber" && <HTContasReceber />}
       {tab === "leads" && (
         <div className="px-6 md:px-10 py-8">
