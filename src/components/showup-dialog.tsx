@@ -262,18 +262,20 @@ export function ShowUpDialog({
     const [firstName, ...rest] = form.nome.trim().split(/\s+/);
     const lastName = rest.join(" ");
 
-    const sendPromise = onSendShowUp({
-      data: {
-        eventName: "ShowUp",
-        email: form.email,
-        phone: form.whatsapp || undefined,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
-        externalId: form.externalId || form.email || undefined,
-        fbp: form.fbp || undefined,
-        fbc: form.fbc || undefined,
-      },
-    });
+    const sendPromise = Promise.resolve().then(() =>
+      onSendShowUp({
+        data: {
+          eventName: "ShowUp",
+          email: form.email,
+          phone: form.whatsapp || undefined,
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          externalId: form.externalId || form.email || undefined,
+          fbp: form.fbp || undefined,
+          fbc: form.fbc || undefined,
+        },
+      }),
+    );
     sendPromise.catch(() => undefined);
 
     try {
@@ -290,21 +292,6 @@ export function ShowUpDialog({
       setSending(false);
     }
   }
-
-  /*
-      return onSendShowUp({
-        data: {
-          eventName: "ShowUp",
-          email: form.email,
-          phone: form.whatsapp || undefined,
-          firstName: firstName || undefined,
-          lastName: lastName || undefined,
-          externalId: form.externalId || form.email || undefined,
-          fbp: form.fbp || undefined,
-          fbc: form.fbc || undefined,
-        },
-      });
-  */
 
   const matchScore = useMemo(() => {
     let s = 10;
