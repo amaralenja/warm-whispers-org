@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 
 import { Search, Zap, CheckCircle2, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { sendMetaEvent } from "@/lib/meta-ads.functions";
 
 // ---- Quiz Supabase (external, somente leitura) ----
 const QUIZ_SUPABASE_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
@@ -47,6 +45,19 @@ type QuizLead = {
 
 type LinkRecord = { eventId: string; leadId: string; nome?: string; email?: string };
 const LINK_KEY = "calendar_quiz_links_v1";
+
+export type SendShowUpEvent = (args: {
+  data: {
+    eventName: "ShowUp";
+    email?: string;
+    phone?: string;
+    firstName?: string;
+    lastName?: string;
+    externalId?: string;
+    fbp?: string;
+    fbc?: string;
+  };
+}) => Promise<unknown>;
 
 function loadLinks(): Record<string, LinkRecord> {
   if (typeof window === "undefined") return {};
@@ -142,14 +153,15 @@ export function ShowUpDialog({
   eventId,
   defaultEmail,
   defaultName,
+  onSendShowUp,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   eventId: string;
   defaultEmail?: string;
   defaultName?: string;
+  onSendShowUp: SendShowUpEvent;
 }) {
-  const sendShowUpEvent = useServerFn(sendMetaEvent);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<QuizLead[]>([]);
   const [searching, setSearching] = useState(false);
@@ -230,7 +242,7 @@ export function ShowUpDialog({
       }
       const [firstName, ...rest] = form.nome.trim().split(/\s+/);
       const lastName = rest.join(" ");
-      return sendShowUpEvent({
+      return onSendShowUp({
         data: {
           eventName: "ShowUp",
           email: form.email,
