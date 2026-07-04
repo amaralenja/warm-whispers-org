@@ -172,7 +172,7 @@ function CalendarPage() {
   const [range, setRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showUpEvent, setShowUpEvent] = useState<CalendarEvent | null>(null);
-  const [, refreshMarkers] = useState(0);
+  const [markerVersion, refreshMarkers] = useState(0);
   const [form, setForm] = useState<FormState>(emptyForm());
 
   const { data, isLoading, refetch, isFetching, error } = useQuery({
@@ -543,9 +543,9 @@ function CalendarPage() {
       ) : null}
 
       {view === "metrics" ? (
-        <MetricsView events={events} range={range} setRange={setRange} />
+        <MetricsView events={events} range={range} setRange={setRange} markerVersion={markerVersion} />
       ) : (
-        <StatsCards events={events} range={range} setRange={setRange} />
+        <StatsCards events={events} range={range} setRange={setRange} markerVersion={markerVersion} />
       )}
 
       {view === "month" && (
@@ -736,7 +736,7 @@ function CalendarPage() {
   );
 }
 
-function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; range: DateRangeValue; setRange: (v: DateRangeValue) => void }) {
+function StatsCards({ events, range, setRange, markerVersion }: { events: CalendarEvent[]; range: DateRangeValue; setRange: (v: DateRangeValue) => void; markerVersion: number }) {
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -763,7 +763,7 @@ function StatsCards({ events, range, setRange }: { events: CalendarEvent[]; rang
       else if (!past) proximas++;
     }
     return { agendadas, showup, noshow, proximas };
-  }, [events, range]);
+  }, [events, range, markerVersion]);
 
   const cards = [
     { label: "Agendadas no período", value: stats.agendadas, icon: CalendarIcon, color: "text-blue-400", bg: "bg-blue-500/10" },
@@ -962,10 +962,12 @@ function MetricsView({
   events,
   range,
   setRange,
+  markerVersion,
 }: {
   events: CalendarEvent[];
   range: DateRangeValue;
   setRange: (v: DateRangeValue) => void;
+  markerVersion: number;
 }) {
   const { data: vendasData, isLoading: vendasLoading } = useQuery({
     queryKey: ["calendar-metrics-vendas", range.from, range.to],
@@ -1013,7 +1015,7 @@ function MetricsView({
       }
     }
     return { agendadas, proximas, realizadas, showup, noshow, linkadas };
-  }, [events, range]);
+  }, [events, range, markerVersion]);
 
   const totalFat = Number(vendasData?.totalFaturamento || 0);
   const totalVendas = Number(vendasData?.totalVendas || 0);
