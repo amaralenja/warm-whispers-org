@@ -46,7 +46,9 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
+  const setErrorSafe = (v: unknown) => setError(safeText(v));
+
 
   useEffect(() => {
     setPlaying(false);
