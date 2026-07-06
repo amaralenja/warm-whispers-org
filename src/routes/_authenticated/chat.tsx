@@ -567,6 +567,17 @@ function ChatPage() {
     );
   }, [conversationList, search, listFilter, activeFlowConvIds]);
 
+  const PAGE_SIZE = 40;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, listFilter]);
+  const visibleFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && visibleCount < filtered.length) {
+      setVisibleCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
+    }
+  };
+
 
   // Estabiliza a referência de `active`: mantém o último objeto conhecido enquanto
   // o refetch estiver em andamento, evitando desmontar a coluna do chat (e o textarea).
@@ -923,7 +934,7 @@ function ChatPage() {
 
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy">
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy" onScroll={handleListScroll}>
             {convsError || channelsError ? (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
                 {errorToText(convsError ?? channelsError, "Falha ao carregar conversas do WhatsApp")}
@@ -934,7 +945,7 @@ function ChatPage() {
               </div>
             ) : (
               <div>
-                {filtered.map((c) => {
+                {visibleFiltered.map((c) => {
                   const contactWaId = toText(c.contact_wa_id);
                   const contactName = toText(c.contact_name);
                   const isActive = String(c.id) === activeId;
