@@ -126,8 +126,11 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   }
 
   function cycleSpeed() {
-    const idx = SPEEDS.indexOf(speed);
-    setSpeed(SPEEDS[(idx + 1) % SPEEDS.length]);
+    const list = Array.isArray(SPEEDS) ? SPEEDS : [1];
+    const len = list.length || 1;
+    const idx = list.indexOf(speed);
+    const nextIdx = idx < 0 ? 0 : (idx + 1) % len;
+    setSpeed((list[nextIdx] ?? 1) as (typeof SPEEDS)[number]);
   }
 
   function onSeek(e: React.ChangeEvent<HTMLInputElement>) {
