@@ -126,13 +126,13 @@ export function LeadSearchPicker({
             {results.map((l) => (
               <button
                 type="button"
-                key={l.id}
+                key={safeStr(l.id)}
                 onClick={() => pick(l)}
                 className="w-full text-left p-2 rounded-md border border-border hover:bg-accent/10 hover:border-accent transition"
               >
-                <div className="font-medium text-sm">{l.nome || "(sem nome)"}</div>
+                <div className="font-medium text-sm">{safeStr(l.nome, "(sem nome)")}</div>
                 <div className="text-xs text-muted-foreground">
-                  {l.email || "—"} {l.whatsapp ? `• ${l.whatsapp}` : ""}
+                  {safeStr(l.email, "—")}{l.whatsapp ? ` • ${safeStr(l.whatsapp)}` : ""}
                 </div>
               </button>
             ))}
