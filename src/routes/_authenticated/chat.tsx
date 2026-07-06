@@ -594,7 +594,8 @@ function ChatPage() {
     // Vendedor não recebe realtime (RLS); poll agressivo pra ver mensagens do fluxo entrarem na thread.
     refetchInterval: activeId ? (vendorSession ? 3_000 : 20_000) : false,
     refetchOnWindowFocus: false,
-    staleTime: vendorSession ? 1_000 : 10_000,
+    staleTime: vendorSession ? 1_000 : 30_000,
+    gcTime: 10 * 60_000,
   });
 
   const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
@@ -951,12 +952,23 @@ function ChatPage() {
                   const isActive = String(c.id) === activeId;
                   const preview = toText(c.last_message_preview);
                   const hasActiveFlow = activeFlowConvIds.has(String(c.id));
+                  const prefetchMessages = () => {
+                    const cid = String(c.id);
+                    qc.prefetchQuery({
+                      queryKey: ["wa-messages", cid],
+                      queryFn: () => listMsgFn({ data: { conversationId: cid } }),
+                      staleTime: 15_000,
+                    });
+                  };
                   return (
                     <div
                       key={String(c.id)}
                       role="button"
                       tabIndex={0}
                       onClick={() => setActiveId(String(c.id))}
+                      onMouseEnter={prefetchMessages}
+                      onFocus={prefetchMessages}
+                      onTouchStart={prefetchMessages}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
