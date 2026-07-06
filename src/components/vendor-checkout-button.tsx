@@ -185,20 +185,24 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
         imagePath = uploaded.path;
       } catch (e: any) {
         toast.error(e?.message ?? "Falha no upload da imagem");
-        setUploading(false);
         return;
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
     }
 
-    await upsertMut.mutateAsync({
-      id: editing?.id,
-      nome,
-      mensagem,
-      link: "",
-      imagePath,
-      clearImage: editing?._removeImage === true,
-    });
+    try {
+      await upsertMut.mutateAsync({
+        id: editing?.id,
+        nome,
+        mensagem,
+        link: "",
+        imagePath,
+        clearImage: editing?._removeImage === true,
+      });
+    } catch {
+      // Toast já tratado no onError da mutation.
+    }
   }
 
   function removeImage() {
