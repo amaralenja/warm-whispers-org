@@ -110,6 +110,40 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               for (const m of messages) {
                 const contactName = contactNameByWaId[m.from] ?? m.from;
 
+                // Reactions: não são mensagens próprias — atualizam a msg alvo com raw.reactions.theirs
+                // e NÃO devem virar linha nova em wa_messages (senão aparecem como "documento").
+                if ((m as any).type === "reaction") {
+                  try {
+                    const targetWamid = (m as any).reaction?.message_id as string | undefined;
+                    const emoji = ((m as any).reaction?.emoji ?? "") as string;
+                    if (targetWamid) {
+                      const { data: target } = await supabaseAdmin
+                        .from("wa_messages" as any)
+                        .select("id,raw")
+                        .eq("channel_id", channelId)
+                        .eq("wa_message_id", targetWamid)
+                        .maybeSingle();
+                      if (target) {
+                        const prevRaw = ((target as any).raw ?? {}) as Record<string, any>;
+                        const prevReactions = (prevRaw.reactions ?? {}) as Record<string, any>;
+                        await supabaseAdmin
+                          .from("wa_messages" as any)
+                          .update({
+                            raw: {
+                              ...prevRaw,
+                              reactions: { ...prevReactions, theirs: emoji || null },
+                            },
+                          })
+                          .eq("id", (target as any).id);
+                      }
+                    }
+                  } catch (e) {
+                    console.error("[wa-webhook] reaction handling error", e);
+                  }
+                  continue;
+                }
+
+
                 // Ensure conversation exists — but do NOT overwrite
                 // last_message_* unconditionally. A retried/late inbound
                 // webhook from Meta must not clobber a newer outbound
