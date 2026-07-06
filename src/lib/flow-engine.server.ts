@@ -712,7 +712,35 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const { data: leads } = await ctx.db
         .from("crm_leads" as any).select("id,tags,telefone,expert,status").ilike("telefone", `%${tail}%`).limit(5);
 
-      for (const l of leads ?? []) {
+      // Se nenhum lead casa com o telefone, cria um novo já com as tags —
+      // assim o fluxo consegue mover o contato pro CRM automaticamente.
+      let targetLeads = leads ?? [];
+      if (targetLeads.length === 0) {
+        // Descobre a operação/expert do canal e o nome do contato pela conversa.
+        const { data: ch } = await ctx.db
+          .from("wa_channels" as any).select("operacao_id").eq("id", ctx.channelId).maybeSingle();
+        let contactName = "";
+        if (ctx.conversationId) {
+          const { data: conv } = await ctx.db
+            .from("wa_conversations" as any).select("contact_name").eq("id", ctx.conversationId).maybeSingle();
+          contactName = String((conv as any)?.contact_name ?? "").trim();
+        }
+        const insertPayload: Record<string, any> = {
+          nome: contactName || phone,
+          telefone: ctx.contactWaId,
+          expert: (ch as any)?.operacao_id ?? null,
+          tags: addNames,
+          fonte: "fluxo",
+        };
+        const autoStatus = await resolveStageFromTags(ctx.db, addNames, insertPayload.expert);
+        if (autoStatus) insertPayload.status = autoStatus;
+        const { data: created, error: insErr } = await ctx.db
+          .from("crm_leads" as any).insert(insertPayload).select("id,tags,expert,status").single();
+        if (insErr) return { log: { error: insErr.message, tried: "create_lead" } };
+        return { log: { created: true, leadId: (created as any)?.id, added: addNames, status: (created as any)?.status ?? null } };
+      }
+
+      for (const l of targetLeads) {
         const cur: string[] = Array.isArray((l as any).tags) ? (l as any).tags : [];
         const next = new Set(cur);
         for (const n of addNames) next.add(n);
@@ -723,7 +751,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (autoStatus) patch.status = autoStatus;
         await ctx.db.from("crm_leads" as any).update(patch).eq("id", (l as any).id);
       }
-      return { log: { added: addNames, removed: removeNames, leads: leads?.length ?? 0 } };
+      return { log: { added: addNames, removed: removeNames, leads: targetLeads.length } };
     }
 
     case "condition": {
