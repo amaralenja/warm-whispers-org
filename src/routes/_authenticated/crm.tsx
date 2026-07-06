@@ -410,16 +410,34 @@ function KanbanCard({
   onClick: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
 }) {
+  const navigate = useNavigate();
   const avatarColor = colorFromName(lead.nome);
   const initials = initialsOf(lead.nome);
+  const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
+  const openChat = () => {
+    if (!phoneDigits) {
+      onClick();
+      return;
+    }
+    navigate({ to: "/chat", search: { phone: phoneDigits } });
+  };
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, lead)}
-      onClick={onClick}
+      onClick={openChat}
       style={{ borderLeftColor: stageColor }}
-      className="group cursor-pointer rounded-lg border border-border border-l-4 bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
+      className="group relative cursor-pointer rounded-lg border border-border border-l-4 bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
+      title={phoneDigits ? "Abrir conversa" : "Editar lead"}
     >
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className="absolute right-1.5 top-1.5 hidden rounded-md p-1 text-muted-foreground hover:bg-muted/60 hover:text-foreground group-hover:block"
+        title="Editar lead"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
       <div className="flex items-start gap-2.5">
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
@@ -447,7 +465,12 @@ function KanbanCard({
       </div>
       {(lead.telefone || lead.email) && (
         <div className="mt-2 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
-          {lead.telefone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{lead.telefone}</span>}
+          {lead.telefone && (
+            <span className="flex items-center gap-1">
+              <MessageCircle className="h-3 w-3 text-emerald-400" />
+              {lead.telefone}
+            </span>
+          )}
           {lead.email && <span className="flex items-center gap-1 truncate"><Mail className="h-3 w-3 shrink-0" />{lead.email}</span>}
         </div>
       )}
