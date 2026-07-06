@@ -1413,6 +1413,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          image_path: string | null
           link: string
           mensagem: string
           nome: string
@@ -1423,6 +1424,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          image_path?: string | null
           link?: string
           mensagem?: string
           nome: string
@@ -1433,6 +1435,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          image_path?: string | null
           link?: string
           mensagem?: string
           nome?: string
@@ -2467,6 +2470,7 @@ export type Database = {
         Returns: {
           created_at: string
           id: string
+          image_path: string | null
           link: string
           mensagem: string
           nome: string
@@ -2907,6 +2911,7 @@ export type Database = {
         Args: {
           _codigo: string
           _id: string
+          _image_path?: string
           _link: string
           _mensagem: string
           _nome: string
