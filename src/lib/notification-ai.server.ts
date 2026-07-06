@@ -6,6 +6,10 @@ const EVOHUB_BASE = "https://api.evohub.ai";
 
 type AnyDb = any;
 
+function toArray<T = any>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
 // ---- Phone normalization & allowlist ----
 // Gera variantes possíveis (com/sem 9º dígito, com/sem 55) pra um número BR.
 function brPhoneVariants(raw: string): string[] {
@@ -208,6 +212,7 @@ async function sendWhatsapp(channelId: string, contactWa: string, body: any, db:
 }
 
 async function callOpenAI(messages: ChatMsg[]) {
+  const safeMessages = toArray<ChatMsg>(messages);
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -217,7 +222,7 @@ async function callOpenAI(messages: ChatMsg[]) {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       temperature: 0.5,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...safeMessages],
       tools: TOOLS,
       tool_choice: "auto",
     }),
@@ -280,7 +285,7 @@ export async function resolveWaMediaToken(db: AnyDb, channelId: string, phoneNum
     });
     if (!res.ok) return localToken || null;
     const body = await res.json();
-    const list: any[] = Array.isArray(body) ? body : body?.data ?? body?.channels ?? [];
+    const list: any[] = Array.isArray(body) ? body : toArray(body?.data).length ? toArray(body?.data) : toArray(body?.channels);
     for (const row of list) {
       const detailRes = await fetch(`${EVOHUB_BASE}/api/v1/channels/${row.id}`, {
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -447,7 +452,7 @@ function startOfTodayBRT(): Date {
 // ---- Report builders ----
 async function reportSalesToday(db: AnyDb) {
   const { data } = await db.rpc("get_ranking_tv_stats");
-  const ranking = (data?.ranking ?? []).filter((r: any) => r.vendas > 0).slice(0, 5);
+  const ranking = toArray<any>(data?.ranking).filter((r: any) => r.vendas > 0).slice(0, 5);
   return {
     total_faturamento: brlFmt(data?.totalFaturamento || 0),
     total_vendas: data?.totalVendas || 0,
@@ -476,7 +481,7 @@ async function reportMyTasks(db: AnyDb, me: { id: string } | null) {
     .eq("concluida", false)
     .order("prazo", { ascending: true })
     .limit(20);
-  const items = (data ?? []) as any[];
+  const items = toArray<any>(data);
   const atrasadas = items.filter((t) => t.prazo && new Date(t.prazo) < new Date());
   const hoje = items.filter((t) => t.prazo && new Date(t.prazo) <= todayEnd && new Date(t.prazo) >= new Date());
   return {
@@ -574,7 +579,7 @@ async function reportFinancial(db: AnyDb) {
     .from("financeiro").select("tipo,valor,status,data_vencimento,descricao")
     .gte("data_ref", ini)
     .limit(500);
-  const rows = (data ?? []) as any[];
+  const rows = toArray<any>(data);
   let receitas = 0, despesas = 0, aReceber = 0, aPagar = 0;
   for (const r of rows) {
     const v = Number(r.valor || 0);
@@ -737,7 +742,7 @@ export async function continueNotificationSession(opts: {
       tool_calls: choice.tool_calls,
     } as any);
 
-    const toolCalls: any[] = choice.tool_calls || [];
+    const toolCalls: any[] = toArray(choice.tool_calls);
     if (toolCalls.length === 0) {
       // final text reply
       const reply = String(choice.content || "").trim();
@@ -766,7 +771,7 @@ export async function continueNotificationSession(opts: {
             timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "20",
           });
           const r: any = await gcal(`/events?${params.toString()}`);
-          const items = (r?.items ?? []).map((ev: any) => ({
+          const items = toArray<any>(r?.items).map((ev: any) => ({
             event_id: ev.id,
             titulo: ev.summary,
             inicio: ev.start?.dateTime || ev.start?.date,

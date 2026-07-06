@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const BUCKET = "vendor-assets";
+const BUCKET = "wa-media";
+const LEGACY_BUCKET = "vendor-assets";
 
 type Checkout = {
   id: string;
@@ -27,7 +28,12 @@ function vendorArgs(context: any): { _vendor_id: number; _codigo: string } {
 async function signPath(path: string | null | undefined, ttlSeconds = 60 * 60 * 24 * 7): Promise<string | null> {
   if (!path) return null;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, ttlSeconds);
+  let { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, ttlSeconds);
+  if ((error || !data?.signedUrl) && !path.startsWith("vendor-assets/")) {
+    const legacy = await supabaseAdmin.storage.from(LEGACY_BUCKET).createSignedUrl(path, ttlSeconds);
+    data = legacy.data;
+    error = legacy.error;
+  }
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
@@ -38,7 +44,7 @@ export const listVendorCheckoutsFn = createServerFn({ method: "GET" })
     const args = vendorArgs(context);
     const { data, error } = await (context as any).supabase.rpc("vendor_list_checkouts", args);
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as any[];
+    const rows = Array.isArray(data) ? data as any[] : [];
     const withUrls = await Promise.all(
       rows.map(async (r) => ({
         id: r.id,
@@ -71,8 +77,15 @@ export const upsertVendorCheckoutFn = createServerFn({ method: "POST" })
     const nome = String(data.nome ?? "").trim();
     const mensagem = String(data.mensagem ?? "").trim();
     const link = String(data.link ?? "").trim();
-    const imagePath = data.clearImage ? null : (data.imagePath ?? undefined);
+    let imagePath = data.clearImage ? null : (data.imagePath ?? undefined);
     if (!nome) throw new Error("Nome é obrigatório.");
+
+    if (data.id && imagePath === undefined && !data.clearImage) {
+      const { data: rows } = await (context as any).supabase.rpc("vendor_list_checkouts", args);
+      const current = Array.isArray(rows) ? rows.find((r: any) => String(r.id) === String(data.id)) : null;
+      imagePath = current?.image_path ?? null;
+    }
+
     if (!mensagem && !imagePath && !link) throw new Error("Coloque uma mensagem, imagem ou link.");
     const { data: id, error } = await (context as any).supabase.rpc("vendor_upsert_checkout", {
       ...args,
@@ -99,6 +112,9 @@ export const deleteVendorCheckoutFn = createServerFn({ method: "POST" })
       if (row?.image_path) {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         await supabaseAdmin.storage.from(BUCKET).remove([row.image_path]);
+        if (!String(row.image_path).startsWith("vendor-assets/")) {
+          await supabaseAdmin.storage.from(LEGACY_BUCKET).remove([row.image_path]);
+        }
       }
     } catch {}
     const { error } = await (context as any).supabase.rpc("vendor_delete_checkout", {
@@ -123,7 +139,7 @@ export const uploadVendorCheckoutImageFn = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const safe = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "image.jpg";
     const ext = safe.split(".").pop() || "jpg";
-    const path = `${args._vendor_id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const path = `vendor-assets/${args._vendor_id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const buffer = Buffer.from(data.base64, "base64");
     const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, buffer, {
       contentType: data.contentType,
