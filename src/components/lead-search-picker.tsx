@@ -43,9 +43,13 @@ function toStr(v: any): string | null {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   return null;
 }
+function safeStr(v: any, fallback = ""): string {
+  const s = toStr(v);
+  return s == null ? fallback : s;
+}
 function sanitizeLead(l: any): PickedLead {
   return {
-    id: String(l?.id ?? ""),
+    id: safeStr(l?.id),
     nome: toStr(l?.nome),
     email: toStr(l?.email),
     whatsapp: toStr(l?.whatsapp),
@@ -78,7 +82,7 @@ export function LeadSearchPicker({
       if (error) throw error;
       setResults(((data ?? []) as any[]).map(sanitizeLead));
     } catch (e: any) {
-      toast.error("Erro ao buscar: " + (toStr(e?.message) || toStr(e) || "erro interno"));
+      toast.error("Erro ao buscar: " + safeStr(e?.message, safeStr(e, "erro interno")));
     } finally {
       setLoading(false);
     }
@@ -94,7 +98,7 @@ export function LeadSearchPicker({
   return (
     <>
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <UserPlus className="h-4 w-4 mr-1" /> {triggerLabel}
+        <UserPlus className="h-4 w-4 mr-1" /> {safeStr(triggerLabel, "Buscar lead")}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
@@ -122,13 +126,13 @@ export function LeadSearchPicker({
             {results.map((l) => (
               <button
                 type="button"
-                key={l.id}
+                key={safeStr(l.id)}
                 onClick={() => pick(l)}
                 className="w-full text-left p-2 rounded-md border border-border hover:bg-accent/10 hover:border-accent transition"
               >
-                <div className="font-medium text-sm">{l.nome || "(sem nome)"}</div>
+                <div className="font-medium text-sm">{safeStr(l.nome, "(sem nome)")}</div>
                 <div className="text-xs text-muted-foreground">
-                  {l.email || "—"} {l.whatsapp ? `• ${l.whatsapp}` : ""}
+                  {safeStr(l.email, "—")}{l.whatsapp ? ` • ${safeStr(l.whatsapp)}` : ""}
                 </div>
               </button>
             ))}
