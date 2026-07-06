@@ -115,7 +115,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
               size="sm"
               variant="ghost"
               className="h-8 gap-1 text-xs"
-              onClick={() => setEditing({ nome: "", mensagem: "", link: "" })}
+              onClick={() => { setOpen(false); setEditing({ nome: "", mensagem: "", link: "" }); }}
             >
               <Plus className="h-4 w-4" /> Novo
             </Button>
@@ -138,7 +138,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
                 >
                   <button
                     className="flex-1 text-left"
-                    onClick={() => setConfirm(c)}
+                    onClick={() => { setOpen(false); setConfirm(c); }}
                     title="Enviar este checkout"
                   >
                     <div className="text-sm font-medium leading-tight">{c.nome}</div>
@@ -154,7 +154,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
                       size="icon"
                       variant="ghost"
                       className="h-7 w-7"
-                      onClick={() => setEditing(c)}
+                      onClick={() => { setOpen(false); setEditing(c); }}
                       title="Editar"
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -220,14 +220,18 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
             </Button>
             <Button
               disabled={upsertMut.isPending}
-              onClick={() =>
+              onClick={() => {
+                const nome = (editing?.nome ?? "").trim();
+                const link = (editing?.link ?? "").trim();
+                if (!nome) { toast.error("Preencha o nome"); return; }
+                if (!link) { toast.error("Preencha o link"); return; }
                 upsertMut.mutate({
                   id: editing?.id,
-                  nome: (editing?.nome ?? "").trim(),
+                  nome,
                   mensagem: editing?.mensagem ?? "",
-                  link: (editing?.link ?? "").trim(),
-                })
-              }
+                  link,
+                });
+              }}
             >
               {upsertMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Salvar
