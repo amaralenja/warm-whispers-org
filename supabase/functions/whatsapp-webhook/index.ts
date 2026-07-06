@@ -57,6 +57,38 @@ function extractMedia(m: any) {
   };
 }
 
+// Detecta edições de mensagem — Meta/EvoHub podem entregar como
+// type "message_edit" / "message_edited" / flag edited=true / campo edited_message.
+// Retorna o corpo novo e (quando disponível) o id da mensagem original.
+function extractEditedMessage(m: any): { body: string; originalId?: string } | null {
+  const t = String(m?.type ?? "").toLowerCase();
+  const flagged =
+    t === "message_edit" ||
+    t === "message_edited" ||
+    t === "edited" ||
+    m?.edited === true ||
+    m?.is_edit === true ||
+    m?.edited_message != null ||
+    m?.message_edit != null;
+  if (!flagged) return null;
+  const body =
+    m?.edited_message?.text?.body ??
+    m?.message_edit?.text?.body ??
+    m?.edited?.text?.body ??
+    m?.edited?.body ??
+    m?.text?.body ??
+    (typeof m?.text === "string" ? m.text : null) ??
+    m?.body ??
+    "";
+  const originalId =
+    m?.context?.id ??
+    m?.edited_message?.id ??
+    m?.message_edit?.id ??
+    m?.original_message_id ??
+    undefined;
+  return { body: String(body ?? ""), originalId: originalId ? String(originalId) : undefined };
+}
+
 // Baixa a mídia VIA PROXY do EvoHub (/meta/*). Bater direto em graph.facebook.com
 // com o channel token retorna 401 — o Hub que troca pelo token oficial Meta.
 async function downloadMetaMedia(token: string, mediaId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
@@ -1373,6 +1405,30 @@ Deno.serve(async (req) => {
               .update({ ultima_interacao: new Date(timestampMs).toISOString() })
               .eq("id", (existing as any).id);
           }
+        }
+
+        // Se for edição de mensagem, tenta atualizar a original; senão insere como texto marcado.
+        const edited = extractEditedMessage(m);
+        if (edited) {
+          if (edited.originalId) {
+            const { data: orig } = await supabase
+              .from("wa_messages")
+              .select("id")
+              .eq("channel_id", channelId)
+              .eq("wa_message_id", edited.originalId)
+              .maybeSingle();
+            if (orig) {
+              await supabase
+                .from("wa_messages")
+                .update({ text_body: `✏️ (editada) ${edited.body}` })
+                .eq("id", (orig as any).id);
+              continue;
+            }
+          }
+          // Fallback: registra como texto novo referenciando a original
+          m.type = "text";
+          m.text = { body: `✏️ (editada) ${edited.body}` };
+          if (edited.originalId && !m.context) m.context = { id: edited.originalId };
         }
 
         const media = extractMedia(m);
