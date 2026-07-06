@@ -2,7 +2,7 @@
 // Never import this from client modules.
 
 const EVOHUB_BASE = "https://api.evohub.ai";
-const API_TIMEOUT_MS = 15_000;
+const API_TIMEOUT_MS = 60_000;
 
 type Ctx = {
   runId: string;
