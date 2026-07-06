@@ -1599,22 +1599,30 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
     return <InteractiveContent msg={msg} outgoing={outgoing} />;
   }
 
+  // Deduz o tipo efetivo pelo mime — sticker chega como image/webp e às vezes
+  // o msg_type vem como "document" no fallback do webhook.
+  const effectiveMime = (mediaState?.mime ?? msg.media_mime ?? "").toLowerCase();
+  const effectiveType =
+    msg.msg_type === "sticker" || effectiveMime === "image/webp"
+      ? "sticker"
+      : msg.msg_type;
+
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
+    return <RenderMedia type={effectiveType} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
     if (mediaState?.error) {
-      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
+      return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
+      return <RenderMedia type={effectiveType} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
     }
     if (mediaState?.loading) {
-      return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading outgoing={outgoing} />;
+      return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} loading outgoing={outgoing} />;
     }
-    if (msg.msg_type === "document") {
+    if (effectiveType === "document") {
       return (
         <button
           type="button"
@@ -1625,9 +1633,9 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
         </button>
       );
     }
-    return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading onRetry={onLoadMedia} outgoing={outgoing} />;
+    return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} loading onRetry={onLoadMedia} outgoing={outgoing} />;
   }
-  return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} outgoing={outgoing} />;
+  return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} outgoing={outgoing} />;
 }
 
 function InteractiveContent({ msg, outgoing }: { msg: Msg; outgoing?: boolean }) {
@@ -1687,6 +1695,7 @@ function InteractiveContent({ msg, outgoing }: { msg: Msg; outgoing?: boolean })
 function MediaPlaceholder({
   type,
   filename,
+  mime,
   loading,
   error,
   onRetry,
@@ -1694,12 +1703,21 @@ function MediaPlaceholder({
 }: {
   type: string;
   filename: string | null;
+  mime?: string | null;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
   outgoing?: boolean;
 }) {
-  const safeType = toText(type);
+  const rawType = toText(type);
+  const safeMime = (mime ?? "").toLowerCase();
+  // Se o tipo veio vazio/estranho, deduz pelo mime (WhatsApp manda sticker como image/webp).
+  const safeType = rawType === "sticker" || safeMime === "image/webp"
+    ? "sticker"
+    : rawType || (safeMime.startsWith("image/") ? "image"
+        : safeMime.startsWith("video/") ? "video"
+        : safeMime.startsWith("audio/") ? "audio"
+        : "document");
   const safeFilename = toText(filename);
   const icon = safeType === "image" || safeType === "sticker"
     ? <ImageIcon className="h-5 w-5" />
@@ -1744,7 +1762,19 @@ function MediaPlaceholder({
 function RenderMedia({
   type, url, mime, filename, outgoing, onMediaSettled, trackId,
 }: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void; trackId?: string }) {
-  const safeType = toText(type);
+  const rawType = toText(type);
+  const safeMime = (mime ?? "").toLowerCase();
+  // Deduz o tipo real pelo mime quando o msg_type vier vazio ou como "document"
+  // (WhatsApp entrega sticker como image/webp e alguns webhooks caem no fallback "document").
+  const safeType = rawType === "sticker" || safeMime === "image/webp"
+    ? "sticker"
+    : rawType === "image" || safeMime.startsWith("image/")
+      ? "image"
+      : rawType === "video" || safeMime.startsWith("video/")
+        ? "video"
+        : rawType === "audio" || safeMime.startsWith("audio/")
+          ? "audio"
+          : rawType || "document";
   const safeUrl = toText(url);
   const safeFilename = toText(filename);
   if (safeType === "image" || safeType === "sticker") {
