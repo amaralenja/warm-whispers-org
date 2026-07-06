@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const BUCKET = "vendor-assets";
+const BUCKET = "wa-media";
 
 type Checkout = {
   id: string;
@@ -130,7 +130,7 @@ export const uploadVendorCheckoutImageFn = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const safe = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "image.jpg";
     const ext = safe.split(".").pop() || "jpg";
-    const path = `${args._vendor_id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const path = `vendor-assets/${args._vendor_id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const buffer = Buffer.from(data.base64, "base64");
     const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, buffer, {
       contentType: data.contentType,
