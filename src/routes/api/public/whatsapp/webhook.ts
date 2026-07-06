@@ -110,7 +110,13 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               for (const m of messages) {
                 const contactName = contactNameByWaId[m.from] ?? m.from;
 
-                // upsert conversation
+                // Ensure conversation exists — do NOT overwrite last_message_*
+                // unconditionally, or a late/retried inbound webhook will
+                // clobber a newer outbound (flow-sent message) that was
+                // persisted in between. We update last_message_* below only
+                // if the new inbound is actually newer than what's stored.
+                const inboundIso = new Date(parseInt(m.timestamp, 10) * 1000).toISOString();
+                const inboundPreview = previewFor(m);
                 const { data: conv, error: convErr } = await supabaseAdmin
                   .from("wa_conversations" as any)
                   .upsert(
@@ -120,18 +126,31 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                       contact_wa_id: m.from,
                       contact_name: contactName,
                       operacao_id: operacaoId,
-                      last_message_at: new Date(parseInt(m.timestamp, 10) * 1000).toISOString(),
-                      last_message_preview: previewFor(m),
+                      last_message_at: inboundIso,
+                      last_message_preview: inboundPreview,
                       last_message_direction: "in",
                     },
-                    { onConflict: "channel_id,contact_wa_id" }
+                    { onConflict: "channel_id,contact_wa_id", ignoreDuplicates: false }
                   )
-                  .select("id")
+                  .select("id,last_message_at")
                   .single();
                 if (convErr || !conv) {
                   console.error("[wa-webhook] upsert conv error", convErr);
                   continue;
                 }
+                // Conditional: only refresh last_message_* when the current
+                // stored timestamp is older than this inbound. Handles Meta
+                // retries and out-of-order webhooks arriving after a flow
+                // has already written a newer outbound row.
+                await supabaseAdmin
+                  .from("wa_conversations" as any)
+                  .update({
+                    last_message_at: inboundIso,
+                    last_message_preview: inboundPreview,
+                    last_message_direction: "in",
+                  })
+                  .eq("id", (conv as any).id)
+                  .lt("last_message_at", inboundIso);
 
                 // Round-robin: atribui vendedor automaticamente se ainda não tem
                 try {
