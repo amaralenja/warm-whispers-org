@@ -73,7 +73,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
       setCurrent(0);
     };
     const onErr = () => {
-      setError("Falha ao carregar áudio");
+      setErrorSafe("Falha ao carregar áudio");
       setLoading(false);
       setPlaying(false);
     };
