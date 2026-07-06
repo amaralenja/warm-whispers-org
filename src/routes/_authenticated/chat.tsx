@@ -580,6 +580,49 @@ function ChatPage() {
     }
   }, [searchParams.phone, searchParams.conversationId, conversationList, navigate]);
 
+  // ---- CRM stage lookup by phone ----
+  const listCrmLeadsFn = useServerFn(listCrmLeads);
+  const listCrmStagesFn = useServerFn(listCrmStages);
+  const { data: crmLeadsForStage = [] } = useQuery({
+    queryKey: ["crm-leads-for-chat"],
+    queryFn: () => listCrmLeadsFn(),
+    staleTime: 60_000,
+  });
+  const { data: crmStagesForChat = [] } = useQuery({
+    queryKey: ["crm-stages-for-chat"],
+    queryFn: () => listCrmStagesFn({ data: { operacao: "all" } }),
+    staleTime: 60_000,
+  });
+  const stageById = useMemo(() => {
+    const map = new Map<string, { id: string; nome: string; cor: string }>();
+    for (const s of DEFAULT_STAGES) map.set(s.id, { id: s.id, nome: s.nome, cor: s.cor });
+    for (const s of (crmStagesForChat as any[])) {
+      if (s?.id) map.set(String(s.id), { id: String(s.id), nome: String(s.nome ?? ""), cor: String(s.cor ?? "#3b82f6") });
+    }
+    return map;
+  }, [crmStagesForChat]);
+  const leadByPhone = useMemo(() => {
+    const map = new Map<string, any>();
+    const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
+    for (const l of (crmLeadsForStage as any[])) {
+      const d = digits(l?.telefone);
+      if (d) map.set(d, l);
+    }
+    return map;
+  }, [crmLeadsForStage]);
+  const findLeadForConv = (waId: string | null | undefined): any | null => {
+    const d = String(waId ?? "").replace(/\D+/g, "");
+    if (!d) return null;
+    if (leadByPhone.has(d)) return leadByPhone.get(d);
+    // try suffix match (varying country codes)
+    for (const [k, v] of leadByPhone.entries()) {
+      if (k.endsWith(d) || d.endsWith(k)) return v;
+    }
+    return null;
+  };
+
+
+
 
   const unreadTotal = useMemo(
     () => conversationList.reduce((acc, c) => acc + (Number((c as any).unread_count ?? 0) > 0 ? 1 : 0), 0),
