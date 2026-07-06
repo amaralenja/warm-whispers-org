@@ -85,6 +85,7 @@ import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } fro
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
+import { CurrentConversationProvider } from "@/lib/audio-player-context";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
@@ -1267,6 +1268,7 @@ function ChatPage() {
 
 
 
+              <CurrentConversationProvider value={{ conversationId: String(active.id), phone: (active as any).contact_wa_id ?? null, title: (active as any).contact_name ?? (active as any).contact_wa_id ?? "Conversa" }}>
               <div
                 ref={scrollRef}
                 className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-6 py-6 scrollbar-fancy"
@@ -1297,6 +1299,9 @@ function ChatPage() {
 
                 </div>
               </div>
+              </CurrentConversationProvider>
+
+
 
               <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
                 {replyTo && (
@@ -1570,7 +1575,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
 
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
+    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
@@ -1578,7 +1583,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
+      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
     }
     if (mediaState?.loading) {
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading outgoing={outgoing} />;
@@ -1711,8 +1716,8 @@ function MediaPlaceholder({
 }
 
 function RenderMedia({
-  type, url, mime, filename, outgoing, onMediaSettled,
-}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void }) {
+  type, url, mime, filename, outgoing, onMediaSettled, trackId,
+}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void; trackId?: string }) {
   const safeType = toText(type);
   const safeUrl = toText(url);
   const safeFilename = toText(filename);
@@ -1731,7 +1736,7 @@ function RenderMedia({
     return <video src={safeUrl} controls onLoadedMetadata={onMediaSettled} className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
   if (safeType === "audio") {
-    return <WhatsappAudioPlayer url={safeUrl} outgoing={outgoing} />;
+    return <WhatsappAudioPlayer url={safeUrl} outgoing={outgoing} trackId={trackId} />;
   }
   if (safeType === "document") {
     return (

@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import { DashboardConfigProvider } from "@/lib/dashboard-config";
+import { AudioPlayerProvider, FloatingAudioMiniPlayer } from "@/lib/audio-player-context";
 
 
 export const Route = createFileRoute("/_authenticated")({
@@ -30,19 +31,22 @@ function AuthedLayout() {
   return (
     <WorkspaceProvider>
       <DashboardConfigProvider>
-        <SidebarProvider>
-          <div className="flex min-h-screen w-full bg-background">
-            <AppSidebar />
-            <div className="flex-1 flex flex-col min-w-0">
-              <header className="flex h-14 items-center gap-3 border-b border-border px-3 md:px-5">
-                <SidebarTrigger />
-              </header>
-              <div className="flex-1">
-                <Outlet />
+        <AudioPlayerProvider>
+          <SidebarProvider>
+            <div className="flex min-h-screen w-full bg-background">
+              <AppSidebar />
+              <div className="flex-1 flex flex-col min-w-0">
+                <header className="flex h-14 items-center gap-3 border-b border-border px-3 md:px-5">
+                  <SidebarTrigger />
+                </header>
+                <div className="flex-1">
+                  <Outlet />
+                </div>
               </div>
             </div>
-          </div>
-        </SidebarProvider>
+            <FloatingAudioMiniPlayer />
+          </SidebarProvider>
+        </AudioPlayerProvider>
       </DashboardConfigProvider>
     </WorkspaceProvider>
   );

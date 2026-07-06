@@ -44,8 +44,8 @@
   --color-chat-accent: var(--chat-accent);
   --color-chat-accent-foreground: var(--chat-accent-foreground);
 
-  --font-display: "Inter", system-ui, -apple-system, sans-serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Inter", system-ui, -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
 }
 
 /* Premium dark — editorial, monocromático com acento âmbar quente */
