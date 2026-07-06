@@ -800,12 +800,154 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId } } : {}),
     };
 
+    // Chunk long text messages — Meta rejects text > 4096 chars with a generic INTERNAL error.
+    // We split at paragraph/word boundaries and send each chunk as its own message.
+    const MAX_TEXT_LEN = 3500;
+    function splitText(input: string): string[] {
+      const text = String(input ?? "");
+      if (text.length <= MAX_TEXT_LEN) return [text];
+      const chunks: string[] = [];
+      let remaining = text;
+      while (remaining.length > MAX_TEXT_LEN) {
+        let cut = remaining.lastIndexOf("\n\n", MAX_TEXT_LEN);
+        if (cut < MAX_TEXT_LEN * 0.5) cut = remaining.lastIndexOf("\n", MAX_TEXT_LEN);
+        if (cut < MAX_TEXT_LEN * 0.5) cut = remaining.lastIndexOf(" ", MAX_TEXT_LEN);
+        if (cut <= 0) cut = MAX_TEXT_LEN;
+        chunks.push(remaining.slice(0, cut).trimEnd());
+        remaining = remaining.slice(cut).trimStart();
+      }
+      if (remaining) chunks.push(remaining);
+      return chunks;
+    }
+
+    async function deliverOne(sendBody: any, chunkText: string | null) {
+      let insertedMessageId = "";
+      if (isVendor) {
+        const rpcArgs = vendorRpcArgs(context);
+        if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+        const { data: messageId, error } = await db.rpc("vendor_insert_wa_message" as any, {
+          ...rpcArgs,
+          _conversation_id: conversationId,
+          _channel_id: data.channelId,
+          _wa_message_id: null,
+          _direction: "out",
+          _msg_type: data.type,
+          _text_body: data.type === "text" ? chunkText : null,
+          _media_url: data.type !== "text" ? data.mediaUrl : null,
+          _media_filename: data.filename || null,
+          _caption: data.caption || null,
+          _from_wa_id: ch.phoneNumberId,
+          _to_wa_id: toNormalized,
+          _status: "pending",
+          _raw: { pending: true, request: sendBody, sent_by_vendor_id: (context as any).vendor?.id ?? null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
+        });
+        if (error || !messageId) throw new Error(`Falha ao salvar mensagem: ${error?.message ?? "mensagem não criada"}`);
+        insertedMessageId = String(messageId);
+
+        await db.rpc("vendor_touch_wa_conversation" as any, {
+          ...rpcArgs,
+          _conversation_id: conversationId,
+          _preview: data.type === "text" ? (chunkText ?? "").slice(0, 120) : previewForOut(data),
+          _direction: "out",
+        });
+      } else {
+        const { data: inserted, error } = await db.from("wa_messages" as any).insert({
+          conversation_id: conversationId,
+          channel_id: data.channelId,
+          wa_message_id: null,
+          direction: "out",
+          msg_type: data.type,
+          text_body: data.type === "text" ? chunkText : null,
+          media_url: data.type !== "text" ? data.mediaUrl : null,
+          media_filename: data.filename || null,
+          caption: data.caption || null,
+          from_wa_id: ch.phoneNumberId,
+          to_wa_id: toNormalized,
+          status: "pending",
+          sent_by: context.userId,
+          raw: { pending: true, request: sendBody, sent_by_vendor_id: null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
+        }).select("id").single();
+        if (error) throw new Error(`Falha ao salvar mensagem: ${error.message}`);
+        insertedMessageId = String((inserted as any).id);
+
+        await db
+          .from("wa_conversations" as any)
+          .update({
+            last_message_at: new Date().toISOString(),
+            last_message_preview: data.type === "text" ? (chunkText ?? "").slice(0, 120) : previewForOut(data),
+            last_message_direction: "out",
+            last_message_status: "pending",
+          })
+          .eq("id", conversationId);
+      }
+
+      try {
+        const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+          method: "POST",
+          body: JSON.stringify(sendBody),
+        }, db);
+
+        const waMsgId = resp?.messages?.[0]?.id ?? null;
+        const replyMeta = data.contextWaMessageId
+          ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null }
+          : {};
+        if (isVendor) {
+          const rpcArgs = vendorRpcArgs(context);
+          if (rpcArgs) {
+            await db.rpc("vendor_update_wa_message_status" as any, {
+              ...rpcArgs,
+              _message_id: insertedMessageId,
+              _wa_message_id: waMsgId,
+              _status: "sent",
+              _raw: { request: sendBody, response: resp, ...replyMeta },
+            });
+          }
+        } else {
+          await db
+            .from("wa_messages" as any)
+            .update({ wa_message_id: waMsgId, status: "sent", raw: { request: sendBody, response: resp, ...replyMeta } })
+            .eq("id", insertedMessageId);
+        }
+        return { waMsgId, messageId: insertedMessageId };
+      } catch (e: any) {
+        const rawMessage = e?.message ? String(e.message) : "Falha ao enviar no WhatsApp";
+        const friendly = rawMessage === "INTERNAL" || /\bINTERNAL\b/.test(rawMessage)
+          ? "WhatsApp recusou a mensagem (erro INTERNAL da Meta). Isso costuma acontecer com texto muito longo, link/mídia inválida ou janela de 24h expirada. Tente encurtar a mensagem ou reenviar."
+          : rawMessage;
+        if (isVendor) {
+          const rpcArgs = vendorRpcArgs(context);
+          if (rpcArgs) {
+            await db.rpc("vendor_update_wa_message_status" as any, {
+              ...rpcArgs,
+              _message_id: insertedMessageId,
+              _wa_message_id: null,
+              _status: "failed",
+              _raw: { request: sendBody, error: rawMessage },
+            });
+          }
+        } else {
+          await db
+            .from("wa_messages" as any)
+            .update({ status: "failed", raw: { request: sendBody, error: rawMessage } })
+            .eq("id", insertedMessageId);
+        }
+        throw new Error(friendly);
+      }
+    }
+
     if (data.type === "text") {
       if (!data.text) throw new Error("Texto vazio");
-      body.text = { body: data.text };
-    } else if (data.type === "audio") {
+      const chunks = splitText(data.text);
+      let last: { waMsgId: string | null; messageId: string } | null = null;
+      for (const chunk of chunks) {
+        const chunkBody = { ...body, text: { body: chunk } };
+        last = await deliverOne(chunkBody, chunk);
+      }
+      return { ok: true, waMsgId: last?.waMsgId ?? null, messageId: last?.messageId ?? "", chunks: chunks.length };
+    }
+
+    if (data.type === "audio") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
-      // Convert to OGG/Opus mono so WhatsApp renders as a voice note with waveform.
       let voiceUrl = data.mediaUrl;
       try {
         const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
@@ -822,117 +964,8 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };
     }
 
-    let insertedMessageId = "";
-    if (isVendor) {
-      const rpcArgs = vendorRpcArgs(context);
-      if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
-      const { data: messageId, error } = await db.rpc("vendor_insert_wa_message" as any, {
-        ...rpcArgs,
-        _conversation_id: conversationId,
-        _channel_id: data.channelId,
-        _wa_message_id: null,
-        _direction: "out",
-        _msg_type: data.type,
-        _text_body: data.type === "text" ? data.text : null,
-        _media_url: data.type !== "text" ? data.mediaUrl : null,
-        _media_filename: data.filename || null,
-        _caption: data.caption || null,
-        _from_wa_id: ch.phoneNumberId,
-        _to_wa_id: toNormalized,
-        _status: "pending",
-        _raw: { pending: true, request: body, sent_by_vendor_id: (context as any).vendor?.id ?? null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
-      });
-      if (error || !messageId) throw new Error(`Falha ao salvar mensagem: ${error?.message ?? "mensagem não criada"}`);
-      insertedMessageId = String(messageId);
-
-      await db.rpc("vendor_touch_wa_conversation" as any, {
-        ...rpcArgs,
-        _conversation_id: conversationId,
-        _preview: previewForOut(data),
-        _direction: "out",
-      });
-    } else {
-      const { data: inserted, error } = await db.from("wa_messages" as any).insert({
-        conversation_id: conversationId,
-        channel_id: data.channelId,
-        wa_message_id: null,
-        direction: "out",
-        msg_type: data.type,
-        text_body: data.type === "text" ? data.text : null,
-        media_url: data.type !== "text" ? data.mediaUrl : null,
-        media_filename: data.filename || null,
-        caption: data.caption || null,
-        from_wa_id: ch.phoneNumberId,
-        to_wa_id: toNormalized,
-        status: "pending",
-        sent_by: context.userId,
-        raw: { pending: true, request: body, sent_by_vendor_id: null, ...(data.contextWaMessageId ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null } : {}) },
-      }).select("id").single();
-      if (error) throw new Error(`Falha ao salvar mensagem: ${error.message}`);
-      insertedMessageId = String((inserted as any).id);
-
-      await db
-        .from("wa_conversations" as any)
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_preview: previewForOut(data),
-          last_message_direction: "out",
-          last_message_status: "pending",
-        })
-        .eq("id", conversationId);
-    }
-
-    try {
-      const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      }, db);
-
-      const waMsgId = resp?.messages?.[0]?.id ?? null;
-      const replyMeta = data.contextWaMessageId
-        ? { context: { message_id: data.contextWaMessageId }, reply_preview: data.replyPreview || null }
-        : {};
-      if (isVendor) {
-        const rpcArgs = vendorRpcArgs(context);
-        if (rpcArgs) {
-          await db.rpc("vendor_update_wa_message_status" as any, {
-            ...rpcArgs,
-            _message_id: insertedMessageId,
-            _wa_message_id: waMsgId,
-            _status: "sent",
-            _raw: { request: body, response: resp, ...replyMeta },
-          });
-        }
-      } else {
-        await db
-          .from("wa_messages" as any)
-          .update({ wa_message_id: waMsgId, status: "sent", raw: { request: body, response: resp, ...replyMeta } })
-          .eq("id", insertedMessageId);
-      }
-
-
-      return { ok: true, waMsgId, messageId: insertedMessageId };
-    } catch (e: any) {
-      const errorMessage = e?.message ? String(e.message) : "Falha ao enviar no WhatsApp";
-      if (isVendor) {
-        const rpcArgs = vendorRpcArgs(context);
-        if (rpcArgs) {
-          await db.rpc("vendor_update_wa_message_status" as any, {
-            ...rpcArgs,
-            _message_id: insertedMessageId,
-            _wa_message_id: null,
-            _status: "failed",
-            _raw: { request: body, error: errorMessage },
-          });
-        }
-      } else {
-        await db
-          .from("wa_messages" as any)
-          .update({ status: "failed", raw: { request: body, error: errorMessage } })
-          .eq("id", insertedMessageId);
-      }
-      throw new Error(errorMessage);
-    }
+    const result = await deliverOne(body, null);
+    return { ok: true, waMsgId: result.waMsgId, messageId: result.messageId };
   });
 
 function previewForOut(d: SendInput): string {
