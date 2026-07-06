@@ -85,7 +85,7 @@ export class ChatErrorBoundary extends Component<Props, State> {
   reset = () => this.setState({ error: null, errorText: "", stackText: "" });
 
   render() {
-    if (!this.state.error) return <SafeChildren>{this.props.children}</SafeChildren>;
+    if (!this.state.error) return <SafeChildren>{this.props?.children ?? null}</SafeChildren>;
     const errorText = forceText(this.state.errorText, "Erro desconhecido");
     const stackText = forceText(this.state.stackText, "Sem detalhes técnicos disponíveis.");
     return (
