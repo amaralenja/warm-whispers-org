@@ -2097,6 +2097,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _vendor_check: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: boolean
+      }
       _vendor_norm: { Args: { value: string }; Returns: string }
       _wa_contact_variants: { Args: { _raw: string }; Returns: string[] }
       assign_vendor_for_channel: {
@@ -2362,6 +2366,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_delete_checkout: {
+        Args: { _codigo: string; _id: string; _vendor_id: number }
+        Returns: boolean
+      }
       vendor_delete_crm_stage: {
         Args: { _codigo: string; _id: string; _vendor_id: number }
         Returns: boolean
@@ -2453,6 +2461,25 @@ export type Database = {
           updated_at: string
           waiting_for: string
         }[]
+      }
+      vendor_list_checkouts: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          created_at: string
+          id: string
+          link: string
+          mensagem: string
+          nome: string
+          ordem: number
+          updated_at: string
+          vendedor_id: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "vendor_checkouts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       vendor_list_crm_experts: {
         Args: { _codigo: string; _vendor_id: number }
@@ -2875,6 +2902,18 @@ export type Database = {
           _wa_message_id?: string
         }
         Returns: boolean
+      }
+      vendor_upsert_checkout: {
+        Args: {
+          _codigo: string
+          _id: string
+          _link: string
+          _mensagem: string
+          _nome: string
+          _ordem: number
+          _vendor_id: number
+        }
+        Returns: string
       }
       vendor_upsert_crm_stage: {
         Args: {
