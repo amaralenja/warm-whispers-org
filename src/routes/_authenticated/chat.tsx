@@ -1354,15 +1354,26 @@ function ChatPage() {
                   <VendorCheckoutButton
                     enabled={!!vendorSession}
                     disabled={sendMut.isPending || !active}
-                    onSend={async (text: string) => {
+                    onSend={async (payload) => {
                       if (!active) return;
-                      await sendMut.mutateAsync({
-                        channelId: active.channel_id,
-                        conversationId: active.id,
-                        to: active.contact_wa_id,
-                        type: "text",
-                        text,
-                      });
+                      if (payload.kind === "image") {
+                        await sendMut.mutateAsync({
+                          channelId: active.channel_id,
+                          conversationId: active.id,
+                          to: active.contact_wa_id,
+                          type: "image",
+                          mediaUrl: payload.imageUrl,
+                          caption: payload.caption,
+                        });
+                      } else {
+                        await sendMut.mutateAsync({
+                          channelId: active.channel_id,
+                          conversationId: active.id,
+                          to: active.contact_wa_id,
+                          type: "text",
+                          text: payload.text,
+                        });
+                      }
                     }}
                   />
                   <DropdownMenu>
