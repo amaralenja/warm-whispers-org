@@ -85,6 +85,7 @@ import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } fro
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
+import { CurrentConversationProvider } from "@/lib/audio-player-context";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
