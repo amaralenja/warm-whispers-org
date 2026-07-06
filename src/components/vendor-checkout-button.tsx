@@ -338,7 +338,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
