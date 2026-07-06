@@ -1716,8 +1716,8 @@ function MediaPlaceholder({
 }
 
 function RenderMedia({
-  type, url, mime, filename, outgoing, onMediaSettled,
-}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void }) {
+  type, url, mime, filename, outgoing, onMediaSettled, trackId,
+}: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void; trackId?: string }) {
   const safeType = toText(type);
   const safeUrl = toText(url);
   const safeFilename = toText(filename);
@@ -1736,7 +1736,7 @@ function RenderMedia({
     return <video src={safeUrl} controls onLoadedMetadata={onMediaSettled} className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
   if (safeType === "audio") {
-    return <WhatsappAudioPlayer url={safeUrl} outgoing={outgoing} />;
+    return <WhatsappAudioPlayer url={safeUrl} outgoing={outgoing} trackId={trackId} />;
   }
   if (safeType === "document") {
     return (
