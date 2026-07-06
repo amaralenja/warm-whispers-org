@@ -1819,6 +1819,33 @@ function RenderMedia({
   return null;
 }
 
+function ClickableImage({
+  src,
+  alt,
+  onMediaSettled,
+  isSticker,
+}: {
+  src: string;
+  alt: string;
+  onMediaSettled?: () => void;
+  isSticker?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        onLoad={onMediaSettled}
+        onClick={() => setOpen(true)}
+        className={`mb-2 block cursor-zoom-in rounded-2xl border border-chat-line object-contain transition hover:opacity-95 ${isSticker ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
+      />
+      {open && <ImageLightbox src={src} alt={alt} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 function WindowCountdown({ lastInboundAt }: { lastInboundAt: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
