@@ -2160,6 +2160,16 @@ function FlowInlineBar({
       ) : (
         <div
           className="flex gap-2 overflow-x-auto scrollbar-fancy pb-2 cursor-grab active:cursor-grabbing"
+          onWheel={(e) => {
+            const el = e.currentTarget;
+            const canScrollX = el.scrollWidth > el.clientWidth;
+            if (!canScrollX) return;
+            // Se o usuário rolar vertical em cima da faixa, converte pra horizontal.
+            const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+            if (delta === 0) return;
+            el.scrollLeft += delta;
+            e.preventDefault();
+          }}
           onMouseDown={(e) => {
             const el = e.currentTarget;
             const startX = e.pageX - el.offsetLeft;
