@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const BUCKET = "wa-media";
+const LEGACY_BUCKET = "vendor-assets";
 
 type Checkout = {
   id: string;
@@ -27,7 +28,12 @@ function vendorArgs(context: any): { _vendor_id: number; _codigo: string } {
 async function signPath(path: string | null | undefined, ttlSeconds = 60 * 60 * 24 * 7): Promise<string | null> {
   if (!path) return null;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, ttlSeconds);
+  let { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, ttlSeconds);
+  if ((error || !data?.signedUrl) && !path.startsWith("vendor-assets/")) {
+    const legacy = await supabaseAdmin.storage.from(LEGACY_BUCKET).createSignedUrl(path, ttlSeconds);
+    data = legacy.data;
+    error = legacy.error;
+  }
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
@@ -106,6 +112,9 @@ export const deleteVendorCheckoutFn = createServerFn({ method: "POST" })
       if (row?.image_path) {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         await supabaseAdmin.storage.from(BUCKET).remove([row.image_path]);
+        if (!String(row.image_path).startsWith("vendor-assets/")) {
+          await supabaseAdmin.storage.from(LEGACY_BUCKET).remove([row.image_path]);
+        }
       }
     } catch {}
     const { error } = await (context as any).supabase.rpc("vendor_delete_checkout", {
