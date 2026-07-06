@@ -43,9 +43,13 @@ function toStr(v: any): string | null {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   return null;
 }
+function safeStr(v: any, fallback = ""): string {
+  const s = toStr(v);
+  return s == null ? fallback : s;
+}
 function sanitizeLead(l: any): PickedLead {
   return {
-    id: String(l?.id ?? ""),
+    id: safeStr(l?.id),
     nome: toStr(l?.nome),
     email: toStr(l?.email),
     whatsapp: toStr(l?.whatsapp),
