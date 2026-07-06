@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -98,6 +98,10 @@ function ChatRoute() {
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatRoute,
+  validateSearch: (search: Record<string, unknown>) => ({
+    phone: typeof search.phone === "string" ? search.phone : undefined,
+    conversationId: typeof search.conversationId === "string" ? search.conversationId : undefined,
+  }),
 });
 
 type Conv = {
@@ -404,6 +408,9 @@ function ChatPage() {
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const searchParams = Route.useSearch();
+  const navigate = useNavigate();
+  const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned">("all");
 
@@ -547,6 +554,31 @@ function ChatPage() {
 
 
   const conversationList = useMemo(() => sortConversationsByLastInteraction(asArray<Conv>(convs)), [convs]);
+
+  // Auto-open a conversation when arriving via ?phone= or ?conversationId=
+  useEffect(() => {
+    const wanted = `${searchParams.conversationId ?? ""}|${searchParams.phone ?? ""}`;
+    if (!searchParams.conversationId && !searchParams.phone) return;
+    if (autoOpenedRef.current === wanted) return;
+    if (conversationList.length === 0) return;
+    const digits = (s: string) => s.replace(/\D+/g, "");
+    let match: Conv | undefined;
+    if (searchParams.conversationId) {
+      match = conversationList.find((c) => String(c.id) === searchParams.conversationId);
+    }
+    if (!match && searchParams.phone) {
+      const wantedDigits = digits(searchParams.phone);
+      if (wantedDigits) {
+        match = conversationList.find((c) => digits(String(c.contact_wa_id ?? "")).endsWith(wantedDigits) || digits(String(c.contact_wa_id ?? "")) === wantedDigits);
+      }
+    }
+    if (match) {
+      autoOpenedRef.current = wanted;
+      setActiveId(String(match.id));
+      navigate({ to: "/chat", search: {}, replace: true });
+    }
+  }, [searchParams.phone, searchParams.conversationId, conversationList, navigate]);
+
 
   const unreadTotal = useMemo(
     () => conversationList.reduce((acc, c) => acc + (Number((c as any).unread_count ?? 0) > 0 ? 1 : 0), 0),
