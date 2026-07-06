@@ -182,10 +182,26 @@ export async function sendWA(channelId: string, to: string, body: any, db: any) 
   const toNormalized = normalizeBrWhatsappNumber(to);
   const payload = { messaging_product: "whatsapp", to: toNormalized, ...body };
 
-  let attempt = await postMetaMessage(token, phoneNumberId, payload);
+  // Retry transitório: mídia (vídeo especialmente) volta 5xx/timeout com frequência
+  // quando o Meta demora pra baixar a URL. Tenta até 3 vezes com backoff antes de trocar token.
+  let attempt = { ok: false, status: 0, json: null as any };
+  let lastErr: unknown = null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      attempt = await postMetaMessage(token, phoneNumberId, payload);
+    } catch (e) {
+      lastErr = e;
+      attempt = { ok: false, status: 0, json: { error: { message: String((e as any)?.message ?? e) } } };
+    }
+    if (attempt.ok) break;
+    const transient = attempt.status === 0 || attempt.status >= 500;
+    if (!transient) break;
+    await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+  }
+
   let workingToken = token;
   if (!attempt.ok) {
-    const msg = attempt.json?.error?.message ?? attempt.json?.message ?? `HTTP ${attempt.status}`;
+    const msg = attempt.json?.error?.message ?? attempt.json?.message ?? (lastErr ? String((lastErr as any)?.message ?? lastErr) : `HTTP ${attempt.status}`);
     const msgStr = typeof msg === "string" ? msg : JSON.stringify(msg);
     const canRetry = /INTERNAL|Meta token|Unsupported|OAuth|missing permissions|\b(400|401|500)\b/i.test(msgStr);
     if (canRetry) {
