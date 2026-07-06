@@ -921,9 +921,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         return { waMsgId, messageId: insertedMessageId };
       } catch (e: any) {
         const rawMessage = e?.message ? String(e.message) : "Falha ao enviar no WhatsApp";
-        const friendly = rawMessage === "INTERNAL" || /\bINTERNAL\b/.test(rawMessage)
-          ? "WhatsApp recusou a mensagem (erro INTERNAL da Meta). Isso costuma acontecer com texto muito longo, link/mídia inválida ou janela de 24h expirada. Tente encurtar a mensagem ou reenviar."
-          : rawMessage;
+        const isBareInternal = rawMessage.trim().toUpperCase() === "INTERNAL";
+        const friendly = isBareInternal
+          ? "WhatsApp recusou (INTERNAL da Meta, sem detalhe). Provável janela de 24h expirada — o cliente precisa enviar uma mensagem antes, ou você precisa usar um template aprovado."
+          : `WhatsApp recusou: ${rawMessage}`;
         if (isVendor) {
           const rpcArgs = vendorRpcArgs(context);
           if (rpcArgs) {
