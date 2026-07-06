@@ -892,10 +892,29 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       }
 
       try {
-        const { body: resp } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
-          method: "POST",
-          body: JSON.stringify(sendBody),
-        }, db);
+        let resp: any;
+        try {
+          const r = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+            method: "POST",
+            body: JSON.stringify(sendBody),
+          }, db);
+          resp = r.body;
+        } catch (firstErr: any) {
+          const firstMsg = String(firstErr?.message ?? "").trim().toUpperCase();
+          // Meta devolve "INTERNAL" opaco quando o context.message_id do reply está
+          // expirado/inválido. Retry sem o context resolve na maior parte dos casos.
+          if (firstMsg === "INTERNAL" && sendBody?.context?.message_id) {
+            const { context: _drop, ...retryBody } = sendBody;
+            console.warn("[whatsapp-chat] Meta INTERNAL com context.message_id — tentando sem reply");
+            const r = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+              method: "POST",
+              body: JSON.stringify(retryBody),
+            }, db);
+            resp = r.body;
+          } else {
+            throw firstErr;
+          }
+        }
 
         const waMsgId = resp?.messages?.[0]?.id ?? null;
         const replyMeta = data.contextWaMessageId
