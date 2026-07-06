@@ -1687,6 +1687,7 @@ function InteractiveContent({ msg, outgoing }: { msg: Msg; outgoing?: boolean })
 function MediaPlaceholder({
   type,
   filename,
+  mime,
   loading,
   error,
   onRetry,
@@ -1694,12 +1695,21 @@ function MediaPlaceholder({
 }: {
   type: string;
   filename: string | null;
+  mime?: string | null;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
   outgoing?: boolean;
 }) {
-  const safeType = toText(type);
+  const rawType = toText(type);
+  const safeMime = (mime ?? "").toLowerCase();
+  // Se o tipo veio vazio/estranho, deduz pelo mime (WhatsApp manda sticker como image/webp).
+  const safeType = rawType === "sticker" || safeMime === "image/webp"
+    ? "sticker"
+    : rawType || (safeMime.startsWith("image/") ? "image"
+        : safeMime.startsWith("video/") ? "video"
+        : safeMime.startsWith("audio/") ? "audio"
+        : "document");
   const safeFilename = toText(filename);
   const icon = safeType === "image" || safeType === "sticker"
     ? <ImageIcon className="h-5 w-5" />
@@ -1744,7 +1754,19 @@ function MediaPlaceholder({
 function RenderMedia({
   type, url, mime, filename, outgoing, onMediaSettled, trackId,
 }: { type: string; url: string; mime: string | null; filename: string | null; outgoing?: boolean; onMediaSettled?: () => void; trackId?: string }) {
-  const safeType = toText(type);
+  const rawType = toText(type);
+  const safeMime = (mime ?? "").toLowerCase();
+  // Deduz o tipo real pelo mime quando o msg_type vier vazio ou como "document"
+  // (WhatsApp entrega sticker como image/webp e alguns webhooks caem no fallback "document").
+  const safeType = rawType === "sticker" || safeMime === "image/webp"
+    ? "sticker"
+    : rawType === "image" || safeMime.startsWith("image/")
+      ? "image"
+      : rawType === "video" || safeMime.startsWith("video/")
+        ? "video"
+        : rawType === "audio" || safeMime.startsWith("audio/")
+          ? "audio"
+          : rawType || "document";
   const safeUrl = toText(url);
   const safeFilename = toText(filename);
   if (safeType === "image" || safeType === "sticker") {
