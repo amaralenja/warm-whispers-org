@@ -98,7 +98,7 @@ export function LeadSearchPicker({
   return (
     <>
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <UserPlus className="h-4 w-4 mr-1" /> {triggerLabel}
+        <UserPlus className="h-4 w-4 mr-1" /> {safeStr(triggerLabel, "Buscar lead")}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
