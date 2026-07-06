@@ -118,12 +118,12 @@ export function LeadSearchPicker({
             </Button>
           </div>
           <div className="max-h-[400px] overflow-y-auto space-y-1 mt-2">
-            {results.length === 0 && !loading ? (
+            {(!Array.isArray(results) || results.length === 0) && !loading ? (
               <p className="text-xs text-muted-foreground text-center py-6">
                 Digite e busque para encontrar leads.
               </p>
             ) : null}
-            {results.map((l) => (
+            {(Array.isArray(results) ? results : []).map((l) => (
               <button
                 type="button"
                 key={safeStr(l.id)}
