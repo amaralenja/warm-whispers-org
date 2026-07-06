@@ -64,7 +64,17 @@ async function metaProxy(channelToken: string, path: string, init?: RequestInit)
   let body: any = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
   if (!res.ok) {
-    const msg = (body && (body?.error?.message || body?.message)) || `Meta HTTP ${res.status}`;
+    const err = body?.error ?? {};
+    const parts = [
+      err.error_user_title,
+      err.error_user_msg,
+      err.message || body?.message,
+      err.error_subcode ? `subcode ${err.error_subcode}` : null,
+      err.code ? `code ${err.code}` : null,
+      err.type || null,
+    ].filter(Boolean);
+    const msg = parts.length ? parts.join(" — ") : `Meta HTTP ${res.status}`;
+    console.error("[metaProxy] Meta rejected request", { path, status: res.status, body });
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
   return body;
