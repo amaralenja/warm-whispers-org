@@ -82,7 +82,7 @@ export function LeadSearchPicker({
       if (error) throw error;
       setResults(((data ?? []) as any[]).map(sanitizeLead));
     } catch (e: any) {
-      toast.error("Erro ao buscar: " + (toStr(e?.message) || toStr(e) || "erro interno"));
+      toast.error("Erro ao buscar: " + safeStr(e?.message, safeStr(e, "erro interno")));
     } finally {
       setLoading(false);
     }
