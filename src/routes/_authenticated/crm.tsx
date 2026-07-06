@@ -312,6 +312,7 @@ function Kanban({
 }) {
 
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [chatLead, setChatLead] = useState<Lead | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
     for (const s of stages) map.set(s.id, []);
@@ -343,62 +344,104 @@ function Kanban({
   const [visible, setVisible] = useState<Record<string, number>>({});
   const PAGE = 15;
 
+  const chatPhone = (chatLead?.telefone ?? "").replace(/\D+/g, "");
+
   return (
-    <DragScroll className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide cursor-grab active:cursor-grabbing select-none">
-      {stages.map((s) => {
-        const items = grouped.get(s.id) ?? [];
-        const shown = visible[s.id] ?? PAGE;
-        const totalValor = items.reduce((a, b) => a + (b.valor_estimado ?? 0), 0);
-        const isOver = dragOver === s.id;
-        return (
-          <div
-            key={s.id}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(s.id); }}
-            onDragLeave={() => setDragOver((p) => (p === s.id ? null : p))}
-            onDrop={(e) => onDrop(e, s.id)}
-            style={{ borderColor: hexToRgba(s.cor, 0.4), background: isOver ? hexToRgba(s.cor, 0.08) : undefined }}
-            className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card/40 transition-colors"
-          >
-            <div className="h-1 w-full" style={{ background: s.cor }} />
-            <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5" style={{ background: hexToRgba(s.cor, 0.12) }}>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: s.cor }} />
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: s.cor }}>{s.label}</span>
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                  {items.length}
-                </span>
-              </div>
-              {totalValor > 0 && (
-                <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
-              )}
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
-              {items.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border/40 py-6 text-center text-[11px] text-muted-foreground">
-                  Arraste leads aqui
+    <>
+      <DragScroll className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide cursor-grab active:cursor-grabbing select-none">
+        {stages.map((s) => {
+          const items = grouped.get(s.id) ?? [];
+          const shown = visible[s.id] ?? PAGE;
+          const totalValor = items.reduce((a, b) => a + (b.valor_estimado ?? 0), 0);
+          const isOver = dragOver === s.id;
+          return (
+            <div
+              key={s.id}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(s.id); }}
+              onDragLeave={() => setDragOver((p) => (p === s.id ? null : p))}
+              onDrop={(e) => onDrop(e, s.id)}
+              style={{ borderColor: hexToRgba(s.cor, 0.4), background: isOver ? hexToRgba(s.cor, 0.08) : undefined }}
+              className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card/40 transition-colors"
+            >
+              <div className="h-1 w-full" style={{ background: s.cor }} />
+              <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5" style={{ background: hexToRgba(s.cor, 0.12) }}>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full" style={{ background: s.cor }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: s.cor }}>{s.label}</span>
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                    {items.length}
+                  </span>
                 </div>
-              )}
-              {items.slice(0, shown).map((lead) => (
-                <KanbanCard key={lead.id} lead={lead} stageColor={s.cor} tagColors={tagColors} onClick={() => onEdit(lead)} onDragStart={onDragStart} />
-              ))}
+                {totalValor > 0 && (
+                  <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
+                )}
+              </div>
 
-              {items.length > shown && (
-                <button
-                  type="button"
-                  onClick={() => setVisible((v) => ({ ...v, [s.id]: shown + PAGE }))}
-                  className="mt-1 rounded-lg border border-dashed border-border/50 py-2 text-[11px] font-medium text-muted-foreground hover:bg-muted/40"
-                >
-                  Ver mais ({items.length - shown})
-                </button>
-              )}
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+                {items.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-border/40 py-6 text-center text-[11px] text-muted-foreground">
+                    Arraste leads aqui
+                  </div>
+                )}
+                {items.slice(0, shown).map((lead) => (
+                  <KanbanCard
+                    key={lead.id}
+                    lead={lead}
+                    stageColor={s.cor}
+                    tagColors={tagColors}
+                    onEdit={() => onEdit(lead)}
+                    onOpenChat={() => setChatLead(lead)}
+                    onDragStart={onDragStart}
+                  />
+                ))}
+
+                {items.length > shown && (
+                  <button
+                    type="button"
+                    onClick={() => setVisible((v) => ({ ...v, [s.id]: shown + PAGE }))}
+                    className="mt-1 rounded-lg border border-dashed border-border/50 py-2 text-[11px] font-medium text-muted-foreground hover:bg-muted/40"
+                  >
+                    Ver mais ({items.length - shown})
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </DragScroll>
+          );
+        })}
+      </DragScroll>
+
+      <Dialog open={!!chatLead} onOpenChange={(o) => !o && setChatLead(null)}>
+        <DialogContent className="h-[85vh] max-w-5xl overflow-hidden p-0 sm:rounded-2xl">
+          <DialogHeader className="border-b px-4 py-3">
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <MessageCircle className="h-4 w-4 text-emerald-400" />
+              Conversa — {chatLead?.nome}
+              {chatLead?.telefone && (
+                <span className="text-xs font-normal text-muted-foreground">({chatLead.telefone})</span>
+              )}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Chat ao vivo com o lead selecionado.
+            </DialogDescription>
+          </DialogHeader>
+          {chatPhone ? (
+            <iframe
+              key={chatPhone}
+              src={`/chat?phone=${encodeURIComponent(chatPhone)}`}
+              title="Chat ao vivo"
+              className="h-full w-full flex-1 border-0"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
+              Este lead não tem telefone cadastrado.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
 
 
 function KanbanCard({
