@@ -294,6 +294,7 @@ function sortMessagesByCreatedAt<T extends Record<string, any>>(rows: T[]): T[] 
 function previewForMessageRow(m: any) {
   const body = toText(m?.text_body) || toText(m?.caption);
   if (body) return body.slice(0, 120);
+  if (toText(m?.msg_type).toLowerCase() === "unsupported" && toText(m?.raw?.unsupported?.type).toLowerCase() === "edit") return "✏️ Mensagem editada";
   switch (toText(m?.msg_type)) {
     case "image": return "📷 Imagem";
     case "audio": return "🎤 Áudio";
@@ -683,6 +684,7 @@ function ChatPage() {
     return asArray<Msg>(messages).filter((m) => {
       const t = String((m as any)?.msg_type ?? "").toLowerCase();
       if (t === "reaction") return false;
+      if (t === "unsupported" && String((m as any)?.raw?.unsupported?.type ?? "").toLowerCase() === "edit") return false;
       // Alguns provedores marcam a reação como "document" sem media_id nem filename.
       // Nesses casos escondemos a bolha vazia de "Documento".
       if (t === "document" && !(m as any)?.media_id && !(m as any)?.media_url && !(m as any)?.media_filename) return false;

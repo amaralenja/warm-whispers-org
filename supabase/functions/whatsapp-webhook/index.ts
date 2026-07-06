@@ -89,6 +89,21 @@ function extractEditedMessage(m: any): { body: string; originalId?: string } | n
   return { body: String(body ?? ""), originalId: originalId ? String(originalId) : undefined };
 }
 
+// A Cloud API oficial entrega edição de mensagem como "unsupported" quando a conta
+// ainda não tem suporte ao conteúdo editado. Nesse caso não existe mídia real pra
+// baixar nem texto novo confiável; registrar isso como documento polui a conversa.
+function isUnsupportedEditMessage(m: any): boolean {
+  const t = String(m?.type ?? "").toLowerCase();
+  const unsupportedType = String(m?.unsupported?.type ?? "").toLowerCase();
+  if (t === "unsupported" && unsupportedType === "edit") return true;
+  const errors = Array.isArray(m?.errors) ? m.errors : [];
+  return t === "unsupported" && errors.some((err: any) => {
+    const code = String(err?.code ?? "");
+    const details = String(err?.error_data?.details ?? err?.message ?? err?.title ?? "").toLowerCase();
+    return code === "131051" && details.includes("message type");
+  });
+}
+
 // Baixa a mídia VIA PROXY do EvoHub (/meta/*). Bater direto em graph.facebook.com
 // com o channel token retorna 401 — o Hub que troca pelo token oficial Meta.
 async function downloadMetaMedia(token: string, mediaId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
@@ -1332,6 +1347,10 @@ Deno.serve(async (req) => {
       const messages: any[] = Array.isArray(change.messages) ? change.messages : [];
       for (const m of messages) {
         if (!m?.from) continue;
+        if (isUnsupportedEditMessage(m)) {
+          console.log("[wa-webhook] edição unsupported ignorada", { id: m?.id, from: m?.from });
+          continue;
+        }
         const contactName = nameByWaId[m.from] ?? m.profile?.name ?? m.from;
         const timestampMs = parseInt(normalizeTimestamp(m.timestamp), 10) * 1000;
 
