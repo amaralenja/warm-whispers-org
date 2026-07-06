@@ -67,6 +67,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getVendorSession } from "@/lib/vendor-session";
+import { VendorCheckoutButton } from "@/components/vendor-checkout-button";
 import {
   listConversations,
   listMessages,
