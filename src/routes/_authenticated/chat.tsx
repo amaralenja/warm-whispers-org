@@ -86,6 +86,7 @@ import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } fro
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
+import { ImageLightbox } from "@/components/image-lightbox";
 import { CurrentConversationProvider } from "@/lib/audio-player-context";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1792,12 +1793,11 @@ function RenderMedia({
   const safeFilename = toText(filename);
   if (safeType === "image" || safeType === "sticker") {
     return (
-      <img
+      <ClickableImage
         src={safeUrl}
         alt={safeFilename || (safeType === "sticker" ? "Figurinha recebida" : "Imagem recebida")}
-        loading="lazy"
-        onLoad={onMediaSettled}
-        className={`mb-2 block rounded-2xl border border-chat-line object-contain ${safeType === "sticker" ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
+        onMediaSettled={onMediaSettled}
+        isSticker={safeType === "sticker"}
       />
     );
   }
