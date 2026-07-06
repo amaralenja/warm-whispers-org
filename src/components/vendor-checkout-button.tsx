@@ -143,12 +143,13 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
   }
 
   async function handlePickImage(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecione uma imagem");
+    const okTypes = ["image/jpeg", "image/jpg", "image/png"];
+    if (!okTypes.includes(file.type.toLowerCase())) {
+      toast.error("Só JPG ou PNG (WhatsApp não aceita webp/gif como imagem)");
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Imagem muito grande (máx 8MB)");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 5MB pelo WhatsApp)");
       return;
     }
     const preview = URL.createObjectURL(file);
