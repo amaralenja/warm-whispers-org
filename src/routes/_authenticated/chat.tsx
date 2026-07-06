@@ -30,6 +30,7 @@ import {
   StickyNote,
   ArrowUpDown,
   GripVertical,
+  Columns3,
 } from "lucide-react";
 import {
   DndContext,
