@@ -945,19 +945,18 @@ function ChatPage() {
               </div>
             ) : (
               <div>
-                {filtered.map((c) => {
-                  const contactWaId = toText(c.contact_wa_id);
-                  const contactName = toText(c.contact_name);
-                  const isActive = String(c.id) === activeId;
-                  const preview = toText(c.last_message_preview);
-                  const hasActiveFlow = activeFlowConvIds.has(String(c.id));
-                  return (
-                    <div
-                      key={String(c.id)}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setActiveId(String(c.id))}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy" onScroll={handleListScroll}>
+            {convsError || channelsError ? (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
+                {errorToText(convsError ?? channelsError, "Falha ao carregar conversas do WhatsApp")}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
+              </div>
+            ) : (
+              <div>
+                {visibleFiltered.map((c) => {
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
                       }`}
