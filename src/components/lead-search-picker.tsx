@@ -80,7 +80,7 @@ export function LeadSearchPicker({
       else q = q.or(`nome.ilike.%${t}%,whatsapp.ilike.%${t}%,email.ilike.%${t}%`);
       const { data, error } = await q;
       if (error) throw error;
-      setResults(((data ?? []) as any[]).map(sanitizeLead));
+      setResults((Array.isArray(data) ? data : []).map(sanitizeLead));
     } catch (e: any) {
       toast.error("Erro ao buscar: " + safeStr(e?.message, safeStr(e, "erro interno")));
     } finally {
