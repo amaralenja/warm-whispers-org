@@ -9,13 +9,21 @@ type Props = {
 };
 
 export function ImageLightbox({ src, alt, onClose }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
   const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
 
+  function reset() {
+    setScale(1);
+    setTx(0);
+    setTy(0);
+  }
+
   useEffect(() => {
+    setMounted(true);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       else if (e.key === "+" || e.key === "=") setScale((s) => Math.min(6, s + 0.25));
@@ -30,12 +38,6 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
       document.body.style.overflow = prev;
     };
   }, [onClose]);
-
-  function reset() {
-    setScale(1);
-    setTx(0);
-    setTy(0);
-  }
 
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
@@ -87,6 +89,8 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
     else reset();
   }
 
+  if (!mounted || typeof document === "undefined") return null;
+
   const node = (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-sm"
@@ -94,7 +98,6 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Toolbar */}
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1 rounded-full bg-black/60 p-1 text-white shadow-lg backdrop-blur">
         <button
           onClick={() => setScale((s) => Math.max(1, s - 0.5))}
@@ -140,12 +143,10 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
         </button>
       </div>
 
-      {/* Hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[11px] text-white/70 backdrop-blur">
         Duplo clique para zoom · Scroll ou pinça · Esc para fechar
       </div>
 
-      {/* Image */}
       <div
         className="flex h-full w-full items-center justify-center overflow-hidden"
         onWheel={onWheel}
@@ -173,6 +174,5 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
     </div>
   );
 
-  if (typeof document === "undefined") return null;
   return createPortal(node, document.body);
 }
