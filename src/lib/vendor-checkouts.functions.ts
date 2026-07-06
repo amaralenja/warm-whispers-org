@@ -21,7 +21,7 @@ export const listVendorCheckoutsFn = createServerFn({ method: "GET" })
       .order("ordem", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return (data ?? []) as Array<{
+    return (data ?? []) as unknown as Array<{
       id: string;
       nome: string;
       mensagem: string;
