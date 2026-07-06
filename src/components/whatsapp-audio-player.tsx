@@ -119,7 +119,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
       await audio.play();
       setPlaying(true);
     } catch (e: any) {
-      setError(safeText(e?.message || e) || "Falha ao reproduzir");
+      setErrorSafe(safeText(e?.message ?? e) || "Falha ao reproduzir");
     } finally {
       setLoading(false);
     }
