@@ -1,6 +1,6 @@
 import { Component, Fragment, isValidElement, type ReactNode } from "react";
 
-type Props = { children: ReactNode };
+type Props = { children?: ReactNode };
 type State = { error: unknown | null; errorText: string; stackText: string };
 
 function safeErrorText(error: unknown, fallback: string): string {
@@ -85,7 +85,7 @@ export class ChatErrorBoundary extends Component<Props, State> {
   reset = () => this.setState({ error: null, errorText: "", stackText: "" });
 
   render() {
-    if (!this.state.error) return <SafeChildren>{this.props.children}</SafeChildren>;
+    if (!this.state.error) return <SafeChildren>{this.props?.children ?? null}</SafeChildren>;
     const errorText = forceText(this.state.errorText, "Erro desconhecido");
     const stackText = forceText(this.state.stackText, "Sem detalhes técnicos disponíveis.");
     return (

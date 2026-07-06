@@ -30,6 +30,7 @@ import {
   StickyNote,
   ArrowUpDown,
   GripVertical,
+  Columns3,
 } from "lucide-react";
 import {
   DndContext,
@@ -81,7 +82,8 @@ import {
   reactToWhatsappMessage,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
-import { listCrmTags } from "@/lib/crm.functions";
+import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
+import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -578,6 +580,49 @@ function ChatPage() {
       navigate({ to: "/chat", search: {}, replace: true });
     }
   }, [searchParams.phone, searchParams.conversationId, conversationList, navigate]);
+
+  // ---- CRM stage lookup by phone ----
+  const listCrmLeadsFn = useServerFn(listCrmLeads);
+  const listCrmStagesFn = useServerFn(listCrmStages);
+  const { data: crmLeadsForStage = [] } = useQuery({
+    queryKey: ["crm-leads-for-chat"],
+    queryFn: () => listCrmLeadsFn(),
+    staleTime: 60_000,
+  });
+  const { data: crmStagesForChat = [] } = useQuery({
+    queryKey: ["crm-stages-for-chat"],
+    queryFn: () => listCrmStagesFn({ data: { operacao: "all" } }),
+    staleTime: 60_000,
+  });
+  const stageById = useMemo(() => {
+    const map = new Map<string, { id: string; nome: string; cor: string }>();
+    for (const s of DEFAULT_STAGES) map.set(s.id, { id: s.id, nome: s.nome, cor: s.cor });
+    for (const s of (crmStagesForChat as any[])) {
+      if (s?.id) map.set(String(s.id), { id: String(s.id), nome: String(s.nome ?? ""), cor: String(s.cor ?? "#3b82f6") });
+    }
+    return map;
+  }, [crmStagesForChat]);
+  const leadByPhone = useMemo(() => {
+    const map = new Map<string, any>();
+    const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
+    for (const l of (crmLeadsForStage as any[])) {
+      const d = digits(l?.telefone);
+      if (d) map.set(d, l);
+    }
+    return map;
+  }, [crmLeadsForStage]);
+  const findLeadForConv = (waId: string | null | undefined): any | null => {
+    const d = String(waId ?? "").replace(/\D+/g, "");
+    if (!d) return null;
+    if (leadByPhone.has(d)) return leadByPhone.get(d);
+    // try suffix match (varying country codes)
+    for (const [k, v] of leadByPhone.entries()) {
+      if (k.endsWith(d) || d.endsWith(k)) return v;
+    }
+    return null;
+  };
+
+
 
 
   const unreadTotal = useMemo(
@@ -1156,6 +1201,23 @@ function ChatPage() {
                           </span>
                         ) : null;
                       })()}
+                      {(() => {
+                        const lead = findLeadForConv(active.contact_wa_id);
+                        if (!lead) return null;
+                        const stage = stageById.get(String(lead.status ?? ""));
+                        if (!stage) return null;
+                        return (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                            style={{ color: stage.cor, borderColor: `${stage.cor}66`, backgroundColor: `${stage.cor}1f` }}
+                            title={`CRM: ${stage.nome}`}
+                          >
+                            <Columns3 className="h-3 w-3" /> {stage.nome}
+                          </span>
+                        );
+                      })()}
+
+
 
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
