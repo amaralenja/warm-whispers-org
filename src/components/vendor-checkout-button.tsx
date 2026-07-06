@@ -220,14 +220,18 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
             </Button>
             <Button
               disabled={upsertMut.isPending}
-              onClick={() =>
+              onClick={() => {
+                const nome = (editing?.nome ?? "").trim();
+                const link = (editing?.link ?? "").trim();
+                if (!nome) { toast.error("Preencha o nome"); return; }
+                if (!link) { toast.error("Preencha o link"); return; }
                 upsertMut.mutate({
                   id: editing?.id,
-                  nome: (editing?.nome ?? "").trim(),
+                  nome,
                   mensagem: editing?.mensagem ?? "",
-                  link: (editing?.link ?? "").trim(),
-                })
-              }
+                  link,
+                });
+              }}
             >
               {upsertMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Salvar
