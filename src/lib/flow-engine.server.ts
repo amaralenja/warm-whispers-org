@@ -1007,6 +1007,54 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
   };
 }
 
+// Recupera runs travados em nós de envio/ação com status "running" mas sem
+// waiting_for (Worker morreu no meio do loop). Avança pro próximo nó.
+export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit = 20) {
+  const db = await getAdminDb();
+  const { data: stale, error } = await db.rpc("claim_stale_running_send_flow_runs" as any, {
+    _older_than_seconds: olderThanSeconds,
+    _limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  const runs = Array.isArray(stale) ? stale : [];
+  if (runs.length === 0) return { recovered: 0, results: [] };
+
+  const results = await Promise.allSettled(
+    runs.map(async (run: any) => {
+      const ctx: Ctx = {
+        runId: String(run.id),
+        flowId: String(run.flow_id),
+        channelId: String(run.channel_id),
+        contactWaId: String(run.contact_wa_id),
+        conversationId: run.conversation_id ?? null,
+        db,
+        variables: (run.context as any) ?? {},
+        vendor: null,
+      };
+      try {
+        const flow = await loadFlow(ctx.flowId, db);
+        const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+        const nextId = nextNodeId(edges, String(run.current_node_id));
+        if (!nextId) {
+          await updateFlowRun(ctx, { status: "completed", waiting_for: null, expires_at: null });
+          return { runId: ctx.runId, completed: true };
+        }
+        await executeFrom(ctx, nextId);
+        return { runId: ctx.runId, ok: true, resumedFrom: nextId };
+      } catch (err: any) {
+        await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
+        return { runId: ctx.runId, error: String(err?.message ?? err) };
+      }
+    }),
+  );
+
+  return {
+    recovered: runs.length,
+    results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
+  };
+}
+
+
 // Clears flows that were waiting for a user reply/button and already expired.
 // Timer delays are handled by processExpiredTimerRuns; do not cancel them here.
 export async function processExpiredWaitingRuns(olderThanSeconds = 60, limit = 100) {

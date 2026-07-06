@@ -1,0 +1,1 @@
+UPDATE public.wa_flow_runs SET updated_at = now() - interval '5 minutes' WHERE id = 'bba1b6b5-6891-45bc-8e99-a4f4106e3e95' AND status = 'running';

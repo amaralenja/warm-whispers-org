@@ -2167,6 +2167,30 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_stale_running_send_flow_runs: {
+        Args: { _limit?: number; _older_than_seconds?: number }
+        Returns: {
+          channel_id: string
+          contact_wa_id: string
+          context: Json
+          conversation_id: string | null
+          created_at: string
+          current_node_id: string | null
+          error: string | null
+          expires_at: string | null
+          flow_id: string
+          id: string
+          status: string
+          updated_at: string
+          waiting_for: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_flow_runs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       generate_vendedor_codigo: { Args: never; Returns: string }
       get_hall_of_fame_mes: { Args: never; Returns: Json }
       get_metas_coletivas_mes: { Args: never; Returns: Json }
