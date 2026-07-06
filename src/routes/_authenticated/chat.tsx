@@ -594,7 +594,8 @@ function ChatPage() {
     // Vendedor não recebe realtime (RLS); poll agressivo pra ver mensagens do fluxo entrarem na thread.
     refetchInterval: activeId ? (vendorSession ? 3_000 : 20_000) : false,
     refetchOnWindowFocus: false,
-    staleTime: vendorSession ? 1_000 : 10_000,
+    staleTime: vendorSession ? 1_000 : 30_000,
+    gcTime: 10 * 60_000,
   });
 
   const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
