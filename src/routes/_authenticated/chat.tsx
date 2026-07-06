@@ -676,7 +676,18 @@ function ChatPage() {
     gcTime: 10 * 60_000,
   });
 
-  const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
+  const messageList = useMemo(() => {
+    // Reações do WhatsApp não são mensagens próprias — não devem virar bolha
+    // (se não são exibidas como emoji na mensagem original).
+    return asArray<Msg>(messages).filter((m) => {
+      const t = String((m as any)?.msg_type ?? "").toLowerCase();
+      if (t === "reaction") return false;
+      // Alguns provedores marcam a reação como "document" sem media_id nem filename.
+      // Nesses casos escondemos a bolha vazia de "Documento".
+      if (t === "document" && !(m as any)?.media_id && !(m as any)?.media_url && !(m as any)?.media_filename) return false;
+      return true;
+    });
+  }, [messages]);
 
   function scrollToBottom() {
     const el = scrollRef.current;
