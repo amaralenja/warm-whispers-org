@@ -408,6 +408,9 @@ function ChatPage() {
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const searchParams = Route.useSearch();
+  const navigate = useNavigate();
+  const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned">("all");
 
