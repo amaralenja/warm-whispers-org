@@ -1200,6 +1200,30 @@ function ChatPage() {
                           </span>
                         ) : null;
                       })()}
+                      {(() => {
+                        const lead = findLeadForConv(active.contact_wa_id);
+                        if (!lead) return null;
+                        const stage = stageById.get(String(lead.status ?? ""));
+                        if (!stage) return null;
+                        return (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                            style={{ color: stage.cor, borderColor: `${stage.cor}66`, backgroundColor: `${stage.cor}1f` }}
+                            title={`CRM: ${stage.nome}`}
+                          >
+                            <Columns3 className="h-3 w-3" /> {stage.nome}
+                          </span>
+                        );
+                      })()}
+
+                            className="inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                            style={{ color: b.hex, borderColor: `${b.hex}66`, backgroundColor: `${b.hex}1f` }}
+                            title={`Operação: ${b.nome}`}
+                          >
+                            {b.nome}
+                          </span>
+                        ) : null;
+                      })()}
 
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
