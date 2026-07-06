@@ -39,18 +39,19 @@ export const listVendorCheckoutsFn = createServerFn({ method: "GET" })
 
 export const upsertVendorCheckoutFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id?: string; nome: string; mensagem?: string; link: string; ordem?: number }) => input)
+  .inputValidator((input: { id?: string; nome: string; mensagem?: string; link?: string; ordem?: number }) => input)
   .handler(async ({ data, context }) => {
     const args = vendorArgs(context);
     const nome = String(data.nome ?? "").trim();
+    const mensagem = String(data.mensagem ?? "").trim();
     const link = String(data.link ?? "").trim();
     if (!nome) throw new Error("Nome é obrigatório.");
-    if (!link) throw new Error("Link é obrigatório.");
+    if (!mensagem && !link) throw new Error("Coloque uma mensagem ou um link.");
     const { data: id, error } = await (context as any).supabase.rpc("vendor_upsert_checkout", {
       ...args,
       _id: data.id ?? null,
       _nome: nome,
-      _mensagem: String(data.mensagem ?? ""),
+      _mensagem: mensagem,
       _link: link,
       _ordem: data.ordem ?? 0,
     });

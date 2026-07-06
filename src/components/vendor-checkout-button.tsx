@@ -61,7 +61,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["vendor-checkouts"] });
       setEditing(null);
-      toast.success("Checkout salvo");
+      toast.success("Mensagem salva");
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
   });
@@ -70,7 +70,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
     mutationFn: (id: string) => deleteFn({ data: { id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["vendor-checkouts"] });
-      toast.success("Checkout removido");
+      toast.success("Mensagem removida");
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao remover"),
   });
@@ -78,8 +78,10 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
   if (!enabled) return null;
 
   function buildFullMessage(c: Checkout) {
-    const msg = c.mensagem?.trim();
-    return msg ? `${msg}\n\n${c.link}` : c.link;
+    const msg = (c.mensagem ?? "").trim();
+    const link = (c.link ?? "").trim();
+    if (msg && link) return `${msg}\n\n${link}`;
+    return msg || link;
   }
 
   async function handleConfirmSend() {
@@ -103,21 +105,21 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
             size="icon"
             disabled={disabled}
             className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent"
-            title="Meus checkouts"
+            title="Minhas mensagens rápidas"
           >
             <Zap className="h-5 w-5" />
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" side="top" className="w-96 rounded-2xl border-chat-line bg-popover p-3">
           <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-semibold">Meus checkouts</div>
+            <div className="text-sm font-semibold">Mensagens rápidas</div>
             <Button
               size="sm"
               variant="ghost"
               className="h-8 gap-1 text-xs"
               onClick={() => { setOpen(false); setEditing({ nome: "", mensagem: "", link: "" }); }}
             >
-              <Plus className="h-4 w-4" /> Novo
+              <Plus className="h-4 w-4" /> Nova
             </Button>
           </div>
 
@@ -125,9 +127,9 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
-          ) : checkouts.length === 0 ? (
+          ) : (checkouts?.length ?? 0) === 0 ? (
             <div className="rounded-xl bg-muted/40 px-3 py-6 text-center text-xs text-muted-foreground">
-              Nenhum checkout salvo. Clique em <b>Novo</b> para criar o primeiro.
+              Nenhuma mensagem salva. Clique em <b>Nova</b> para criar a primeira.
             </div>
           ) : (
             <ul className="max-h-80 space-y-1.5 overflow-y-auto">
@@ -139,14 +141,16 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
                   <button
                     className="flex-1 text-left"
                     onClick={() => { setOpen(false); setConfirm(c); }}
-                    title="Enviar este checkout"
+                    title="Enviar esta mensagem"
                   >
                     <div className="text-sm font-medium leading-tight">{c.nome}</div>
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{c.link}</div>
                     {c.mensagem && (
                       <div className="mt-1 line-clamp-2 text-[11px] text-muted-foreground/80">
                         {c.mensagem}
                       </div>
+                    )}
+                    {c.link && (
+                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{c.link}</div>
                     )}
                   </button>
                   <div className="flex flex-col gap-1 opacity-0 transition group-hover:opacity-100">
@@ -182,8 +186,8 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing?.id ? "Editar checkout" : "Novo checkout"}</DialogTitle>
-            <DialogDescription>Salvo só pra você, ninguém mais vê.</DialogDescription>
+            <DialogTitle>{editing?.id ? "Editar mensagem rápida" : "Nova mensagem rápida"}</DialogTitle>
+            <DialogDescription>Salva só pra você, ninguém mais vê.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -195,22 +199,22 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium">Link do checkout</label>
-              <Input
-                placeholder="https://..."
-                value={editing?.link ?? ""}
-                onChange={(e) => setEditing((s) => ({ ...(s ?? {}), link: e.target.value }))}
+              <label className="mb-1 block text-xs font-medium">Mensagem</label>
+              <Textarea
+                rows={4}
+                placeholder="Escreve aqui a mensagem que vai ser enviada..."
+                value={editing?.mensagem ?? ""}
+                onChange={(e) => setEditing((s) => ({ ...(s ?? {}), mensagem: e.target.value }))}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium">
-                Mensagem (opcional) — enviada antes do link
+                Link (opcional) — enviado junto na mesma mensagem
               </label>
-              <Textarea
-                rows={4}
-                placeholder="Olá! Segue o link pra você garantir agora 👇"
-                value={editing?.mensagem ?? ""}
-                onChange={(e) => setEditing((s) => ({ ...(s ?? {}), mensagem: e.target.value }))}
+              <Input
+                placeholder="https://..."
+                value={editing?.link ?? ""}
+                onChange={(e) => setEditing((s) => ({ ...(s ?? {}), link: e.target.value }))}
               />
             </div>
           </div>
@@ -222,13 +226,14 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
               disabled={upsertMut.isPending}
               onClick={() => {
                 const nome = (editing?.nome ?? "").trim();
+                const mensagem = (editing?.mensagem ?? "").trim();
                 const link = (editing?.link ?? "").trim();
                 if (!nome) { toast.error("Preencha o nome"); return; }
-                if (!link) { toast.error("Preencha o link"); return; }
+                if (!mensagem && !link) { toast.error("Coloque uma mensagem ou um link"); return; }
                 upsertMut.mutate({
                   id: editing?.id,
                   nome,
-                  mensagem: editing?.mensagem ?? "",
+                  mensagem,
                   link,
                 });
               }}
