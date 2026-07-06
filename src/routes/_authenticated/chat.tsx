@@ -81,7 +81,8 @@ import {
   reactToWhatsappMessage,
 } from "@/lib/whatsapp-chat.functions";
 import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
-import { listCrmTags } from "@/lib/crm.functions";
+import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
+import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { WhatsappRecorder } from "@/components/whatsapp-recorder";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
