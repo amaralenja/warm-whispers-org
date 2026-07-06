@@ -115,7 +115,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
               size="sm"
               variant="ghost"
               className="h-8 gap-1 text-xs"
-              onClick={() => setEditing({ nome: "", mensagem: "", link: "" })}
+              onClick={() => { setOpen(false); setEditing({ nome: "", mensagem: "", link: "" }); }}
             >
               <Plus className="h-4 w-4" /> Novo
             </Button>
