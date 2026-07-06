@@ -79,12 +79,13 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
   const [confirm, setConfirm] = useState<Checkout | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const { data: checkouts = [], isLoading } = useQuery({
+  const { data: checkoutRows, isLoading } = useQuery({
     queryKey: ["vendor-checkouts"],
     queryFn: () => listFn(),
     enabled: enabled && open,
     staleTime: 15_000,
   });
+  const checkouts = Array.isArray(checkoutRows) ? checkoutRows : [];
 
   const upsertMut = useMutation({
     mutationFn: (input: {
