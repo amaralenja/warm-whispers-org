@@ -136,7 +136,25 @@ const rootQueryClient = new QueryClient();
 function RootComponent() {
   return (
     <QueryClientProvider client={rootQueryClient}>
-      <Outlet />
+      <RouteBoundary>
+        <Outlet />
+      </RouteBoundary>
     </QueryClientProvider>
   );
+}
+
+class RouteBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error) {
+    reportLovableError(error, { boundary: "route_boundary" });
+  }
+  render() {
+    if (this.state.error) {
+      return <ErrorComponent error={this.state.error} reset={() => this.setState({ error: null })} />;
+    }
+    return this.props.children;
+  }
 }
