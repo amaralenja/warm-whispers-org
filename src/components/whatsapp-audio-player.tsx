@@ -46,14 +46,16 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
+  const setErrorSafe = (v: unknown) => setError(safeText(v));
+
 
   useEffect(() => {
     setPlaying(false);
     setLoading(false);
     setDuration(0);
     setCurrent(0);
-    setError(null);
+    setError("");
     if (!safeUrl) {
       audioRef.current = null;
       return;
@@ -71,7 +73,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
       setCurrent(0);
     };
     const onErr = () => {
-      setError("Falha ao carregar áudio");
+      setErrorSafe("Falha ao carregar áudio");
       setLoading(false);
       setPlaying(false);
     };
@@ -117,7 +119,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
       await audio.play();
       setPlaying(true);
     } catch (e: any) {
-      setError(safeText(e?.message || e) || "Falha ao reproduzir");
+      setErrorSafe(safeText(e?.message ?? e) || "Falha ao reproduzir");
     } finally {
       setLoading(false);
     }
@@ -220,7 +222,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
           </span>
           <span>{safeText(formatTime(duration))}</span>
         </div>
-        {error && <p className="text-[10px] text-destructive mt-0.5">{safeText(error)}</p>}
+        {error ? <p className="text-[10px] text-destructive mt-0.5">{safeText(error)}</p> : null}
       </div>
 
       <button
