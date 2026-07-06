@@ -1407,6 +1407,30 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Se for edição de mensagem, tenta atualizar a original; senão insere como texto marcado.
+        const edited = extractEditedMessage(m);
+        if (edited) {
+          if (edited.originalId) {
+            const { data: orig } = await supabase
+              .from("wa_messages")
+              .select("id")
+              .eq("channel_id", channelId)
+              .eq("wa_message_id", edited.originalId)
+              .maybeSingle();
+            if (orig) {
+              await supabase
+                .from("wa_messages")
+                .update({ text_body: `✏️ (editada) ${edited.body}` })
+                .eq("id", (orig as any).id);
+              continue;
+            }
+          }
+          // Fallback: registra como texto novo referenciando a original
+          m.type = "text";
+          m.text = { body: `✏️ (editada) ${edited.body}` };
+          if (edited.originalId && !m.context) m.context = { id: edited.originalId };
+        }
+
         const media = extractMedia(m);
         const interactive = m.interactive;
         const buttonId = interactive?.button_reply?.id ?? interactive?.list_reply?.id ?? m.button?.payload ?? null;
