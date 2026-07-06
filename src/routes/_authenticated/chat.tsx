@@ -67,6 +67,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getVendorSession } from "@/lib/vendor-session";
+import { VendorCheckoutButton } from "@/components/vendor-checkout-button";
 import {
   listConversations,
   listMessages,
@@ -1350,6 +1351,20 @@ function ChatPage() {
                       />
                     </PopoverContent>
                   </Popover>
+                  <VendorCheckoutButton
+                    enabled={!!vendorSession}
+                    disabled={sendMut.isPending || !active}
+                    onSend={async (text: string) => {
+                      if (!active) return;
+                      await sendMut.mutateAsync({
+                        channelId: active.channel_id,
+                        conversationId: active.id,
+                        to: active.contact_wa_id,
+                        type: "text",
+                        text,
+                      });
+                    }}
+                  />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">

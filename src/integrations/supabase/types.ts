@@ -1409,6 +1409,39 @@ export type Database = {
           },
         ]
       }
+      vendor_checkouts: {
+        Row: {
+          created_at: string
+          id: string
+          link: string
+          mensagem: string
+          nome: string
+          ordem: number
+          updated_at: string
+          vendedor_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link?: string
+          mensagem?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+          vendedor_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link?: string
+          mensagem?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+          vendedor_id?: number
+        }
+        Relationships: []
+      }
       wa_ai_sessions: {
         Row: {
           calendar_event_id: string | null
