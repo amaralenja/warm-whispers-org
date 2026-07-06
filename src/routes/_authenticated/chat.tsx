@@ -1354,7 +1354,7 @@ function ChatPage() {
                   <VendorCheckoutButton
                     enabled={!!vendorSession}
                     disabled={sendMut.isPending || !active}
-                    onSend={async (text) => {
+                    onSend={async (text: string) => {
                       if (!active) return;
                       await sendMut.mutateAsync({
                         channelId: active.channel_id,
