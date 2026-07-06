@@ -580,10 +580,10 @@ function ChatPage() {
     queryKey: ["wa-messages", activeId],
     queryFn: () => activeId ? listMsgFn({ data: { conversationId: activeId } }) : Promise.resolve([]),
     enabled: !!activeId,
-    // Realtime empurra novas mensagens; polling só de fallback lento pra não travar o textarea.
-    refetchInterval: activeId ? 20_000 : false,
+    // Vendedor não recebe realtime (RLS); poll agressivo pra ver mensagens do fluxo entrarem na thread.
+    refetchInterval: activeId ? (vendorSession ? 3_000 : 20_000) : false,
     refetchOnWindowFocus: false,
-    staleTime: 10_000,
+    staleTime: vendorSession ? 1_000 : 10_000,
   });
 
   const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
