@@ -38,7 +38,7 @@ export const listVendorCheckoutsFn = createServerFn({ method: "GET" })
     const args = vendorArgs(context);
     const { data, error } = await (context as any).supabase.rpc("vendor_list_checkouts", args);
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as any[];
+    const rows = Array.isArray(data) ? data as any[] : [];
     const withUrls = await Promise.all(
       rows.map(async (r) => ({
         id: r.id,
@@ -71,8 +71,15 @@ export const upsertVendorCheckoutFn = createServerFn({ method: "POST" })
     const nome = String(data.nome ?? "").trim();
     const mensagem = String(data.mensagem ?? "").trim();
     const link = String(data.link ?? "").trim();
-    const imagePath = data.clearImage ? null : (data.imagePath ?? undefined);
+    let imagePath = data.clearImage ? null : (data.imagePath ?? undefined);
     if (!nome) throw new Error("Nome é obrigatório.");
+
+    if (data.id && imagePath === undefined && !data.clearImage) {
+      const { data: rows } = await (context as any).supabase.rpc("vendor_list_checkouts", args);
+      const current = Array.isArray(rows) ? rows.find((r: any) => String(r.id) === String(data.id)) : null;
+      imagePath = current?.image_path ?? null;
+    }
+
     if (!mensagem && !imagePath && !link) throw new Error("Coloque uma mensagem, imagem ou link.");
     const { data: id, error } = await (context as any).supabase.rpc("vendor_upsert_checkout", {
       ...args,
