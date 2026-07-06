@@ -135,7 +135,7 @@ export const uploadVendorCheckoutImageFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const args = vendorArgs(context);
     if (!data.base64) throw new Error("Arquivo vazio");
-    if (!/^image\//.test(data.contentType)) throw new Error("Apenas imagens são permitidas");
+    if (!/^image\/(jpeg|jpg|png)$/i.test(data.contentType)) throw new Error("Só JPG ou PNG (WhatsApp não aceita webp/gif como imagem)");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const safe = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "image.jpg";
     const ext = safe.split(".").pop() || "jpg";
