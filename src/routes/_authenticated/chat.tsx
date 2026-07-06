@@ -1575,7 +1575,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
 
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
+    return <RenderMedia type={msg.msg_type} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
@@ -1583,7 +1583,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} />;
+      return <RenderMedia type={msg.msg_type} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
     }
     if (mediaState?.loading) {
       return <MediaPlaceholder type={msg.msg_type} filename={msg.media_filename} loading outgoing={outgoing} />;
