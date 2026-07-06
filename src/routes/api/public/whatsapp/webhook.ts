@@ -110,27 +110,61 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               for (const m of messages) {
                 const contactName = contactNameByWaId[m.from] ?? m.from;
 
-                // upsert conversation
-                const { data: conv, error: convErr } = await supabaseAdmin
+                // Ensure conversation exists — but do NOT overwrite
+                // last_message_* unconditionally. A retried/late inbound
+                // webhook from Meta must not clobber a newer outbound
+                // (e.g. a flow-sent message) already persisted.
+                const inboundIso = new Date(parseInt(m.timestamp, 10) * 1000).toISOString();
+                const inboundPreview = previewFor(m);
+
+                const { data: existing } = await supabaseAdmin
                   .from("wa_conversations" as any)
-                  .upsert(
-                    {
+                  .select("id,last_message_at")
+                  .eq("channel_id", channelId)
+                  .eq("contact_wa_id", m.from)
+                  .maybeSingle();
+
+                let conv: { id: string } | null = existing
+                  ? { id: (existing as any).id }
+                  : null;
+
+                if (!conv) {
+                  const { data: inserted, error: insErr } = await supabaseAdmin
+                    .from("wa_conversations" as any)
+                    .insert({
                       channel_id: channelId,
                       phone_number_id: phoneNumberId,
                       contact_wa_id: m.from,
                       contact_name: contactName,
                       operacao_id: operacaoId,
-                      last_message_at: new Date(parseInt(m.timestamp, 10) * 1000).toISOString(),
-                      last_message_preview: previewFor(m),
+                      last_message_at: inboundIso,
+                      last_message_preview: inboundPreview,
                       last_message_direction: "in",
-                    },
-                    { onConflict: "channel_id,contact_wa_id" }
-                  )
-                  .select("id")
-                  .single();
-                if (convErr || !conv) {
-                  console.error("[wa-webhook] upsert conv error", convErr);
-                  continue;
+                    })
+                    .select("id")
+                    .single();
+                  if (insErr || !inserted) {
+                    console.error("[wa-webhook] insert conv error", insErr);
+                    continue;
+                  }
+                  conv = { id: (inserted as any).id };
+                } else {
+                  // Only bump last_message_* when this inbound is newer than
+                  // what's currently stored. Prevents Meta retries and
+                  // out-of-order webhooks from overwriting a flow's newer
+                  // outbound message.
+                  const currentTs = (existing as any).last_message_at as string | null;
+                  if (!currentTs || currentTs < inboundIso) {
+                    await supabaseAdmin
+                      .from("wa_conversations" as any)
+                      .update({
+                        last_message_at: inboundIso,
+                        last_message_preview: inboundPreview,
+                        last_message_direction: "in",
+                        contact_name: contactName,
+                      })
+                      .eq("id", conv.id);
+                  }
                 }
 
                 // Round-robin: atribui vendedor automaticamente se ainda não tem
