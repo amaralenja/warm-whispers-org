@@ -1,6 +1,6 @@
 import { Component, Fragment, isValidElement, type ReactNode } from "react";
 
-type Props = { children: ReactNode };
+type Props = { children?: ReactNode };
 type State = { error: unknown | null; errorText: string; stackText: string };
 
 function safeErrorText(error: unknown, fallback: string): string {
