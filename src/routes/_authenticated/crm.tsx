@@ -445,42 +445,40 @@ function Kanban({
 
 
 function KanbanCard({
-  lead, stageColor, tagColors, onClick, onDragStart,
+  lead, stageColor, tagColors, onEdit, onOpenChat, onDragStart,
 }: {
   lead: Lead;
   stageColor: string;
   tagColors: Map<string, string>;
-  onClick: () => void;
+  onEdit: () => void;
+  onOpenChat: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
 }) {
-  const navigate = useNavigate();
   const avatarColor = colorFromName(lead.nome);
   const initials = initialsOf(lead.nome);
   const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
-  const openChat = () => {
-    if (!phoneDigits) {
-      onClick();
-      return;
-    }
-    navigate({ to: "/chat", search: { phone: phoneDigits } });
+  const handleClick = () => {
+    if (phoneDigits) onOpenChat();
+    else onEdit();
   };
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, lead)}
-      onClick={openChat}
+      onClick={handleClick}
       style={{ borderLeftColor: stageColor }}
       className="group relative cursor-pointer rounded-lg border border-border border-l-4 bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
       title={phoneDigits ? "Abrir conversa" : "Editar lead"}
     >
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
         className="absolute right-1.5 top-1.5 hidden rounded-md p-1 text-muted-foreground hover:bg-muted/60 hover:text-foreground group-hover:block"
         title="Editar lead"
       >
         <Pencil className="h-3 w-3" />
       </button>
+
       <div className="flex items-start gap-2.5">
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
