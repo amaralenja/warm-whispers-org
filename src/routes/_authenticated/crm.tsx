@@ -1,9 +1,9 @@
 import { useMemo, useState, type DragEvent } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
-  User, MoreVertical, Tag as TagIcon, Columns3,
+  User, MoreVertical, Tag as TagIcon, Columns3, MessageCircle,
 } from "lucide-react";
 import {
   TagsManagerDialog, StagesManagerDialog, useCrmStages, useCrmTags, DEFAULT_STAGES, useHiddenDefaultStages,
