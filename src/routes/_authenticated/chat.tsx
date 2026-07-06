@@ -445,10 +445,11 @@ function ChatPage() {
   const { data: convs = [], error: convsError } = useQuery({
     queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin"],
     queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
-    // Realtime cuida das atualizações incrementais; polling só de segurança.
-    refetchInterval: 30_000,
+    // Vendedor não recebe realtime (RLS bloqueia leitura direta; leituras vêm via RPC SECURITY DEFINER).
+    // Poll rápido pra que fluxos disparados atualizem o preview da conversa quase em tempo real.
+    refetchInterval: vendorSession ? 5_000 : 30_000,
     refetchOnWindowFocus: false,
-    staleTime: 15_000,
+    staleTime: vendorSession ? 2_000 : 15_000,
   });
 
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
@@ -579,10 +580,10 @@ function ChatPage() {
     queryKey: ["wa-messages", activeId],
     queryFn: () => activeId ? listMsgFn({ data: { conversationId: activeId } }) : Promise.resolve([]),
     enabled: !!activeId,
-    // Realtime empurra novas mensagens; polling só de fallback lento pra não travar o textarea.
-    refetchInterval: activeId ? 20_000 : false,
+    // Vendedor não recebe realtime (RLS); poll agressivo pra ver mensagens do fluxo entrarem na thread.
+    refetchInterval: activeId ? (vendorSession ? 3_000 : 20_000) : false,
     refetchOnWindowFocus: false,
-    staleTime: 10_000,
+    staleTime: vendorSession ? 1_000 : 10_000,
   });
 
   const messageList = useMemo(() => asArray<Msg>(messages), [messages]);
