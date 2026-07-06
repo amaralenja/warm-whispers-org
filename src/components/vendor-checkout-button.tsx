@@ -150,22 +150,60 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
       toast.error("Imagem muito grande (máx 8MB)");
       return;
     }
-    setUploading(true);
-    try {
-      const base64 = await fileToBase64(file);
-      const { path } = await uploadFn({ data: { filename: file.name, contentType: file.type, base64 } });
-      const preview = URL.createObjectURL(file);
-      setEditing((s) => ({ ...(s ?? {}), _newImagePath: path, _newImagePreview: preview, _removeImage: false }));
-    } catch (e: any) {
-      toast.error(e?.message ?? "Falha no upload");
-    } finally {
+    const preview = URL.createObjectURL(file);
+    setEditing((s) => {
+      if (s?._newImagePreview?.startsWith("blob:")) URL.revokeObjectURL(s._newImagePreview);
+      return {
+        ...(s ?? {}),
+        _newImageFile: file,
+        _newImagePreview: preview,
+        _newImagePath: null,
+        _removeImage: false,
+      };
+    });
+  }
+
+  async function handleSaveEditing() {
+    const nome = (editing?.nome ?? "").trim();
+    const mensagem = (editing?.mensagem ?? "").trim();
+    const hasNewImageFile = !!editing?._newImageFile;
+    const keepExistingImage = !editing?._removeImage && !!editing?.image_path && !hasNewImageFile;
+    const hasImage = hasNewImageFile || keepExistingImage;
+
+    if (!nome) { toast.error("Preencha o nome"); return; }
+    if (!mensagem && !hasImage) { toast.error("Coloque uma mensagem ou imagem"); return; }
+
+    let imagePath: string | null | undefined = keepExistingImage ? editing?.image_path ?? null : undefined;
+
+    if (editing?._newImageFile) {
+      setUploading(true);
+      try {
+        const file = editing._newImageFile;
+        const base64 = await fileToBase64(file);
+        const uploaded = await uploadFn({ data: { filename: file.name, contentType: file.type, base64 } });
+        imagePath = uploaded.path;
+      } catch (e: any) {
+        toast.error(e?.message ?? "Falha no upload da imagem");
+        setUploading(false);
+        return;
+      }
       setUploading(false);
     }
+
+    await upsertMut.mutateAsync({
+      id: editing?.id,
+      nome,
+      mensagem,
+      link: "",
+      imagePath,
+      clearImage: editing?._removeImage === true,
+    });
   }
 
   function removeImage() {
     setEditing((s) => ({
       ...(s ?? {}),
+      _newImageFile: null,
       _newImagePath: null,
       _newImagePreview: null,
       _removeImage: true,
@@ -323,7 +361,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageIcon className="mr-2 h-4 w-4" />}
-                  {uploading ? "Enviando..." : "Adicionar imagem"}
+                  Adicionar imagem
                 </Button>
               )}
             </div>
@@ -350,26 +388,10 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
             </Button>
             <Button
               disabled={upsertMut.isPending || uploading}
-              onClick={() => {
-                const nome = (editing?.nome ?? "").trim();
-                const mensagem = (editing?.mensagem ?? "").trim();
-                const hasNewImage = !!editing?._newImagePath;
-                const keepExistingImage = !editing?._removeImage && !!editing?.image_path && !hasNewImage;
-                const hasImage = hasNewImage || keepExistingImage;
-                if (!nome) { toast.error("Preencha o nome"); return; }
-                if (!mensagem && !hasImage) { toast.error("Coloque uma mensagem ou imagem"); return; }
-                upsertMut.mutate({
-                  id: editing?.id,
-                  nome,
-                  mensagem,
-                  link: "",
-                  imagePath: hasNewImage ? editing?._newImagePath ?? null : undefined,
-                  clearImage: editing?._removeImage === true,
-                });
-              }}
+              onClick={handleSaveEditing}
             >
-              {upsertMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Salvar
+              {upsertMut.isPending || uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {uploading ? "Enviando imagem..." : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
