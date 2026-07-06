@@ -567,6 +567,17 @@ function ChatPage() {
     );
   }, [conversationList, search, listFilter, activeFlowConvIds]);
 
+  const PAGE_SIZE = 40;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, listFilter]);
+  const visibleFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && visibleCount < filtered.length) {
+      setVisibleCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
+    }
+  };
+
 
   // Estabiliza a referência de `active`: mantém o último objeto conhecido enquanto
   // o refetch estiver em andamento, evitando desmontar a coluna do chat (e o textarea).
