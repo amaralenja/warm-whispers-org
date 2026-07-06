@@ -149,9 +149,6 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
                         {c.mensagem}
                       </div>
                     )}
-                    {c.link && (
-                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{c.link}</div>
-                    )}
                   </button>
                   <div className="flex flex-col gap-1 opacity-0 transition group-hover:opacity-100">
                     <Button
@@ -201,20 +198,10 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
             <div>
               <label className="mb-1 block text-xs font-medium">Mensagem</label>
               <Textarea
-                rows={4}
-                placeholder="Escreve aqui a mensagem que vai ser enviada..."
+                rows={6}
+                placeholder="Escreve a mensagem que vai ser enviada. Pode colar link aqui dentro se quiser."
                 value={editing?.mensagem ?? ""}
                 onChange={(e) => setEditing((s) => ({ ...(s ?? {}), mensagem: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium">
-                Link (opcional) — enviado junto na mesma mensagem
-              </label>
-              <Input
-                placeholder="https://..."
-                value={editing?.link ?? ""}
-                onChange={(e) => setEditing((s) => ({ ...(s ?? {}), link: e.target.value }))}
               />
             </div>
           </div>
@@ -227,14 +214,13 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
               onClick={() => {
                 const nome = (editing?.nome ?? "").trim();
                 const mensagem = (editing?.mensagem ?? "").trim();
-                const link = (editing?.link ?? "").trim();
                 if (!nome) { toast.error("Preencha o nome"); return; }
-                if (!mensagem && !link) { toast.error("Coloque uma mensagem ou um link"); return; }
+                if (!mensagem) { toast.error("Escreve a mensagem"); return; }
                 upsertMut.mutate({
                   id: editing?.id,
                   nome,
                   mensagem,
-                  link,
+                  link: "",
                 });
               }}
             >
