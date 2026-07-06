@@ -55,7 +55,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
     setLoading(false);
     setDuration(0);
     setCurrent(0);
-    setError(null);
+    setError("");
     if (!safeUrl) {
       audioRef.current = null;
       return;
