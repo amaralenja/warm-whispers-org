@@ -138,7 +138,7 @@ export function VendorCheckoutButton({ enabled, disabled, onSend }: Props) {
                 >
                   <button
                     className="flex-1 text-left"
-                    onClick={() => setConfirm(c)}
+                    onClick={() => { setOpen(false); setConfirm(c); }}
                     title="Enviar este checkout"
                   >
                     <div className="text-sm font-medium leading-tight">{c.nome}</div>
