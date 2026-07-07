@@ -262,9 +262,23 @@ function FlowsListPage() {
 
   // Fluxos sem operação são considerados "globais" e aparecem em qualquer workspace
   // (importante pra vendedor enxergar fluxos compartilhados).
-  const filtered = (flows as any[]).filter((f) =>
+  const scoped = (flows as any[]).filter((f) =>
     workspace.id === "all" ? true : (!f.operacao_id || f.operacao_id === workspace.id),
   );
+
+  const q = search.trim().toLowerCase();
+  const filtered = !q ? scoped : scoped.filter((f: any) => {
+    const hay: string[] = [
+      String(f?.nome ?? ""),
+      String(f?.folder ?? ""),
+      String(f?.operacao_id ?? ""),
+    ];
+    for (const t of (f?.wa_flow_triggers ?? [])) {
+      const val = t?.valor == null ? "" : (typeof t.valor === "object" ? JSON.stringify(t.valor) : String(t.valor));
+      hay.push(String(t?.tipo ?? ""), val);
+    }
+    return hay.some((s) => s.toLowerCase().includes(q));
+  });
 
   const copyExport = async () => {
     try {
