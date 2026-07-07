@@ -707,12 +707,14 @@ type SendInput = {
 // Many contacts arrive without the "9" (legacy 10-digit format). Insert it when missing.
 function normalizeBrWhatsappNumber(raw: string): string {
   let digits = String(raw ?? "").replace(/\D/g, "");
-  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
-  // 55 + DDD(2) + number(8 or 9)
-  if (digits.length === 12) {
+  // Só assume BR se for local 10/11 dígitos. Internacionais (ex.: +1 xxx, +351 xxx)
+  // passam intactos — senão o "55" grudado no início destrói o número.
+  const looksLocalBr = digits.length === 10 || digits.length === 11;
+  if (!digits.startsWith("55") && looksLocalBr) digits = `55${digits}`;
+  // 55 + DDD(2) + number(8 or 9) — só ajusta o 9 quando o DDI é 55.
+  if (digits.startsWith("55") && digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
-    // WhatsApp BR mobile: add the extra 9 even when the old 8-digit number starts with 9.
     if (rest.length === 8) {
       return `55${ddd}9${rest}`;
     }
