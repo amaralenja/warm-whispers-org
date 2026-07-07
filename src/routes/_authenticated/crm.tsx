@@ -397,7 +397,7 @@ function Kanban({
                     stageColor={s.cor}
                     tagColors={tagColors}
                     onEdit={() => onEdit(lead)}
-                    onOpenChat={() => setChatLead(lead)}
+                    onOpenChat={() => openChatForLead(lead)}
                     onDragStart={onDragStart}
                   />
                 ))}
