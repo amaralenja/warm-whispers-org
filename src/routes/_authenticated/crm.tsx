@@ -422,7 +422,8 @@ function Kanban({
 }
 
 // (chat abre em /chat?phone=... — sem iframe)
-function _KanbanChatDialogPlaceholder() { return null;
+
+
 
 
 
