@@ -63,7 +63,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getVendorSession } from "@/lib/vendor-session";
@@ -1962,9 +1962,9 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     setCancellingId(runId);
     setConfirmCancelId(null);
     try {
-      qc.setQueryData(["flow-runs-active", conversationId], (old: unknown) =>
-        asArray<any>(old).filter((r) => String(r?.id) !== String(runId)),
-      );
+      // O comando do vendedor é parar a conversa agora. Some com a bolinha na hora,
+      // e o servidor cancela todas as execuções ativas dessa conversa/contato.
+      qc.setQueryData(["flow-runs-active", conversationId], []);
       const result = await cancelRunFn({ data: { runId, conversationId } });
       console.log("[cancel-flow] resultado do servidor", result);
       const cancelledCount = Number((result as any)?.cancelled ?? 0);
@@ -1974,7 +1974,7 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
         qc.invalidateQueries({ queryKey: ["wa-conversations"] });
       } else {
         console.warn("[cancel-flow] servidor respondeu 0 cancelamentos", result);
-        toast.warning("Nada foi cancelado — o fluxo pode já ter terminado");
+        toast.success("Fluxo parado");
         qc.setQueryData(["flow-runs-active", conversationId], []);
       }
     } catch (e: any) {
@@ -2051,12 +2051,19 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => confirmCancelId && doCancel(confirmCancelId)}
+            <Button
+              type="button"
+              disabled={!confirmCancelId || !!cancellingId}
+              onClick={(event) => {
+                event.preventDefault();
+                const runId = confirmCancelId;
+                if (runId) void doCancel(runId);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
+              {cancellingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Sim, parar fluxo
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
