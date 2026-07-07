@@ -1035,7 +1035,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
   return (
-    <div className={(searchParams.embed ? "h-screen" : "h-[calc(100vh-3.5rem)]") + " w-full overflow-hidden bg-chat-shell text-foreground"}>
+    <div className={(searchParams.embed ? "h-full" : "h-[calc(100vh-3.5rem)]") + " w-full overflow-hidden bg-chat-shell text-foreground"}>
       <div className={"grid h-full min-h-0 " + (searchParams.embed ? "grid-cols-1" : "grid-cols-[380px_minmax(0,1fr)]") + " overflow-hidden bg-chat-thread"}>
 
 
