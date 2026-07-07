@@ -47,6 +47,7 @@ function FlowsListPage() {
   const [name, setName] = useState("");
   const [op, setOp] = useState<string>(workspace.id === "all" ? "" : workspace.id);
   const [folder, setFolder] = useState<string>("");
+  const [search, setSearch] = useState<string>("");
 
   // Import
   const [importOpen, setImportOpen] = useState(false);
@@ -262,9 +263,23 @@ function FlowsListPage() {
 
   // Fluxos sem operação são considerados "globais" e aparecem em qualquer workspace
   // (importante pra vendedor enxergar fluxos compartilhados).
-  const filtered = (flows as any[]).filter((f) =>
+  const scoped = (flows as any[]).filter((f) =>
     workspace.id === "all" ? true : (!f.operacao_id || f.operacao_id === workspace.id),
   );
+
+  const q = search.trim().toLowerCase();
+  const filtered = !q ? scoped : scoped.filter((f: any) => {
+    const hay: string[] = [
+      String(f?.nome ?? ""),
+      String(f?.folder ?? ""),
+      String(f?.operacao_id ?? ""),
+    ];
+    for (const t of (f?.wa_flow_triggers ?? [])) {
+      const val = t?.valor == null ? "" : (typeof t.valor === "object" ? JSON.stringify(t.valor) : String(t.valor));
+      hay.push(String(t?.tipo ?? ""), val);
+    }
+    return hay.some((s) => s.toLowerCase().includes(q));
+  });
 
   const copyExport = async () => {
     try {
@@ -331,6 +346,23 @@ function FlowsListPage() {
         </div>
       </div>
 
+      <div className="relative">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="🔍 Pesquisar fluxos por nome, pasta, operação ou gatilho..."
+          className="pr-20"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
 
       {filtered.length === 0 ? (
         <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground">
