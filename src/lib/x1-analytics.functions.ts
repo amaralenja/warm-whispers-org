@@ -374,7 +374,7 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const [channelsRes, conversationsRes, messagesRes, crmLeadsRes, produtosMapRes, vendasRows] = await Promise.all([
+  const [channelsRes, conversationsRes, messagesRes, crmLeadsRes, produtosMapRes, vendasRes] = await Promise.all([
     db.rpc("vendor_list_wa_channels" as any, rpcArgs),
     db.rpc("vendor_list_x1_wa_conversations" as any, {
       ...rpcArgs,
@@ -390,19 +390,18 @@ async function getVendorX1Analytics(
     }),
     db.rpc("vendor_list_crm_leads" as any, rpcArgs),
     db.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
-    pageAllWithDb<any>((from, to) =>
-      db
-        .from("vendas")
-        .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+    db.rpc("vendor_list_x1_sales" as any, {
+      ...rpcArgs,
+      _from: data.from || null,
+      _to: data.to || null,
+    }),
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
   if (messagesRes.error) throw new Error(messagesRes.error.message);
   if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
   if (produtosMapRes.error) throw new Error(produtosMapRes.error.message);
+  if (vendasRes.error) throw new Error(vendasRes.error.message);
 
   const produtoToOperacao = new Map<string, string>();
   for (const p of ((produtosMapRes.data ?? []) as any[])) {
@@ -495,7 +494,7 @@ async function getVendorX1Analytics(
   const vendorExpert = safeNullableString(context?.vendor?.expert);
   const primaryOp = vendorExpert ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
   const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
-  const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
+  const vendorSales = ((vendasRes.data ?? []) as any[]).filter((v) => {
     if (!isApprovedEvent(v?.Evento)) return false;
     if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
     if (!inDay(parseDataField(v?.Data))) return false;
