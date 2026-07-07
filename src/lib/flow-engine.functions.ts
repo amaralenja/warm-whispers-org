@@ -887,6 +887,19 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
     return rows.map((r) => ({ ...r, flow_nome: nameById.get(String(r.flow_id)) ?? "Fluxo" }));
   });
 
+export const listActiveFlowConversationIds = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await dbFor(context);
+    const rpcArgs = vendorRpcArgs(context);
+    const rpcName = rpcArgs ? "vendor_active_wa_flow_conversation_ids" : "active_wa_flow_conversation_ids";
+    const { data, error } = await db.rpc(rpcName as any, rpcArgs ?? undefined);
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as any[])
+      .map((r) => String(r?.conversation_id ?? ""))
+      .filter(Boolean);
+  });
+
 export const fireNewLeadTrigger = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { lead_id: string }) => ({ lead_id: String(d?.lead_id ?? "") }))
