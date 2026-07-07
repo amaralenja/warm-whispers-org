@@ -269,22 +269,21 @@ async function autoAssignUnassignedConversations(db: any, channelIds?: string[])
   const { data: rows, error } = await q;
   if (error || !Array.isArray(rows) || rows.length === 0) return;
 
-  const channelCache = new Map<string, number | null>();
+  // IMPORTANTE: NÃO cachear o vendedor por canal. Antes, a gente pegava um único
+  // vendedor via `assign_vendor_for_channel` e reusava pra TODAS as conversas
+  // não atribuídas do mesmo canal — resultado: todos os leads da Jéssica caíam
+  // pro Caio (ou vice-versa) em um único disparo. Agora cada conversa recebe
+  // seu próprio sorteio ponderado, mantendo o balanceamento por vendedor.
   for (const row of rows as any[]) {
     const channelId = String(row.channel_id ?? "");
     if (!channelId) continue;
 
-    if (!channelCache.has(channelId)) {
-      const { data: vendorId } = await db.rpc("assign_vendor_for_channel" as any, { _channel_id: channelId });
-      channelCache.set(channelId, vendorId ? Number(vendorId) : null);
-    }
-
-    const vendorId = channelCache.get(channelId);
+    const { data: vendorId } = await db.rpc("assign_vendor_for_channel" as any, { _channel_id: channelId });
     if (!vendorId) continue;
 
     await db
       .from("wa_conversations" as any)
-      .update({ assigned_vendor_id: vendorId })
+      .update({ assigned_vendor_id: Number(vendorId) })
       .eq("id", row.id)
       .is("assigned_vendor_id", null);
   }
