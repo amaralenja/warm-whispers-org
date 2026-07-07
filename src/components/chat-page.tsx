@@ -509,12 +509,24 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const { data: convs = [], error: convsError, isLoading: convsLoading } = useQuery({
     queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin", searchParams.embed ? requestedPhone ?? requestedConversationId ?? "embed" : "full"],
     queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId, phone: searchParams.embed ? requestedPhone : undefined } }),
-    // Vendedor não recebe realtime (RLS bloqueia leitura direta; leituras vêm via RPC SECURITY DEFINER).
-    // Poll rápido pra que fluxos disparados atualizem o preview da conversa quase em tempo real.
     refetchInterval: vendorSession ? 5_000 : 30_000,
     refetchOnWindowFocus: false,
     staleTime: vendorSession ? 2_000 : 15_000,
   });
+
+  // Fallback: se filtro por telefone no embed voltou vazio, busca sem filtro pra achar mesmo
+  // conversas com contact_wa_id em formato diferente do esperado.
+  const needsFallback = Boolean(
+    searchParams.embed && requestedPhone && !convsLoading && asArray<Conv>(convs).length === 0,
+  );
+  const { data: convsFallback = [] } = useQuery({
+    queryKey: ["wa-conversations-fallback", opFilter ?? "all", vendorId ?? "admin"],
+    queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
+    enabled: needsFallback,
+    staleTime: 30_000,
+  });
+
+
 
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
   const { data: channels = [], error: channelsError } = useQuery({
