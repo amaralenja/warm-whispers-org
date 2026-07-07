@@ -378,10 +378,16 @@ function ChatPage() {
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
     queryFn: async () => {
-      const res = await listAllTagsFn({ data: { operacao: "all" } });
-      return Array.isArray(res) ? res : [];
+      try {
+        const res = await listAllTagsFn({ data: { operacao: "all" } });
+        return Array.isArray(res) ? res : [];
+      } catch (err) {
+        console.warn("[chat] listCrmTags falhou, seguindo sem tags", err);
+        return [];
+      }
     },
     staleTime: 60_000,
+    retry: false,
   });
   const tagColorMap = useMemo(() => {
     const m = new Map<string, string>();

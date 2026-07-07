@@ -69,7 +69,15 @@ export function useCrmTags(operacao: string | undefined) {
   const listTagsFn = useServerFn(listCrmTags);
   return useQuery({
     queryKey: ["crm-tags", operacao ?? "all"],
-    queryFn: async () => (await listTagsFn({ data: { operacao: operacao ?? "all" } })) as CrmTag[],
+    queryFn: async () => {
+      try {
+        return (await listTagsFn({ data: { operacao: operacao ?? "all" } })) as CrmTag[];
+      } catch (err) {
+        console.warn("[useCrmTags] falhou, retornando lista vazia", err);
+        return [] as CrmTag[];
+      }
+    },
+    retry: false,
   });
 }
 
