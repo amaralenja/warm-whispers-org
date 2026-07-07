@@ -189,15 +189,22 @@ function TasksPage() {
     },
   });
 
+  const vendorSession = typeof window !== "undefined" ? getVendorSession() : null;
+  const vendorAssigneeId = vendorSession?.id ? `v:${vendorSession.id}` : null;
+
   const tasksQ = useQuery({
-    queryKey: ["tasks", activeBoardId],
+    queryKey: ["tasks", activeBoardId, vendorAssigneeId],
     enabled: !!activeBoardId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("tasks" as any)
         .select("*")
         .eq("board_id", activeBoardId!)
         .order("ordem");
+      if (vendorAssigneeId) {
+        q = q.contains("assignee_ids", [vendorAssigneeId]);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as any[]).map((t) => ({
         ...t,
