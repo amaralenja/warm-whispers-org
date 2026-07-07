@@ -1139,6 +1139,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       staleTime: 15_000,
                     });
                   };
+                  const leadForConv = findLeadForConv(contactWaId);
+                  const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
+                  const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
+
                   return (
                     <div
                       key={String(c.id)}
@@ -1149,10 +1153,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       onFocus={prefetchMessages}
                       onTouchStart={prefetchMessages}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
+                      style={leadStage ? { borderLeft: `3px solid ${leadStage.cor}` } : undefined}
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
                       }`}
                     >
+
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback
@@ -1180,6 +1186,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 </span>
                               ) : null;
                             })()}
+                            {leadStage ? (
+                              <span
+                                className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                style={{ color: leadStage.cor, borderColor: `${leadStage.cor}66`, backgroundColor: `${leadStage.cor}1a` }}
+                                title={`Etapa CRM: ${leadStage.nome}`}
+                              >
+                                {leadStage.nome}
+                              </span>
+                            ) : null}
                             {hasActiveFlow ? (
                               <span
                                 title="Fluxo sendo disparado"
@@ -1189,6 +1204,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-chat-accent" />
                               </span>
                             ) : null}
+
                           </div>
 
                           {(() => {
