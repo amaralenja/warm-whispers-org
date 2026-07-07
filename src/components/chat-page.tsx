@@ -633,10 +633,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
   const conversationList = useMemo(() => {
-    const sorted = sortConversationsByLastInteraction(asArray<Conv>(convs));
+    const primary = asArray<Conv>(convs);
+    const source = primary.length === 0 && needsFallback ? asArray<Conv>(convsFallback) : primary;
+    const sorted = sortConversationsByLastInteraction(source);
     if (!vendorSession || vendorId == null) return sorted;
     return sorted.filter((c) => Number((c as any)?.assigned_vendor_id) === Number(vendorId));
-  }, [convs, vendorSession, vendorId]);
+  }, [convs, convsFallback, needsFallback, vendorSession, vendorId]);
+
 
   // Auto-open a conversation when arriving via ?phone= or ?conversationId=
   useEffect(() => {
