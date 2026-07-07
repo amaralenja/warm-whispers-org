@@ -46,8 +46,11 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = API
 
 function normalizeBrWhatsappNumber(raw: string): string {
   let digits = String(raw ?? "").replace(/\D/g, "");
-  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
-  if (digits.length === 12) {
+  // Só padroniza como BR se claramente for local BR (10/11 dígitos) ou já vier com DDI 55.
+  // Números internacionais (ex.: +1, +351, +34) passam intactos.
+  const looksLocalBr = digits.length === 10 || digits.length === 11;
+  if (!digits.startsWith("55") && looksLocalBr) digits = `55${digits}`;
+  if (digits.startsWith("55") && digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
     if (rest.length === 8) return `55${ddd}9${rest}`;
