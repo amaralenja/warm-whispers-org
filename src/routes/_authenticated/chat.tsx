@@ -2063,7 +2063,8 @@ function useActiveFlowConversationIds(): Set<string> {
       clearInterval(iv);
       supabase.removeChannel(ch);
     };
-  }, [listActiveFlowIdsFn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return ids;
 }
