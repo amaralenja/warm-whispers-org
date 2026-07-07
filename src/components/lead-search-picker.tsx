@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { isValidElement, useState, type ReactNode } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Search, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -34,7 +34,7 @@ export type PickedLead = {
 
 type LeadSearchPickerProps = {
   onPick?: (lead: PickedLead) => void;
-  triggerLabel?: string;
+  triggerLabel?: ReactNode;
 };
 
 function toStr(v: any): string | null {
@@ -46,6 +46,14 @@ function toStr(v: any): string | null {
 function safeStr(v: any, fallback = ""): string {
   const s = toStr(v);
   return s == null ? fallback : s;
+}
+function safeNode(v: ReactNode, fallback: string): ReactNode {
+  if (v == null || typeof v === "boolean") return fallback;
+  if (typeof v === "string" || typeof v === "number") return v;
+  if (Array.isArray(v)) return v;
+  // Nunca renderiza objeto cru como child; isso derruba React com "Objects are not valid...".
+  if (typeof v === "object" && !isValidElement(v)) return fallback;
+  return v;
 }
 function sanitizeLead(l: any): PickedLead {
   return {
@@ -98,7 +106,7 @@ export function LeadSearchPicker({
   return (
     <>
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <UserPlus className="h-4 w-4 mr-1" /> {safeStr(triggerLabel, "Buscar lead")}
+        <UserPlus className="h-4 w-4 mr-1" /> {safeNode(triggerLabel, "Buscar lead")}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">

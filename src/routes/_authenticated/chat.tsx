@@ -486,13 +486,23 @@ function ChatPage() {
 
   // Realtime: refresh conv list when new conversation/message lands
   useEffect(() => {
+    // Sessão de vendedor lê conversas por RPC filtrada. Realtime direto na tabela pode
+    // entregar eventos de outros vendedores e poluir o cache local; o polling acima é a fonte segura.
+    if (vendorSession) return;
+
+    const currentConversationQueryKey = ["wa-conversations", opFilter ?? "all", "admin"] as const;
+    const rowBelongsToCurrentWorkspace = (row: any) => {
+      if (!opFilter) return true;
+      return toText(row?.operacao_id).trim().toLowerCase() === String(opFilter).trim().toLowerCase();
+    };
     const bump = (convId?: string | null) => {
-      qc.invalidateQueries({ queryKey: ["wa-conversations"], refetchType: "active" });
+      qc.invalidateQueries({ queryKey: currentConversationQueryKey, refetchType: "active" });
       if (convId) qc.invalidateQueries({ queryKey: ["wa-messages", String(convId)], refetchType: "active" });
     };
     const applyConversationToCaches = (row: any) => {
       if (!row?.id) return;
-      qc.setQueriesData({ queryKey: ["wa-conversations"] }, (old: unknown) => {
+      if (!rowBelongsToCurrentWorkspace(row)) return;
+      qc.setQueryData(currentConversationQueryKey, (old: unknown) => {
         const list = asArray<any>(old);
         if (list.length === 0 && !Array.isArray(old)) return old;
         const idx = list.findIndex((c: any) => String(c?.id) === String(row.id));
@@ -515,7 +525,7 @@ function ChatPage() {
         return sortMessagesByCreatedAt(list);
       });
       // Atualiza o preview da conversa na sidebar sem esperar refetch.
-      qc.setQueriesData({ queryKey: ["wa-conversations"] }, (old: unknown) => {
+      qc.setQueryData(currentConversationQueryKey, (old: unknown) => {
         if (!Array.isArray(old)) return old;
         const mapped = old.map((c: any) => {
           if (String(c?.id) !== convId) return c;
@@ -556,10 +566,14 @@ function ChatPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [qc]);
+  }, [qc, vendorSession, opFilter]);
 
 
-  const conversationList = useMemo(() => sortConversationsByLastInteraction(asArray<Conv>(convs)), [convs]);
+  const conversationList = useMemo(() => {
+    const sorted = sortConversationsByLastInteraction(asArray<Conv>(convs));
+    if (!vendorSession || vendorId == null) return sorted;
+    return sorted.filter((c) => Number((c as any)?.assigned_vendor_id) === Number(vendorId));
+  }, [convs, vendorSession, vendorId]);
 
   // Auto-open a conversation when arriving via ?phone= or ?conversationId=
   useEffect(() => {

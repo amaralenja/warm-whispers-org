@@ -467,7 +467,7 @@ export const listConversations = createServerFn({ method: "GET" })
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
     if (isVendor) {
       if (allowed.length === 0) return [];
-      q = q.in("channel_id", allowed).or(`assigned_vendor_id.eq.${(context as any).vendor.id},assigned_vendor_id.is.null`);
+      q = q.in("channel_id", allowed).eq("assigned_vendor_id", Number((context as any).vendor.id));
     } else if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
