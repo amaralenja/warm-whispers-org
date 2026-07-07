@@ -76,9 +76,31 @@ function VendedoresPage() {
     qc.invalidateQueries({ queryKey: ["vendedores-list"] });
   }
 
-  function copyCode(code: string) {
-    navigator.clipboard.writeText(code);
-    toast.success(`Código ${code} copiado`);
+  async function copyCode(code: string) {
+    const text = String(code ?? "");
+    if (!text) {
+      toast.error("Vendedor sem código");
+      return;
+    }
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success(`Código ${text} copiado`);
+    } catch (err) {
+      console.error("[copyCode] falhou", err);
+      toast.error(`Não deu pra copiar. Código: ${text}`);
+    }
   }
 
 
