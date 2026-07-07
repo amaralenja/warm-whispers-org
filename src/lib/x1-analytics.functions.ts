@@ -481,15 +481,16 @@ async function getVendorX1Analytics(
     return true;
   });
 
-  const primaryOp = safeNullableString(context?.vendor?.expert) ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
+  const vendorExpert = safeNullableString(context?.vendor?.expert);
+  const primaryOp = vendorExpert ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
   const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
   const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
     if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
     if (!inDay(parseDataField(v?.Data))) return false;
-    if (!qualifiedVendaOperacao(v, produtoToOperacao)) return false;
-    const op = resolveVendaOperacao(v, produtoToOperacao);
-    if (opFilter && !sameText(op, opFilter)) return false;
-    return !op || opAllowed(op, allowedWorkspaces);
+    // Opera com o expert do vendedor como fallback quando o produto não está mapeado
+    const op = resolveVendaOperacao(v, produtoToOperacao) ?? vendorExpert;
+    if (opFilter && op && !sameText(op, opFilter)) return false;
+    return true;
   });
   const vendas = vendorSales.length;
   const faturamento = vendorSales.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
