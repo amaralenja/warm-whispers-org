@@ -1139,6 +1139,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       staleTime: 15_000,
                     });
                   };
+                  const leadForConv = findLeadForConv(contactWaId);
+                  const leadStage = leadForConv?.stage_id ? stageById.get(String(leadForConv.stage_id)) : null;
                   return (
                     <div
                       key={String(c.id)}
@@ -1149,10 +1151,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       onFocus={prefetchMessages}
                       onTouchStart={prefetchMessages}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
+                      style={leadStage ? { borderLeft: `3px solid ${leadStage.cor}` } : undefined}
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
                       }`}
                     >
+
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
                           <AvatarFallback
