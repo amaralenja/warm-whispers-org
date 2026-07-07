@@ -920,11 +920,12 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
     // A permissão já foi validada acima.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: target } = await supabaseAdmin
+    const { data: targetRaw } = await supabaseAdmin
       .from("wa_flow_runs" as any)
       .select("id, flow_id, channel_id, contact_wa_id, conversation_id, status")
       .eq("id", data.runId)
       .maybeSingle();
+    const target = targetRaw as any;
 
     const activeStatuses = ["queued", "running", "waiting"];
     const cancelPatch = {
