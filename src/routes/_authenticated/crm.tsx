@@ -343,14 +343,16 @@ function Kanban({
   const [visible, setVisible] = useState<Record<string, number>>({});
   const PAGE = 15;
 
+  const [chatPhone, setChatPhone] = useState<string | null>(null);
   const openChatForLead = (lead: Lead) => {
     const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
     if (!phoneDigits) {
       onEdit(lead);
       return;
     }
-    navigate({ to: "/chat", search: { phone: phoneDigits } });
+    setChatPhone(phoneDigits);
   };
+
 
 
   return (
