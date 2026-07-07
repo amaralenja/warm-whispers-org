@@ -610,7 +610,7 @@ function ChatPage() {
   const listCrmStagesFn = useServerFn(listCrmStages);
   const { data: crmLeadsForStage = [] } = useQuery({
     queryKey: ["crm-leads-for-chat"],
-    queryFn: () => listCrmLeadsFn(),
+    queryFn: () => listCrmLeadsFn({ data: undefined }),
     staleTime: 60_000,
   });
   const { data: crmStagesForChat = [] } = useQuery({
