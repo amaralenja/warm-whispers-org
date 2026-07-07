@@ -64,10 +64,10 @@ function sanitizeLead(l: any): PickedLead {
   };
 }
 
-export function LeadSearchPicker({
-  onPick,
-  triggerLabel = "Buscar lead",
-}: LeadSearchPickerProps = {}) {
+export function LeadSearchPicker(props: LeadSearchPickerProps | null = {}) {
+  const safeProps = props ?? {};
+  const onPick = safeProps.onPick;
+  const triggerLabel = safeProps.triggerLabel ?? "Buscar lead";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PickedLead[]>([]);
