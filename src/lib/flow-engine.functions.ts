@@ -890,8 +890,11 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
 export const listActiveFlowConversationIds = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const db = await dbFor(context);
-    const rpcArgs = vendorRpcArgs(context);
+    const db = context.supabase as any;
+    const vendor = (context as any)?.vendor;
+    const vendorId = Number(vendor?.id);
+    const codigo = String(vendor?.codigo ?? "").trim();
+    const rpcArgs = Number.isFinite(vendorId) && vendorId > 0 && codigo ? { _vendor_id: vendorId, _codigo: codigo } : null;
     const rpcName = rpcArgs ? "vendor_active_wa_flow_conversation_ids" : "active_wa_flow_conversation_ids";
     const { data, error } = await db.rpc(rpcName as any, rpcArgs ?? undefined);
     if (error) throw new Error(error.message);
