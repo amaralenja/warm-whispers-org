@@ -457,7 +457,7 @@ async function reportSalesToday(db: AnyDb) {
     total_faturamento: brlFmt(data?.totalFaturamento || 0),
     total_vendas: data?.totalVendas || 0,
     ticket_medio: brlFmt(data?.ticketMedioGeral || 0),
-    top_vendedores: ranking.map((r: any) => ({
+    top_vendedores: toArray<any>(ranking).map((r: any) => ({
       nome: r.nome, utm: r.utm, faturamento: brlFmt(r.faturamento), vendas: r.vendas, meta_pct: Math.round(r.metaPct),
     })),
   };
@@ -486,8 +486,8 @@ async function reportMyTasks(db: AnyDb, me: { id: string } | null) {
   const hoje = items.filter((t) => t.prazo && new Date(t.prazo) <= todayEnd && new Date(t.prazo) >= new Date());
   return {
     pendentes_total: items.length,
-    atrasadas: atrasadas.map((t) => ({ titulo: t.titulo, prazo: t.prazo, prioridade: t.prioridade })),
-    hoje: hoje.map((t) => ({ titulo: t.titulo, prazo: t.prazo, prioridade: t.prioridade })),
+    atrasadas: toArray<any>(atrasadas).map((t) => ({ titulo: t.titulo, prazo: t.prazo, prioridade: t.prioridade })),
+    hoje: toArray<any>(hoje).map((t) => ({ titulo: t.titulo, prazo: t.prazo, prioridade: t.prioridade })),
   };
 }
 
@@ -586,7 +586,7 @@ async function reportFinancial(db: AnyDb) {
     if (r.tipo === "receita") { receitas += v; if (r.status !== "pago") aReceber += v; }
     else { despesas += v; if (r.status !== "pago") aPagar += v; }
   }
-  const proximos = rows
+  const proximos = toArray<any>(rows)
     .filter((r) => r.status !== "pago" && r.data_vencimento)
     .sort((a, b) => String(a.data_vencimento).localeCompare(String(b.data_vencimento)))
     .slice(0, 5)
