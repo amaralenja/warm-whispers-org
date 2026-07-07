@@ -417,37 +417,13 @@ function Kanban({
         })}
       </DragScroll>
 
-      <Dialog open={!!chatLead} onOpenChange={(o) => !o && setChatLead(null)}>
-        <DialogContent className="h-[85vh] max-w-5xl overflow-hidden p-0 sm:rounded-2xl">
-          <DialogHeader className="border-b px-4 py-3">
-            <DialogTitle className="flex items-center gap-2 text-sm">
-              <MessageCircle className="h-4 w-4 text-emerald-400" />
-              Conversa — {chatLead?.nome}
-              {chatLead?.telefone && (
-                <span className="text-xs font-normal text-muted-foreground">({chatLead.telefone})</span>
-              )}
-            </DialogTitle>
-            <DialogDescription className="sr-only">
-              Chat ao vivo com o lead selecionado.
-            </DialogDescription>
-          </DialogHeader>
-          {chatPhone ? (
-            <iframe
-              key={chatPhone}
-              src={`/chat?phone=${encodeURIComponent(chatPhone)}`}
-              title="Chat ao vivo"
-              className="h-full w-full flex-1 border-0"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
-              Este lead não tem telefone cadastrado.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
+
+// (chat abre em /chat?phone=... — sem iframe)
+function _KanbanChatDialogPlaceholder() { return null;
+
 
 
 
