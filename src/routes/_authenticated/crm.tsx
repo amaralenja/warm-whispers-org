@@ -419,9 +419,24 @@ function Kanban({
         })}
       </DragScroll>
 
+      <Dialog open={!!chatPhone} onOpenChange={(o) => !o && setChatPhone(null)}>
+        <DialogContent className="p-0 max-w-[95vw] w-[1200px] h-[85vh] overflow-hidden flex flex-col gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Chat ao vivo</DialogTitle>
+          </DialogHeader>
+          {chatPhone && (
+            <iframe
+              src={`/chat?phone=${encodeURIComponent(chatPhone)}`}
+              className="flex-1 w-full h-full border-0 bg-chat-shell"
+              title="Chat ao vivo"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
 
 // (chat abre em /chat?phone=... — sem iframe)
 
