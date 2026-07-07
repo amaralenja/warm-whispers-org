@@ -792,7 +792,10 @@ function ChatPage() {
 
     },
     onSuccess: () => {
-      setDraft("");
+      // NÃO limpar `draft` aqui: essa mesma mutation é usada pra enviar áudio,
+      // imagem, vídeo e documento. Se o vendedor tá digitando e um envio de mídia
+      // termina no meio, o setDraft("") apagava o texto que ele tava escrevendo.
+      // O envio de texto já limpa o draft de forma otimista em handleSendText().
       qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
