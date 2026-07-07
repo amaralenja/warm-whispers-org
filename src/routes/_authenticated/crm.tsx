@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Download, LayoutGrid, List, Trash2, Pencil, Phone, Mail,
@@ -310,7 +310,7 @@ function Kanban({
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
 }) {
-  const navigate = useNavigate();
+  
   const [dragOver, setDragOver] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
@@ -343,14 +343,16 @@ function Kanban({
   const [visible, setVisible] = useState<Record<string, number>>({});
   const PAGE = 15;
 
+  const [chatPhone, setChatPhone] = useState<string | null>(null);
   const openChatForLead = (lead: Lead) => {
     const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
     if (!phoneDigits) {
       onEdit(lead);
       return;
     }
-    navigate({ to: "/chat", search: { phone: phoneDigits } });
+    setChatPhone(phoneDigits);
   };
+
 
 
   return (
@@ -417,9 +419,24 @@ function Kanban({
         })}
       </DragScroll>
 
+      <Dialog open={!!chatPhone} onOpenChange={(o) => !o && setChatPhone(null)}>
+        <DialogContent className="p-0 max-w-[95vw] w-[1200px] h-[85vh] overflow-hidden flex flex-col gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Chat ao vivo</DialogTitle>
+          </DialogHeader>
+          {chatPhone && (
+            <iframe
+              src={`/chat?phone=${encodeURIComponent(chatPhone)}`}
+              className="flex-1 w-full h-full border-0 bg-chat-shell"
+              title="Chat ao vivo"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
 
 // (chat abre em /chat?phone=... — sem iframe)
 
