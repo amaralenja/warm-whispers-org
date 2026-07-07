@@ -1939,6 +1939,7 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     refetchInterval: 4000,
   });
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
   useEffect(() => {
     const ch = supabase
@@ -1956,22 +1957,28 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     };
   }, [conversationId, qc]);
 
-  async function handleCancel(runId: string) {
-    if (!confirm("Parar este fluxo? O lead não vai receber as próximas mensagens.")) return;
+  async function doCancel(runId: string) {
+    console.log("[cancel-flow] iniciando", { runId, conversationId });
     setCancellingId(runId);
+    setConfirmCancelId(null);
     try {
       qc.setQueryData(["flow-runs-active", conversationId], (old: unknown) =>
         asArray<any>(old).filter((r) => String(r?.id) !== String(runId)),
       );
       const result = await cancelRunFn({ data: { runId, conversationId } });
-      toast.success("Fluxo parado");
-      if (Number((result as any)?.cancelled ?? 0) > 0) {
+      console.log("[cancel-flow] resultado do servidor", result);
+      const cancelledCount = Number((result as any)?.cancelled ?? 0);
+      if (cancelledCount > 0) {
+        toast.success(`Fluxo parado (${cancelledCount} execuç${cancelledCount === 1 ? "ão" : "ões"})`);
         qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
         qc.invalidateQueries({ queryKey: ["wa-conversations"] });
       } else {
+        console.warn("[cancel-flow] servidor respondeu 0 cancelamentos", result);
+        toast.warning("Nada foi cancelado — o fluxo pode já ter terminado");
         qc.setQueryData(["flow-runs-active", conversationId], []);
       }
     } catch (e: any) {
+      console.error("[cancel-flow] erro", e);
       qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
       toast.error(e?.message ?? "Falha ao parar fluxo");
     } finally {
@@ -2015,7 +2022,10 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
               <span className="font-mono text-[10px] text-muted-foreground">etapa {step}</span>
               <button
                 type="button"
-                onClick={() => handleCancel(runId)}
+                onClick={() => {
+                  console.log("[cancel-flow] clique no X", { runId });
+                  setConfirmCancelId(runId);
+                }}
                 disabled={isCancelling}
                 title="Parar fluxo"
                 className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
@@ -2026,6 +2036,30 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
           );
         })}
       </div>
+      <AlertDialog
+        open={!!confirmCancelId}
+        onOpenChange={(o) => {
+          if (!o) setConfirmCancelId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parar este fluxo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O lead não vai receber as próximas mensagens desse fluxo. Essa ação é imediata e não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmCancelId && doCancel(confirmCancelId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sim, parar fluxo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
