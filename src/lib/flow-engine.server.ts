@@ -420,6 +420,26 @@ async function isFlowRunCancelled(ctx: Ctx): Promise<boolean> {
   return String((data as any)?.status ?? "") === "cancelled";
 }
 
+async function hasRecentManualCancellation(ctx: Ctx): Promise<boolean> {
+  const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const variants = whatsappNumberVariants(ctx.contactWaId);
+  const { data } = await ctx.db
+    .from("wa_flow_runs" as any)
+    .select("id")
+    .eq("channel_id", ctx.channelId)
+    .in("contact_wa_id", variants.length > 0 ? variants : [ctx.contactWaId])
+    .eq("status", "cancelled")
+    .gte("updated_at", since)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+async function shouldStopFlowRun(ctx: Ctx): Promise<boolean> {
+  return (await isFlowRunCancelled(ctx)) || (await hasRecentManualCancellation(ctx));
+}
+
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
   const edge = edges.find((e) =>
     e.source === fromNodeId &&
@@ -469,7 +489,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
   let safety = 0;
 
   while (currentId && safety++ < 50) {
-    if (await isFlowRunCancelled(ctx)) return;
+    if (await shouldStopFlowRun(ctx)) return;
     const node = nodes.find((n) => n.id === currentId);
     if (!node) {
       // Node não existe mais (fluxo editado). Não deixa o run preso em "running".
@@ -481,7 +501,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
 
     try {
       const result = await runNode(node, ctx);
-      if (await isFlowRunCancelled(ctx)) return;
+      if (await shouldStopFlowRun(ctx)) return;
 
       // Update run pointer
       await updateFlowRun(ctx, {
@@ -551,7 +571,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
     node.type === "send_audio" ||
     node.type === "send_document" ||
     node.type === "send_buttons";
-  if (isSendNode && (await isFlowRunCancelled(ctx))) {
+  if (isSendNode && (await shouldStopFlowRun(ctx))) {
     return {};
   }
   switch (node.type) {
@@ -563,9 +583,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
       if (!text) return {};
       const body = { type: "text", text: { body: text } };
-      if (await isFlowRunCancelled(ctx)) return {};
+      if (await shouldStopFlowRun(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-      if (await isFlowRunCancelled(ctx)) return {};
+      if (await shouldStopFlowRun(ctx)) return {};
       await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized);
       return { log: { text } };
     }
@@ -597,9 +617,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (mediaType === "document" && filename) inner.filename = filename;
       }
       const body: any = { type: mediaType, [mediaType]: inner };
-      if (await isFlowRunCancelled(ctx)) return {};
+      if (await shouldStopFlowRun(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-      if (await isFlowRunCancelled(ctx)) return {};
+      if (await shouldStopFlowRun(ctx)) return {};
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
       return { log: { url: finalUrl } };
     }
@@ -628,9 +648,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
             },
           },
         };
-        if (await isFlowRunCancelled(ctx)) return {};
+        if (await shouldStopFlowRun(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-        if (await isFlowRunCancelled(ctx)) return {};
+        if (await shouldStopFlowRun(ctx)) return {};
         await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
       }
 
@@ -647,9 +667,9 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
             },
           },
         };
-        if (await isFlowRunCancelled(ctx)) return {};
+        if (await shouldStopFlowRun(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-        if (await isFlowRunCancelled(ctx)) return {};
+        if (await shouldStopFlowRun(ctx)) return {};
         await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
       }
 
