@@ -905,6 +905,7 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!data.runId) throw new Error("runId obrigatório");
     const db = await dbFor(context);
+    const userDb = (context as any)?.supabase ?? db;
 
     // Valida acesso do vendedor à conversa (admin passa direto).
     if (data.conversationId && (context as any).vendor) {
@@ -915,17 +916,46 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       }
     }
 
-    // Sempre usa admin pra cancelar — bypass total de RLS e das checagens
-    // de canal_allowed que às vezes zeravam o cancel do vendedor.
-    // A permissão já foi validada acima.
+    // Primeiro tenta pelas RPCs SECURITY DEFINER usando a sessão autenticada.
+    // Isso evita o caso em que o admin client cai pra chave publishable/anon
+    // no preview e o UPDATE direto não consegue furar RLS.
+    const rpcArgs = vendorRpcArgs(context);
+    let rpcCancelled = 0;
+    try {
+      const rpcResult = rpcArgs
+        ? await userDb.rpc("vendor_cancel_wa_flow_run" as any, { ...rpcArgs, _run_id: data.runId })
+        : await userDb.rpc("cancel_active_wa_flow_runs" as any, { _run_id: data.runId });
+      if (rpcResult?.error) {
+        console.warn("[flow-engine] cancel RPC falhou, tentando fallback admin", rpcResult.error);
+      } else {
+        rpcCancelled = Number(rpcResult?.data ?? 0) || 0;
+      }
+    } catch (err) {
+      console.warn("[flow-engine] cancel RPC exception, tentando fallback admin", err);
+    }
+
+    // Depois reforça com admin pra matar runs irmãs/duplicadas que a RPC antiga
+    // ainda pode deixar vivas. A permissão já foi validada acima.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    let target: any = null;
     const { data: targetRaw } = await supabaseAdmin
       .from("wa_flow_runs" as any)
       .select("id, flow_id, channel_id, contact_wa_id, conversation_id, status")
       .eq("id", data.runId)
       .maybeSingle();
-    const target = targetRaw as any;
+    target = targetRaw as any;
+
+    if (!target) {
+      try {
+        const { data: userTarget } = await userDb
+          .from("wa_flow_runs" as any)
+          .select("id, flow_id, channel_id, contact_wa_id, conversation_id, status")
+          .eq("id", data.runId)
+          .maybeSingle();
+        target = userTarget as any;
+      } catch {}
+    }
 
     const activeStatuses = ["queued", "running", "waiting"];
     const cancelPatch = {
@@ -978,11 +1008,11 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       .in("id", Array.from(idsToKill))
       .in("status", activeStatuses)
       .select("id");
-    if (forceError) throw new Error(forceError.message);
+    if (forceError && rpcCancelled === 0) throw new Error(forceError.message);
 
     return {
       ok: true,
-      cancelled: Array.isArray(forceRows) ? forceRows.length : 0,
+      cancelled: rpcCancelled + (Array.isArray(forceRows) ? forceRows.length : 0),
       targetFound: Boolean(target),
     };
   });
