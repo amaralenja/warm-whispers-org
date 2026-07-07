@@ -413,12 +413,42 @@ async function assertConversationAccess(
 
 export const listConversations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { operacaoId?: string; vendorId?: number | null } | undefined) => ({
+  .inputValidator((d: { operacaoId?: string; vendorId?: number | null; phone?: string | null } | undefined) => ({
     operacaoId: d?.operacaoId ?? null,
     vendorId: d?.vendorId ?? null,
+    phone: d?.phone ? String(d.phone) : null,
   }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    const phoneDigits = String(data.phone ?? "").replace(/\D+/g, "");
+    const phoneCandidates = (() => {
+      if (!phoneDigits) return [] as string[];
+      const set = new Set<string>([phoneDigits]);
+      const add = (value: string) => {
+        const digits = String(value ?? "").replace(/\D+/g, "");
+        if (digits) set.add(digits);
+      };
+      if (!phoneDigits.startsWith("55") && (phoneDigits.length === 10 || phoneDigits.length === 11)) add(`55${phoneDigits}`);
+      if (phoneDigits.startsWith("55")) add(phoneDigits.slice(2));
+      const withoutCountry = phoneDigits.startsWith("55") ? phoneDigits.slice(2) : phoneDigits;
+      if (withoutCountry.length === 10) {
+        const withNine = `${withoutCountry.slice(0, 2)}9${withoutCountry.slice(2)}`;
+        add(withNine);
+        add(`55${withNine}`);
+      }
+      if (withoutCountry.length === 11 && withoutCountry[2] === "9") {
+        const withoutNine = `${withoutCountry.slice(0, 2)}${withoutCountry.slice(3)}`;
+        add(withoutNine);
+        add(`55${withoutNine}`);
+      }
+      if (phoneDigits.length > 8) add(phoneDigits.slice(-8));
+      return Array.from(set).filter((v) => v.length >= 8);
+    })();
+    const phoneMatches = (row: any) => {
+      if (phoneCandidates.length === 0) return true;
+      const wa = String(row?.contact_wa_id ?? "").replace(/\D+/g, "");
+      return phoneCandidates.some((candidate) => wa === candidate || wa.endsWith(candidate) || candidate.endsWith(wa));
+    };
     const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
     if (rpcArgs) {
       const vendorId = Number((context as any).vendor.id);
@@ -435,6 +465,7 @@ export const listConversations = createServerFn({ method: "GET" })
         throw new Error(error.message);
       }
       const result = ((rows ?? []) as any[])
+        .filter(phoneMatches)
         .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime());
       console.info("[whatsapp-chat] vendor listConversations", {
         vendorId,
@@ -465,13 +496,20 @@ export const listConversations = createServerFn({ method: "GET" })
       .or("operacao_id.is.null,operacao_id.neq.__notificador__");
     if (notifIds.length) q = q.not("channel_id", "in", `(${notifIds.map((i) => `"${i}"`).join(",")})`);
     if (data.operacaoId) q = q.eq("operacao_id", data.operacaoId);
+    if (phoneCandidates.length) {
+      const filters = phoneCandidates.flatMap((candidate) => [
+        `contact_wa_id.eq.${candidate}`,
+        `contact_wa_id.ilike.%${candidate}`,
+      ]);
+      q = q.or(filters.join(",")).limit(25);
+    }
     if (isVendor) {
       if (allowed.length === 0) return [];
       q = q.in("channel_id", allowed).eq("assigned_vendor_id", Number((context as any).vendor.id));
     } else if (data.vendorId != null) q = q.eq("assigned_vendor_id", data.vendorId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    return phoneCandidates.length ? ((rows ?? []) as any[]).filter(phoneMatches) : rows ?? [];
   });
 
 export const listMessages = createServerFn({ method: "GET" })

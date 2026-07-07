@@ -4,17 +4,17 @@ import { Check, ChevronRight, Circle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const ContextMenu = ContextMenuPrimitive.Root;
+const ContextMenu = ContextMenuPrimitive.ContextMenu ?? ContextMenuPrimitive.Root;
 
-const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+const ContextMenuTrigger = ContextMenuPrimitive.ContextMenuTrigger ?? ContextMenuPrimitive.Trigger;
 
-const ContextMenuGroup = ContextMenuPrimitive.Group;
+const ContextMenuGroup = ContextMenuPrimitive.ContextMenuGroup ?? ContextMenuPrimitive.Group;
 
-const ContextMenuPortal = ContextMenuPrimitive.Portal;
+const ContextMenuPortal = ContextMenuPrimitive.ContextMenuPortal ?? ContextMenuPrimitive.Portal;
 
-const ContextMenuSub = ContextMenuPrimitive.Sub;
+const ContextMenuSub = ContextMenuPrimitive.ContextMenuSub ?? ContextMenuPrimitive.Sub;
 
-const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
+const ContextMenuRadioGroup = ContextMenuPrimitive.ContextMenuRadioGroup ?? ContextMenuPrimitive.RadioGroup;
 
 const ContextMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
