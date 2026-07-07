@@ -2022,7 +2022,10 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
               <span className="font-mono text-[10px] text-muted-foreground">etapa {step}</span>
               <button
                 type="button"
-                onClick={() => handleCancel(runId)}
+                onClick={() => {
+                  console.log("[cancel-flow] clique no X", { runId });
+                  setConfirmCancelId(runId);
+                }}
                 disabled={isCancelling}
                 title="Parar fluxo"
                 className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
@@ -2033,6 +2036,30 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
           );
         })}
       </div>
+      <AlertDialog
+        open={!!confirmCancelId}
+        onOpenChange={(o) => {
+          if (!o) setConfirmCancelId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parar este fluxo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O lead não vai receber as próximas mensagens desse fluxo. Essa ação é imediata e não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmCancelId && doCancel(confirmCancelId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sim, parar fluxo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
