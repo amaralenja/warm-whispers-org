@@ -1939,6 +1939,7 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     refetchInterval: 4000,
   });
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
   useEffect(() => {
     const ch = supabase
@@ -1956,22 +1957,28 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
     };
   }, [conversationId, qc]);
 
-  async function handleCancel(runId: string) {
-    if (!confirm("Parar este fluxo? O lead não vai receber as próximas mensagens.")) return;
+  async function doCancel(runId: string) {
+    console.log("[cancel-flow] iniciando", { runId, conversationId });
     setCancellingId(runId);
+    setConfirmCancelId(null);
     try {
       qc.setQueryData(["flow-runs-active", conversationId], (old: unknown) =>
         asArray<any>(old).filter((r) => String(r?.id) !== String(runId)),
       );
       const result = await cancelRunFn({ data: { runId, conversationId } });
-      toast.success("Fluxo parado");
-      if (Number((result as any)?.cancelled ?? 0) > 0) {
+      console.log("[cancel-flow] resultado do servidor", result);
+      const cancelledCount = Number((result as any)?.cancelled ?? 0);
+      if (cancelledCount > 0) {
+        toast.success(`Fluxo parado (${cancelledCount} execuç${cancelledCount === 1 ? "ão" : "ões"})`);
         qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
         qc.invalidateQueries({ queryKey: ["wa-conversations"] });
       } else {
+        console.warn("[cancel-flow] servidor respondeu 0 cancelamentos", result);
+        toast.warning("Nada foi cancelado — o fluxo pode já ter terminado");
         qc.setQueryData(["flow-runs-active", conversationId], []);
       }
     } catch (e: any) {
+      console.error("[cancel-flow] erro", e);
       qc.invalidateQueries({ queryKey: ["flow-runs-active", conversationId] });
       toast.error(e?.message ?? "Falha ao parar fluxo");
     } finally {
