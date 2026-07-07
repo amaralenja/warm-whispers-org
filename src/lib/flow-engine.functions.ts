@@ -985,37 +985,26 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
     const idsToKill = new Set<string>([data.runId]);
     if (target?.id) idsToKill.add(String(target.id));
 
-    // Mata TODAS as runs irmãs (mesmo flow) na mesma conversa OU no mesmo
-    // contato/canal — cobre duplicação por triggers concorrentes.
-    if (target?.flow_id) {
-      const conversationId = String(target.conversation_id ?? data.conversationId ?? "").trim();
-      if (conversationId) {
-        const { data: sib1 } = await supabaseAdmin
-          .from("wa_flow_runs" as any)
-          .select("id")
-          .eq("flow_id", String(target.flow_id))
-          .eq("conversation_id", conversationId)
-          .in("status", activeStatuses);
-        for (const row of (sib1 ?? []) as any[]) idsToKill.add(String(row.id));
-      }
-      if (target.channel_id && target.contact_wa_id) {
-        const variants = whatsappNumberVariants(String(target.contact_wa_id));
-        const { data: sib2 } = await supabaseAdmin
-          .from("wa_flow_runs" as any)
-          .select("id")
-          .eq("flow_id", String(target.flow_id))
-          .eq("channel_id", String(target.channel_id))
-          .in("contact_wa_id", variants.length > 0 ? variants : [String(target.contact_wa_id)])
-          .in("status", activeStatuses);
-        for (const row of (sib2 ?? []) as any[]) idsToKill.add(String(row.id));
-      }
-    } else if (data.conversationId) {
+    // Mata qualquer execução ativa na mesma conversa OU no mesmo contato/canal.
+    // Na prática, quando o vendedor aperta parar, nada daquele lead deve continuar disparando.
+    const conversationId = String(target?.conversation_id ?? data.conversationId ?? "").trim();
+    if (conversationId) {
       const { data: convRuns } = await supabaseAdmin
         .from("wa_flow_runs" as any)
         .select("id")
-        .eq("conversation_id", data.conversationId)
+        .eq("conversation_id", conversationId)
         .in("status", activeStatuses);
       for (const row of (convRuns ?? []) as any[]) idsToKill.add(String(row.id));
+    }
+    if (target?.channel_id && target?.contact_wa_id) {
+      const variants = whatsappNumberVariants(String(target.contact_wa_id));
+      const { data: contactRuns } = await supabaseAdmin
+        .from("wa_flow_runs" as any)
+        .select("id")
+        .eq("channel_id", String(target.channel_id))
+        .in("contact_wa_id", variants.length > 0 ? variants : [String(target.contact_wa_id)])
+        .in("status", activeStatuses);
+      for (const row of (contactRuns ?? []) as any[]) idsToKill.add(String(row.id));
     }
 
     const { data: forceRows, error: forceError } = await supabaseAdmin
