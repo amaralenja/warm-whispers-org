@@ -142,6 +142,25 @@ export function AppSidebar() {
   }, []);
 
 
+  const vendorSession = perm !== null ? getVendorSession() : null;
+  const vendorAssigneeId = vendorSession?.id ? `v:${vendorSession.id}` : null;
+
+  const pendingTasksQ = useQuery({
+    queryKey: ["sidebar_pending_tasks", vendorAssigneeId],
+    enabled: !!vendorAssigneeId,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("tasks" as any)
+        .select("id", { count: "exact", head: true })
+        .contains("assignee_ids", [vendorAssigneeId!])
+        .or("concluida.is.false,concluida.is.null");
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+  const hasPendingTasks = (pendingTasksQ.data ?? 0) > 0;
+
   const visibleMain = mainItems.filter((i) => canSee(perm, keyFromUrl(i.url)));
   const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
   const visibleHT = highTicketItems.filter((i) => canSee(perm, "high-ticket", keyFromUrl(i.url)));
@@ -164,6 +183,7 @@ export function AppSidebar() {
 
   const renderMenuItem = (item: Item) => {
     const active = pathname === item.url;
+    const showDot = item.url === "/tasks" && hasPendingTasks;
     return (
       <SidebarMenuItem key={item.title}>
         <SidebarMenuButton
@@ -181,18 +201,29 @@ export function AppSidebar() {
             {active && (
               <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
             )}
-            <item.icon
-              className={[
-                "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
-                active ? "text-accent" : "",
-              ].join(" ")}
-            />
-            {!collapsed && <span className="truncate">{item.title}</span>}
+            <span className="relative shrink-0">
+              <item.icon
+                className={[
+                  "!h-[1.35rem] !w-[1.35rem] transition-transform group-hover/menu:scale-110",
+                  active ? "text-accent" : "",
+                ].join(" ")}
+              />
+              {showDot && (
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+              )}
+            </span>
+            {!collapsed && <span className="truncate flex-1">{item.title}</span>}
+            {showDot && !collapsed && (
+              <span className="ml-auto rounded-full bg-red-500/20 px-1.5 py-0.5 text-[0.6rem] font-bold text-red-400">
+                {pendingTasksQ.data}
+              </span>
+            )}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
     );
   };
+
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
