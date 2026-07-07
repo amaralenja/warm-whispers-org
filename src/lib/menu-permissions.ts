@@ -55,6 +55,7 @@ export function defaultPermissoes(): Permissoes {
       }
       p[n.key] = sub;
     } else {
+      if (n.key === "tasks") { p[n.key] = true; continue; }
       p[n.key] = false;
     }
   }

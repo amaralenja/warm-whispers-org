@@ -246,13 +246,22 @@ export function VendorPermissionsDialog({
               <div className="space-y-2">
                 {MENU_TREE.map((node) => {
                   const isGroup = "children" in node;
+                  const isLocked = node.key === "tasks";
                   return (
                     <div key={node.key} className="rounded-lg border border-border bg-card/40 p-3">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{node.title}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {node.title}
+                          {isLocked && (
+                            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.6rem] uppercase tracking-wider text-accent">
+                              Obrigatório
+                            </span>
+                          )}
+                        </div>
                         <Switch
-                          checked={isTopOn(node.key)}
-                          onCheckedChange={(v) => setTop(node.key, v)}
+                          checked={isLocked ? true : isTopOn(node.key)}
+                          disabled={isLocked}
+                          onCheckedChange={(v) => !isLocked && setTop(node.key, v)}
                         />
                       </div>
                       {isGroup && (

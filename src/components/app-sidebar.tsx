@@ -161,7 +161,7 @@ export function AppSidebar() {
   });
   const hasPendingTasks = (pendingTasksQ.data ?? 0) > 0;
 
-  const visibleMain = mainItems.filter((i) => canSee(perm, keyFromUrl(i.url)));
+  const visibleMain = mainItems.filter((i) => i.url === "/tasks" || canSee(perm, keyFromUrl(i.url)));
   const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
   const visibleHT = highTicketItems.filter((i) => canSee(perm, "high-ticket", keyFromUrl(i.url)));
   const showOpX1Group = canSee(perm, "operacao-x1") && visibleOpX1.length > 0;
