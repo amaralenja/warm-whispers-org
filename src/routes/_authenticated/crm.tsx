@@ -426,7 +426,7 @@ function Kanban({
           </DialogHeader>
           {chatPhone && (
             <iframe
-              src={`/chat?phone=${encodeURIComponent(chatPhone)}`}
+              src={`/chat?phone=${encodeURIComponent(chatPhone)}&embed=1`}
               className="flex-1 w-full h-full border-0 bg-chat-shell"
               title="Chat ao vivo"
             />
