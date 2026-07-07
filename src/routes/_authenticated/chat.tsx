@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -93,10 +93,29 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 
+type ChatSearchParams = {
+  phone?: string;
+  conversationId?: string;
+  embed?: boolean;
+};
+
 function ChatRoute() {
   return (
     <ChatErrorBoundary>
       <ChatPage />
+    </ChatErrorBoundary>
+  );
+}
+
+export function ChatEmbed({ phone, conversationId }: { phone?: string; conversationId?: string }) {
+  const searchOverride = useMemo<ChatSearchParams>(
+    () => ({ phone, conversationId, embed: true }),
+    [phone, conversationId],
+  );
+
+  return (
+    <ChatErrorBoundary>
+      <ChatPage searchOverride={searchOverride} />
     </ChatErrorBoundary>
   );
 }
@@ -378,7 +397,7 @@ function PreviewStatusTick({ status }: { status: string | null }) {
   return <Clock className="h-3.5 w-3.5 shrink-0 text-white/60" />;
 }
 
-function ChatPage() {
+function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}) {
   const qc = useQueryClient();
   const { workspace, workspaces } = useWorkspace();
   const opBadgeFor = (opId: string | null | undefined) => {
@@ -447,7 +466,13 @@ function ChatPage() {
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
-  const searchParams = Route.useSearch();
+  const routeSearch = useSearch({ strict: false }) as Record<string, unknown>;
+  const routeSearchParams: ChatSearchParams = {
+    phone: typeof routeSearch.phone === "string" ? routeSearch.phone : undefined,
+    conversationId: typeof routeSearch.conversationId === "string" ? routeSearch.conversationId : undefined,
+    embed: routeSearch.embed === "1" || routeSearch.embed === 1 || routeSearch.embed === true,
+  };
+  const searchParams = searchOverride ?? routeSearchParams;
   const requestedPhone = searchParams.phone?.trim() || undefined;
   const requestedConversationId = searchParams.conversationId?.trim() || undefined;
   const navigate = useNavigate();
