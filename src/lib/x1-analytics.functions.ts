@@ -541,7 +541,7 @@ async function getVendorX1Analytics(
       if (key) leadOpKeys.add(key);
     }
     const msgOp = msgsScoped.filter((m: any) => sameText(channelToOp.get(safeString(m?.channel_id)), op));
-    const vdsOp = vendorSales.filter((v: any) => sameText(resolveVendaOperacao(v, produtoToOperacao), op));
+    const vdsOp = vendorSales.filter((v: any) => sameText(resolveVendaOperacao(v, produtoToOperacao) ?? vendorExpert, op));
     const fatOp = vdsOp.reduce((acc: number, v: any) => acc + parseTicket(v?.Ticket), 0);
     return {
       operacao: op,
