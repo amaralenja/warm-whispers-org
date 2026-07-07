@@ -706,16 +706,21 @@ type SendInput = {
 // Brazilian numbers: WhatsApp Cloud API expects mobile as 55 + DDD + 9 + 8 digits.
 // Many contacts arrive without the "9" (legacy 10-digit format). Insert it when missing.
 function normalizeBrWhatsappNumber(raw: string): string {
-  let digits = String(raw ?? "").replace(/\D/g, "");
-  // Só assume BR se for local 10/11 dígitos. Internacionais (ex.: +1 xxx, +351 xxx)
-  // passam intactos — senão o "55" grudado no início destrói o número.
-  const looksLocalBr = digits.length === 10 || digits.length === 11;
-  if (!digits.startsWith("55") && looksLocalBr) digits = `55${digits}`;
-  // 55 + DDD(2) + number(8 or 9) — só ajusta o 9 quando o DDI é 55.
+  const rawStr = String(raw ?? "").trim();
+  let digits = rawStr.replace(/\D/g, "");
+  // Se veio com "+" explícito, é internacional — nunca prefixar 55.
+  const hasPlus = rawStr.startsWith("+");
+  // Heurística BR: DDD válido (dígitos 1-9, 1-9). Móvel BR de 11 dígitos tem o "9" na posição 2.
+  const dddOk = digits.length >= 2 && digits[0] !== "0" && digits[1] !== "0";
+  const looksBr11 = digits.length === 11 && dddOk && digits[2] === "9";
+  const looksBr10 = digits.length === 10 && dddOk;
+  if (!hasPlus && !digits.startsWith("55") && (looksBr10 || looksBr11)) {
+    digits = `55${digits}`;
+  }
   if (digits.startsWith("55") && digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
-    if (rest.length === 8) {
+    if (rest.length === 8 && ddd[0] !== "0" && ddd[1] !== "0") {
       return `55${ddd}9${rest}`;
     }
   }
