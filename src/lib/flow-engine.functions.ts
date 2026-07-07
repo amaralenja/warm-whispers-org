@@ -24,8 +24,9 @@ function normalizeText(value: unknown): string {
 
 function normalizeBrWhatsappNumber(raw: string): string {
   let digits = String(raw ?? "").replace(/\D/g, "");
-  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
-  if (digits.length === 12) {
+  const looksLocalBr = digits.length === 10 || digits.length === 11;
+  if (!digits.startsWith("55") && looksLocalBr) digits = `55${digits}`;
+  if (digits.startsWith("55") && digits.length === 12) {
     const ddd = digits.slice(2, 4);
     const rest = digits.slice(4);
     if (rest.length === 8) return `55${ddd}9${rest}`;
