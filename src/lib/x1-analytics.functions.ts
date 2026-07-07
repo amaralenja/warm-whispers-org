@@ -369,9 +369,15 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const [channelsRes, conversationsRes, crmLeadsRes, produtosMapRes, vendasRows] = await Promise.all([
+  const [channelsRes, conversationsRes, messagesRes, crmLeadsRes, produtosMapRes, vendasRows] = await Promise.all([
     db.rpc("vendor_list_wa_channels" as any, rpcArgs),
     db.rpc("vendor_list_x1_wa_conversations" as any, {
+      ...rpcArgs,
+      _operacao_id: opFilter ?? null,
+      _from: fromIso,
+      _to: toIso,
+    }),
+    db.rpc("vendor_list_x1_wa_messages" as any, {
       ...rpcArgs,
       _operacao_id: opFilter ?? null,
       _from: fromIso,
@@ -390,6 +396,7 @@ async function getVendorX1Analytics(
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
+  if (messagesRes.error) throw new Error(messagesRes.error.message);
   if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
   if (produtosMapRes.error) throw new Error(produtosMapRes.error.message);
 
@@ -464,7 +471,7 @@ async function getVendorX1Analytics(
     if (key) leadKeys.add(key);
   }
 
-  const messages = await fetchAnalyticsMessages(db, Array.from(channelIds), fromIso, toIso);
+  const messages = (messagesRes.data ?? []) as any[];
   const msgsScoped = messages.filter((m: any) => {
     if (m?.deleted_at) return false;
     if (!isWithinIso(m?.created_at, fromIso, toIso)) return false;
