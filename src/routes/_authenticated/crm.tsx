@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { DragScroll } from "@/components/drag-scroll";
+import { ChatEmbed } from "@/routes/_authenticated/chat";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crm")({
@@ -425,11 +426,9 @@ function Kanban({
             <DialogTitle>Chat ao vivo</DialogTitle>
           </DialogHeader>
           {chatPhone && (
-            <iframe
-              src={`/chat?phone=${encodeURIComponent(chatPhone)}&embed=1`}
-              className="flex-1 w-full h-full border-0 bg-chat-shell"
-              title="Chat ao vivo"
-            />
+            <div className="min-h-0 flex-1 bg-chat-shell">
+              <ChatEmbed phone={chatPhone} />
+            </div>
           )}
         </DialogContent>
       </Dialog>

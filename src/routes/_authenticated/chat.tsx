@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -93,10 +93,29 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 
+type ChatSearchParams = {
+  phone?: string;
+  conversationId?: string;
+  embed?: boolean;
+};
+
 function ChatRoute() {
   return (
     <ChatErrorBoundary>
       <ChatPage />
+    </ChatErrorBoundary>
+  );
+}
+
+export function ChatEmbed({ phone, conversationId }: { phone?: string; conversationId?: string }) {
+  const searchOverride = useMemo<ChatSearchParams>(
+    () => ({ phone, conversationId, embed: true }),
+    [phone, conversationId],
+  );
+
+  return (
+    <ChatErrorBoundary>
+      <ChatPage searchOverride={searchOverride} />
     </ChatErrorBoundary>
   );
 }
@@ -218,6 +237,31 @@ function initials(name: unknown, fallback: unknown) {
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase() ?? "")
     .join("") || "?";
+}
+
+function phoneCandidates(raw: unknown): string[] {
+  const digits = toText(raw).replace(/\D+/g, "");
+  if (!digits) return [];
+  const set = new Set<string>([digits]);
+  const add = (value: string) => {
+    const onlyDigits = value.replace(/\D+/g, "");
+    if (onlyDigits) set.add(onlyDigits);
+  };
+  if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) add(`55${digits}`);
+  if (digits.startsWith("55")) add(digits.slice(2));
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (local.length === 10) {
+    const withNine = `${local.slice(0, 2)}9${local.slice(2)}`;
+    add(withNine);
+    add(`55${withNine}`);
+  }
+  if (local.length === 11 && local[2] === "9") {
+    const withoutNine = `${local.slice(0, 2)}${local.slice(3)}`;
+    add(withoutNine);
+    add(`55${withoutNine}`);
+  }
+  if (digits.length > 8) add(digits.slice(-8));
+  return Array.from(set).filter((value) => value.length >= 8);
 }
 
 // Paleta dark: cada letra tem sua cor pra diferenciar visualmente os contatos
@@ -353,7 +397,7 @@ function PreviewStatusTick({ status }: { status: string | null }) {
   return <Clock className="h-3.5 w-3.5 shrink-0 text-white/60" />;
 }
 
-function ChatPage() {
+function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}) {
   const qc = useQueryClient();
   const { workspace, workspaces } = useWorkspace();
   const opBadgeFor = (opId: string | null | undefined) => {
@@ -422,7 +466,15 @@ function ChatPage() {
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
-  const searchParams = Route.useSearch();
+  const routeSearch = useSearch({ strict: false }) as Record<string, unknown>;
+  const routeSearchParams: ChatSearchParams = {
+    phone: typeof routeSearch.phone === "string" ? routeSearch.phone : undefined,
+    conversationId: typeof routeSearch.conversationId === "string" ? routeSearch.conversationId : undefined,
+    embed: routeSearch.embed === "1" || routeSearch.embed === 1 || routeSearch.embed === true,
+  };
+  const searchParams = searchOverride ?? routeSearchParams;
+  const requestedPhone = searchParams.phone?.trim() || undefined;
+  const requestedConversationId = searchParams.conversationId?.trim() || undefined;
   const navigate = useNavigate();
   const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
@@ -463,9 +515,9 @@ function ChatPage() {
   // estão sem operacao_id preenchido; isso fazia a Amanda ver o chat zerado.
   const opFilter = vendorSession ? undefined : workspace.id === "all" ? undefined : workspace.id;
 
-  const { data: convs = [], error: convsError } = useQuery({
-    queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin"],
-    queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId } }),
+  const { data: convs = [], error: convsError, isLoading: convsLoading } = useQuery({
+    queryKey: ["wa-conversations", opFilter ?? "all", vendorId ?? "admin", searchParams.embed ? requestedPhone ?? requestedConversationId ?? "embed" : "full"],
+    queryFn: () => listConvFn({ data: { operacaoId: opFilter, vendorId, phone: searchParams.embed ? requestedPhone : undefined } }),
     // Vendedor não recebe realtime (RLS bloqueia leitura direta; leituras vêm via RPC SECURITY DEFINER).
     // Poll rápido pra que fluxos disparados atualizem o preview da conversa quase em tempo real.
     refetchInterval: vendorSession ? 5_000 : 30_000,
@@ -585,27 +637,28 @@ function ChatPage() {
 
   // Auto-open a conversation when arriving via ?phone= or ?conversationId=
   useEffect(() => {
-    const wanted = `${searchParams.conversationId ?? ""}|${searchParams.phone ?? ""}`;
-    if (!searchParams.conversationId && !searchParams.phone) return;
+    const wanted = `${requestedConversationId ?? ""}|${requestedPhone ?? ""}`;
+    if (!requestedConversationId && !requestedPhone) return;
     if (autoOpenedRef.current === wanted) return;
     if (conversationList.length === 0) return;
-    const digits = (s: string) => s.replace(/\D+/g, "");
     let match: Conv | undefined;
-    if (searchParams.conversationId) {
-      match = conversationList.find((c) => String(c.id) === searchParams.conversationId);
+    if (requestedConversationId) {
+      match = conversationList.find((c) => String(c.id) === requestedConversationId);
     }
-    if (!match && searchParams.phone) {
-      const wantedDigits = digits(searchParams.phone);
-      if (wantedDigits) {
-        match = conversationList.find((c) => digits(String(c.contact_wa_id ?? "")).endsWith(wantedDigits) || digits(String(c.contact_wa_id ?? "")) === wantedDigits);
-      }
+    if (!match && requestedPhone) {
+      const candidates = phoneCandidates(requestedPhone);
+      match = conversationList.find((c) => {
+        const waDigits = toText(c.contact_wa_id).replace(/\D+/g, "");
+        return candidates.some((candidate) => waDigits === candidate || waDigits.endsWith(candidate) || candidate.endsWith(waDigits));
+      });
+      if (!match && searchParams.embed && conversationList.length === 1) match = conversationList[0];
     }
     if (match) {
       autoOpenedRef.current = wanted;
       setActiveId(String(match.id));
-      navigate({ to: "/chat", search: {}, replace: true });
+      if (!searchParams.embed) navigate({ to: "/chat", search: {}, replace: true });
     }
-  }, [searchParams.phone, searchParams.conversationId, conversationList, navigate]);
+  }, [requestedPhone, requestedConversationId, searchParams.embed, conversationList, navigate]);
 
   // ---- CRM stage lookup by phone ----
   const listCrmLeadsFn = useServerFn(listCrmLeads);
@@ -1207,10 +1260,23 @@ function ChatPage() {
             <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
               <div className="max-w-sm text-center">
                 <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-chat-line bg-chat-panel text-chat-accent">
-                  <Headphones className="h-9 w-9" />
+                  {searchParams.embed && (requestedPhone || requestedConversationId) ? <Loader2 className="h-9 w-9 animate-spin" /> : <Headphones className="h-9 w-9" />}
                 </div>
-                <p className="text-lg font-semibold text-foreground">Selecione uma conversa</p>
-                <p className="mt-1 text-sm">O histórico abre aqui com mídia, áudio e disparo de fluxo.</p>
+                {searchParams.embed && (requestedPhone || requestedConversationId) ? (
+                  <>
+                    <p className="text-lg font-semibold text-foreground">
+                      {convsLoading ? "Abrindo conversa" : "Conversa não encontrada"}
+                    </p>
+                    <p className="mt-1 text-sm">
+                      {convsLoading ? "Carregando o histórico deste lead…" : "Não achei conversa de WhatsApp para este telefone."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg font-semibold text-foreground">Selecione uma conversa</p>
+                    <p className="mt-1 text-sm">O histórico abre aqui com mídia, áudio e disparo de fluxo.</p>
+                  </>
+                )}
               </div>
             </div>
           ) : (
