@@ -310,9 +310,8 @@ function Kanban({
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
 }) {
-
+  const navigate = useNavigate();
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const [chatLead, setChatLead] = useState<Lead | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
     for (const s of stages) map.set(s.id, []);
@@ -344,7 +343,15 @@ function Kanban({
   const [visible, setVisible] = useState<Record<string, number>>({});
   const PAGE = 15;
 
-  const chatPhone = (chatLead?.telefone ?? "").replace(/\D+/g, "");
+  const openChatForLead = (lead: Lead) => {
+    const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
+    if (!phoneDigits) {
+      onEdit(lead);
+      return;
+    }
+    navigate({ to: "/chat", search: { phone: phoneDigits } });
+  };
+
 
   return (
     <>
