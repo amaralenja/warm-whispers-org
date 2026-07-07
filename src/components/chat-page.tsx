@@ -1184,6 +1184,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 </span>
                               ) : null;
                             })()}
+                            {leadStage ? (
+                              <span
+                                className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                style={{ color: leadStage.cor, borderColor: `${leadStage.cor}66`, backgroundColor: `${leadStage.cor}1a` }}
+                                title={`Etapa CRM: ${leadStage.nome}`}
+                              >
+                                {leadStage.nome}
+                              </span>
+                            ) : null}
                             {hasActiveFlow ? (
                               <span
                                 title="Fluxo sendo disparado"
@@ -1193,6 +1202,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-chat-accent" />
                               </span>
                             ) : null}
+
                           </div>
 
                           {(() => {
