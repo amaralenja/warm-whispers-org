@@ -499,10 +499,11 @@ export const listConversations = createServerFn({ method: "GET" })
     if (phoneCandidates.length) {
       const filters = phoneCandidates.flatMap((candidate) => [
         `contact_wa_id.eq.${candidate}`,
-        `contact_wa_id.ilike.%${candidate}`,
+        `contact_wa_id.ilike.%${candidate}%`,
       ]);
-      q = q.or(filters.join(",")).limit(25);
+      q = q.or(filters.join(",")).limit(50);
     }
+
     if (isVendor) {
       if (allowed.length === 0) return [];
       q = q.in("channel_id", allowed).eq("assigned_vendor_id", Number((context as any).vendor.id));
