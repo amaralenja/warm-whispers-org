@@ -610,7 +610,7 @@ function ChatPage() {
   const listCrmStagesFn = useServerFn(listCrmStages);
   const { data: crmLeadsForStage = [] } = useQuery({
     queryKey: ["crm-leads-for-chat"],
-    queryFn: () => listCrmLeadsFn(),
+    queryFn: () => listCrmLeadsFn({ data: undefined }),
     staleTime: 60_000,
   });
   const { data: crmStagesForChat = [] } = useQuery({
@@ -2079,7 +2079,7 @@ function useActiveFlowConversationIds(): Set<string> {
     let cancelled = false;
     async function refresh() {
       try {
-        const data = await listActiveFlowIdsFn();
+        const data = await listActiveFlowIdsFn({ data: undefined });
         if (cancelled) return;
         setIds(new Set(asArray<string>(data).map(String).filter(Boolean)));
       } catch (e) {
