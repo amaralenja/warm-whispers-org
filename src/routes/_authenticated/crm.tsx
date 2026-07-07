@@ -310,7 +310,7 @@ function Kanban({
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
 }) {
-  void useNavigate;
+  
   const [dragOver, setDragOver] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
