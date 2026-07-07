@@ -889,8 +889,9 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
 
 export const listActiveFlowConversationIds = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
+  .inputValidator(() => undefined)
   .handler(async ({ context }) => {
-    const db = context.supabase as any;
+    const db = await dbFor(context);
     const vendor = (context as any)?.vendor;
     const vendorId = Number(vendor?.id);
     const codigo = String(vendor?.codigo ?? "").trim();
@@ -948,6 +949,16 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       }
     } catch (err) {
       console.warn("[flow-engine] cancel RPC exception, tentando fallback admin", err);
+    }
+
+    // Se a RPC nova já matou a execução, encerra aqui. Evita depender do
+    // service role no preview/sessão de vendedor e deixa o clique responder na hora.
+    if (rpcCancelled > 0) {
+      return {
+        ok: true,
+        cancelled: rpcCancelled,
+        targetFound: true,
+      };
     }
 
     // Depois reforça com admin pra matar runs irmãs/duplicadas que a RPC antiga

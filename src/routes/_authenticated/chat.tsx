@@ -2079,7 +2079,7 @@ function useActiveFlowConversationIds(): Set<string> {
     let cancelled = false;
     async function refresh() {
       try {
-        const data = await listActiveFlowIdsFn();
+        const data = await listActiveFlowIdsFn({ data: undefined });
         if (cancelled) return;
         setIds(new Set(asArray<string>(data).map(String).filter(Boolean)));
       } catch (e) {
