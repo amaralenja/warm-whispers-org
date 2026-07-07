@@ -19,7 +19,6 @@ type Ctx = {
 type Node = { id: string; type: string; data: any };
 type Edge = { id: string; source: string; target: string; sourceHandle?: string | null };
 type VendorRunContext = { id: number; codigo: string };
-const ACTIVE_FLOW_STATUSES = ["queued", "running", "waiting"];
 
 async function getAdminDb() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
