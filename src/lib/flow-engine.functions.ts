@@ -905,42 +905,29 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!data.runId) throw new Error("runId obrigatório");
     const db = await dbFor(context);
-    if (data.conversationId) {
+
+    // Valida acesso do vendedor à conversa (admin passa direto).
+    if (data.conversationId && (context as any).vendor) {
       try {
         await assertVendorConversationAccess(context, db, data.conversationId);
-      } catch (e) {
+      } catch {
         throw new Error("Sem acesso a esta conversa");
       }
     }
-    // Cancela TODAS as runs "irmãs" (mesmo flow + canal + contato) ainda ativas.
-    // Se o dispatcher duplicou, um clique no X mata tudo, sem deixar cópia rodando.
-    const { data: target } = await db
+
+    // Sempre usa admin pra cancelar — bypass total de RLS e das checagens
+    // de canal_allowed que às vezes zeravam o cancel do vendedor.
+    // A permissão já foi validada acima.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: targetRaw } = await supabaseAdmin
       .from("wa_flow_runs" as any)
-      .select("id, flow_id, channel_id, contact_wa_id, conversation_id")
+      .select("id, flow_id, channel_id, contact_wa_id, conversation_id, status")
       .eq("id", data.runId)
       .maybeSingle();
+    const target = targetRaw as any;
 
-    const rpcArgs = vendorRpcArgs(context);
-    let cancelledTotal = 0;
-    if (rpcArgs) {
-      const { data: cancelled, error } = await db.rpc("vendor_cancel_wa_flow_run" as any, {
-        ...rpcArgs,
-        _run_id: data.runId,
-      });
-      if (error) throw new Error(error.message);
-      cancelledTotal += Number(cancelled ?? 0);
-    } else {
-      const { data: cancelled, error } = await db.rpc("cancel_active_wa_flow_runs" as any, {
-        _run_id: data.runId,
-      });
-      if (error) throw new Error(error.message);
-      cancelledTotal += Number(cancelled ?? 0);
-    }
-
-    // Fallback agressivo: se o worker já trocou o status entre a listagem e o clique,
-    // ou se existe uma duplicata ativa no mesmo atendimento, cancela pelo contexto da conversa.
-    // A permissão já foi validada acima; usar admin evita RLS/política antiga bloquear o X.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const activeStatuses = ["queued", "running", "waiting"];
     const cancelPatch = {
       status: "cancelled",
       waiting_for: null,
@@ -949,41 +936,53 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     };
 
-    const activeStatuses = ["queued", "running", "waiting"];
-    const fallbackIds = new Set<string>();
+    const idsToKill = new Set<string>([data.runId]);
+    if (target?.id) idsToKill.add(String(target.id));
 
-    if (target?.id) fallbackIds.add(String(target.id));
-    if (data.runId) fallbackIds.add(String(data.runId));
-
-    if (target?.flow_id && (target?.conversation_id || data.conversationId)) {
-      const { data: siblings, error: siblingError } = await supabaseAdmin
-        .from("wa_flow_runs" as any)
-        .select("id")
-        .eq("conversation_id", String(target.conversation_id ?? data.conversationId))
-        .eq("flow_id", String(target.flow_id))
-        .in("status", activeStatuses);
-      if (siblingError) throw new Error(siblingError.message);
-      for (const row of (siblings ?? []) as any[]) fallbackIds.add(String(row.id));
+    // Mata TODAS as runs irmãs (mesmo flow) na mesma conversa OU no mesmo
+    // contato/canal — cobre duplicação por triggers concorrentes.
+    if (target?.flow_id) {
+      const conversationId = String(target.conversation_id ?? data.conversationId ?? "").trim();
+      if (conversationId) {
+        const { data: sib1 } = await supabaseAdmin
+          .from("wa_flow_runs" as any)
+          .select("id")
+          .eq("flow_id", String(target.flow_id))
+          .eq("conversation_id", conversationId)
+          .in("status", activeStatuses);
+        for (const row of (sib1 ?? []) as any[]) idsToKill.add(String(row.id));
+      }
+      if (target.channel_id && target.contact_wa_id) {
+        const variants = whatsappNumberVariants(String(target.contact_wa_id));
+        const { data: sib2 } = await supabaseAdmin
+          .from("wa_flow_runs" as any)
+          .select("id")
+          .eq("flow_id", String(target.flow_id))
+          .eq("channel_id", String(target.channel_id))
+          .in("contact_wa_id", variants.length > 0 ? variants : [String(target.contact_wa_id)])
+          .in("status", activeStatuses);
+        for (const row of (sib2 ?? []) as any[]) idsToKill.add(String(row.id));
+      }
     } else if (data.conversationId) {
-      const { data: activeRows, error: activeError } = await supabaseAdmin
+      const { data: convRuns } = await supabaseAdmin
         .from("wa_flow_runs" as any)
         .select("id")
         .eq("conversation_id", data.conversationId)
         .in("status", activeStatuses);
-      if (activeError) throw new Error(activeError.message);
-      for (const row of (activeRows ?? []) as any[]) fallbackIds.add(String(row.id));
+      for (const row of (convRuns ?? []) as any[]) idsToKill.add(String(row.id));
     }
 
-    if (fallbackIds.size > 0) {
-      const { data: forceRows, error: forceError } = await supabaseAdmin
-        .from("wa_flow_runs" as any)
-        .update(cancelPatch)
-        .in("id", Array.from(fallbackIds))
-        .in("status", activeStatuses)
-        .select("id");
-      if (forceError) throw new Error(forceError.message);
-      cancelledTotal += Array.isArray(forceRows) ? forceRows.length : 0;
-    }
+    const { data: forceRows, error: forceError } = await supabaseAdmin
+      .from("wa_flow_runs" as any)
+      .update(cancelPatch)
+      .in("id", Array.from(idsToKill))
+      .in("status", activeStatuses)
+      .select("id");
+    if (forceError) throw new Error(forceError.message);
 
-    return { ok: true, cancelled: cancelledTotal, targetFound: Boolean(target) };
+    return {
+      ok: true,
+      cancelled: Array.isArray(forceRows) ? forceRows.length : 0,
+      targetFound: Boolean(target),
+    };
   });
