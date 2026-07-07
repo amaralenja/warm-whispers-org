@@ -1140,7 +1140,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     });
                   };
                   const leadForConv = findLeadForConv(contactWaId);
-                  const leadStage = leadForConv?.stage_id ? stageById.get(String(leadForConv.stage_id)) : null;
+                  const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
+                  const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
+
                   return (
                     <div
                       key={String(c.id)}
