@@ -80,8 +80,12 @@ function sameWorkspace(a: unknown, b: unknown) {
   return normalizeText(a) === normalizeText(b);
 }
 
+function jsonArray<T = any>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 async function resolveStageFromTags(db: any, tags: string[], operation?: unknown) {
-  const tagNames = [...new Set(tags.map((t) => String(t ?? "").trim()).filter(Boolean))];
+  const tagNames = [...new Set(jsonArray<string>(tags).map((t) => String(t ?? "").trim()).filter(Boolean))];
   if (tagNames.length === 0) return null;
   const { data: tagRows } = await db
     .from("crm_tags" as any)
@@ -458,8 +462,8 @@ async function loadFlow(flowId: string, db: any) {
 
 async function executeFrom(ctx: Ctx, startNodeId: string) {
   const flow = await loadFlow(ctx.flowId, ctx.db);
-  const nodes: Node[] = (flow.nodes as Node[]) ?? [];
-  const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+  const nodes: Node[] = jsonArray<Node>(flow.nodes);
+  const edges: Edge[] = jsonArray<Edge>(flow.edges);
 
   let currentId: string | null = startNodeId;
   let safety = 0;
@@ -847,8 +851,8 @@ export async function runFlowAdmin(args: {
 }) {
   const db = args.db ?? await getAdminDb();
   const flow = await loadFlow(args.flowId, db);
-  const nodes: Node[] = (flow.nodes as Node[]) ?? [];
-  const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+  const nodes: Node[] = jsonArray<Node>(flow.nodes);
+  const edges: Edge[] = jsonArray<Edge>(flow.edges);
   if (nodes.length === 0) throw new Error("Fluxo sem nós");
 
   // Se o vendedor cancelou este fluxo agora há pouco, não deixa gatilho
@@ -1013,7 +1017,7 @@ export async function processExpiredTimerRuns(limit = 20) {
   const results = await Promise.allSettled(
     claimed.map(async (run: any) => {
       const flow = await loadFlow(String(run.flow_id), db);
-      const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+      const edges: Edge[] = jsonArray<Edge>(flow.edges);
       const nextId = nextNodeId(edges, String(run.current_node_id));
       const ctx: Ctx = {
         runId: String(run.id),
@@ -1101,7 +1105,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
       };
       try {
         const flow = await loadFlow(ctx.flowId, db);
-        const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+        const edges: Edge[] = jsonArray<Edge>(flow.edges);
         const nextId = nextNodeId(edges, String(run.current_node_id));
         if (!nextId) {
           await updateFlowRun(ctx, { status: "completed", waiting_for: null, expires_at: null });
@@ -1169,7 +1173,7 @@ export async function advanceWaitingRun(args: {
 
   const r = run as any;
   const flow = await loadFlow(r.flow_id, db);
-  const edges: Edge[] = (flow.edges as Edge[]) ?? [];
+  const edges: Edge[] = jsonArray<Edge>(flow.edges);
 
   const ctx: Ctx = {
     runId: r.id,

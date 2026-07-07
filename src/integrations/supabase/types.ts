@@ -2106,6 +2106,12 @@ export type Database = {
       }
       _vendor_norm: { Args: { value: string }; Returns: string }
       _wa_contact_variants: { Args: { _raw: string }; Returns: string[] }
+      active_wa_flow_conversation_ids: {
+        Args: never
+        Returns: {
+          conversation_id: string
+        }[]
+      }
       assign_vendor_for_channel: {
         Args: { _channel_id: string }
         Returns: number
@@ -2278,6 +2284,12 @@ export type Database = {
       update_wa_flow_run: {
         Args: { _patch?: Json; _run_id: string }
         Returns: boolean
+      }
+      vendor_active_wa_flow_conversation_ids: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          conversation_id: string
+        }[]
       }
       vendor_allowed_channel_ids: {
         Args: { _codigo: string; _vendor_id: number }

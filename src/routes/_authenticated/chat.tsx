@@ -82,7 +82,7 @@ import {
   updateConversationNotes,
   reactToWhatsappMessage,
 } from "@/lib/whatsapp-chat.functions";
-import { listFlows, listActiveFlowRuns, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
+import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
@@ -2031,25 +2031,21 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
 }
 
 function useActiveFlowConversationIds(): Set<string> {
+  const listActiveFlowIdsFn = useServerFn(listActiveFlowConversationIds);
   const [ids, setIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     async function refresh() {
       try {
-        const { data } = await supabase
-          .from("wa_flow_runs" as any)
-          .select("conversation_id, status")
-          .in("status", ["queued", "running", "waiting"])
-          .limit(500);
+        const data = await listActiveFlowIdsFn();
         if (cancelled) return;
-        const next = new Set<string>();
-        for (const r of (data as any[]) ?? []) {
-          if (r?.conversation_id) next.add(String(r.conversation_id));
+        setIds(new Set(asArray<string>(data).map(String).filter(Boolean)));
+      } catch (e) {
+        if (!cancelled) {
+          console.warn("[chat] active flow ids falhou", e);
+          setIds(new Set());
         }
-        setIds(next);
-      } catch {
-        // ignore — RLS may block for some roles
       }
     }
     refresh();
@@ -2067,6 +2063,7 @@ function useActiveFlowConversationIds(): Set<string> {
       clearInterval(iv);
       supabase.removeChannel(ch);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return ids;
