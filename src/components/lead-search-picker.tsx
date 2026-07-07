@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { isValidElement, useState, type ReactNode } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Search, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -52,7 +52,7 @@ function safeNode(v: ReactNode, fallback: string): ReactNode {
   if (typeof v === "string" || typeof v === "number") return v;
   if (Array.isArray(v)) return v;
   // Nunca renderiza objeto cru como child; isso derruba React com "Objects are not valid...".
-  if (typeof v === "object" && !("$$typeof" in (v as Record<string, unknown>))) return fallback;
+  if (typeof v === "object" && !isValidElement(v)) return fallback;
   return v;
 }
 function sanitizeLead(l: any): PickedLead {
