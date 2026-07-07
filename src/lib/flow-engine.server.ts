@@ -55,6 +55,19 @@ function normalizeBrWhatsappNumber(raw: string): string {
   return digits;
 }
 
+function whatsappNumberVariants(raw: string): string[] {
+  const variants = new Set<string>();
+  for (const value of [raw, String(raw ?? "").replace(/\D/g, ""), normalizeBrWhatsappNumber(raw)]) {
+    const clean = String(value ?? "").replace(/\D/g, "").trim();
+    if (clean) variants.add(clean);
+  }
+  for (const value of Array.from(variants)) {
+    if (value.startsWith("55") && value.length === 13 && value[4] === "9") variants.add(`${value.slice(0, 4)}${value.slice(5)}`);
+    if (value.startsWith("55") && value.length === 12) variants.add(`${value.slice(0, 4)}9${value.slice(4)}`);
+  }
+  return Array.from(variants).filter(Boolean);
+}
+
 function normalizeText(value: unknown): string {
   return String(value ?? "")
     .normalize("NFD")
@@ -838,13 +851,40 @@ export async function runFlowAdmin(args: {
   const edges: Edge[] = (flow.edges as Edge[]) ?? [];
   if (nodes.length === 0) throw new Error("Fluxo sem nós");
 
+  // Se o vendedor cancelou este fluxo agora há pouco, não deixa gatilho
+  // automático/webhook recriar a mesma execução logo em seguida. Disparo manual
+  // explícito continua permitido.
+  if ((args.triggerContext as any)?.manual !== true) {
+    const contactCandidates = whatsappNumberVariants(String(args.contactWaId ?? ""));
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: recentCancelled } = await db
+      .from("wa_flow_runs" as any)
+      .select("id, updated_at")
+      .eq("flow_id", args.flowId)
+      .eq("channel_id", args.channelId)
+      .in("contact_wa_id", contactCandidates.length > 0 ? contactCandidates : [String(args.contactWaId ?? "")])
+      .eq("status", "cancelled")
+      .gte("updated_at", since)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (recentCancelled) {
+      console.log("[flow-engine] dispatch skipped after recent manual cancel", {
+        flowId: args.flowId,
+        channelId: args.channelId,
+        contactWaId: args.contactWaId,
+        cancelledRunId: (recentCancelled as any).id,
+      });
+      return { runId: (recentCancelled as any).id, skipped: true, recentlyCancelled: true };
+    }
+  }
+
   // Idempotency guard: se já existe uma run ativa (queued/running/waiting)
   // pra mesma combinação flow + canal + contato, NÃO cria outra. Impede
   // duplicação de disparos por triggers concorrentes (auto + manual,
   // webhooks duplicados, retries do worker, etc.)
   {
-    const contactNorm = normalizeBrWhatsappNumber(String(args.contactWaId ?? ""));
-    const contactCandidates = Array.from(new Set([String(args.contactWaId ?? ""), contactNorm].filter(Boolean)));
+    const contactCandidates = whatsappNumberVariants(String(args.contactWaId ?? ""));
     const { data: existingActive } = await db
       .from("wa_flow_runs" as any)
       .select("id, status, current_node_id, contact_wa_id")
@@ -1067,6 +1107,12 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
           await updateFlowRun(ctx, { status: "completed", waiting_for: null, expires_at: null });
           return { runId: ctx.runId, completed: true };
         }
+        await updateFlowRun(ctx, {
+          status: "running",
+          waiting_for: null,
+          expires_at: null,
+          current_node_id: nextId,
+        });
         await executeFrom(ctx, nextId);
         return { runId: ctx.runId, ok: true, resumedFrom: nextId };
       } catch (err: any) {
@@ -1146,15 +1192,11 @@ export async function advanceWaitingRun(args: {
   }
 
   if (!nextId) {
-    await db.from("wa_flow_runs" as any).update({
-      status: "completed", waiting_for: null,
-    }).eq("id", r.id);
+    await updateFlowRun(ctx, { status: "completed", waiting_for: null });
     return { runId: r.id, completed: true };
   }
 
-  await db.from("wa_flow_runs" as any).update({
-    status: "running", waiting_for: null,
-  }).eq("id", r.id);
+  await updateFlowRun(ctx, { status: "running", waiting_for: null });
   await executeFrom(ctx, nextId);
   return { runId: r.id };
 }
