@@ -99,7 +99,7 @@ type ChatSearchParams = {
   embed?: boolean;
 };
 
-function ChatRoute() {
+export function ChatRoute() {
   return (
     <ChatErrorBoundary>
       <ChatPage />
@@ -120,15 +120,6 @@ export function ChatEmbed({ phone, conversationId }: { phone?: string; conversat
   );
 }
 
-export const Route = createFileRoute("/_authenticated/chat")({
-  component: ChatRoute,
-  validateSearch: (search: Record<string, unknown>) => ({
-    phone: typeof search.phone === "string" ? search.phone : undefined,
-    conversationId: typeof search.conversationId === "string" ? search.conversationId : undefined,
-    embed: search.embed === "1" || search.embed === 1 || search.embed === true ? true : undefined,
-  }),
-
-});
 
 type Conv = {
   id: string;
