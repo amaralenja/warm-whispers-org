@@ -2712,6 +2712,23 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_list_x1_sales: {
+        Args: {
+          _codigo: string
+          _from?: string
+          _to?: string
+          _vendor_id: number
+        }
+        Returns: {
+          Data: string
+          Evento: string
+          nome_expert: string
+          Produto: string
+          Ticket: string
+          tipo_produto: string
+          UTM: string
+        }[]
+      }
       vendor_list_x1_wa_conversations: {
         Args: {
           _codigo: string

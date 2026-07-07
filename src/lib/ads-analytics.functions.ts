@@ -1,6 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
 const GRAPH = "https://graph.facebook.com/v21.0";
 
 async function sendWhatsapp(channelId: string, phone: string, body: any, db: any) {
@@ -295,14 +292,6 @@ async function computeAndSendAds(db: any, opts: { preset?: string } = {}) {
 
   return { sent, total: recipients.length, errors, stats, topBlock, worstBlock };
 }
-
-export const sendAdsAnalytics = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { preset?: string } | undefined) => ({ preset: d?.preset }))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    return await computeAndSendAds(supabaseAdmin, { preset: data.preset });
-  });
 
 export async function runAdsAnalyticsCron(preset?: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

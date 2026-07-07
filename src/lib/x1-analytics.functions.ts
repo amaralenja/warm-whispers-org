@@ -185,6 +185,11 @@ function safeNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function isApprovedEvent(value: unknown): boolean {
+  const event = safeString(value).trim().toLowerCase();
+  return event === "purchase_approved" || event.includes("aprov");
+}
+
 function normalizeUtm(value: unknown): string {
   return safeString(value).trim().toUpperCase();
 }
@@ -369,7 +374,7 @@ async function getVendorX1Analytics(
     return { ...EMPTY, operacoesDisponiveis: allowedWorkspaces };
   }
 
-  const [channelsRes, conversationsRes, crmLeadsRes, produtosMapRes, vendasRows] = await Promise.all([
+  const [channelsRes, conversationsRes, messagesRes, crmLeadsRes, produtosMapRes, vendasRes] = await Promise.all([
     db.rpc("vendor_list_wa_channels" as any, rpcArgs),
     db.rpc("vendor_list_x1_wa_conversations" as any, {
       ...rpcArgs,
@@ -377,21 +382,26 @@ async function getVendorX1Analytics(
       _from: fromIso,
       _to: toIso,
     }),
+    db.rpc("vendor_list_x1_wa_messages" as any, {
+      ...rpcArgs,
+      _operacao_id: opFilter ?? null,
+      _from: fromIso,
+      _to: toIso,
+    }),
     db.rpc("vendor_list_crm_leads" as any, rpcArgs),
     db.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
-    pageAllWithDb<any>((from, to) =>
-      db
-        .from("vendas")
-        .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
-        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+    db.rpc("vendor_list_x1_sales" as any, {
+      ...rpcArgs,
+      _from: data.from || null,
+      _to: data.to || null,
+    }),
   ]);
   if (channelsRes.error) throw new Error(channelsRes.error.message);
   if (conversationsRes.error) throw new Error(conversationsRes.error.message);
+  if (messagesRes.error) throw new Error(messagesRes.error.message);
   if (crmLeadsRes.error) throw new Error(crmLeadsRes.error.message);
   if (produtosMapRes.error) throw new Error(produtosMapRes.error.message);
+  if (vendasRes.error) throw new Error(vendasRes.error.message);
 
   const produtoToOperacao = new Map<string, string>();
   for (const p of ((produtosMapRes.data ?? []) as any[])) {
@@ -464,7 +474,7 @@ async function getVendorX1Analytics(
     if (key) leadKeys.add(key);
   }
 
-  const messages = await fetchAnalyticsMessages(db, Array.from(channelIds), fromIso, toIso);
+  const messages = (messagesRes.data ?? []) as any[];
   const msgsScoped = messages.filter((m: any) => {
     if (m?.deleted_at) return false;
     if (!isWithinIso(m?.created_at, fromIso, toIso)) return false;
@@ -484,7 +494,8 @@ async function getVendorX1Analytics(
   const vendorExpert = safeNullableString(context?.vendor?.expert);
   const primaryOp = vendorExpert ?? allowedWorkspaces[0] ?? Array.from(operacoesSet)[0] ?? null;
   const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
-  const vendorSales = ((vendasRows ?? []) as any[]).filter((v) => {
+  const vendorSales = ((vendasRes.data ?? []) as any[]).filter((v) => {
+    if (!isApprovedEvent(v?.Evento)) return false;
     if (!vendorUtmNorm || normalizeUtm(v?.UTM) !== vendorUtmNorm) return false;
     if (!inDay(parseDataField(v?.Data))) return false;
     // Opera com o expert do vendedor como fallback quando o produto não está mapeado
@@ -785,7 +796,6 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         supabase
           .from("vendas")
           .select('"Ticket","Data","UTM","Evento","Produto",nome_expert,tipo_produto')
-          .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
           .order("id", { ascending: true })
           .range(from, to),
       ),
@@ -811,7 +821,11 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const vendaOperacao = (venda: any): string | null => resolveVendaOperacao(venda, produtoToOperacao, utmToVendedor);
 
     const inDay = (t: number | null) => isWithinDayField(t, fromDay, toDay);
-    const vendasPeriodo = vendasAll.filter((v: any) => inDay(parseDataField(v.Data)) && !!qualifiedVendaOperacao(v, produtoToOperacao));
+    const vendasPeriodo = vendasAll.filter((v: any) => (
+      isApprovedEvent(v?.Evento)
+      && inDay(parseDataField(v.Data))
+      && !!(vendaOperacao(v) ?? safeNullableString(v?.nome_expert))
+    ));
     const vendasScoped = vendasPeriodo.filter((v: any) => {
       const op = vendaOperacao(v);
       if (opFilter) return sameText(op, opFilter);
