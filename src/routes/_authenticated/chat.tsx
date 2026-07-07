@@ -1199,6 +1199,8 @@ function ChatPage() {
           </div>
 
         </aside>
+        )}
+
 
         <main className="flex min-h-0 min-w-0 flex-col bg-chat-thread">
           {!active ? (
