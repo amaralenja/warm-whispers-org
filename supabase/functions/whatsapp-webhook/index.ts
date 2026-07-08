@@ -1347,6 +1347,40 @@ Deno.serve(async (req) => {
       const messages: any[] = Array.isArray(change.messages) ? change.messages : [];
       for (const m of messages) {
         if (!m?.from) continue;
+
+        // Reações: não são mensagens próprias — atualizam a msg alvo em raw.reactions.theirs
+        // (senão apareceriam como "documento" na conversa)
+        if ((m as any).type === "reaction") {
+          try {
+            const targetWamid = (m as any).reaction?.message_id as string | undefined;
+            const emoji = ((m as any).reaction?.emoji ?? "") as string;
+            if (targetWamid) {
+              const { data: target } = await supabase
+                .from("wa_messages")
+                .select("id,raw")
+                .eq("channel_id", channelId)
+                .eq("wa_message_id", targetWamid)
+                .maybeSingle();
+              if (target) {
+                const prevRaw = ((target as any).raw ?? {}) as Record<string, any>;
+                const prevReactions = (prevRaw.reactions ?? {}) as Record<string, any>;
+                await supabase
+                  .from("wa_messages")
+                  .update({
+                    raw: {
+                      ...prevRaw,
+                      reactions: { ...prevReactions, theirs: emoji || null },
+                    },
+                  })
+                  .eq("id", (target as any).id);
+              }
+            }
+          } catch (e) {
+            console.error("[wa-webhook] reaction handling error", e);
+          }
+          continue;
+        }
+
         if (isUnsupportedEditMessage(m)) {
           console.log("[wa-webhook] edição unsupported ignorada", { id: m?.id, from: m?.from });
           continue;
