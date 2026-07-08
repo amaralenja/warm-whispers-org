@@ -1,4 +1,5 @@
-import { useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { getVendorSession } from "@/lib/vendor-session";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -133,12 +134,57 @@ function CRMPage() {
   const { data: customStages = [] } = useCrmStages(stageOperacao);
   const [hiddenDefaults] = useHiddenDefaultStages(stageOperacao);
 
-  const stages: StageView[] = useMemo(() => {
+  const baseStages: StageView[] = useMemo(() => {
     return [
       ...DEFAULT_STAGES.filter((s) => !hiddenDefaults.includes(s.id)).map((s) => stageView(s.id, s.nome, s.cor)),
       ...customStages.map((s) => stageView(s.id, s.nome, s.cor)),
     ];
   }, [customStages, hiddenDefaults]);
+
+  // Per-user column ordering (persisted in localStorage)
+  const orderStorageKey = useMemo(() => {
+    const vendor = typeof window !== "undefined" ? getVendorSession() : null;
+    const who = vendor?.id ? `v${vendor.id}` : "admin";
+    return `crm-col-order:${who}:${stageOperacao}`;
+  }, [stageOperacao]);
+
+  const [colOrder, setColOrder] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(orderStorageKey);
+      setColOrder(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      setColOrder([]);
+    }
+  }, [orderStorageKey]);
+
+  const stages: StageView[] = useMemo(() => {
+    if (colOrder.length === 0) return baseStages;
+    const byId = new Map(baseStages.map((s) => [s.id, s]));
+    const ordered: StageView[] = [];
+    for (const id of colOrder) {
+      const s = byId.get(id);
+      if (s) { ordered.push(s); byId.delete(id); }
+    }
+    for (const s of byId.values()) ordered.push(s);
+    return ordered;
+  }, [baseStages, colOrder]);
+
+  const handleReorderStages = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    const current = stages.map((s) => s.id);
+    const fromIdx = current.indexOf(fromId);
+    const toIdx = current.indexOf(toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = current.slice();
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, fromId);
+    setColOrder(next);
+    try {
+      window.localStorage.setItem(orderStorageKey, JSON.stringify(next));
+    } catch { /* noop */ }
+  };
 
   const { data: crmTags = [] } = useCrmTags(stageOperacao);
   const tagColorMap = useMemo(() => {
@@ -276,7 +322,7 @@ function CRMPage() {
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Carregando leads…</div>
       ) : view === "kanban" ? (
-        <Kanban stages={stages} leads={filtered} tagColors={tagColorMap} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} />
+        <Kanban stages={stages} leads={filtered} tagColors={tagColorMap} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} onReorderStages={handleReorderStages} />
       ) : (
         <Lista stages={stages} leads={filtered} tagColors={tagColorMap} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
 
@@ -303,16 +349,18 @@ function CRMPage() {
 
 // ---------- Kanban ----------
 function Kanban({
-  stages, leads, tagColors, onMove, onEdit,
+  stages, leads, tagColors, onMove, onEdit, onReorderStages,
 }: {
   stages: StageView[];
   leads: Lead[];
   tagColors: Map<string, string>;
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
+  onReorderStages?: (fromId: string, toId: string) => void;
 }) {
   
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [colDragId, setColDragId] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
     for (const s of stages) map.set(s.id, []);
@@ -330,9 +378,22 @@ function Kanban({
     e.dataTransfer.effectAllowed = "move";
   }
 
+  function onColDragStart(e: DragEvent<HTMLDivElement>, stageId: string) {
+    e.dataTransfer.setData("application/x-col-id", stageId);
+    e.dataTransfer.effectAllowed = "move";
+    setColDragId(stageId);
+  }
+
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function onDrop(e: DragEvent<HTMLDivElement>, status: string) {
     e.preventDefault();
+    const colId = e.dataTransfer.getData("application/x-col-id");
+    if (colId) {
+      setColDragId(null);
+      setDragOver(null);
+      onReorderStages?.(colId, status);
+      return;
+    }
     const id =
       e.dataTransfer.getData("application/x-lead-id") ||
       e.dataTransfer.getData("text/plain");
@@ -374,7 +435,14 @@ function Kanban({
               className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card/40 transition-colors"
             >
               <div className="h-1 w-full" style={{ background: s.cor }} />
-              <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5" style={{ background: hexToRgba(s.cor, 0.12) }}>
+              <div
+                draggable={!!onReorderStages}
+                onDragStart={(e) => onReorderStages && onColDragStart(e, s.id)}
+                onDragEnd={() => setColDragId(null)}
+                title={onReorderStages ? "Arraste para reordenar a coluna" : undefined}
+                className={`flex items-center justify-between border-b border-border/60 px-3 py-2.5 ${onReorderStages ? "cursor-grab active:cursor-grabbing" : ""} ${colDragId === s.id ? "opacity-50" : ""}`}
+                style={{ background: hexToRgba(s.cor, 0.12) }}
+              >
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full" style={{ background: s.cor }} />
                   <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: s.cor }}>{s.label}</span>
