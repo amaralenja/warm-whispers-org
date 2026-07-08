@@ -349,16 +349,18 @@ function CRMPage() {
 
 // ---------- Kanban ----------
 function Kanban({
-  stages, leads, tagColors, onMove, onEdit,
+  stages, leads, tagColors, onMove, onEdit, onReorderStages,
 }: {
   stages: StageView[];
   leads: Lead[];
   tagColors: Map<string, string>;
   onMove: (id: string, status: string) => void;
   onEdit: (l: Lead) => void;
+  onReorderStages?: (fromId: string, toId: string) => void;
 }) {
   
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [colDragId, setColDragId] = useState<string | null>(null);
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
     for (const s of stages) map.set(s.id, []);
@@ -376,9 +378,22 @@ function Kanban({
     e.dataTransfer.effectAllowed = "move";
   }
 
+  function onColDragStart(e: DragEvent<HTMLDivElement>, stageId: string) {
+    e.dataTransfer.setData("application/x-col-id", stageId);
+    e.dataTransfer.effectAllowed = "move";
+    setColDragId(stageId);
+  }
+
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function onDrop(e: DragEvent<HTMLDivElement>, status: string) {
     e.preventDefault();
+    const colId = e.dataTransfer.getData("application/x-col-id");
+    if (colId) {
+      setColDragId(null);
+      setDragOver(null);
+      onReorderStages?.(colId, status);
+      return;
+    }
     const id =
       e.dataTransfer.getData("application/x-lead-id") ||
       e.dataTransfer.getData("text/plain");
