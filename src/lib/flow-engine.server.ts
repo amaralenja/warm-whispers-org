@@ -610,11 +610,23 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       let finalUrl = url;
       const inner: any = {};
       if (mediaType === "audio") {
-        try {
-          const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
-          finalUrl = await convertAudioToWhatsappVoice(url);
-        } catch (e) {
-          console.error("Flow voice conversion failed:", e);
+        const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
+        let lastErr: unknown = null;
+        finalUrl = "";
+        for (let i = 0; i < 3; i++) {
+          try {
+            finalUrl = await convertAudioToWhatsappVoice(url);
+            break;
+          } catch (e) {
+            lastErr = e;
+            console.error(`Flow voice conversion attempt ${i + 1} failed:`, e);
+            await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+          }
+        }
+        if (!finalUrl) {
+          // Não envia áudio "cru" (mp3/m4a) pro WhatsApp — fica travado no relógio.
+          // Melhor falhar o node pra ficar visível e o vendedor reenviar.
+          throw new Error(`Falha ao converter áudio pra formato WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
         }
         inner.link = finalUrl;
         inner.voice = true;

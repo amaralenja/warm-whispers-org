@@ -66,15 +66,19 @@ export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<st
 
   const assemblyUrl: string = created.assembly_ssl_url;
 
-  // Poll until completed
-  const deadline = Date.now() + 90_000;
+  // Poll until completed — áudios grandes podem levar bem mais que 90s.
+  const deadline = Date.now() + 240_000;
   let assembly: any = created;
   while (Date.now() < deadline) {
     if (assembly?.ok === "ASSEMBLY_COMPLETED") break;
     if (assembly?.error) throw new Error(`Transloadit erro: ${assembly.error} ${assembly.message ?? ""}`);
-    await new Promise((r) => setTimeout(r, 1200));
-    const res = await fetch(assemblyUrl);
-    assembly = await res.json();
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const res = await fetch(assemblyUrl);
+      assembly = await res.json();
+    } catch {
+      // ignore intermittent poll errors, tenta de novo
+    }
   }
 
   if (assembly?.ok !== "ASSEMBLY_COMPLETED") {
