@@ -435,7 +435,14 @@ function Kanban({
               className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card/40 transition-colors"
             >
               <div className="h-1 w-full" style={{ background: s.cor }} />
-              <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5" style={{ background: hexToRgba(s.cor, 0.12) }}>
+              <div
+                draggable={!!onReorderStages}
+                onDragStart={(e) => onReorderStages && onColDragStart(e, s.id)}
+                onDragEnd={() => setColDragId(null)}
+                title={onReorderStages ? "Arraste para reordenar a coluna" : undefined}
+                className={`flex items-center justify-between border-b border-border/60 px-3 py-2.5 ${onReorderStages ? "cursor-grab active:cursor-grabbing" : ""} ${colDragId === s.id ? "opacity-50" : ""}`}
+                style={{ background: hexToRgba(s.cor, 0.12) }}
+              >
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full" style={{ background: s.cor }} />
                   <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: s.cor }}>{s.label}</span>
