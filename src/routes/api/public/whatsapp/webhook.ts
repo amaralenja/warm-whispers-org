@@ -119,7 +119,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     if (targetWamid) {
                       const { data: target } = await supabaseAdmin
                         .from("wa_messages" as any)
-                        .select("id,raw")
+                        .select("id,raw,conversation_id")
                         .eq("channel_id", channelId)
                         .eq("wa_message_id", targetWamid)
                         .maybeSingle();
@@ -135,6 +135,18 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                             },
                           })
                           .eq("id", (target as any).id);
+                        const convId = (target as any).conversation_id;
+                        if (convId) {
+                          const previewText = emoji ? `Reagiu com: ${emoji}` : "Removeu reação";
+                          await supabaseAdmin
+                            .from("wa_conversations" as any)
+                            .update({
+                              last_message_at: new Date().toISOString(),
+                              last_message_preview: previewText,
+                              last_message_direction: "in",
+                            })
+                            .eq("id", convId);
+                        }
                       }
                     }
                   } catch (e) {
