@@ -1308,8 +1308,8 @@ export const updateConversationNotes = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-
 // React (or remove reaction) to a WhatsApp message. Empty emoji removes the reaction.
+// cache-bust v2: force client bundle refresh after server-fn ID scheme change
 export const reactToWhatsappMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { conversationId: string; messageId: string; emoji: string }) => ({
