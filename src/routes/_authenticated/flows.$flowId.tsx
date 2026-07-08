@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -320,6 +320,9 @@ function Editor({ flowId }: { flowId: string }) {
   const { data: flow, isLoading } = useQuery({
     queryKey: ["wa-flow", flowId],
     queryFn: () => getFlowFn({ data: { id: flowId } }),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+    staleTime: 0,
   });
 
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -343,9 +346,15 @@ function Editor({ flowId }: { flowId: string }) {
     return (allChannels as any[]).filter((c) => String(c?.metadata?.operacao_id ?? "") === String(operacaoId));
   }, [allChannels, operacaoId]);
 
-  // Hydrate from server
+  // Hydrate from server APENAS uma vez por flowId. Refetches (ex: pós-save)
+  // não podem sobrescrever o estado local — isso estava fazendo as edições
+  // dos vendedores "sumirem" quando o React Query servia cache stale antes
+  // do fetch novo terminar.
+  const hydratedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!flow) return;
+    if (hydratedRef.current === flowId) return;
+    hydratedRef.current = flowId;
     const f = flow as any;
     setName(f.nome ?? "");
     setAtivo(f.ativo ?? false);
@@ -353,7 +362,7 @@ function Editor({ flowId }: { flowId: string }) {
     setNodes((f.nodes ?? []) as Node[]);
     setEdges((f.edges ?? []) as Edge[]);
     setTriggers(f.wa_flow_triggers ?? []);
-  }, [flow]);
+  }, [flow, flowId]);
 
   const onNodesChange = useCallback((c: NodeChange[]) => setNodes((n) => applyNodeChanges(c, n)), []);
   const onEdgesChange = useCallback((c: EdgeChange[]) => setEdges((e) => applyEdgeChanges(c, e)), []);
