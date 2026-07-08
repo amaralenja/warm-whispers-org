@@ -467,6 +467,7 @@ export const createFlow = createServerFn({ method: "POST" })
     return row;
   });
 
+// v2 — vendor save vai por RPC (vendor_update_wa_flow); cache-bust do bundle client
 export const saveFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
