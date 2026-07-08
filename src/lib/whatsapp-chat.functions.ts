@@ -1320,21 +1320,48 @@ export const reactToWhatsappMessage = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!data.conversationId || !data.messageId) throw new Error("Parâmetros inválidos");
     const db = await dbFor(context);
-    const conv = await assertConversationAccess(context, db, data.conversationId);
-    const ch = await findChannel(String(conv.channel_id), db);
+    const isVendor = Boolean((context as any).vendor);
+
+    let targetWamid: string | null = null;
+    let channelId: string | null = null;
+    let contactWaId: string | null = null;
+    let prevRaw: Record<string, any> = {};
+
+    if (isVendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+      const { data: rows, error } = await db.rpc("vendor_get_wa_message_for_react" as any, {
+        ...rpcArgs,
+        _message_id: data.messageId,
+      });
+      if (error) throw new Error(error.message);
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (!row) throw new Error("Mensagem não encontrada ou fora do seu acesso");
+      targetWamid = (row as any).wa_message_id ?? null;
+      channelId = (row as any).channel_id ?? null;
+      contactWaId = (row as any).contact_wa_id ?? null;
+      prevRaw = ((row as any).raw ?? {}) as Record<string, any>;
+    } else {
+      const conv = await assertConversationAccess(context, db, data.conversationId);
+      channelId = String(conv.channel_id);
+      contactWaId = String(conv.contact_wa_id);
+      const { data: msgRow, error: msgErr } = await db
+        .from("wa_messages" as any)
+        .select("id, wa_message_id, raw, direction")
+        .eq("id", data.messageId)
+        .maybeSingle();
+      if (msgErr || !msgRow) throw new Error("Mensagem não encontrada");
+      targetWamid = (msgRow as any).wa_message_id ?? null;
+      prevRaw = ((msgRow as any).raw ?? {}) as Record<string, any>;
+    }
+
+    if (!targetWamid) throw new Error("Mensagem ainda não confirmada pelo WhatsApp");
+    if (!channelId) throw new Error("Canal não encontrado");
+
+    const ch = await findChannel(channelId, db);
     if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
 
-    // load target message
-    const { data: msgRow, error: msgErr } = await db
-      .from("wa_messages" as any)
-      .select("id, wa_message_id, raw, direction")
-      .eq("id", data.messageId)
-      .maybeSingle();
-    if (msgErr || !msgRow) throw new Error("Mensagem não encontrada");
-    const targetWamid = (msgRow as any).wa_message_id as string | null;
-    if (!targetWamid) throw new Error("Mensagem ainda não confirmada pelo WhatsApp");
-
-    const toNormalized = normalizeBrWhatsappNumber(String(conv.contact_wa_id));
+    const toNormalized = normalizeBrWhatsappNumber(String(contactWaId ?? ""));
     const body = {
       messaging_product: "whatsapp",
       to: toNormalized,
@@ -1349,24 +1376,37 @@ export const reactToWhatsappMessage = createServerFn({ method: "POST" })
       db,
     );
 
-    // persist locally in raw.reactions.mine
-    const prevRaw = ((msgRow as any).raw ?? {}) as Record<string, any>;
-    const prevReactions = (prevRaw.reactions ?? {}) as Record<string, any>;
-    const nextRaw = {
-      ...prevRaw,
-      reactions: {
-        ...prevReactions,
-        mine: data.emoji || null,
-        mine_at: new Date().toISOString(),
-        mine_response: resp?.messages?.[0]?.id ?? null,
-      },
-    };
+    const responseId = resp?.messages?.[0]?.id ?? null;
 
-    const { error: updErr } = await db
-      .from("wa_messages" as any)
-      .update({ raw: nextRaw })
-      .eq("id", data.messageId);
-    if (updErr) throw new Error(updErr.message);
+    if (isVendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (rpcArgs) {
+        const { error: applyErr } = await db.rpc("vendor_apply_wa_reaction" as any, {
+          ...rpcArgs,
+          _message_id: data.messageId,
+          _emoji: data.emoji || "",
+          _response_id: responseId,
+        });
+        if (applyErr) console.warn("[whatsapp-chat] vendor_apply_wa_reaction falhou", applyErr);
+      }
+    } else {
+      const prevReactions = (prevRaw.reactions ?? {}) as Record<string, any>;
+      const nextRaw = {
+        ...prevRaw,
+        reactions: {
+          ...prevReactions,
+          mine: data.emoji || null,
+          mine_at: new Date().toISOString(),
+          mine_response: responseId,
+        },
+      };
+      const { error: updErr } = await db
+        .from("wa_messages" as any)
+        .update({ raw: nextRaw })
+        .eq("id", data.messageId);
+      if (updErr) throw new Error(updErr.message);
+    }
+
     return { ok: true, emoji: data.emoji || null };
   });
 
