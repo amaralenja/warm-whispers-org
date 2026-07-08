@@ -2299,6 +2299,16 @@ export type Database = {
         Args: { _codigo: string; _vendor_id: number }
         Returns: string[]
       }
+      vendor_apply_wa_reaction: {
+        Args: {
+          _codigo: string
+          _emoji: string
+          _message_id: string
+          _response_id: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
       vendor_cancel_wa_flow_run: {
         Args: { _codigo: string; _run_id: string; _vendor_id: number }
         Returns: number
@@ -2428,6 +2438,17 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      vendor_get_wa_message_for_react: {
+        Args: { _codigo: string; _message_id: string; _vendor_id: number }
+        Returns: {
+          channel_id: string
+          contact_wa_id: string
+          conversation_id: string
+          id: string
+          raw: Json
+          wa_message_id: string
+        }[]
       }
       vendor_insert_wa_flow_execution: {
         Args: {
