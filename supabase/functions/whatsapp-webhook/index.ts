@@ -1357,7 +1357,7 @@ Deno.serve(async (req) => {
             if (targetWamid) {
               const { data: target } = await supabase
                 .from("wa_messages")
-                .select("id,raw")
+                .select("id,raw,conversation_id")
                 .eq("channel_id", channelId)
                 .eq("wa_message_id", targetWamid)
                 .maybeSingle();
@@ -1373,6 +1373,18 @@ Deno.serve(async (req) => {
                     },
                   })
                   .eq("id", (target as any).id);
+                const convId = (target as any).conversation_id;
+                if (convId) {
+                  const previewText = emoji ? `Reagiu com: ${emoji}` : "Removeu reação";
+                  await supabase
+                    .from("wa_conversations")
+                    .update({
+                      last_message_at: new Date().toISOString(),
+                      last_message_preview: previewText,
+                      last_message_direction: "in",
+                    })
+                    .eq("id", convId);
+                }
               }
             }
           } catch (e) {
