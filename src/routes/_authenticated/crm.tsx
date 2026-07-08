@@ -134,12 +134,57 @@ function CRMPage() {
   const { data: customStages = [] } = useCrmStages(stageOperacao);
   const [hiddenDefaults] = useHiddenDefaultStages(stageOperacao);
 
-  const stages: StageView[] = useMemo(() => {
+  const baseStages: StageView[] = useMemo(() => {
     return [
       ...DEFAULT_STAGES.filter((s) => !hiddenDefaults.includes(s.id)).map((s) => stageView(s.id, s.nome, s.cor)),
       ...customStages.map((s) => stageView(s.id, s.nome, s.cor)),
     ];
   }, [customStages, hiddenDefaults]);
+
+  // Per-user column ordering (persisted in localStorage)
+  const orderStorageKey = useMemo(() => {
+    const vendor = typeof window !== "undefined" ? getVendorSession() : null;
+    const who = vendor?.id ? `v${vendor.id}` : "admin";
+    return `crm-col-order:${who}:${stageOperacao}`;
+  }, [stageOperacao]);
+
+  const [colOrder, setColOrder] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(orderStorageKey);
+      setColOrder(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      setColOrder([]);
+    }
+  }, [orderStorageKey]);
+
+  const stages: StageView[] = useMemo(() => {
+    if (colOrder.length === 0) return baseStages;
+    const byId = new Map(baseStages.map((s) => [s.id, s]));
+    const ordered: StageView[] = [];
+    for (const id of colOrder) {
+      const s = byId.get(id);
+      if (s) { ordered.push(s); byId.delete(id); }
+    }
+    for (const s of byId.values()) ordered.push(s);
+    return ordered;
+  }, [baseStages, colOrder]);
+
+  const handleReorderStages = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    const current = stages.map((s) => s.id);
+    const fromIdx = current.indexOf(fromId);
+    const toIdx = current.indexOf(toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = current.slice();
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, fromId);
+    setColOrder(next);
+    try {
+      window.localStorage.setItem(orderStorageKey, JSON.stringify(next));
+    } catch { /* noop */ }
+  };
 
   const { data: crmTags = [] } = useCrmTags(stageOperacao);
   const tagColorMap = useMemo(() => {
