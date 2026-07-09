@@ -1506,25 +1506,46 @@ export const editWhatsappMessage = createServerFn({ method: "POST" })
     const ch = await findChannel(channelId, db);
     if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
 
-    // Meta Cloud API — edit text message. Payload deve conter APENAS
-    // messaging_product, message_id, type e text. Incluir "to"/"recipient_type"
-    // faz o Meta interpretar como novo envio e a edição não aparece no WhatsApp.
-    void contactWaId;
+    // Meta Cloud API — edit text message. Docs oficiais exigem messaging_product,
+    // recipient_type, to, type, text E message_id. Ver:
+    // https://developers.facebook.com/docs/whatsapp/cloud-api/guides/edit-message
+    const toNormalized = normalizeBrWhatsappNumber(String(contactWaId ?? ""));
+    if (!toNormalized) throw new Error("Número do contato não encontrado");
     const editBody = {
       messaging_product: "whatsapp",
-      message_id: targetWamid,
+      recipient_type: "individual",
+      to: toNormalized,
       type: "text",
       text: { body: newText, preview_url: false },
+      message_id: targetWamid,
     };
 
+    console.log("[editWhatsappMessage] enviando edit", {
+      channelId,
+      phoneNumberId: ch.phoneNumberId,
+      to: toNormalized,
+      wamid: targetWamid,
+      wamidLooksValid: /^wamid\./i.test(String(targetWamid ?? "")),
+      newTextLen: newText.length,
+      isVendor,
+    });
+
     try {
-      await metaProxyForChannel(
+      const proxied = await metaProxyForChannel(
         ch,
         `/${ch.phoneNumberId}/messages`,
         { method: "POST", body: JSON.stringify(editBody) },
         db,
       );
+      console.log("[editWhatsappMessage] meta OK", {
+        wamid: targetWamid,
+        response: proxied?.body,
+      });
     } catch (e: any) {
+      console.error("[editWhatsappMessage] meta FAIL", {
+        wamid: targetWamid,
+        error: String(e?.message ?? e),
+      });
       // Rollback local se Meta rejeitar
       if (!isVendor && prevText !== null) {
         await db.from("wa_messages" as any).update({ text_body: prevText }).eq("id", data.messageId);
