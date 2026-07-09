@@ -23,6 +23,8 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
+import { Route as AuthenticatedHtKanbanSdrRouteImport } from './routes/_authenticated/ht-kanban-sdr'
+import { Route as AuthenticatedHtKanbanCloserRouteImport } from './routes/_authenticated/ht-kanban-closer'
 import { Route as AuthenticatedHtApiRouteImport } from './routes/_authenticated/ht-api'
 import { Route as AuthenticatedHtAnalyticsRouteImport } from './routes/_authenticated/ht-analytics'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -115,6 +117,18 @@ const AuthenticatedMetaAdsRoute = AuthenticatedMetaAdsRouteImport.update({
   path: '/meta-ads',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedHtKanbanSdrRoute =
+  AuthenticatedHtKanbanSdrRouteImport.update({
+    id: '/ht-kanban-sdr',
+    path: '/ht-kanban-sdr',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedHtKanbanCloserRoute =
+  AuthenticatedHtKanbanCloserRouteImport.update({
+    id: '/ht-kanban-closer',
+    path: '/ht-kanban-closer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedHtApiRoute = AuthenticatedHtApiRouteImport.update({
   id: '/ht-api',
   path: '/ht-api',
@@ -243,6 +257,8 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
   '/ht-api': typeof AuthenticatedHtApiRoute
+  '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
+  '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
@@ -279,6 +295,8 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
   '/ht-api': typeof AuthenticatedHtApiRoute
+  '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
+  '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
@@ -317,6 +335,8 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
   '/_authenticated/ht-api': typeof AuthenticatedHtApiRoute
+  '/_authenticated/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
+  '/_authenticated/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
@@ -355,6 +375,8 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/ht-analytics'
     | '/ht-api'
+    | '/ht-kanban-closer'
+    | '/ht-kanban-sdr'
     | '/meta-ads'
     | '/quiz'
     | '/ranking'
@@ -391,6 +413,8 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/ht-analytics'
     | '/ht-api'
+    | '/ht-kanban-closer'
+    | '/ht-kanban-sdr'
     | '/meta-ads'
     | '/quiz'
     | '/ranking'
@@ -428,6 +452,8 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/ht-analytics'
     | '/_authenticated/ht-api'
+    | '/_authenticated/ht-kanban-closer'
+    | '/_authenticated/ht-kanban-sdr'
     | '/_authenticated/meta-ads'
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
@@ -569,6 +595,20 @@ declare module '@tanstack/react-router' {
       path: '/meta-ads'
       fullPath: '/meta-ads'
       preLoaderRoute: typeof AuthenticatedMetaAdsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ht-kanban-sdr': {
+      id: '/_authenticated/ht-kanban-sdr'
+      path: '/ht-kanban-sdr'
+      fullPath: '/ht-kanban-sdr'
+      preLoaderRoute: typeof AuthenticatedHtKanbanSdrRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ht-kanban-closer': {
+      id: '/_authenticated/ht-kanban-closer'
+      path: '/ht-kanban-closer'
+      fullPath: '/ht-kanban-closer'
+      preLoaderRoute: typeof AuthenticatedHtKanbanCloserRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ht-api': {
@@ -730,6 +770,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedHtAnalyticsRoute: typeof AuthenticatedHtAnalyticsRoute
   AuthenticatedHtApiRoute: typeof AuthenticatedHtApiRoute
+  AuthenticatedHtKanbanCloserRoute: typeof AuthenticatedHtKanbanCloserRoute
+  AuthenticatedHtKanbanSdrRoute: typeof AuthenticatedHtKanbanSdrRoute
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
@@ -753,6 +795,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedHtAnalyticsRoute: AuthenticatedHtAnalyticsRoute,
   AuthenticatedHtApiRoute: AuthenticatedHtApiRoute,
+  AuthenticatedHtKanbanCloserRoute: AuthenticatedHtKanbanCloserRoute,
+  AuthenticatedHtKanbanSdrRoute: AuthenticatedHtKanbanSdrRoute,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
