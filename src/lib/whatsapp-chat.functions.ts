@@ -1423,4 +1423,118 @@ export const reactToWhatsappMessage = createServerFn({ method: "POST" })
     return { ok: true, emoji: data.emoji || null };
   });
 
+// Edit an outbound text message via WhatsApp Cloud API (15-min window).
+export const editWhatsappMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; messageId: string; newText: string }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    messageId: String(d?.messageId ?? ""),
+    newText: String(d?.newText ?? ""),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId || !data.messageId) throw new Error("Parâmetros inválidos");
+    const newText = data.newText.trim();
+    if (!newText) throw new Error("Texto não pode ficar vazio");
+    if (newText.length > 4096) throw new Error("Texto muito longo (máx 4096 caracteres)");
+
+    const db = await dbFor(context);
+    const isVendor = Boolean((context as any).vendor);
+
+    let targetWamid: string | null = null;
+    let channelId: string | null = null;
+    let contactWaId: string | null = null;
+    let prevText: string | null = null;
+
+    if (isVendor) {
+      const rpcArgs = vendorRpcArgs(context);
+      if (!rpcArgs) throw new Error("Sessão de vendedor inválida");
+      const { data: rows, error } = await db.rpc("vendor_edit_wa_message" as any, {
+        ...rpcArgs,
+        _message_id: data.messageId,
+        _new_text: newText,
+      });
+      if (error) throw new Error(error.message);
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (!row) throw new Error("Mensagem não encontrada, já expirou (15min) ou não é sua");
+      targetWamid = (row as any).wa_message_id ?? null;
+      channelId = (row as any).channel_id ?? null;
+      contactWaId = (row as any).contact_wa_id ?? null;
+      prevText = (row as any).prev_text ?? null;
+    } else {
+      const { data: msgRow, error: msgErr } = await db
+        .from("wa_messages" as any)
+        .select("id, wa_message_id, channel_id, direction, msg_type, text_body, created_at, deleted_at, raw, conversation_id")
+        .eq("id", data.messageId)
+        .maybeSingle();
+      if (msgErr || !msgRow) throw new Error("Mensagem não encontrada");
+      const m: any = msgRow;
+      if (m.direction !== "out") throw new Error("Só é possível editar mensagens enviadas por você");
+      if (m.msg_type !== "text") throw new Error("Só é possível editar mensagens de texto");
+      if (m.deleted_at) throw new Error("Mensagem foi apagada");
+      const ageMs = Date.now() - new Date(m.created_at).getTime();
+      if (ageMs > 15 * 60 * 1000) throw new Error("Janela de 15min para edição expirou");
+      targetWamid = m.wa_message_id ?? null;
+      channelId = m.channel_id ?? null;
+      prevText = m.text_body ?? null;
+
+      const { data: conv } = await db
+        .from("wa_conversations" as any)
+        .select("contact_wa_id")
+        .eq("id", m.conversation_id)
+        .maybeSingle();
+      contactWaId = (conv as any)?.contact_wa_id ?? null;
+
+      const prevRaw = (m.raw ?? {}) as Record<string, any>;
+      const nextRaw = {
+        ...prevRaw,
+        edited_at: new Date().toISOString(),
+        edit_history: [
+          ...(Array.isArray(prevRaw.edit_history) ? prevRaw.edit_history : []),
+          { at: new Date().toISOString(), prev: prevText },
+        ],
+      };
+      const { error: updErr } = await db
+        .from("wa_messages" as any)
+        .update({ text_body: newText, raw: nextRaw })
+        .eq("id", data.messageId);
+      if (updErr) throw new Error(updErr.message);
+    }
+
+    if (!targetWamid) throw new Error("Mensagem ainda não confirmada pelo WhatsApp");
+    if (!channelId) throw new Error("Canal não encontrado");
+
+    const ch = await findChannel(channelId, db);
+    if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
+
+    const toNormalized = normalizeBrWhatsappNumber(String(contactWaId ?? ""));
+    const editBody = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: toNormalized,
+      type: "text",
+      message_id: targetWamid,
+      text: { body: newText },
+    };
+
+    try {
+      await metaProxyForChannel(
+        ch,
+        `/${ch.phoneNumberId}/messages`,
+        { method: "POST", body: JSON.stringify(editBody) },
+        db,
+      );
+    } catch (e: any) {
+      // Rollback local se Meta rejeitar
+      if (!isVendor && prevText !== null) {
+        await db.from("wa_messages" as any).update({ text_body: prevText }).eq("id", data.messageId);
+      }
+      const msg = String(e?.message ?? "Falha ao editar no WhatsApp");
+      throw new Error(msg);
+    }
+
+    return { ok: true, newText };
+  });
+
+
+
 
