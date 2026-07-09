@@ -1490,7 +1490,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
             </div>
           </div>
         ))}
-      </div>
+      </DragScroll>
       <HtLeadDetailDialog
         lead={selectedLead}
         role="sdr"
