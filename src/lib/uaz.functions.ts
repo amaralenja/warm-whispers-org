@@ -79,6 +79,9 @@ export const testUazConnection = createServerFn({ method: "POST" })
     } catch (e: any) {
       return { ok: false, status: 0, body: String(e?.message ?? e) };
     }
+  });
+
+
 
 export const getUazInstanceStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
