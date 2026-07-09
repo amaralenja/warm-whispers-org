@@ -1790,20 +1790,32 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const byStage = useMemo(() => {
     const m: Record<string, CloserCard[]> = {};
     for (const s of CLOSER_STAGES) m[s.id] = [];
+    // Traduz stage do SDR → colunas do closer
+    const sdrToCloser = (s: string | undefined): string | null => {
+      switch (s) {
+        case "agendado": return "agendado";
+        case "descartado": return "descartado";
+        case "no_show": return "descartado";
+        case "fake": return "fake";
+        default: return null;
+      }
+    };
     for (const c of filtered) {
       const quizId = c.lead?.id;
       const isFake = quizId ? fakeSet.has(quizId) : false;
       const isScheduled = quizId ? !!schedMap[quizId] : false;
+      const sdrMapped = quizId ? sdrToCloser(sdrStageMap[quizId]) : null;
       const st = isFake
         ? "fake"
-        : (stageMap[c.id] || (isScheduled ? "agendado" : c.defaultStage));
+        : (stageMap[c.id] || (isScheduled ? "agendado" : (sdrMapped ?? c.defaultStage)));
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap, fakeSet, schedMap]);
+  }, [filtered, stageMap, fakeSet, schedMap, sdrStageMap]);
+
 
 
   function moveTo(id: string, stage: string) {
