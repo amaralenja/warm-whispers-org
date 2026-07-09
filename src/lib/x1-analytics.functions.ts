@@ -691,6 +691,8 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const opFilter = data.operacao && data.operacao !== "all" ? String(data.operacao) : null;
     const channelFilterRaw = safeString(data.channelId).trim();
     const channelFilterActive = channelFilterRaw && channelFilterRaw !== "all" ? channelFilterRaw : null;
+    const vendorFilterRaw = safeString(data.vendedorId).trim();
+    const vendorFilterId = vendorFilterRaw && vendorFilterRaw !== "all" ? Number(vendorFilterRaw) : null;
 
     if (context?.vendor) {
       return getVendorX1Analytics(context, data, opFilter, fromIso, toIso);
