@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { KeyRound, Plus, Copy, ShieldOff, Loader2, ShieldAlert, Radio } from "lucide-react";
+import { KeyRound, Plus, Copy, ShieldOff, Loader2, ShieldAlert, Radio, Download } from "lucide-react";
+
 import {
   listHtApiTokens,
   createHtApiToken,
