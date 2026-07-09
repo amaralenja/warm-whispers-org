@@ -1505,7 +1505,8 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
               if (id) moveTo(id, s.id);
               setDraggingId(null);
             }}
-            className="shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh]">
+            className={`shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh] ${s.id === "fake" ? "opacity-40 grayscale" : ""}`}>
+
             <div className="px-3 py-3 border-b border-border/40 flex items-center justify-between sticky top-0 bg-card/60 rounded-t-xl">
               <div className={`text-xs font-semibold tracking-tight ${s.accent ?? ""}`}>{s.label}</div>
               <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground">
