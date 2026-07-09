@@ -2745,22 +2745,11 @@ function ConversationActionsMenu({
   currentVendorId: number | null;
   archived?: boolean;
 }) {
-  const archiveFn = useServerFn(setConversationArchived);
-  const doArchive = async () => {
-    try {
-      await archiveFn({ data: { conversationId, archived: !archived } });
-      toast.success(archived ? "Conversa desarquivada" : "Conversa arquivada");
-      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-    } catch (e: any) {
-      toast.error(`Falha: ${errorToText(e, "erro")}`);
-    } finally {
-      setOpen(false);
-    }
-  };
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const listVendorsFn = useServerFn(listVendorsForChannel);
   const transferFn = useServerFn(transferConversation);
+  const archiveFn = useServerFn(setConversationArchived);
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ["chat-transfer-vendors", channelId],
@@ -2776,6 +2765,18 @@ function ConversationActionsMenu({
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     } catch (e: any) {
       toast.error(`Falha ao transferir: ${errorToText(e, "erro")}`);
+    } finally {
+      setOpen(false);
+    }
+  };
+
+  const doArchive = async () => {
+    try {
+      await archiveFn({ data: { conversationId, archived: !archived } });
+      toast.success(archived ? "Conversa desarquivada" : "Conversa arquivada");
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+    } catch (e: any) {
+      toast.error(`Falha: ${errorToText(e, "erro")}`);
     } finally {
       setOpen(false);
     }
