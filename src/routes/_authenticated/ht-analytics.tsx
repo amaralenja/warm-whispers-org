@@ -1725,39 +1725,63 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
 
   useEffect(() => { setStageMap(loadCloserMap()); }, []);
 
+  // Mesma lógica de resolução de stage do SDR — fonte da verdade
+  const mapCrmSdr = (s: string | null | undefined): string => {
+    switch ((s ?? "").toLowerCase()) {
+      case "followup": return "c2";
+      case "grupo13k": return "no_grupo";
+      case "reagendamento": return "convite";
+      case "fechado":
+      case "agendado": return "agendado";
+      case "noshow": return "no_show";
+      case "descartado_sdr":
+      case "descartado_closer":
+      case "descartado": return "descartado";
+      default: return "novos";
+    }
+  };
+  const sdrStageOf = (l: QLead): string => {
+    if (fakeSet.has(l.id)) return "fake";
+    if (schedMap[l.id]) return "agendado";
+    return sdrStageMap[l.id] || mapCrmSdr(l.crm_status);
+  };
+  // Traduz stage do SDR → coluna padrão do closer. null = não aparece no closer.
+  const sdrToCloser = (s: string): string | null => {
+    switch (s) {
+      case "agendado": return "agendado";
+      case "fechado": return "fechado";
+      case "descartado": return "descartado";
+      case "no_show": return "descartado";
+      case "fake": return "fake";
+      default: return null; // novos, c2, no_grupo, convite — não são responsabilidade do closer
+    }
+  };
+
   const cards: CloserCard[] = useMemo(() => {
     const list: CloserCard[] = [];
-    // Leads quentes do quiz — usa crm_status como stage padrão
-    const mapCloserStage = (s: string | null | undefined): string => {
-      switch ((s ?? "").toLowerCase()) {
-        case "fechado": return "fechado";
-        case "followup": return "followup";
-        case "reagendamento": return "remarcada";
-        case "noshow": return "descartado";
-        case "descartado_sdr":
-        case "descartado_closer":
-        case "descartado": return "descartado";
-        default: return "agendado";
-      }
-    };
     for (const l of leads || []) {
       if (!isFinalizado(l)) continue;
       const caixa = (l.caixa_letra ?? "").toUpperCase();
       if (!"DEFG".includes(caixa)) continue;
+      const sdr = sdrStageOf(l);
+      const def = sdrToCloser(sdr);
+      const cardId = `qlead-${l.id}`;
+      // Só entra no closer se o SDR marcou como agendado/descartado/fake/fechado,
+      // ou se o closer já moveu o card manualmente (override local).
+      if (!def && !stageMap[cardId]) continue;
       list.push({
-        id: `qlead-${l.id}`,
+        id: cardId,
         nome: l.nome || l.whatsapp || "Sem nome",
         valor: Number(l.crm_valor || CAIXA_VALOR[caixa] || 0),
         created_at: l.crm_data_agendamento || l.data_criacao,
         closer: null,
         source: "lead",
-        defaultStage: mapCloserStage(l.crm_status),
+        defaultStage: def ?? "agendado",
         caixa: l.caixa_label,
         utm: l.utm_source,
         lead: l,
       });
     }
-    // Vendas confirmadas = fechado (ganho)
     for (const v of vendas || []) {
       list.push({
         id: `venda-${v.id}`,
@@ -1770,7 +1794,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
       });
     }
     return list;
-  }, [leads, vendas]);
+  }, [leads, vendas, fakeSet, schedMap, sdrStageMap, stageMap]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
@@ -1790,31 +1814,17 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const byStage = useMemo(() => {
     const m: Record<string, CloserCard[]> = {};
     for (const s of CLOSER_STAGES) m[s.id] = [];
-    // Traduz stage do SDR → colunas do closer
-    const sdrToCloser = (s: string | undefined): string | null => {
-      switch (s) {
-        case "agendado": return "agendado";
-        case "descartado": return "descartado";
-        case "no_show": return "descartado";
-        case "fake": return "fake";
-        default: return null;
-      }
-    };
     for (const c of filtered) {
-      const quizId = c.lead?.id;
-      const isFake = quizId ? fakeSet.has(quizId) : false;
-      const isScheduled = quizId ? !!schedMap[quizId] : false;
-      const sdrMapped = quizId ? sdrToCloser(sdrStageMap[quizId]) : null;
-      const st = isFake
-        ? "fake"
-        : (stageMap[c.id] || (isScheduled ? "agendado" : (sdrMapped ?? c.defaultStage)));
+      // defaultStage já reflete o SDR. stageMap só sobrescreve para colunas
+      // exclusivas do closer (followup, remarcada, sinal, fechado manual).
+      const st = stageMap[c.id] || c.defaultStage;
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap, fakeSet, schedMap, sdrStageMap]);
+  }, [filtered, stageMap]);
 
 
 
