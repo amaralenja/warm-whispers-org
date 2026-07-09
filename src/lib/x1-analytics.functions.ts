@@ -73,7 +73,16 @@ export type X1Filter = {
   to?: string | null;
   operacao?: string | null; // "all" | operacao_id
   channelId?: string | null; // "all" | wa_channels.id
+  vendedorId?: string | null; // "all" | vendedores.id
 };
+
+export type X1VendedorOpcao = {
+  id: number;
+  nome: string;
+  utm: string | null;
+  fotoUrl: string | null;
+};
+
 
 export type X1CanalRow = {
   id: string;
