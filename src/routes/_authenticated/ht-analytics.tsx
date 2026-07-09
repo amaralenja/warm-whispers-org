@@ -1641,10 +1641,13 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
         role="sdr"
         open={!!selectedLead}
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+        scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
+        onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
       />
     </div>
   );
 }
+
 
 // ============================================================
 // Kanban Closer
