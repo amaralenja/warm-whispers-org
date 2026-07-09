@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getVendorSession } from "@/lib/vendor-session";
-import { MessageSquare, Trash2, User as UserIcon, Phone, Mail, Instagram } from "lucide-react";
+import {
+  MessageSquare, Trash2, Phone, Mail, Instagram, Send,
+  Wallet, TrendingUp, Target, Rocket, Lightbulb, Users, Flame,
+  Calendar, X, Crown,
+} from "lucide-react";
 
 export type LeadLike = {
   id: string;
@@ -41,11 +45,47 @@ type Note = {
 
 type Role = "sdr" | "closer";
 
+const CAIXA_TIER: Record<string, { ring: string; glow: string; badge: string; label: string }> = {
+  A: { ring: "ring-zinc-500/40", glow: "", badge: "bg-zinc-500/15 text-zinc-300", label: "Até R$ 1k" },
+  B: { ring: "ring-blue-500/40", glow: "", badge: "bg-blue-500/15 text-blue-300", label: "R$ 1k–5k" },
+  C: { ring: "ring-cyan-500/40", glow: "", badge: "bg-cyan-500/15 text-cyan-300", label: "R$ 5k–10k" },
+  D: { ring: "ring-emerald-500/50", glow: "shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]", badge: "bg-emerald-500/15 text-emerald-300", label: "R$ 10k–30k" },
+  E: { ring: "ring-amber-500/60", glow: "shadow-[0_0_50px_-10px_rgba(245,158,11,0.55)]", badge: "bg-amber-500/15 text-amber-300", label: "R$ 30k–50k" },
+  F: { ring: "ring-orange-500/70", glow: "shadow-[0_0_60px_-10px_rgba(249,115,22,0.6)]", badge: "bg-orange-500/15 text-orange-300", label: "R$ 50k–100k" },
+  G: { ring: "ring-yellow-500/80", glow: "shadow-[0_0_70px_-8px_rgba(234,179,8,0.75)]", badge: "bg-yellow-500/15 text-yellow-300", label: "R$ 100k+" },
+};
+
+const QUIZ_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  caixa: Wallet,
+  faturamento: TrendingUp,
+  momento: Rocket,
+  objetivo: Target,
+  investir: Lightbulb,
+  minicurso: Lightbulb,
+  socio: Users,
+  comprometimento: Flame,
+};
+
+function initials(name: string): string {
+  return (name || "?")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0] || "")
+    .join("")
+    .toUpperCase();
+}
+
+function fmtDate(iso?: string | null) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("pt-BR", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return ""; }
+}
+
 export function HtLeadDetailDialog({
-  lead,
-  role,
-  open,
-  onOpenChange,
+  lead, role, open, onOpenChange,
 }: {
   lead: LeadLike | null;
   role: Role;
@@ -56,15 +96,14 @@ export function HtLeadDetailDialog({
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
 
   const authorName = useMemo(() => {
     try {
       const s = getVendorSession() as any;
-      return s?.nome || s?.codigo || "Admin";
-    } catch {
-      return "Admin";
-    }
-  }, []);
+      return s?.nome || s?.codigo || (role === "sdr" ? "SDR" : "Closer");
+    } catch { return role === "sdr" ? "SDR" : "Closer"; }
+  }, [role]);
 
   useEffect(() => {
     if (!open || !lead?.id) return;
@@ -80,9 +119,7 @@ export function HtLeadDetailDialog({
       setNotes(((data as any[]) ?? []) as Note[]);
       setLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [open, lead?.id]);
 
   async function addNote() {
@@ -107,164 +144,280 @@ export function HtLeadDetailDialog({
     if (error) setNotes(prev);
   }
 
-  const answers: { label: string; value?: string | null }[] = lead
+  const letter = (lead?.caixa_letra ?? "").toUpperCase();
+  const tier = CAIXA_TIER[letter];
+  const name = lead?.nome || "Sem nome";
+  const igHandle = (lead?.instagram || "").replace(/^@/, "").replace(/\/+$/, "");
+  const isHigh = "EFG".includes(letter);
+
+  const answers: { key: string; label: string; value?: string | null }[] = lead
     ? [
-        { label: "Caixa disponível", value: lead.caixa_label ?? lead.caixa_letra },
-        { label: "Faturamento atual", value: lead.faturamento },
-        { label: "Momento", value: lead.momento },
-        { label: "Objetivo", value: lead.objetivo },
-        { label: "Já investiu / tentou SaaS?", value: lead.investir },
-        { label: "Tem ideia de SaaS?", value: lead.minicurso },
-        { label: "Sócio/Cônjuge", value: lead.socio },
-        { label: "Comprometimento", value: lead.comprometimento },
+        { key: "faturamento", label: "Faturamento atual", value: lead.faturamento },
+        { key: "momento", label: "Momento atual", value: lead.momento },
+        { key: "objetivo", label: "Meta / Objetivo", value: lead.objetivo },
+        { key: "investir", label: "Já investiu em SaaS?", value: lead.investir },
+        { key: "minicurso", label: "Tem ideia de SaaS?", value: lead.minicurso },
+        { key: "socio", label: "Sócio / Cônjuge", value: lead.socio },
+        { key: "comprometimento", label: "Comprometimento", value: lead.comprometimento },
       ].filter((x) => x.value)
     : [];
 
+  const filteredNotes = filter === "all" ? notes : notes.filter((n) => n.role === filter);
+  const sdrCount = notes.filter((n) => n.role === "sdr").length;
+  const closerCount = notes.filter((n) => n.role === "closer").length;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserIcon className="h-4 w-4 text-accent" />
-            {lead?.nome || "Sem nome"}
-            {lead?.caixa_letra && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-mono">
-                Caixa {lead.caixa_letra}
-              </span>
-            )}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent
+        className="max-w-4xl p-0 gap-0 overflow-hidden border-border/60 bg-background"
+        style={{ maxHeight: "90vh" }}
+      >
+        {/* HERO */}
+        <div className="relative overflow-hidden border-b border-border/60">
+          <div
+            className="absolute inset-0 opacity-70 pointer-events-none"
+            style={{
+              background: isHigh
+                ? "radial-gradient(ellipse at top right, oklch(0.78 0.16 75 / 0.35), transparent 60%), radial-gradient(ellipse at bottom left, oklch(0.55 0.15 25 / 0.18), transparent 55%)"
+                : "radial-gradient(ellipse at top right, oklch(0.55 0.10 260 / 0.25), transparent 60%)",
+            }}
+          />
+          <div className="absolute inset-0 opacity-[0.04] pointer-events-none"
+            style={{ backgroundImage: "linear-gradient(oklch(1 0 0) 1px, transparent 1px), linear-gradient(90deg, oklch(1 0 0) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
 
-        <div className="flex-1 overflow-y-auto space-y-5 pr-2">
-          {/* Contatos */}
-          <div className="flex flex-wrap gap-3 text-xs">
-            {lead?.whatsapp && (
-              <a
-                href={`https://wa.me/${String(lead.whatsapp).replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-              >
-                <Phone className="h-3 w-3" />
-                {lead.whatsapp}
-              </a>
-            )}
-            {lead?.email && (
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/40 text-muted-foreground">
-                <Mail className="h-3 w-3" /> {lead.email}
-              </span>
-            )}
-            {lead?.instagram && (
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/40 text-muted-foreground">
-                <Instagram className="h-3 w-3" /> {lead.instagram}
-              </span>
-            )}
-            {lead?.utm_source && (
-              <span className="px-2.5 py-1 rounded bg-accent/10 text-accent border border-accent/20 text-[11px]">
-                UTM: {lead.utm_source}
-                {lead.utm_campaign ? ` · ${lead.utm_campaign}` : ""}
-              </span>
-            )}
-          </div>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="absolute top-3 right-3 z-10 h-8 w-8 rounded-full bg-background/70 backdrop-blur border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-accent/50 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
-          {/* Respostas do quiz */}
-          <div>
-            <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
-              Respostas do Quiz
-            </h3>
-            {answers.length === 0 ? (
-              <div className="text-xs text-muted-foreground py-2">Sem respostas registradas.</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {answers.map((a, i) => (
-                  <div key={i} className="rounded-md border border-border/50 bg-card/40 p-2.5">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {a.label}
-                    </div>
-                    <div className="text-xs font-medium mt-0.5">{a.value}</div>
+          <div className="relative p-6 md:p-8">
+            <div className="flex items-start gap-5">
+              <div className={`relative h-16 w-16 md:h-20 md:w-20 rounded-full ring-2 ${tier?.ring ?? "ring-border/60"} ${tier?.glow ?? ""} bg-gradient-to-br from-card via-card/80 to-background flex items-center justify-center shrink-0`}>
+                <span className="text-xl md:text-2xl font-black tracking-tight">
+                  {initials(name)}
+                </span>
+                {isHigh && (
+                  <Crown className="absolute -top-1.5 -right-1.5 h-5 w-5 text-yellow-400 drop-shadow" />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground mb-2">
+                  <span className="h-px w-6 bg-accent/60" />
+                  Lead · High Ticket
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight truncate">
+                  {name}
+                </h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {tier && (
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${tier.badge} border border-current/30`}>
+                      Caixa {letter} · {lead?.caixa_label || tier.label}
+                    </span>
+                  )}
+                  {lead?.crm_status && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-muted/40 text-muted-foreground border border-border/40">
+                      {lead.crm_status}
+                    </span>
+                  )}
+                  {lead?.crm_data_agendamento && (
+                    <span className="text-[10px] px-2 py-1 rounded bg-accent/10 text-accent border border-accent/30 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> {fmtDate(lead.crm_data_agendamento)}
+                    </span>
+                  )}
+                  {lead?.utm_source && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-violet-500/10 text-violet-300 border border-violet-500/30">
+                      UTM · {lead.utm_source}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Contatos */}
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              {lead?.whatsapp && (
+                <a href={`https://wa.me/${String(lead.whatsapp).replace(/\D/g, "")}`}
+                  target="_blank" rel="noreferrer"
+                  className="group flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 px-3 py-2.5 transition-colors">
+                  <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Phone className="h-3.5 w-3.5 text-emerald-400" />
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="min-w-0">
+                    <div className="text-[9px] uppercase tracking-wider text-emerald-400/80">WhatsApp</div>
+                    <div className="text-xs font-mono text-emerald-200 truncate">{lead.whatsapp}</div>
+                  </div>
+                </a>
+              )}
+              {lead?.email && (
+                <a href={`mailto:${lead.email}`}
+                  className="group flex items-center gap-2.5 rounded-lg border border-border/60 bg-card/40 hover:bg-card/70 px-3 py-2.5 transition-colors">
+                  <div className="h-8 w-8 rounded-full bg-muted/40 flex items-center justify-center">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground">E-mail</div>
+                    <div className="text-xs truncate">{lead.email}</div>
+                  </div>
+                </a>
+              )}
+              {igHandle && (
+                <a href={`https://instagram.com/${igHandle}`}
+                  target="_blank" rel="noreferrer"
+                  className="group flex items-center gap-2.5 rounded-lg border border-pink-500/30 bg-pink-500/5 hover:bg-pink-500/10 px-3 py-2.5 transition-colors">
+                  <div className="h-8 w-8 rounded-full bg-pink-500/20 flex items-center justify-center">
+                    <Instagram className="h-3.5 w-3.5 text-pink-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] uppercase tracking-wider text-pink-400/80">Instagram</div>
+                    <div className="text-xs text-pink-200 truncate">@{igHandle}</div>
+                  </div>
+                </a>
+              )}
+            </div>
           </div>
+        </div>
 
-          {/* Notas */}
-          <div>
-            <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2 flex items-center gap-1.5">
-              <MessageSquare className="h-3 w-3" /> Observações (SDR ↔ Closer)
-            </h3>
-            {loading ? (
-              <div className="text-xs text-muted-foreground">Carregando…</div>
-            ) : notes.length === 0 ? (
-              <div className="text-xs text-muted-foreground italic py-2">
-                Nenhuma observação ainda.
+        {/* CONTEÚDO SCROLLÁVEL */}
+        <div className="overflow-y-auto" style={{ maxHeight: "calc(90vh - 260px)" }}>
+          <div className="grid md:grid-cols-[1fr_1.1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40">
+
+            {/* QUIZ */}
+            <div className="p-6 space-y-3">
+              <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground mb-3">
+                <span className="h-px w-6 bg-accent/60" />
+                Respostas do Quiz
               </div>
-            ) : (
-              <div className="space-y-2">
-                {notes.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`rounded-md border p-2.5 ${
-                      n.role === "closer"
-                        ? "border-violet-500/30 bg-violet-500/5"
-                        : "border-sky-500/30 bg-sky-500/5"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[9px] px-1.5 py-0.5 rounded font-mono uppercase ${
-                            n.role === "closer"
-                              ? "bg-violet-500/20 text-violet-300"
-                              : "bg-sky-500/20 text-sky-300"
-                          }`}
-                        >
-                          {n.role}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {n.author || "—"} ·{" "}
-                          {new Date(n.created_at).toLocaleString("pt-BR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
+              {answers.length === 0 ? (
+                <div className="text-xs text-muted-foreground italic py-4">Sem respostas registradas.</div>
+              ) : (
+                <div className="space-y-2">
+                  {answers.map((a) => {
+                    const Icon = QUIZ_ICONS[a.key] || Wallet;
+                    return (
+                      <div key={a.key}
+                        className="group rounded-lg border border-border/50 bg-card/30 hover:bg-card/60 hover:border-accent/40 transition-colors p-3">
+                        <div className="flex items-start gap-2.5">
+                          <div className="h-7 w-7 shrink-0 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                            <Icon className="h-3.5 w-3.5 text-accent" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-semibold">
+                              {a.label}
+                            </div>
+                            <div className="text-sm font-medium mt-0.5 leading-snug">{a.value}</div>
+                          </div>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => deleteNote(n.id)}
-                        className="text-muted-foreground hover:text-red-400 opacity-60 hover:opacity-100"
-                        title="Apagar"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="text-sm whitespace-pre-wrap">{n.body}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-            <div className="mt-3 space-y-2">
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={
-                  role === "sdr"
-                    ? "Nota do SDR para o Closer…"
-                    : "Nota do Closer sobre o lead…"
-                }
-                rows={3}
-                className="text-sm"
-              />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={addNote}
-                  disabled={!draft.trim() || saving}
-                >
-                  {saving ? "Salvando…" : `Adicionar como ${role.toUpperCase()}`}
-                </Button>
+            {/* NOTAS */}
+            <div className="p-6 flex flex-col bg-card/20">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+                  <MessageSquare className="h-3 w-3" />
+                  Observações
+                </div>
+                <div className="flex items-center gap-1 p-0.5 rounded-md bg-background/60 border border-border/50">
+                  {(["all", "sdr", "closer"] as const).map((f) => (
+                    <button key={f} onClick={() => setFilter(f)}
+                      className={`text-[10px] px-2 py-1 rounded uppercase tracking-wider transition-colors ${
+                        filter === f
+                          ? f === "sdr" ? "bg-sky-500/20 text-sky-300"
+                          : f === "closer" ? "bg-violet-500/20 text-violet-300"
+                          : "bg-accent/20 text-accent"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}>
+                      {f === "all" ? `Todas ${notes.length}` : f === "sdr" ? `SDR ${sdrCount}` : `Closer ${closerCount}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-2 min-h-[120px] max-h-[280px] overflow-y-auto pr-1">
+                {loading ? (
+                  <div className="text-xs text-muted-foreground py-4 text-center">Carregando…</div>
+                ) : filteredNotes.length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic py-6 text-center border border-dashed border-border/40 rounded-lg">
+                    Nenhuma observação {filter !== "all" ? `do ${filter.toUpperCase()}` : "ainda"}.
+                  </div>
+                ) : (
+                  filteredNotes.map((n) => {
+                    const isCloser = n.role === "closer";
+                    return (
+                      <div key={n.id}
+                        className={`group relative rounded-lg border p-2.5 pl-3 ${
+                          isCloser
+                            ? "border-violet-500/30 bg-violet-500/[0.06]"
+                            : "border-sky-500/30 bg-sky-500/[0.06]"
+                        }`}>
+                        <div className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg ${isCloser ? "bg-violet-500/60" : "bg-sky-500/60"}`} />
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
+                              isCloser ? "bg-violet-500/20 text-violet-300" : "bg-sky-500/20 text-sky-300"
+                            }`}>
+                              {n.role}
+                            </span>
+                            <span className="text-[10px] font-medium truncate">{n.author || "—"}</span>
+                            <span className="text-[10px] text-muted-foreground shrink-0">· {fmtDate(n.created_at)}</span>
+                          </div>
+                          <button onClick={() => deleteNote(n.id)}
+                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-opacity shrink-0"
+                            title="Apagar">
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <div className="text-sm leading-snug whitespace-pre-wrap">{n.body}</div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Composer */}
+              <div className="mt-3 pt-3 border-t border-border/40">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                    role === "closer" ? "bg-violet-500/20 text-violet-300" : "bg-sky-500/20 text-sky-300"
+                  }`}>
+                    Você é {role.toUpperCase()}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                </div>
+                <div className="relative">
+                  <Textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") addNote();
+                    }}
+                    placeholder={
+                      role === "sdr"
+                        ? "Contexto pro Closer: interesse, timing, objeções…"
+                        : "Notas do Closer: status da call, follow-up, sinal…"
+                    }
+                    rows={3}
+                    className="text-sm resize-none pr-12 bg-background/60 border-border/60 focus:border-accent/60"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={addNote}
+                    disabled={!draft.trim() || saving}
+                    className="absolute bottom-2 right-2 h-8 w-8"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1.5 text-right">
+                  ⌘ + Enter para enviar
+                </div>
               </div>
             </div>
           </div>
