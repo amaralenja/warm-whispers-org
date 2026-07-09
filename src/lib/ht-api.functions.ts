@@ -8,9 +8,8 @@ function hashToken(token: string): string {
 
 export const listHtApiTokens = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
       .from("ht_api_tokens" as any)
       .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
       .order("created_at", { ascending: false });
@@ -34,13 +33,11 @@ export const createHtApiToken = createServerFn({ method: "POST" })
     return { name };
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // token = htq_ + 40 chars base64url
     const raw = randomBytes(30).toString("base64").replace(/[+/=]/g, "").slice(0, 40);
     const token = `htq_${raw}`;
     const token_hash = hashToken(token);
     const token_prefix = token.slice(0, 12);
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await context.supabase
       .from("ht_api_tokens" as any)
       .insert({
         name: data.name,
@@ -61,9 +58,8 @@ export const revokeHtApiToken = createServerFn({ method: "POST" })
     if (!id) throw new Error("id obrigatório");
     return { id };
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
       .from("ht_api_tokens" as any)
       .update({ revoked_at: new Date().toISOString() })
       .eq("id", data.id);
@@ -73,9 +69,8 @@ export const revokeHtApiToken = createServerFn({ method: "POST" })
 
 export const listHtQuizSubmissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
       .from("ht_quiz_submissions" as any)
       .select("id, received_at, nome, email, whatsapp, utm_source, utm_campaign")
       .order("received_at", { ascending: false })
