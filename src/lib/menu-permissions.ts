@@ -30,6 +30,8 @@ export const MENU_TREE: MenuNode[] = [
     title: "High Ticket",
     children: [
       { key: "ht-analytics", title: "Analytics", url: "/ht-analytics" },
+      { key: "ht-kanban-sdr", title: "Kanban SDR", url: "/ht-kanban-sdr" },
+      { key: "ht-kanban-closer", title: "Kanban Closer", url: "/ht-kanban-closer" },
       { key: "calendar", title: "Calendário Calls", url: "/calendar" },
       { key: "quiz", title: "Quiz", url: "/quiz" },
       { key: "meta-ads", title: "Facebook Ads", url: "/meta-ads" },
