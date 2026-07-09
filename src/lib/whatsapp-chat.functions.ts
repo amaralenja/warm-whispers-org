@@ -1023,13 +1023,8 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
 
     if (data.type === "audio") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
-      let voiceUrl = data.mediaUrl;
-      try {
-        const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
-        voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
-      } catch (e) {
-        console.error("Transloadit voice conversion failed, sending original audio:", e);
-      }
+      const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
+      const voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
       body.audio = { link: voiceUrl, voice: true };
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
