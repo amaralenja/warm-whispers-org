@@ -311,11 +311,12 @@ function HtApiPage() {
             Formulário 2 (HTML pronto)
           </h2>
           <p className="text-sm text-muted-foreground">
-            Formulário do quiz já configurado pra enviar os leads pra essa API. Baixa o zip, abre o{" "}
-            <code className="rounded bg-muted/50 px-1 font-mono text-xs">index.html</code>, cola o token
-            gerado acima na constante <code className="rounded bg-muted/50 px-1 font-mono text-xs">HT_API_TOKEN</code>{" "}
-            (topo do arquivo, dentro do <code>&lt;script&gt;</code>) e sobe no servidor do cliente.
+            Formulário do quiz já configurado pra enviar os leads pra essa API — <strong>já vem com token embutido</strong>{" "}
+            (<code className="rounded bg-muted/50 px-1 font-mono text-xs">HT_API_TOKEN</code> preenchido em{" "}
+            <code className="rounded bg-muted/50 px-1 font-mono text-xs">index.html</code>). Só baixar, descompactar
+            e subir no servidor do cliente. O token é apenas de <strong>POST</strong>, não permite leitura.
           </p>
+
           <div className="flex flex-wrap gap-2">
             <a href="/downloads/form-multium.zip" download>
               <Button className="gap-2">
