@@ -17,6 +17,7 @@ import {
 import { HTContasReceber } from "@/components/ht-contas-receber";
 import { CalendarPage } from "@/routes/_authenticated/calendar";
 import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
+import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
@@ -59,6 +60,7 @@ const fmtDate = (iso: string) => {
 
 type QLead = {
   id: string; data_criacao: string; nome: string | null; email: string | null; whatsapp: string | null;
+  instagram: string | null;
   caixa_letra: string | null; caixa_label: string | null;
   faturamento: string | null; momento: string | null; objetivo: string | null;
   investir: string | null; minicurso: string | null; socio: string | null;
@@ -1328,6 +1330,12 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
 
+  const igUsernames = useMemo(
+    () => (leads || []).map((l) => l.instagram || "").filter(Boolean),
+    [leads],
+  );
+  const igMap = useIgProfileMap(igUsernames);
+
   useEffect(() => { setStageMap(loadKanbanMap()); }, []);
 
   const utmOptions = useMemo(() => {
@@ -1447,52 +1455,29 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                 </div>
               )}
               {byStage[s.id].slice(0, 50).map((l) => (
-                <div key={l.id}
-                  draggable
+                <KanbanLeadCard
+                  key={l.id}
+                  lead={l}
+                  ig={igMap.get((l.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, ""))}
+                  dragging={draggingId === l.id}
                   onClick={() => setSelectedLead(l)}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/x-lead-id", l.id);
                     setDraggingId(l.id);
                   }}
                   onDragEnd={() => setDraggingId(null)}
-                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-pointer active:cursor-grabbing ${
-                    draggingId === l.id ? "opacity-40" : ""
-                  }`}>
-                  <div className="text-xs font-semibold truncate">{l.nome || "Sem nome"}</div>
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    {l.utm_source && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
-                        {l.utm_source}
-                      </span>
-                    )}
-                    {l.caixa_letra && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground font-mono">
-                        {l.caixa_letra}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1.5 tabular-nums">
-                    {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
-                  </div>
-                  <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  footer={
                     <select
                       value={stageMap[l.id] || "novos"}
                       onChange={(e) => moveTo(l.id, e.target.value)}
-                      className="flex-1 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
+                      className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
+                    >
                       {KANBAN_STAGES.map((ks) => (
                         <option key={ks.id} value={ks.id}>{ks.label}</option>
                       ))}
                     </select>
-                    {l.whatsapp && (
-                      <a href={`https://wa.me/${String(l.whatsapp).replace(/\D/g, "")}`}
-                        target="_blank" rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] px-2 h-6 flex items-center rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30">
-                        WA
-                      </a>
-                    )}
-                  </div>
-                </div>
+                  }
+                />
               ))}
               {byStage[s.id].length > 50 && (
                 <div className="text-[10px] text-center text-muted-foreground py-2">
@@ -1553,6 +1538,12 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
+
+  const igUsernames = useMemo(
+    () => (leads || []).map((l) => l.instagram || "").filter(Boolean),
+    [leads],
+  );
+  const igMap = useIgProfileMap(igUsernames);
 
   useEffect(() => { setStageMap(loadCloserMap()); }, []);
 
@@ -1693,43 +1684,51 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                 {items.length === 0 && (
                   <div className="text-[11px] text-muted-foreground text-center py-6 opacity-60">Vazio</div>
                 )}
-                {items.slice(0, 60).map((c) => (
-                  <div key={c.id}
-                    draggable
-                    onClick={() => { if (c.lead) setSelectedLead(c.lead); }}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/x-closer-id", c.id);
-                      setDraggingId(c.id);
-                    }}
-                    onDragEnd={() => setDraggingId(null)}
-                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors ${c.lead ? "cursor-pointer" : "cursor-grab"} active:cursor-grabbing ${
-                      draggingId === c.id ? "opacity-40" : ""
-                    }`}>
-                    <div className="text-xs font-semibold truncate">{c.nome}</div>
-                    {c.valor > 0 && (
-                      <div className="text-[11px] font-mono tabular-nums text-emerald-400 mt-1">{fmtBRL(c.valor)}</div>
-                    )}
-                    <div className="flex items-center justify-between mt-1.5">
-                      <div className="text-[10px] text-muted-foreground tabular-nums">
-                        {c.created_at ? new Date(c.created_at).toLocaleDateString("pt-BR") : "—"}
-                      </div>
-                      {c.closer && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate max-w-[100px]">
-                          {c.closer}
-                        </span>
-                      )}
-                    </div>
-                    <select
-                      value={stageMap[c.id] || c.defaultStage}
-                      onChange={(e) => moveTo(c.id, e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full mt-2 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
-                      {CLOSER_STAGES.map((ks) => (
-                        <option key={ks.id} value={ks.id}>{ks.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                {items.slice(0, 60).map((c) => {
+                  const leadObj = c.lead ?? {
+                    id: c.id,
+                    nome: c.nome,
+                    caixa_label: c.caixa ?? null,
+                    utm_source: c.utm ?? null,
+                    data_criacao: c.created_at,
+                  };
+                  const handle = (c.lead?.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, "");
+                  return (
+                    <KanbanLeadCard
+                      key={c.id}
+                      lead={leadObj as any}
+                      ig={handle ? igMap.get(handle) : undefined}
+                      dragging={draggingId === c.id}
+                      onClick={c.lead ? () => setSelectedLead(c.lead!) : undefined}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/x-closer-id", c.id);
+                        setDraggingId(c.id);
+                      }}
+                      onDragEnd={() => setDraggingId(null)}
+                      footer={
+                        <div className="space-y-1.5">
+                          {c.valor > 0 && (
+                            <div className="text-[11px] font-mono tabular-nums text-emerald-400">{fmtBRL(c.valor)}</div>
+                          )}
+                          {c.closer && (
+                            <div className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate inline-block">
+                              {c.closer}
+                            </div>
+                          )}
+                          <select
+                            value={stageMap[c.id] || c.defaultStage}
+                            onChange={(e) => moveTo(c.id, e.target.value)}
+                            className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
+                          >
+                            {CLOSER_STAGES.map((ks) => (
+                              <option key={ks.id} value={ks.id}>{ks.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      }
+                    />
+                  );
+                })}
                 {items.length > 60 && (
                   <div className="text-[10px] text-center text-muted-foreground py-2">
                     + {items.length - 60} ocultos
