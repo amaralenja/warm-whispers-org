@@ -1383,8 +1383,26 @@ function loadKanbanMap(): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(KANBAN_LS_KEY) || "{}"); } catch { return {}; }
 }
 function saveKanbanMap(m: Record<string, string>) {
-  try { localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m)); } catch {}
+  try {
+    localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m));
+    window.dispatchEvent(new Event("ht-sdr-updated"));
+  } catch {}
 }
+function useSdrStageMap(): Record<string, string> {
+  const [m, setM] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setM(loadKanbanMap());
+    const on = () => setM(loadKanbanMap());
+    window.addEventListener("ht-sdr-updated", on);
+    window.addEventListener("storage", on);
+    return () => {
+      window.removeEventListener("ht-sdr-updated", on);
+      window.removeEventListener("storage", on);
+    };
+  }, []);
+  return m;
+}
+
 function loadFakeSet(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try { return new Set(JSON.parse(localStorage.getItem(FAKE_LS_KEY) || "[]")); } catch { return new Set(); }
