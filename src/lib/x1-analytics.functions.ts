@@ -761,7 +761,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       const vendorId = numericId(c?.assigned_vendor_id);
       if (id && vendorId) conversationToVendorId.set(id, vendorId);
     }
-    const conversations = allConversations.filter((c: any) => (
+    let conversations = allConversations.filter((c: any) => (
       isWithinIso(c?.last_message_at ?? c?.created_at, fromIso, toIso)
       || isWithinIso(c?.created_at, fromIso, toIso)
     ));
@@ -774,7 +774,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     if (fromIso) novoQuery = novoQuery.gte("created_at", fromIso);
     if (toIso) novoQuery = novoQuery.lte("created_at", toIso);
     const novosLeadsRowsRaw = await pageAll<any>((from, to) => novoQuery.range(from, to));
-    const novosLeadsRows = novosLeadsRowsRaw.filter((c: any) => {
+    let novosLeadsRows = novosLeadsRowsRaw.filter((c: any) => {
       const op = safeString(c?.operacao_id ?? channelToOp.get(safeString(c?.channel_id))).trim();
       if (opFilter && !sameText(op, opFilter)) return false;
       if (!channelAllowed(c?.channel_id)) return false;
@@ -788,7 +788,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     if (fromIso) crmLeadQuery = crmLeadQuery.gte("created_at", fromIso);
     if (toIso) crmLeadQuery = crmLeadQuery.lte("created_at", toIso);
     if (opFilter) crmLeadQuery = crmLeadQuery.eq("expert", opFilter);
-    const crmLeadsRows = await pageAll<any>((from, to) => crmLeadQuery.range(from, to));
+    let crmLeadsRows = await pageAll<any>((from, to) => crmLeadQuery.range(from, to));
 
     // Mensagens do período
     const messageChannelIds = Array.from(channelToOp.keys()).filter((id) => channelAllowed(id));
@@ -796,7 +796,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
 
     // filtra mensagens: só descarta se opFilter estiver ativo e o canal não pertencer.
     // Sem opFilter, contamos TODAS as mensagens do período (mesmo de canais sem operacao_id).
-    const msgsScoped = messages.filter((m) => {
+    let msgsScoped = messages.filter((m) => {
       if (!channelAllowed(m.channel_id)) return false;
       if (opFilter) {
         const op = channelToOp.get(String(m.channel_id)) ?? "";
@@ -844,7 +844,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       && inDay(parseDataField(v.Data))
       && !!(vendaOperacao(v) ?? safeNullableString(v?.nome_expert))
     ));
-    const vendasScoped = vendasPeriodo.filter((v: any) => {
+    let vendasScoped = vendasPeriodo.filter((v: any) => {
       const op = vendaOperacao(v);
       if (opFilter) return sameText(op, opFilter);
       return true;
