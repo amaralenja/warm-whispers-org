@@ -165,6 +165,7 @@ const EMPTY: X1AnalyticsPayload = {
   serieHoraria: [],
   operacoesDisponiveis: [],
   canaisDisponiveis: [],
+  vendedoresDisponiveis: [],
 };
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
