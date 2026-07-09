@@ -81,6 +81,95 @@ export const testUazConnection = createServerFn({ method: "POST" })
     }
   });
 
+
+
+export const getUazInstanceStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{
+    ok: boolean;
+    status: number;
+    state: string | null;
+    connected: boolean;
+    qrcode: string | null;
+    paircode: string | null;
+    raw: string;
+  }> => {
+    const cfg = await loadConfig(context);
+    if (!cfg) throw new Error("Configura server_url e token primeiro");
+    const res = await fetch(`${cfg.server_url}/instance/status`, {
+      method: "GET",
+      headers: { token: cfg.instance_token, Accept: "application/json" },
+    });
+    const text = await res.text();
+    let j: any = null;
+    try { j = JSON.parse(text); } catch { /* raw */ }
+    const inst = j?.instance ?? j ?? {};
+    const state: string | null = inst.status ?? inst.state ?? null;
+    return {
+      ok: res.ok,
+      status: res.status,
+      state,
+      connected: state === "connected",
+      qrcode: inst.qrcode ?? j?.qrcode ?? null,
+      paircode: inst.paircode ?? j?.paircode ?? null,
+      raw: text,
+    };
+  });
+
+export const connectUazInstance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data?: { phone?: string }) => ({
+    phone: data?.phone ? normalizePhone(String(data.phone)) : "",
+  }))
+  .handler(async ({ data, context }): Promise<{
+    ok: boolean;
+    status: number;
+    qrcode: string | null;
+    paircode: string | null;
+    state: string | null;
+    raw: string;
+  }> => {
+    const cfg = await loadConfig(context);
+    if (!cfg) throw new Error("Configura server_url e token primeiro");
+    const body: Record<string, unknown> = {};
+    if (data.phone) body.phone = data.phone;
+    const res = await fetch(`${cfg.server_url}/instance/connect`, {
+      method: "POST",
+      headers: {
+        token: cfg.instance_token,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let j: any = null;
+    try { j = JSON.parse(text); } catch { /* raw */ }
+    const inst = j?.instance ?? j ?? {};
+    return {
+      ok: res.ok,
+      status: res.status,
+      qrcode: inst.qrcode ?? j?.qrcode ?? null,
+      paircode: inst.paircode ?? j?.paircode ?? null,
+      state: inst.status ?? inst.state ?? null,
+      raw: text,
+    };
+  });
+
+export const disconnectUazInstance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ ok: boolean; status: number; raw: string }> => {
+    const cfg = await loadConfig(context);
+    if (!cfg) throw new Error("Configura server_url e token primeiro");
+    const res = await fetch(`${cfg.server_url}/instance/disconnect`, {
+      method: "POST",
+      headers: { token: cfg.instance_token, Accept: "application/json" },
+    });
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, raw: text };
+  });
+
+
 export const getUazProfilePic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { phone: string }) => {
