@@ -79,10 +79,8 @@ function HtApiPage() {
     }
   }
 
-  const endpoint = useMemo(() => {
-    if (typeof window === "undefined") return "/api/public/ht-quiz/submit";
-    return `${window.location.origin}/api/public/ht-quiz/submit`;
-  }, []);
+  const endpoint = "https://multium.vercel.app/api/public/ht-quiz/submit";
+
 
   const curlSample = `curl -X POST '${endpoint}' \\
   -H 'Authorization: Bearer SEU_TOKEN' \\
