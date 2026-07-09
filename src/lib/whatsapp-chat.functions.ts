@@ -464,9 +464,45 @@ export const listConversations = createServerFn({ method: "GET" })
         });
         throw new Error(error.message);
       }
-      const result = ((rows ?? []) as any[])
+      let result = ((rows ?? []) as any[])
         .filter(phoneMatches)
         .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime());
+
+      // Fallback: vendedor abriu um lead pelo Kanban mas a conversa está atribuída
+      // a outro vendedor (ou sem vendor). Se o número existe em um canal permitido
+      // dessa vendedora, reatribui pra ela e retorna a conversa.
+      if (result.length === 0 && phoneCandidates.length > 0) {
+        const allowed = await vendorChannelIds(context, db);
+        if (allowed.length > 0) {
+          const filters = phoneCandidates.flatMap((candidate) => [
+            `contact_wa_id.eq.${candidate}`,
+            `contact_wa_id.ilike.%${candidate}%`,
+          ]);
+          const { data: candidates } = await db
+            .from("wa_conversations" as any)
+            .select("*")
+            .in("channel_id", allowed)
+            .or(filters.join(","))
+            .limit(20);
+          const matches = ((candidates ?? []) as any[]).filter(phoneMatches);
+          if (matches.length > 0) {
+            const ids = matches.map((m) => m.id);
+            await db
+              .from("wa_conversations" as any)
+              .update({ assigned_vendor_id: vendorId })
+              .in("id", ids);
+            result = matches
+              .map((m) => ({ ...m, assigned_vendor_id: vendorId }))
+              .sort((a, b) => new Date(b?.last_message_at ?? 0).getTime() - new Date(a?.last_message_at ?? 0).getTime());
+            console.info("[whatsapp-chat] vendor listConversations reassigned by phone", {
+              vendorId,
+              phone: data.phone,
+              reassigned: ids.length,
+            });
+          }
+        }
+      }
+
       console.info("[whatsapp-chat] vendor listConversations", {
         vendorId,
         operacaoId: data.operacaoId ?? null,
