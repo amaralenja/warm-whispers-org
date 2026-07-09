@@ -1692,6 +1692,9 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
+  const [schedMap, setSched] = useSchedMap();
+
+
 
 
   const igUsernames = useMemo(
