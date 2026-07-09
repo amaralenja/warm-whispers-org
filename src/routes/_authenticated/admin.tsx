@@ -28,6 +28,74 @@ function AdminPage() {
   const saveCfg = useServerFn(saveUazConfig);
   const testCfg = useServerFn(testUazConnection);
   const getPic = useServerFn(getUazProfilePic);
+  const getStatus = useServerFn(getUazInstanceStatus);
+  const connectInst = useServerFn(connectUazInstance);
+  const disconnectInst = useServerFn(disconnectUazInstance);
+
+  const statusQ = useQuery({
+    queryKey: ["uaz-status"],
+    queryFn: () => getStatus(),
+    enabled: false,
+  });
+
+  const [pairPhone, setPairPhone] = useState("");
+  const [qrData, setQrData] = useState<{ qrcode: string | null; paircode: string | null } | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  async function handleConnect() {
+    setConnecting(true);
+    setQrData(null);
+    try {
+      const r = await connectInst({ data: { phone: pairPhone.trim() || undefined } });
+      if (!r.ok) {
+        toast.error(`Falha ${r.status}: ${r.raw.slice(0, 200)}`);
+        return;
+      }
+      setQrData({ qrcode: r.qrcode, paircode: r.paircode });
+      statusQ.refetch();
+      toast.success(r.paircode ? `Pair code: ${r.paircode}` : "QR code gerado — escaneia aí");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleRefreshStatus() {
+    const r = await statusQ.refetch();
+    if (r.data?.connected) {
+      setQrData(null);
+      toast.success("Conectado!");
+    } else if (r.data?.qrcode) {
+      setQrData({ qrcode: r.data.qrcode, paircode: r.data.paircode });
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!confirm("Desconectar essa instância do WhatsApp?")) return;
+    try {
+      await disconnectInst();
+      setQrData(null);
+      statusQ.refetch();
+      toast.success("Desconectado");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro");
+    }
+  }
+
+  // Auto-poll enquanto tem QR na tela
+  useEffect(() => {
+    if (!qrData?.qrcode && !qrData?.paircode) return;
+    const int = setInterval(() => {
+      statusQ.refetch().then((r) => {
+        if (r.data?.connected) {
+          setQrData(null);
+          toast.success("WhatsApp conectado!");
+        }
+      });
+    }, 4000);
+    return () => clearInterval(int);
+  }, [qrData?.qrcode, qrData?.paircode]);
 
   const cfgQ = useQuery({
     queryKey: ["uaz-config"],
