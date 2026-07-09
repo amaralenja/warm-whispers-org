@@ -1455,52 +1455,29 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                 </div>
               )}
               {byStage[s.id].slice(0, 50).map((l) => (
-                <div key={l.id}
-                  draggable
+                <KanbanLeadCard
+                  key={l.id}
+                  lead={l}
+                  ig={igMap.get((l.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, ""))}
+                  dragging={draggingId === l.id}
                   onClick={() => setSelectedLead(l)}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/x-lead-id", l.id);
                     setDraggingId(l.id);
                   }}
                   onDragEnd={() => setDraggingId(null)}
-                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-pointer active:cursor-grabbing ${
-                    draggingId === l.id ? "opacity-40" : ""
-                  }`}>
-                  <div className="text-xs font-semibold truncate">{l.nome || "Sem nome"}</div>
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    {l.utm_source && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
-                        {l.utm_source}
-                      </span>
-                    )}
-                    {l.caixa_letra && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground font-mono">
-                        {l.caixa_letra}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1.5 tabular-nums">
-                    {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
-                  </div>
-                  <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  footer={
                     <select
                       value={stageMap[l.id] || "novos"}
                       onChange={(e) => moveTo(l.id, e.target.value)}
-                      className="flex-1 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
+                      className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
+                    >
                       {KANBAN_STAGES.map((ks) => (
                         <option key={ks.id} value={ks.id}>{ks.label}</option>
                       ))}
                     </select>
-                    {l.whatsapp && (
-                      <a href={`https://wa.me/${String(l.whatsapp).replace(/\D/g, "")}`}
-                        target="_blank" rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] px-2 h-6 flex items-center rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30">
-                        WA
-                      </a>
-                    )}
-                  </div>
-                </div>
+                  }
+                />
               ))}
               {byStage[s.id].length > 50 && (
                 <div className="text-[10px] text-center text-muted-foreground py-2">
