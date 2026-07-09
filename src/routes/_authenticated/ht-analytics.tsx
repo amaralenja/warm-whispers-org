@@ -1383,8 +1383,26 @@ function loadKanbanMap(): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(KANBAN_LS_KEY) || "{}"); } catch { return {}; }
 }
 function saveKanbanMap(m: Record<string, string>) {
-  try { localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m)); } catch {}
+  try {
+    localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m));
+    window.dispatchEvent(new Event("ht-sdr-updated"));
+  } catch {}
 }
+function useSdrStageMap(): Record<string, string> {
+  const [m, setM] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setM(loadKanbanMap());
+    const on = () => setM(loadKanbanMap());
+    window.addEventListener("ht-sdr-updated", on);
+    window.addEventListener("storage", on);
+    return () => {
+      window.removeEventListener("ht-sdr-updated", on);
+      window.removeEventListener("storage", on);
+    };
+  }, []);
+  return m;
+}
+
 function loadFakeSet(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try { return new Set(JSON.parse(localStorage.getItem(FAKE_LS_KEY) || "[]")); } catch { return new Set(); }
@@ -1693,6 +1711,8 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
   const [schedMap, setSched] = useSchedMap();
+  const sdrStageMap = useSdrStageMap();
+
 
 
 
@@ -1770,20 +1790,32 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const byStage = useMemo(() => {
     const m: Record<string, CloserCard[]> = {};
     for (const s of CLOSER_STAGES) m[s.id] = [];
+    // Traduz stage do SDR → colunas do closer
+    const sdrToCloser = (s: string | undefined): string | null => {
+      switch (s) {
+        case "agendado": return "agendado";
+        case "descartado": return "descartado";
+        case "no_show": return "descartado";
+        case "fake": return "fake";
+        default: return null;
+      }
+    };
     for (const c of filtered) {
       const quizId = c.lead?.id;
       const isFake = quizId ? fakeSet.has(quizId) : false;
       const isScheduled = quizId ? !!schedMap[quizId] : false;
+      const sdrMapped = quizId ? sdrToCloser(sdrStageMap[quizId]) : null;
       const st = isFake
         ? "fake"
-        : (stageMap[c.id] || (isScheduled ? "agendado" : c.defaultStage));
+        : (stageMap[c.id] || (isScheduled ? "agendado" : (sdrMapped ?? c.defaultStage)));
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap, fakeSet, schedMap]);
+  }, [filtered, stageMap, fakeSet, schedMap, sdrStageMap]);
+
 
 
   function moveTo(id: string, stage: string) {
