@@ -471,50 +471,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     }
   };
 
-  const [editTarget, setEditTarget] = useState<Msg | null>(null);
-  const [editDraft, setEditDraft] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
+  // Edição de mensagem removida: a API oficial do WhatsApp não permite editar/apagar.
 
-  const handleEdit = (m: Msg) => {
-    if (!active) return;
-    setEditTarget(m);
-    setEditDraft(m.text_body ?? "");
-  };
-
-  const submitEdit = async () => {
-    if (!active || !editTarget) return;
-    const m = editTarget;
-    const current = m.text_body ?? "";
-    const trimmed = editDraft.trim();
-    if (!trimmed) { toast.error("Texto não pode ficar vazio"); return; }
-    if (trimmed === current) { setEditTarget(null); return; }
-    const prev = m.text_body;
-    setEditSaving(true);
-    qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
-      asArray<Msg>(old).map((x) =>
-        x.id === m.id
-          ? { ...x, text_body: trimmed, raw: { ...(x.raw as any || {}), edited_at: new Date().toISOString() } }
-          : x,
-      ),
-    );
-    try {
-      const result = await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
-      if ((result as any)?.whatsappUpdated === false) {
-        toast.warning("Editada só no histórico interno — o WhatsApp oficial não permite alterar mensagem já enviada.");
-      } else {
-        toast.success("Mensagem editada");
-      }
-      setEditTarget(null);
-    } catch (e: any) {
-      toast.error(errorToText(e, "Falha ao editar"));
-      qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
-        asArray<Msg>(old).map((x) => (x.id === m.id ? { ...x, text_body: prev } : x)),
-      );
-      qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
-    } finally {
-      setEditSaving(false);
-    }
-  };
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const routeSearch = useSearch({ strict: false }) as Record<string, unknown>;
