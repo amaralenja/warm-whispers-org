@@ -31,7 +31,7 @@ import {
   ArrowUpDown,
   GripVertical,
   Columns3,
-  Pencil,
+  
 } from "lucide-react";
 import {
   DndContext,
@@ -82,7 +82,7 @@ import {
   updateConversationTags,
   updateConversationNotes,
   reactToWhatsappMessage,
-  editWhatsappMessage,
+  
   setConversationArchived,
 } from "@/lib/whatsapp-chat.functions";
 import {
@@ -425,7 +425,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
-  const editFn = useServerFn(editWhatsappMessage);
+  
   const listAllTagsFn = useServerFn(listCrmTags);
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
@@ -471,50 +471,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     }
   };
 
-  const [editTarget, setEditTarget] = useState<Msg | null>(null);
-  const [editDraft, setEditDraft] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
+  // Edição de mensagem removida: a API oficial do WhatsApp não permite editar/apagar.
 
-  const handleEdit = (m: Msg) => {
-    if (!active) return;
-    setEditTarget(m);
-    setEditDraft(m.text_body ?? "");
-  };
-
-  const submitEdit = async () => {
-    if (!active || !editTarget) return;
-    const m = editTarget;
-    const current = m.text_body ?? "";
-    const trimmed = editDraft.trim();
-    if (!trimmed) { toast.error("Texto não pode ficar vazio"); return; }
-    if (trimmed === current) { setEditTarget(null); return; }
-    const prev = m.text_body;
-    setEditSaving(true);
-    qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
-      asArray<Msg>(old).map((x) =>
-        x.id === m.id
-          ? { ...x, text_body: trimmed, raw: { ...(x.raw as any || {}), edited_at: new Date().toISOString() } }
-          : x,
-      ),
-    );
-    try {
-      const result = await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
-      if ((result as any)?.whatsappUpdated === false) {
-        toast.warning("Editada só no histórico interno — o WhatsApp oficial não permite alterar mensagem já enviada.");
-      } else {
-        toast.success("Mensagem editada");
-      }
-      setEditTarget(null);
-    } catch (e: any) {
-      toast.error(errorToText(e, "Falha ao editar"));
-      qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
-        asArray<Msg>(old).map((x) => (x.id === m.id ? { ...x, text_body: prev } : x)),
-      );
-      qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
-    } finally {
-      setEditSaving(false);
-    }
-  };
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const routeSearch = useSearch({ strict: false }) as Record<string, unknown>;
@@ -1512,7 +1470,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} onEdit={(mm) => handleEdit(mm)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
@@ -1705,35 +1663,6 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o && !editSaving) setEditTarget(null); }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar mensagem</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Textarea
-              value={editDraft}
-              onChange={(e) => setEditDraft(e.target.value)}
-              rows={5}
-              maxLength={4096}
-              placeholder="Nova mensagem"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submitEdit(); }
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              A edição fica registrada no histórico interno. A API oficial do WhatsApp não altera a mensagem já entregue. {editDraft.length}/4096
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditTarget(null)} disabled={editSaving}>Cancelar</Button>
-            <Button onClick={submitEdit} disabled={editSaving || !editDraft.trim()}>
-              {editSaving ? "Salvando…" : "Salvar edição"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -1799,11 +1728,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             <Reply className="mr-2 h-4 w-4" /> Responder
           </DropdownMenuItem>
         )}
-        {canEdit && onEdit && (
-          <DropdownMenuItem onClick={() => onEdit(msg)}>
-            <Pencil className="mr-2 h-4 w-4" /> Editar
-          </DropdownMenuItem>
-        )}
+        
       </DropdownMenuContent>
     </DropdownMenu>
   ) : null;
