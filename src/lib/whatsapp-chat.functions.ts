@@ -1423,7 +1423,9 @@ export const reactToWhatsappMessage = createServerFn({ method: "POST" })
     return { ok: true, emoji: data.emoji || null };
   });
 
-// Edit an outbound text message via WhatsApp Cloud API (15-min window).
+// Edit an outbound text message in the internal chat history (15-min window).
+// Meta's official WhatsApp Cloud API currently exposes incoming edit webhooks,
+// but it does not expose a supported endpoint to edit business-sent messages.
 export const editWhatsappMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { conversationId: string; messageId: string; newText: string }) => ({
@@ -1500,61 +1502,20 @@ export const editWhatsappMessage = createServerFn({ method: "POST" })
       if (updErr) throw new Error(updErr.message);
     }
 
-    if (!targetWamid) throw new Error("Mensagem ainda não confirmada pelo WhatsApp");
-    if (!channelId) throw new Error("Canal não encontrado");
-
-    const ch = await findChannel(channelId, db);
-    if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
-
-    // Meta Cloud API — edit text message. Docs oficiais exigem messaging_product,
-    // recipient_type, to, type, text E message_id. Ver:
-    // https://developers.facebook.com/docs/whatsapp/cloud-api/guides/edit-message
-    const toNormalized = normalizeBrWhatsappNumber(String(contactWaId ?? ""));
-    if (!toNormalized) throw new Error("Número do contato não encontrado");
-    const editBody = {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: toNormalized,
-      type: "text",
-      text: { body: newText, preview_url: false },
-      message_id: targetWamid,
-    };
-
-    console.log("[editWhatsappMessage] enviando edit", {
+    console.log("[editWhatsappMessage] edição oficial indisponível; salvando somente no histórico interno", {
       channelId,
-      phoneNumberId: ch.phoneNumberId,
-      to: toNormalized,
       wamid: targetWamid,
       wamidLooksValid: /^wamid\./i.test(String(targetWamid ?? "")),
       newTextLen: newText.length,
       isVendor,
     });
 
-    try {
-      const proxied = await metaProxyForChannel(
-        ch,
-        `/${ch.phoneNumberId}/messages`,
-        { method: "POST", body: JSON.stringify(editBody) },
-        db,
-      );
-      console.log("[editWhatsappMessage] meta OK", {
-        wamid: targetWamid,
-        response: proxied?.body,
-      });
-    } catch (e: any) {
-      console.error("[editWhatsappMessage] meta FAIL", {
-        wamid: targetWamid,
-        error: String(e?.message ?? e),
-      });
-      // Rollback local se Meta rejeitar
-      if (!isVendor && prevText !== null) {
-        await db.from("wa_messages" as any).update({ text_body: prevText }).eq("id", data.messageId);
-      }
-      const msg = String(e?.message ?? "Falha ao editar no WhatsApp");
-      throw new Error(msg);
-    }
-
-    return { ok: true, newText };
+    return {
+      ok: true,
+      newText,
+      whatsappUpdated: false,
+      reason: "A API oficial do WhatsApp não permite editar mensagens enviadas pela empresa; a alteração foi salva apenas no histórico interno.",
+    };
   });
 
 
