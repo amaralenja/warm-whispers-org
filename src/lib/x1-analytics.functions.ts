@@ -639,6 +639,7 @@ async function getVendorX1Analytics(
   return {
     kpis: {
       novosLeads,
+      leadsAntigosAtivos: Math.max(0, conversations.length - novosLeads),
       conversas: conversations.length,
       msgsIn,
       msgsOut,
@@ -655,6 +656,7 @@ async function getVendorX1Analytics(
     serieHoraria: Array.from(hourMap.values()),
     operacoesDisponiveis: Array.from(operacoesSet).sort(),
     canaisDisponiveis,
+    vendedoresDisponiveis: [],
   };
 }
 
