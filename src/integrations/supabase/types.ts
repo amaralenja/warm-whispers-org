@@ -1728,6 +1728,7 @@ export type Database = {
       }
       wa_conversations: {
         Row: {
+          archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
           contact_name: string | null
@@ -1746,6 +1747,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           assigned_vendor_id?: number | null
           channel_id: string
           contact_name?: string | null
@@ -1764,6 +1766,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           assigned_vendor_id?: number | null
           channel_id?: string
           contact_name?: string | null
@@ -2768,6 +2771,7 @@ export type Database = {
       vendor_list_wa_conversations: {
         Args: { _codigo: string; _operacao_id?: string; _vendor_id: number }
         Returns: {
+          archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
           contact_name: string | null
@@ -2869,6 +2873,7 @@ export type Database = {
           _vendor_id: number
         }
         Returns: {
+          archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
           contact_name: string | null
@@ -2953,6 +2958,7 @@ export type Database = {
           _vendor_id: number
         }
         Returns: {
+          archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
           contact_name: string | null
