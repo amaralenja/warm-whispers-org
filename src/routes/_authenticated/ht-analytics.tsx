@@ -1474,7 +1474,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                   <div className="text-[10px] text-muted-foreground mt-1.5 tabular-nums">
                     {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
                   </div>
-                  <div className="mt-2 flex items-center gap-1">
+                  <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={stageMap[l.id] || "novos"}
                       onChange={(e) => moveTo(l.id, e.target.value)}
@@ -1486,6 +1486,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                     {l.whatsapp && (
                       <a href={`https://wa.me/${String(l.whatsapp).replace(/\D/g, "")}`}
                         target="_blank" rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-[10px] px-2 h-6 flex items-center rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30">
                         WA
                       </a>
