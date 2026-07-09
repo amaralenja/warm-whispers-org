@@ -708,11 +708,12 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const infinite = !!node.data?.infinite;
       const remarketing = node.data?.remarketing;
       let expiresAt: string | null = null;
-      let waitingFor: "message" | "remarketing" = "message";
+      // waiting_for tem check constraint: só aceita 'message' | 'button' | 'timer'.
+      // Remarketing usa 'message' + flag no context; um valor custom quebrava o run
+      // com constraint violation e deixava o fluxo travado sem enviar as próximas msgs.
       if (remarketing?.enabled) {
         const secs = Math.max(1, Number(remarketing.afterSeconds ?? 3600));
         expiresAt = new Date(Date.now() + secs * 1000).toISOString();
-        waitingFor = "remarketing";
         ctx.variables.__remarketing = {
           nodeId: node.id,
           text: String(remarketing.text ?? ""),
@@ -723,7 +724,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         const ttl = Math.max(1, Number(node.data?.timeoutSeconds ?? 86400));
         expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
       }
-      return { pause: true, waitingFor: waitingFor as any, expiresAt };
+      return { pause: true, waitingFor: "message", expiresAt };
     }
 
     case "wait_button": {
