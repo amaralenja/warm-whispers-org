@@ -1585,6 +1585,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         defaultStage: mapCloserStage(l.crm_status),
         caixa: l.caixa_label,
         utm: l.utm_source,
+        lead: l,
       });
     }
     // Vendas confirmadas = fechado (ganho)
