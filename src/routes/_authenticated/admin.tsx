@@ -265,6 +265,70 @@ function AdminPage() {
         </CardContent>
       </Card>
 
+      {/* Conectar WhatsApp via QR / Pair code */}
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Conectar WhatsApp
+            </h2>
+            {statusQ.data && (
+              <Badge
+                variant="outline"
+                className={
+                  statusQ.data.connected
+                    ? "gap-1 bg-emerald-500/10 text-emerald-300"
+                    : "gap-1 bg-amber-500/10 text-amber-300"
+                }
+              >
+                {statusQ.data.state ?? "desconhecido"}
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              placeholder="(opcional) DDI+DDD+número pra pair code, ex: 5511999999999"
+              value={pairPhone}
+              onChange={(e) => setPairPhone(e.target.value)}
+            />
+            <Button onClick={handleConnect} disabled={connecting} className="gap-2">
+              {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+              Gerar QR / Pair code
+            </Button>
+            <Button onClick={handleRefreshStatus} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" /> Status
+            </Button>
+            {statusQ.data?.connected && (
+              <Button onClick={handleDisconnect} variant="destructive" className="gap-2">
+                <LogOut className="h-4 w-4" /> Desconectar
+              </Button>
+            )}
+          </div>
+
+          {qrData?.paircode && (
+            <div className="rounded-md border border-border bg-muted/30 p-4 text-center">
+              <p className="text-xs text-muted-foreground">Pair code (digita no WhatsApp &gt; Aparelhos conectados)</p>
+              <p className="mt-1 font-mono text-2xl tracking-widest">{qrData.paircode}</p>
+            </div>
+          )}
+          {qrData?.qrcode && (
+            <div className="flex flex-col items-center gap-2 rounded-md border border-border bg-white p-4">
+              <img
+                src={qrData.qrcode.startsWith("data:") ? qrData.qrcode : `data:image/png;base64,${qrData.qrcode}`}
+                alt="QR Code UAZ"
+                className="h-64 w-64 object-contain"
+              />
+              <p className="text-xs text-muted-foreground">Escaneia no WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho</p>
+            </div>
+          )}
+
+          <p className="text-[11px] text-muted-foreground">
+            Dica: se der <b>401 invalid token</b>, o token da instância está errado — verifica no painel da UAZ e cola de novo no campo acima.
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="space-y-4 pt-6">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
