@@ -2529,6 +2529,21 @@ export type Database = {
           wa_message_id: string
         }[]
       }
+      vendor_edit_wa_message: {
+        Args: {
+          _codigo: string
+          _message_id: string
+          _new_text: string
+          _vendor_id: number
+        }
+        Returns: {
+          channel_id: string
+          contact_wa_id: string
+          id: string
+          prev_text: string
+          wa_message_id: string
+        }[]
+      }
       vendor_get_flow: {
         Args: { _codigo: string; _flow_id: string; _vendor_id: number }
         Returns: {
