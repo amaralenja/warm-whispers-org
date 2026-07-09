@@ -127,3 +127,105 @@ export const listInstagramLeads = createServerFn({ method: "POST" })
       .in("username", list);
     return rows ?? [];
   });
+
+async function scrapeBrightData(username: string, apiKey: string) {
+  const url = `https://www.instagram.com/${username}/`;
+  try {
+    const res = await fetch(
+      "https://api.brightdata.com/datasets/v3/scrape?dataset_id=gd_l1vikfch901nx3by4&format=json",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify([{ url }]),
+      },
+    );
+    if (!res.ok) return { row: null, failure: `Bright Data ${res.status}`, url };
+    const json = await res.json();
+    const row = Array.isArray(json) ? json[0] : json;
+    if (!row || row.error || row.warning) {
+      return { row: null, failure: row?.error || row?.warning || "not_found", url };
+    }
+    return { row, failure: null, url };
+  } catch (e: any) {
+    return { row: null, failure: e?.message || "fetch_error", url };
+  }
+}
+
+/**
+ * Garante que os @ passados existam no cache. Puxa Bright Data só para os
+ * ausentes (com concorrência limitada) e devolve todos os rows atualizados.
+ */
+export const enrichInstagramLeads = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { usernames: string[]; limit?: number }) => data)
+  .handler(async ({ data, context }) => {
+    const clean = Array.from(
+      new Set(
+        (data.usernames || [])
+          .map((u) => (u || "").replace(/^@/, "").toLowerCase().replace(/\/+$/, ""))
+          .filter((u) => /^[a-z0-9._]+$/.test(u)),
+      ),
+    );
+    if (clean.length === 0) return [];
+
+    const { data: existing } = await context.supabase
+      .from("instagram_leads")
+      .select("*")
+      .in("username", clean);
+    const have = new Set((existing ?? []).map((r: any) => r.username));
+    const missing = clean.filter((u) => !have.has(u)).slice(0, data.limit ?? 25);
+
+    const apiKey = process.env.BRIGHTDATA_API_KEY;
+    if (missing.length === 0 || !apiKey) return existing ?? [];
+
+    const results: any[] = [];
+    const CONC = 3;
+    let idx = 0;
+    async function worker() {
+      while (idx < missing.length) {
+        const i = idx++;
+        const username = missing[i];
+        const { row, failure, url } = await scrapeBrightData(username, apiKey!);
+        if (!row) {
+          const fakeRow = {
+            username,
+            verification_status: "fake",
+            profile_url: url,
+            raw: { failure } as any,
+            fetched_at: new Date().toISOString(),
+          };
+          const { data: saved } = await context.supabase
+            .from("instagram_leads")
+            .upsert(fakeRow, { onConflict: "username" })
+            .select()
+            .single();
+          if (saved) results.push(saved);
+          continue;
+        }
+        const profile = {
+          username: String(row.account || row.username || username).replace(/^@/, "").toLowerCase(),
+          full_name: row.full_name ?? row.profile_name ?? null,
+          biography: row.biography ?? row.bio ?? null,
+          followers: Number(row.followers ?? row.followers_count ?? 0) || 0,
+          following: Number(row.following ?? row.following_count ?? 0) || 0,
+          posts_count: Number(row.posts_count ?? row.posts ?? 0) || 0,
+          is_verified: Boolean(row.is_verified ?? row.verified ?? false),
+          profile_pic_url:
+            row.profile_image_link ?? row.profile_pic_url ?? row.profile_pic_url_hd ??
+            row.profile_picture_url ?? row.profile_image ?? row.avatar ?? row.profilePicUrl ?? null,
+          profile_url: row.url ?? url,
+          verification_status: "real",
+          raw: row,
+          fetched_at: new Date().toISOString(),
+        };
+        const { data: saved } = await context.supabase
+          .from("instagram_leads")
+          .upsert(profile, { onConflict: "username" })
+          .select()
+          .single();
+        if (saved) results.push(saved);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONC, missing.length) }, () => worker()));
+    return [...(existing ?? []), ...results];
+  });
