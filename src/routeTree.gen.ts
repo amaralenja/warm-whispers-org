@@ -23,6 +23,7 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
+import { Route as AuthenticatedHtApiRouteImport } from './routes/_authenticated/ht-api'
 import { Route as AuthenticatedHtAnalyticsRouteImport } from './routes/_authenticated/ht-analytics'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -111,6 +112,11 @@ const AuthenticatedQuizRoute = AuthenticatedQuizRouteImport.update({
 const AuthenticatedMetaAdsRoute = AuthenticatedMetaAdsRouteImport.update({
   id: '/meta-ads',
   path: '/meta-ads',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedHtApiRoute = AuthenticatedHtApiRouteImport.update({
+  id: '/ht-api',
+  path: '/ht-api',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHtAnalyticsRoute =
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
+  '/ht-api': typeof AuthenticatedHtApiRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
+  '/ht-api': typeof AuthenticatedHtApiRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
+  '/_authenticated/ht-api': typeof AuthenticatedHtApiRoute
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
@@ -335,6 +344,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/financeiro'
     | '/ht-analytics'
+    | '/ht-api'
     | '/meta-ads'
     | '/quiz'
     | '/ranking'
@@ -369,6 +379,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/financeiro'
     | '/ht-analytics'
+    | '/ht-api'
     | '/meta-ads'
     | '/quiz'
     | '/ranking'
@@ -404,6 +415,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
     | '/_authenticated/ht-analytics'
+    | '/_authenticated/ht-api'
     | '/_authenticated/meta-ads'
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
@@ -545,6 +557,13 @@ declare module '@tanstack/react-router' {
       path: '/meta-ads'
       fullPath: '/meta-ads'
       preLoaderRoute: typeof AuthenticatedMetaAdsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ht-api': {
+      id: '/_authenticated/ht-api'
+      path: '/ht-api'
+      fullPath: '/ht-api'
+      preLoaderRoute: typeof AuthenticatedHtApiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ht-analytics': {
@@ -690,6 +709,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedHtAnalyticsRoute: typeof AuthenticatedHtAnalyticsRoute
+  AuthenticatedHtApiRoute: typeof AuthenticatedHtApiRoute
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
@@ -711,6 +731,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedHtAnalyticsRoute: AuthenticatedHtAnalyticsRoute,
+  AuthenticatedHtApiRoute: AuthenticatedHtApiRoute,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
