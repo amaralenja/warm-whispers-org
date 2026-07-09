@@ -1696,12 +1696,13 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                 {items.slice(0, 60).map((c) => (
                   <div key={c.id}
                     draggable
+                    onClick={() => { if (c.lead) setSelectedLead(c.lead); }}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/x-closer-id", c.id);
                       setDraggingId(c.id);
                     }}
                     onDragEnd={() => setDraggingId(null)}
-                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-grab active:cursor-grabbing ${
+                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors ${c.lead ? "cursor-pointer" : "cursor-grab"} active:cursor-grabbing ${
                       draggingId === c.id ? "opacity-40" : ""
                     }`}>
                     <div className="text-xs font-semibold truncate">{c.nome}</div>
@@ -1721,6 +1722,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                     <select
                       value={stageMap[c.id] || c.defaultStage}
                       onChange={(e) => moveTo(c.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-full mt-2 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
                       {CLOSER_STAGES.map((ks) => (
                         <option key={ks.id} value={ks.id}>{ks.label}</option>
@@ -1738,6 +1740,12 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
           );
         })}
       </div>
+      <HtLeadDetailDialog
+        lead={selectedLead}
+        role="closer"
+        open={!!selectedLead}
+        onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+      />
     </div>
   );
 }
