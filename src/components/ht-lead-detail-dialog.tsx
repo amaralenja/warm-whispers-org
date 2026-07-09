@@ -229,7 +229,9 @@ export function HtLeadDetailDialog({
                     <span className="text-[10px] px-2 py-1 rounded bg-accent/10 text-accent border border-accent/30 flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> {fmtDate(lead.crm_data_agendamento)}
                     </span>
+                  )}
                   {scheduledAt && (
+
                     <span className="text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Call: {fmtDate(scheduledAt)}
                     </span>
