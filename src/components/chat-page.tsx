@@ -1663,35 +1663,6 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o && !editSaving) setEditTarget(null); }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar mensagem</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Textarea
-              value={editDraft}
-              onChange={(e) => setEditDraft(e.target.value)}
-              rows={5}
-              maxLength={4096}
-              placeholder="Nova mensagem"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submitEdit(); }
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              A edição fica registrada no histórico interno. A API oficial do WhatsApp não altera a mensagem já entregue. {editDraft.length}/4096
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditTarget(null)} disabled={editSaving}>Cancelar</Button>
-            <Button onClick={submitEdit} disabled={editSaving || !editDraft.trim()}>
-              {editSaving ? "Salvando…" : "Salvar edição"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
