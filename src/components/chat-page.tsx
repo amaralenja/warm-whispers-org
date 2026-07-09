@@ -31,6 +31,7 @@ import {
   ArrowUpDown,
   GripVertical,
   Columns3,
+  Pencil,
 } from "lucide-react";
 import {
   DndContext,
@@ -81,6 +82,7 @@ import {
   updateConversationTags,
   updateConversationNotes,
   reactToWhatsappMessage,
+  editWhatsappMessage,
   setConversationArchived,
 } from "@/lib/whatsapp-chat.functions";
 import {
@@ -423,6 +425,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
+  const editFn = useServerFn(editWhatsappMessage);
   const listAllTagsFn = useServerFn(listCrmTags);
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
@@ -464,6 +467,33 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       await reactFn({ data: { conversationId: String(active.id), messageId: String(m.id), emoji } });
     } catch (e: any) {
       toast.error(errorToText(e, "Falha ao reagir"));
+      qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
+    }
+  };
+
+  const handleEdit = async (m: Msg) => {
+    if (!active) return;
+    const current = m.text_body ?? "";
+    const next = typeof window !== "undefined" ? window.prompt("Editar mensagem (até 15min após envio):", current) : null;
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === current) return;
+    const prev = m.text_body;
+    qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
+      asArray<Msg>(old).map((x) =>
+        x.id === m.id
+          ? { ...x, text_body: trimmed, raw: { ...(x.raw as any || {}), edited_at: new Date().toISOString() } }
+          : x,
+      ),
+    );
+    try {
+      await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
+      toast.success("Mensagem editada");
+    } catch (e: any) {
+      toast.error(errorToText(e, "Falha ao editar"));
+      qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
+        asArray<Msg>(old).map((x) => (x.id === m.id ? { ...x, text_body: prev } : x)),
+      );
       qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
     }
   };
@@ -1464,7 +1494,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} onEdit={(mm) => handleEdit(mm)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
@@ -1665,7 +1695,7 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; quotedFrom?: Msg | null }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null }) {
   const isOut = msg.direction === "out";
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
@@ -1674,6 +1704,16 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
   const quotedFromOut = quotedFrom ? quotedFrom.direction === "out" : undefined;
   const myReaction = toText((msg.raw as any)?.reactions?.mine);
   const theirReaction = toText((msg.raw as any)?.reactions?.theirs);
+  const editedAt = toText((msg.raw as any)?.edited_at);
+  const ageMs = Date.now() - new Date(msg.created_at).getTime();
+  const canEdit =
+    isOut &&
+    msg.msg_type === "text" &&
+    !msg.deleted_at &&
+    Boolean(msg.wa_message_id) &&
+    ageMs < 15 * 60 * 1000;
+
+
 
   const reactionBar = onReact ? (
     <Popover>
@@ -1712,6 +1752,11 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             <Reply className="mr-2 h-4 w-4" /> Responder
           </DropdownMenuItem>
         )}
+        {canEdit && onEdit && (
+          <DropdownMenuItem onClick={() => onEdit(msg)}>
+            <Pencil className="mr-2 h-4 w-4" /> Editar
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   ) : null;
@@ -1742,6 +1787,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
             {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
             <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
+              {editedAt && <span className="italic opacity-70">editada</span>}
               <span>{formatTime(msg.created_at)}</span>
               {isOut && <StatusTick status={msg.status} />}
             </div>
