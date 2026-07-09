@@ -481,7 +481,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const navigate = useNavigate();
   const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
-  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned">("all");
+  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned" | "archived">("all");
 
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
