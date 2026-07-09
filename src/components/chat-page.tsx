@@ -498,8 +498,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       ),
     );
     try {
-      await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
-      toast.success("Mensagem editada");
+      const result = await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
+      if ((result as any)?.whatsappUpdated === false) {
+        toast.warning("Editada só no histórico interno — o WhatsApp oficial não permite alterar mensagem já enviada.");
+      } else {
+        toast.success("Mensagem editada");
+      }
       setEditTarget(null);
     } catch (e: any) {
       toast.error(errorToText(e, "Falha ao editar"));
@@ -1719,7 +1723,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Só é possível editar textos enviados nos últimos 15 minutos. {editDraft.length}/4096
+              A edição fica registrada no histórico interno. A API oficial do WhatsApp não altera a mensagem já entregue. {editDraft.length}/4096
             </p>
           </div>
           <DialogFooter>
