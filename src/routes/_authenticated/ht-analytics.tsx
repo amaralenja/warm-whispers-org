@@ -1479,20 +1479,22 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
       }
     };
     for (const l of eligible) {
-      const st = stageMap[l.id] || mapCrm(l.crm_status);
+      const st = fakeSet.has(l.id) ? "fake" : (stageMap[l.id] || mapCrm(l.crm_status));
       (m[st] || m.novos).push(l);
     }
     for (const s of KANBAN_STAGES) {
       m[s.id].sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
     }
     return m;
-  }, [eligible, stageMap]);
+  }, [eligible, stageMap, fakeSet]);
 
   function moveTo(leadId: string, stage: string) {
+    setFake(leadId, stage === "fake");
     setStageMap((prev) => {
       const next = { ...prev, [leadId]: stage };
       saveKanbanMap(next);
       return next;
+
     });
   }
 
