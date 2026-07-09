@@ -1866,7 +1866,9 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                       key={c.id}
                       lead={leadObj as any}
                       ig={handle ? igMap.get(handle) : undefined}
+                      scheduledAt={c.lead ? (schedMap[c.lead.id] ?? null) : null}
                       dragging={draggingId === c.id}
+
                       onClick={c.lead ? () => setSelectedLead(c.lead!) : undefined}
                       onDragStart={(e) => {
                         e.dataTransfer.setData("text/x-closer-id", c.id);
