@@ -98,8 +98,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-function RootShell(props: { children?: ReactNode } | null) {
-  const children = props?.children ?? null;
+function RootShell(props?: { children?: ReactNode } | null) {
+  const children = props && typeof props === "object" ? props.children ?? null : null;
   return (
     <html lang="pt-BR">
       <head>
