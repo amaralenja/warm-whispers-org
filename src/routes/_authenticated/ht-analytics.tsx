@@ -1329,6 +1329,12 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
 
+  const igUsernames = useMemo(
+    () => (leads || []).map((l) => l.instagram || "").filter(Boolean),
+    [leads],
+  );
+  const igMap = useIgProfileMap(igUsernames);
+
   useEffect(() => { setStageMap(loadKanbanMap()); }, []);
 
   const utmOptions = useMemo(() => {
