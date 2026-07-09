@@ -304,6 +304,46 @@ export function HtLeadDetailDialog({
 
         {/* CONTEÚDO SCROLLÁVEL */}
         <div className="overflow-y-auto" style={{ maxHeight: "calc(90vh - 260px)" }}>
+          {onSchedule && (
+            <div className="px-6 py-4 border-b border-border/40 bg-emerald-500/5">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-emerald-300/90 mr-2">
+                  <Calendar className="h-3 w-3" />
+                  {scheduledAt ? "Call agendada" : "Agendar Call"}
+                </div>
+                <input
+                  type="datetime-local"
+                  value={schedDraft}
+                  onChange={(e) => setSchedDraft(e.target.value)}
+                  className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!schedDraft) return;
+                    const iso = new Date(schedDraft).toISOString();
+                    onSchedule(iso);
+                  }}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-md bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors"
+                >
+                  {scheduledAt ? "Atualizar" : "Agendar"}
+                </button>
+                {scheduledAt && (
+                  <button
+                    type="button"
+                    onClick={() => onSchedule(null)}
+                    className="text-[11px] px-3 py-1.5 rounded-md bg-muted/40 text-muted-foreground border border-border/60 hover:text-foreground transition-colors"
+                  >
+                    Desmarcar
+                  </button>
+                )}
+                <div className="ml-auto text-[10px] text-muted-foreground">
+                  Sincroniza automaticamente com o Kanban Closer.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-[1fr_1.1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40">
 
             {/* QUIZ */}
