@@ -425,7 +425,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
-  const editFn = useServerFn(editWhatsappMessage);
+  
   const listAllTagsFn = useServerFn(listCrmTags);
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
