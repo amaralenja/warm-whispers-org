@@ -1704,6 +1704,16 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
   const quotedFromOut = quotedFrom ? quotedFrom.direction === "out" : undefined;
   const myReaction = toText((msg.raw as any)?.reactions?.mine);
   const theirReaction = toText((msg.raw as any)?.reactions?.theirs);
+  const editedAt = toText((msg.raw as any)?.edited_at);
+  const ageMs = Date.now() - new Date(msg.created_at).getTime();
+  const canEdit =
+    isOut &&
+    msg.msg_type === "text" &&
+    !msg.deleted_at &&
+    Boolean(msg.wa_message_id) &&
+    ageMs < 15 * 60 * 1000;
+
+
 
   const reactionBar = onReact ? (
     <Popover>
