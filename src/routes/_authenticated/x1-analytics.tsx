@@ -93,12 +93,13 @@ function X1AnalyticsPage() {
   const [dateRange, setDateRange] = useState<DateRangeValue>(() => computeRange("hoje"));
   const [operacao, setOperacao] = useState<string>("all");
   const [channelId, setChannelId] = useState<string>("all");
+  const [vendedorId, setVendedorId] = useState<string>("all");
 
   const range = { from: dateRange.from ?? "", to: dateRange.to ?? dateRange.from ?? "" };
 
   const { data, isLoading, isFetching, refetch, error, dataUpdatedAt } = useQuery({
-    queryKey: ["x1-analytics", range.from, range.to, operacao, channelId],
-    queryFn: () => fetchFn({ data: { from: range.from, to: range.to, operacao, channelId } }),
+    queryKey: ["x1-analytics", range.from, range.to, operacao, channelId, vendedorId],
+    queryFn: () => fetchFn({ data: { from: range.from, to: range.to, operacao, channelId, vendedorId } }),
     staleTime: 0,
     refetchInterval: 30_000,
     refetchIntervalInBackground: true,
@@ -227,6 +228,25 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Vendedor
+              </Label>
+              <Select value={vendedorId} onValueChange={setVendedorId}>
+                <SelectTrigger className="h-9 w-48 bg-card">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os vendedores</SelectItem>
+                  {(payload?.vendedoresDisponiveis ?? []).map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {safeText(v.nome, "Vendedor")}
+                      {v.utm ? ` · ${v.utm}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={() => refetch()} disabled={isFetching} className="h-9">
               {isFetching ? "…" : "Atualizar"}
             </Button>
@@ -308,28 +328,24 @@ function X1AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <FunnelStep
-                label="Novos leads"
+                label={isHoje ? "Leads que chamaram hoje" : "Novos leads no período"}
                 value={fmtInt(safeNumber(k?.novosLeads))}
                 sub={`${fmtInt(safeNumber(k?.contatosUnicos))} contatos únicos`}
                 tone="blue"
               />
-              <FunnelArrow
-                pct={
-                  safeNumber(k?.novosLeads) > 0
-                    ? (safeNumber(k?.conversas) / safeNumber(k?.novosLeads)) * 100
-                    : 0
-                }
+              <FunnelStep
+                label={isHoje ? "Leads de outros dias" : "Leads antigos ativos"}
+                value={fmtInt(safeNumber(k?.leadsAntigosAtivos))}
+                sub="Conversas que já existiam"
+                tone="indigo"
               />
               <FunnelStep
                 label="Conversas ativas"
                 value={fmtInt(safeNumber(k?.conversas))}
                 sub={`${fmtInt(safeNumber(k?.msgsOut))} msgs enviadas`}
                 tone="violet"
-              />
-              <FunnelArrow
-                pct={safeNumber(k?.conversao) * 100}
               />
               <FunnelStep
                 label="Vendas fechadas"
@@ -338,6 +354,20 @@ function X1AnalyticsPage() {
                 tone="emerald"
                 highlight
               />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-[11px] text-muted-foreground">
+              <span>
+                Total de leads no funil:{" "}
+                <span className="font-semibold text-foreground">
+                  {fmtInt(safeNumber(k?.novosLeads) + safeNumber(k?.leadsAntigosAtivos))}
+                </span>
+              </span>
+              <span>
+                Taxa novos → venda:{" "}
+                <span className="font-semibold text-foreground">
+                  {fmtPct(safeNumber(k?.conversao))}
+                </span>
+              </span>
             </div>
           </CardContent>
         </Card>
