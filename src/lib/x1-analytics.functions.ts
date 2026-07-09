@@ -850,6 +850,32 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       return true;
     });
 
+    // Filtro por vendedor selecionado (admin)
+    if (vendorFilterId) {
+      const selVendor = vendedorById.get(vendorFilterId);
+      const selUtm = normalizeUtm(selVendor?.utm);
+      const vendorConvIds = new Set(
+        allConversations
+          .filter((c: any) => numericId(c?.assigned_vendor_id) === vendorFilterId)
+          .map((c: any) => safeString(c?.id).trim())
+          .filter(Boolean),
+      );
+      conversations = conversations.filter((c: any) => vendorConvIds.has(safeString(c?.id).trim()));
+      novosLeadsRows = novosLeadsRows.filter((c: any) => numericId(c?.assigned_vendor_id) === vendorFilterId);
+      crmLeadsRows = crmLeadsRows.filter((lead: any) => (selVendor ? vendedorMatchesLead(selVendor, lead) : false));
+      msgsScoped = msgsScoped.filter((m: any) => {
+        const convId = safeString(m?.conversation_id).trim();
+        if (!vendorConvIds.has(convId)) return false;
+        if (safeString(m?.direction) === "out") {
+          const explicit = messageVendorId(m);
+          if (explicit && explicit !== vendorFilterId) return false;
+        }
+        return true;
+      });
+      vendasScoped = vendasScoped.filter((v: any) => selUtm && normalizeUtm(v?.UTM) === selUtm);
+    }
+
+
     const allLeadKeys = new Set<string>();
     const vendorLeadKeys = new Map<string, Set<string>>();
     const keyForVendor = (v: any) => `id:${v?.id ?? "?"}|utm:${v?.utm ?? "?"}`;
