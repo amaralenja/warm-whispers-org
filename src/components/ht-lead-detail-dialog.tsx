@@ -85,13 +85,16 @@ function fmtDate(iso?: string | null) {
 }
 
 export function HtLeadDetailDialog({
-  lead, role, open, onOpenChange,
+  lead, role, open, onOpenChange, scheduledAt, onSchedule,
 }: {
   lead: LeadLike | null;
   role: Role;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  scheduledAt?: string | null;
+  onSchedule?: (iso: string | null) => void;
 }) {
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
