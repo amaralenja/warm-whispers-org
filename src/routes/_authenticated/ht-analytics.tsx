@@ -1417,6 +1417,39 @@ function useFakeSet(): [Set<string>, (leadId: string, fake: boolean) => void] {
   return [set, toggle];
 }
 
+const SCHED_LS_KEY = "ht_kanban_scheduled_v1";
+function loadSchedMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(SCHED_LS_KEY) || "{}"); } catch { return {}; }
+}
+function saveSchedMap(m: Record<string, string>) {
+  try {
+    localStorage.setItem(SCHED_LS_KEY, JSON.stringify(m));
+    window.dispatchEvent(new Event("ht-sched-updated"));
+  } catch {}
+}
+function useSchedMap(): [Record<string, string>, (leadId: string, iso: string | null) => void] {
+  const [map, setMap] = useState<Record<string, string>>(() => loadSchedMap());
+  useEffect(() => {
+    const sync = () => setMap(loadSchedMap());
+    window.addEventListener("storage", sync);
+    window.addEventListener("ht-sched-updated", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("ht-sched-updated", sync);
+    };
+  }, []);
+  const set = (leadId: string, iso: string | null) => {
+    setMap((prev) => {
+      const next = { ...prev };
+      if (iso) next[leadId] = iso; else delete next[leadId];
+      saveSchedMap(next);
+      return next;
+    });
+  };
+  return [map, set];
+
+
 
 function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
