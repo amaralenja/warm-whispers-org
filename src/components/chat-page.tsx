@@ -31,7 +31,7 @@ import {
   ArrowUpDown,
   GripVertical,
   Columns3,
-  Pencil,
+  
 } from "lucide-react";
 import {
   DndContext,
@@ -82,7 +82,7 @@ import {
   updateConversationTags,
   updateConversationNotes,
   reactToWhatsappMessage,
-  editWhatsappMessage,
+  
   setConversationArchived,
 } from "@/lib/whatsapp-chat.functions";
 import {
