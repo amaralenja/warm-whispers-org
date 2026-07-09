@@ -51,9 +51,14 @@ export const Route = createFileRoute("/api/public/ht-quiz/submit")({
           const b = body as Record<string, unknown>;
 
           const respostas = (b.respostas && typeof b.respostas === "object") ? b.respostas : null;
+          const session_id = pickStr(b.session_id ?? b.sessionId);
+          const rawStatus = pickStr(b.status);
+          const status = rawStatus === "completed" ? "completed" : "partial";
 
-          const insert = {
+          const insert: Record<string, unknown> = {
             token_id: (tok as any).id as string,
+            session_id,
+            status,
             nome: pickStr(b.nome ?? b.name),
             email: pickStr(b.email),
             whatsapp: pickStr(b.whatsapp ?? b.phone ?? b.telefone),
@@ -68,15 +73,31 @@ export const Route = createFileRoute("/api/public/ht-quiz/submit")({
             gclid: pickStr(b.gclid),
             respostas,
             raw: b,
+            updated_at: new Date().toISOString(),
           };
 
-          const { data: sub, error: insErr } = await supabaseAdmin
-            .from("ht_quiz_submissions" as any)
-            .insert(insert)
-            .select("id, received_at")
-            .single();
+          // Se veio session_id: upsert por (token_id, session_id) — nunca duplica o mesmo lead
+          // e vai atualizando parcialmente até o completed.
+          let sub: any = null;
+          let insErr: any = null;
+          if (session_id) {
+            const res = await supabaseAdmin
+              .from("ht_quiz_submissions" as any)
+              .upsert(insert, { onConflict: "token_id,session_id" })
+              .select("id, received_at")
+              .single();
+            sub = res.data; insErr = res.error;
+          } else {
+            const res = await supabaseAdmin
+              .from("ht_quiz_submissions" as any)
+              .insert(insert)
+              .select("id, received_at")
+              .single();
+            sub = res.data; insErr = res.error;
+          }
 
           if (insErr) return json(500, { ok: false, error: "Erro ao salvar submissão: " + insErr.message });
+
 
           // fire-and-forget update last_used_at
           void supabaseAdmin
