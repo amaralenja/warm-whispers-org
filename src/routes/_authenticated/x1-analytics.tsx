@@ -328,28 +328,24 @@ function X1AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <FunnelStep
-                label="Novos leads"
+                label={isHoje ? "Leads que chamaram hoje" : "Novos leads no período"}
                 value={fmtInt(safeNumber(k?.novosLeads))}
                 sub={`${fmtInt(safeNumber(k?.contatosUnicos))} contatos únicos`}
                 tone="blue"
               />
-              <FunnelArrow
-                pct={
-                  safeNumber(k?.novosLeads) > 0
-                    ? (safeNumber(k?.conversas) / safeNumber(k?.novosLeads)) * 100
-                    : 0
-                }
+              <FunnelStep
+                label={isHoje ? "Leads de outros dias" : "Leads antigos ativos"}
+                value={fmtInt(safeNumber(k?.leadsAntigosAtivos))}
+                sub="Conversas que já existiam"
+                tone="indigo"
               />
               <FunnelStep
                 label="Conversas ativas"
                 value={fmtInt(safeNumber(k?.conversas))}
                 sub={`${fmtInt(safeNumber(k?.msgsOut))} msgs enviadas`}
                 tone="violet"
-              />
-              <FunnelArrow
-                pct={safeNumber(k?.conversao) * 100}
               />
               <FunnelStep
                 label="Vendas fechadas"
@@ -358,6 +354,20 @@ function X1AnalyticsPage() {
                 tone="emerald"
                 highlight
               />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-[11px] text-muted-foreground">
+              <span>
+                Total de leads no funil:{" "}
+                <span className="font-semibold text-foreground">
+                  {fmtInt(safeNumber(k?.novosLeads) + safeNumber(k?.leadsAntigosAtivos))}
+                </span>
+              </span>
+              <span>
+                Taxa novos → venda:{" "}
+                <span className="font-semibold text-foreground">
+                  {fmtPct(safeNumber(k?.conversao))}
+                </span>
+              </span>
             </div>
           </CardContent>
         </Card>
