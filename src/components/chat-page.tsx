@@ -1109,7 +1109,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 { id: "all", label: "Todos", count: conversationList.length },
                 { id: "unread", label: "Não visualizados", count: unreadTotal },
                 { id: "flow", label: "Com fluxo", count: activeFlowConvIds.size },
-                { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null).length },
+                { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null && !(c as any).archived_at).length },
+                { id: "archived", label: "Arquivadas", count: archivedTotal },
               ] as const).map((f) => {
                 const active = listFilter === f.id;
                 return (
