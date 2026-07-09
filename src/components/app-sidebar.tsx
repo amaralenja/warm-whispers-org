@@ -24,6 +24,7 @@ import {
   BookOpenText,
   CheckSquare,
   BarChart3,
+  KeyRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -73,6 +74,7 @@ const highTicketItems: Item[] = [
   { title: "Analytics", url: "/ht-analytics", icon: LineChart },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
+  { title: "API", url: "/ht-api", icon: KeyRound },
 ];
 
 const URL_TO_KEY: Record<string, string> = {
@@ -90,6 +92,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
   "/ht-analytics": "ht-analytics",
+  "/ht-api": "ht-api",
   "/sops": "sops",
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",

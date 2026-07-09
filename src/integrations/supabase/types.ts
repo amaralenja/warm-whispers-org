@@ -555,6 +555,39 @@ export type Database = {
           },
         ]
       }
+      ht_api_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          token_hash: string
+          token_prefix: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+          token_hash: string
+          token_prefix: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          token_hash?: string
+          token_prefix?: string
+        }
+        Relationships: []
+      }
       ht_assets: {
         Row: {
           categoria: string | null
@@ -671,6 +704,74 @@ export type Database = {
           valor?: number | null
         }
         Relationships: []
+      }
+      ht_quiz_submissions: {
+        Row: {
+          email: string | null
+          fbc: string | null
+          fbclid: string | null
+          fbp: string | null
+          gclid: string | null
+          id: string
+          instagram: string | null
+          nome: string | null
+          raw: Json
+          received_at: string
+          respostas: Json | null
+          token_id: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          email?: string | null
+          fbc?: string | null
+          fbclid?: string | null
+          fbp?: string | null
+          gclid?: string | null
+          id?: string
+          instagram?: string | null
+          nome?: string | null
+          raw?: Json
+          received_at?: string
+          respostas?: Json | null
+          token_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          email?: string | null
+          fbc?: string | null
+          fbclid?: string | null
+          fbp?: string | null
+          gclid?: string | null
+          id?: string
+          instagram?: string | null
+          nome?: string | null
+          raw?: Json
+          received_at?: string
+          respostas?: Json | null
+          token_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ht_quiz_submissions_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "ht_api_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ht_reunioes: {
         Row: {

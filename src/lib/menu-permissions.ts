@@ -33,6 +33,7 @@ export const MENU_TREE: MenuNode[] = [
       { key: "calendar", title: "Calendário Calls", url: "/calendar" },
       { key: "quiz", title: "Quiz", url: "/quiz" },
       { key: "meta-ads", title: "Facebook Ads", url: "/meta-ads" },
+      { key: "ht-api", title: "API", url: "/ht-api" },
     ],
   },
 
