@@ -1773,14 +1773,18 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
     for (const c of filtered) {
       const quizId = c.lead?.id;
       const isFake = quizId ? fakeSet.has(quizId) : false;
-      const st = isFake ? "fake" : (stageMap[c.id] || c.defaultStage);
+      const isScheduled = quizId ? !!schedMap[quizId] : false;
+      const st = isFake
+        ? "fake"
+        : (stageMap[c.id] || (isScheduled ? "agendado" : c.defaultStage));
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap, fakeSet]);
+  }, [filtered, stageMap, fakeSet, schedMap]);
+
 
   function moveTo(id: string, stage: string) {
     const card = filtered.find((c) => c.id === id);
