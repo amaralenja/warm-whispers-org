@@ -1742,7 +1742,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
             </div>
           );
         })}
-      </div>
+      </DragScroll>
       <HtLeadDetailDialog
         lead={selectedLead}
         role="closer"
