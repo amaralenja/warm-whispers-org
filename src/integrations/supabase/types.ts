@@ -718,7 +718,10 @@ export type Database = {
           raw: Json
           received_at: string
           respostas: Json | null
+          session_id: string | null
+          status: string
           token_id: string | null
+          updated_at: string
           utm_campaign: string | null
           utm_content: string | null
           utm_medium: string | null
@@ -737,7 +740,10 @@ export type Database = {
           raw?: Json
           received_at?: string
           respostas?: Json | null
+          session_id?: string | null
+          status?: string
           token_id?: string | null
+          updated_at?: string
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
@@ -756,7 +762,10 @@ export type Database = {
           raw?: Json
           received_at?: string
           respostas?: Json | null
+          session_id?: string | null
+          status?: string
           token_id?: string | null
+          updated_at?: string
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null

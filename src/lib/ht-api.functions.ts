@@ -72,9 +72,10 @@ export const listHtQuizSubmissions = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("ht_quiz_submissions" as any)
-      .select("id, received_at, nome, email, whatsapp, utm_source, utm_campaign")
-      .order("received_at", { ascending: false })
+      .select("id, received_at, updated_at, status, nome, email, whatsapp, utm_source, utm_campaign")
+      .order("updated_at", { ascending: false })
       .limit(50);
+
     if (error) throw new Error(error.message);
     return { submissions: (data ?? []) as Array<any> };
   });
