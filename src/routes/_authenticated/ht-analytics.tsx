@@ -541,9 +541,11 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           agenda={agenda}
           reunioes={reunioes}
           vendas={vendas}
+          htLeads={htLeads}
           grupo={funilGrupo}
           setGrupo={setFunilGrupo}
         />
+
 
         {/* Onde os leads abandonam */}
         <section>
@@ -1102,28 +1104,85 @@ const STATUS_NOSHOW = ["no_show", "no-show", "noshow"];
 const norm = (s: string | null | undefined) => (s ?? "").toString().trim().toLowerCase();
 
 function FunilSection({
-  leads, grupo, setGrupo,
+  leads, agenda, vendas, htLeads, grupo, setGrupo,
 }: {
-  leads: QLead[]; agenda: any[]; reunioes: any[]; vendas: any[];
+  leads: QLead[]; agenda: any[]; reunioes: any[]; vendas: any[]; htLeads: any[];
   grupo: FunilGrupo; setGrupo: (g: FunilGrupo) => void;
 }) {
+  const normPhone = (s: any) => String(s ?? "").replace(/\D/g, "").slice(-11);
+
   const metricasPorGrupo = useMemo(() => {
     return FUNIL_GRUPOS.map((g) => {
       const set = new Set(g.letras);
-      // "Formulário finalizado" no funil = lead que chegou até a atribuição de caixa
-      // (mesma base da Lista de Leads quando filtrada por Caixa). Não exigimos
-      // whatsapp/comprometimento aqui pra bater com o número que o usuário vê na lista.
-      const doGrupo = leads.filter((l) => {
-        const c = (l.caixa_letra ?? "").toUpperCase();
-        return set.has(c);
-      });
+      const doGrupo = leads.filter((l) => set.has((l.caixa_letra ?? "").toUpperCase()));
       const finalizados = doGrupo.length;
+      const phones = new Set(doGrupo.map((l) => normPhone(l.whatsapp)).filter(Boolean));
 
-      const withStatus = doGrupo.filter((l) => l.crm_status);
-      const agendados = withStatus.filter((l) => STATUS_AGENDADO.includes(norm(l.crm_status))).length;
-      const realizadas = withStatus.filter((l) => STATUS_CALL_FEITA.includes(norm(l.crm_status))).length;
-      const fechamentos = withStatus.filter((l) => STATUS_FECHADO.includes(norm(l.crm_status))).length;
-      const noShow = withStatus.filter((l) => STATUS_NOSHOW.includes(norm(l.crm_status))).length;
+      // Agendados: qualquer sinal de agendamento (crm, ht_leads.data_agendamento, agenda_leads)
+      const agendadosPhones = new Set<string>();
+      for (const l of doGrupo) {
+        if (l.crm_data_agendamento || STATUS_AGENDADO.includes(norm(l.crm_status))) {
+          const p = normPhone(l.whatsapp);
+          if (p) agendadosPhones.add(p);
+        }
+      }
+      for (const a of agenda) {
+        const p = normPhone(a.lead_telefone);
+        if (p && phones.has(p)) agendadosPhones.add(p);
+      }
+      for (const l of htLeads) {
+        const p = normPhone(l.telefone);
+        if (p && phones.has(p) && l.data_agendamento) agendadosPhones.add(p);
+      }
+
+      // Calls realizadas
+      const realizadasPhones = new Set<string>();
+      for (const l of doGrupo) {
+        if (STATUS_CALL_FEITA.includes(norm(l.crm_status))) {
+          const p = normPhone(l.whatsapp);
+          if (p) realizadasPhones.add(p);
+        }
+      }
+      for (const a of agenda) {
+        const p = normPhone(a.lead_telefone);
+        if (p && phones.has(p) && a.concluido) realizadasPhones.add(p);
+      }
+      for (const l of htLeads) {
+        const p = normPhone(l.telefone);
+        if (p && phones.has(p) && ["followup", "fechado"].includes(String(l.status ?? "").toLowerCase())) {
+          realizadasPhones.add(p);
+        }
+      }
+
+      // Fechamentos
+      const fechamentosPhones = new Set<string>();
+      for (const l of doGrupo) {
+        if (STATUS_FECHADO.includes(norm(l.crm_status))) {
+          const p = normPhone(l.whatsapp);
+          if (p) fechamentosPhones.add(p);
+        }
+      }
+      for (const l of htLeads) {
+        const p = normPhone(l.telefone);
+        if (p && phones.has(p) && String(l.status ?? "").toLowerCase() === "fechado") {
+          fechamentosPhones.add(p);
+        }
+      }
+      // ht_vendas: cliente costuma ser nome; ignoramos no fechamento por grupo (evita ruído)
+
+      // No-show
+      const noShowPhones = new Set<string>();
+      for (const l of doGrupo) {
+        if (STATUS_NOSHOW.includes(norm(l.crm_status))) {
+          const p = normPhone(l.whatsapp);
+          if (p) noShowPhones.add(p);
+        }
+      }
+
+      const agendados = agendadosPhones.size;
+      const realizadas = realizadasPhones.size;
+      const fechamentos = fechamentosPhones.size;
+      const noShow = noShowPhones.size;
       const naoFechou = Math.max(0, realizadas - fechamentos);
 
       const taxaAgend = finalizados > 0 ? (agendados / finalizados) * 100 : 0;
@@ -1134,7 +1193,8 @@ function FunilSection({
       return { g, finalizados, agendados, realizadas, fechamentos, noShow, naoFechou,
         taxaAgend, showUp, taxaFech, taxaNoShow };
     });
-  }, [leads]);
+  }, [leads, agenda, htLeads, vendas]);
+
 
   const atual = metricasPorGrupo.find((m) => m.g.id === grupo)!;
 
