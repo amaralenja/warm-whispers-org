@@ -2820,8 +2820,103 @@ function ConversationActionsMenu({
         >
           Liberar (sem vendedor)
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(e) => { e.preventDefault(); doArchive(); }}
+          className="rounded-xl"
+        >
+          {archived ? (<><ArchiveRestore className="mr-2 h-4 w-4" /> Desarquivar conversa</>) : (<><Archive className="mr-2 h-4 w-4" /> Arquivar conversa</>)}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function ConversationRowContextMenu({
+  conversationId,
+  channelId,
+  currentVendorId,
+  archived,
+  children,
+}: {
+  conversationId: string;
+  channelId: string;
+  currentVendorId: number | null;
+  archived: boolean;
+  children: React.ReactNode;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const listVendorsFn = useServerFn(listVendorsForChannel);
+  const transferFn = useServerFn(transferConversation);
+  const archiveFn = useServerFn(setConversationArchived);
+
+  const { data: vendors = [] } = useQuery({
+    queryKey: ["chat-transfer-vendors", channelId],
+    queryFn: () => listVendorsFn({ data: { channelId } }),
+    enabled: open && !!channelId,
+    staleTime: 30_000,
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+
+  const doArchive = async () => {
+    try {
+      await archiveFn({ data: { conversationId, archived: !archived } });
+      toast.success(archived ? "Conversa desarquivada" : "Conversa arquivada");
+      invalidate();
+    } catch (e: any) {
+      toast.error(`Falha: ${errorToText(e, "erro")}`);
+    }
+  };
+  const doTransfer = async (vendorId: number | null) => {
+    try {
+      await transferFn({ data: { conversationId, vendorId } });
+      toast.success(vendorId ? "Lead transferido" : "Lead liberado");
+      invalidate();
+    } catch (e: any) {
+      toast.error(`Falha ao transferir: ${errorToText(e, "erro")}`);
+    }
+  };
+
+  return (
+    <ContextMenu onOpenChange={setOpen}>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-60 rounded-2xl border-chat-line bg-popover">
+        <ContextMenuItem onSelect={() => doArchive()} className="rounded-xl">
+          {archived ? (<><ArchiveRestore className="mr-2 h-4 w-4" /> Desarquivar</>) : (<><Archive className="mr-2 h-4 w-4" /> Arquivar</>)}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="rounded-xl">
+            <UserCog className="mr-2 h-4 w-4" /> Transferir para
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-56 rounded-2xl border-chat-line bg-popover">
+            {!Array.isArray(vendors) || vendors.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum vendedor.</div>
+            ) : (
+              (vendors as Array<{ id: number; nome: string }>).map((v) => (
+                <ContextMenuItem
+                  key={v.id}
+                  disabled={v.id === currentVendorId}
+                  onSelect={() => doTransfer(v.id)}
+                  className="rounded-xl"
+                >
+                  {toText(v.nome)}
+                  {v.id === currentVendorId && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
+                </ContextMenuItem>
+              ))
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onSelect={() => doTransfer(null)}
+              className="rounded-xl text-destructive focus:text-destructive"
+            >
+              Liberar (sem vendedor)
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
