@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listInstagramLeads } from "@/lib/instagram.functions";
+import { enrichInstagramLeads } from "@/lib/instagram.functions";
 import { Crown, Wallet, Instagram as InstagramIcon, MessageCircle } from "lucide-react";
 
 export type KanbanLeadLike = {
@@ -44,7 +44,7 @@ function cleanHandle(u?: string | null): string {
 
 /** Puxa o cache do banco (mesmo cache da aba Quiz) para os @ visíveis. Nunca chama Bright Data. */
 export function useIgProfileMap(usernames: string[]): Map<string, IgLite> {
-  const listFn = useServerFn(listInstagramLeads);
+  const listFn = useServerFn(enrichInstagramLeads);
   const [map, setMap] = useState<Map<string, IgLite>>(new Map());
 
   const key = useMemo(() => {

@@ -1309,6 +1309,7 @@ const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
   { id: "no_grupo", label: "1-3k no Grupo" },
   { id: "agendado", label: "Agendado", accent: "text-emerald-400" },
   { id: "no_show", label: "No-show", accent: "text-red-400" },
+  { id: "fake", label: "Lead Fake", accent: "text-fuchsia-400" },
   { id: "descartado", label: "Descartado", accent: "text-muted-foreground" },
 ];
 
@@ -1507,6 +1508,7 @@ const CLOSER_STAGES: { id: string; label: string; accent?: string }[] = [
   { id: "remarcada", label: "Remarcada", accent: "text-amber-400" },
   { id: "sinal", label: "Sinal Recebido", accent: "text-violet-400" },
   { id: "fechado", label: "Fechado (Ganho)", accent: "text-emerald-400" },
+  { id: "fake", label: "Lead Fake", accent: "text-fuchsia-400" },
   { id: "descartado", label: "Descartado", accent: "text-red-400" },
 ];
 
