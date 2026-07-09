@@ -26,6 +26,8 @@ import {
   BarChart3,
   KeyRound,
   Settings2,
+  Kanban,
+  Target,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -73,6 +75,8 @@ const operacaoX1Items: Item[] = [
 
 const highTicketItems: Item[] = [
   { title: "Analytics", url: "/ht-analytics", icon: LineChart },
+  { title: "Kanban SDR", url: "/ht-kanban-sdr", icon: Kanban },
+  { title: "Kanban Closer", url: "/ht-kanban-closer", icon: Target },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
   { title: "API", url: "/ht-api", icon: KeyRound },
@@ -93,6 +97,8 @@ const URL_TO_KEY: Record<string, string> = {
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
   "/ht-analytics": "ht-analytics",
+  "/ht-kanban-sdr": "ht-kanban-sdr",
+  "/ht-kanban-closer": "ht-kanban-closer",
   "/ht-api": "ht-api",
   "/sops": "sops",
   "/tasks": "tasks",

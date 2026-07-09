@@ -18,8 +18,10 @@ import { HTContasReceber } from "@/components/ht-contas-receber";
 import { CalendarPage } from "@/routes/_authenticated/calendar";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
-  component: HTAnalytics,
+  component: () => <HTAnalytics />,
 });
+
+type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads";
 
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
@@ -84,7 +86,7 @@ const SCORE_GROUPS: { id: string; label: string; letras: string[] }[] = [
   { id: "minicurso", label: "Minicurso (A)", letras: ["A"] },
 ];
 
-function HTAnalytics() {
+export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab } = {}) {
   const [period, setPeriod] = useState<Period>("30d");
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ function HTAnalytics() {
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
-  const [tab, setTab] = useState<"dashboard" | "kanban" | "closer" | "receber" | "leads">("dashboard");
+  const [tab, setTab] = useState<HTTab>(initialTab);
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -348,8 +350,6 @@ function HTAnalytics() {
         <div className="px-6 md:px-10 flex items-center gap-1">
           {([
             { id: "dashboard", label: "Dashboard" },
-            { id: "kanban", label: "Kanban SDR" },
-            { id: "closer", label: "Kanban Closer" },
             { id: "receber", label: "Contas a Receber" },
             { id: "leads", label: "Lista de Leads" },
           ] as const).map((t) => (
