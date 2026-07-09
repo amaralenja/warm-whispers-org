@@ -541,9 +541,11 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           agenda={agenda}
           reunioes={reunioes}
           vendas={vendas}
+          htLeads={htLeads}
           grupo={funilGrupo}
           setGrupo={setFunilGrupo}
         />
+
 
         {/* Onde os leads abandonam */}
         <section>
