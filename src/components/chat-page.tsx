@@ -1787,6 +1787,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
             {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
             <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
+              {editedAt && <span className="italic opacity-70">editada</span>}
               <span>{formatTime(msg.created_at)}</span>
               {isOut && <StatusTick status={msg.status} />}
             </div>
