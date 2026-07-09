@@ -1527,7 +1527,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
     }
 
     return m;
-  }, [eligible, stageMap, fakeSet]);
+  }, [eligible, stageMap, fakeSet, schedMap]);
 
   function moveTo(leadId: string, stage: string) {
     setFake(leadId, stage === "fake");
