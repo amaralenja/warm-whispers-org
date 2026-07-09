@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listInstagramLeads } from "@/lib/instagram.functions";
+import { enrichInstagramLeads } from "@/lib/instagram.functions";
 import { Crown, Wallet, Instagram as InstagramIcon, MessageCircle } from "lucide-react";
 
 export type KanbanLeadLike = {
