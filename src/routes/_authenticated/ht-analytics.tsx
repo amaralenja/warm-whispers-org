@@ -1914,7 +1914,10 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         role="closer"
         open={!!selectedLead}
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+        scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
+        onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
       />
+
     </div>
   );
 }
