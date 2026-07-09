@@ -81,7 +81,19 @@ import {
   updateConversationTags,
   updateConversationNotes,
   reactToWhatsappMessage,
+  setConversationArchived,
 } from "@/lib/whatsapp-chat.functions";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Archive, ArchiveRestore } from "lucide-react";
 import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
