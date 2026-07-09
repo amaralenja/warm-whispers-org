@@ -1433,7 +1433,8 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10">
+      <DragScroll className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10 cursor-grab active:cursor-grabbing select-none">
+
         {KANBAN_STAGES.map((s) => (
           <div key={s.id}
             onDragOver={(e) => e.preventDefault()}
