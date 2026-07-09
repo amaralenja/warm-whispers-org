@@ -228,6 +228,25 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Vendedor
+              </Label>
+              <Select value={vendedorId} onValueChange={setVendedorId}>
+                <SelectTrigger className="h-9 w-48 bg-card">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os vendedores</SelectItem>
+                  {(payload?.vendedoresDisponiveis ?? []).map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {safeText(v.nome, "Vendedor")}
+                      {v.utm ? ` · ${v.utm}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={() => refetch()} disabled={isFetching} className="h-9">
               {isFetching ? "…" : "Atualizar"}
             </Button>
