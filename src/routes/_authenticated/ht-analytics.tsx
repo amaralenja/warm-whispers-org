@@ -1376,6 +1376,7 @@ const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
 ];
 
 const KANBAN_LS_KEY = "ht_kanban_sdr_v1";
+const FAKE_LS_KEY = "ht_kanban_fake_v1";
 
 function loadKanbanMap(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -1384,6 +1385,38 @@ function loadKanbanMap(): Record<string, string> {
 function saveKanbanMap(m: Record<string, string>) {
   try { localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m)); } catch {}
 }
+function loadFakeSet(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try { return new Set(JSON.parse(localStorage.getItem(FAKE_LS_KEY) || "[]")); } catch { return new Set(); }
+}
+function saveFakeSet(s: Set<string>) {
+  try {
+    localStorage.setItem(FAKE_LS_KEY, JSON.stringify(Array.from(s)));
+    window.dispatchEvent(new Event("ht-fake-updated"));
+  } catch {}
+}
+function useFakeSet(): [Set<string>, (leadId: string, fake: boolean) => void] {
+  const [set, setSet] = useState<Set<string>>(() => loadFakeSet());
+  useEffect(() => {
+    const sync = () => setSet(loadFakeSet());
+    window.addEventListener("storage", sync);
+    window.addEventListener("ht-fake-updated", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("ht-fake-updated", sync);
+    };
+  }, []);
+  const toggle = (leadId: string, fake: boolean) => {
+    setSet((prev) => {
+      const next = new Set(prev);
+      if (fake) next.add(leadId); else next.delete(leadId);
+      saveFakeSet(next);
+      return next;
+    });
+  };
+  return [set, toggle];
+}
+
 
 function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
@@ -1392,6 +1425,11 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
+  const [fakeSet, setFake] = useFakeSet();
+
+
+
+
 
   const igUsernames = useMemo(
     () => (leads || []).map((l) => l.instagram || "").filter(Boolean),
@@ -1441,20 +1479,22 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
       }
     };
     for (const l of eligible) {
-      const st = stageMap[l.id] || mapCrm(l.crm_status);
+      const st = fakeSet.has(l.id) ? "fake" : (stageMap[l.id] || mapCrm(l.crm_status));
       (m[st] || m.novos).push(l);
     }
     for (const s of KANBAN_STAGES) {
       m[s.id].sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
     }
     return m;
-  }, [eligible, stageMap]);
+  }, [eligible, stageMap, fakeSet]);
 
   function moveTo(leadId: string, stage: string) {
+    setFake(leadId, stage === "fake");
     setStageMap((prev) => {
       const next = { ...prev, [leadId]: stage };
       saveKanbanMap(next);
       return next;
+
     });
   }
 
@@ -1605,6 +1645,8 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
+  const [fakeSet, setFake] = useFakeSet();
+
 
   const igUsernames = useMemo(
     () => (leads || []).map((l) => l.instagram || "").filter(Boolean),
@@ -1680,22 +1722,28 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
     const m: Record<string, CloserCard[]> = {};
     for (const s of CLOSER_STAGES) m[s.id] = [];
     for (const c of filtered) {
-      const st = stageMap[c.id] || c.defaultStage;
+      const quizId = c.lead?.id;
+      const isFake = quizId ? fakeSet.has(quizId) : false;
+      const st = isFake ? "fake" : (stageMap[c.id] || c.defaultStage);
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap]);
+  }, [filtered, stageMap, fakeSet]);
 
   function moveTo(id: string, stage: string) {
+    const card = filtered.find((c) => c.id === id);
+    const quizId = card?.lead?.id;
+    if (quizId) setFake(quizId, stage === "fake");
     setStageMap((prev) => {
       const next = { ...prev, [id]: stage };
       saveCloserMap(next);
       return next;
     });
   }
+
 
   return (
     <div className="px-6 md:px-10 py-6 space-y-4">
