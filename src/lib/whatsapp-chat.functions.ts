@@ -1506,14 +1506,15 @@ export const editWhatsappMessage = createServerFn({ method: "POST" })
     const ch = await findChannel(channelId, db);
     if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
 
-    const toNormalized = normalizeBrWhatsappNumber(String(contactWaId ?? ""));
+    // Meta Cloud API — edit text message. Payload deve conter APENAS
+    // messaging_product, message_id, type e text. Incluir "to"/"recipient_type"
+    // faz o Meta interpretar como novo envio e a edição não aparece no WhatsApp.
+    void contactWaId;
     const editBody = {
       messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: toNormalized,
-      type: "text",
       message_id: targetWamid,
-      text: { body: newText },
+      type: "text",
+      text: { body: newText, preview_url: false },
     };
 
     try {

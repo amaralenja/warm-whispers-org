@@ -471,14 +471,25 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     }
   };
 
-  const handleEdit = async (m: Msg) => {
+  const [editTarget, setEditTarget] = useState<Msg | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const handleEdit = (m: Msg) => {
     if (!active) return;
+    setEditTarget(m);
+    setEditDraft(m.text_body ?? "");
+  };
+
+  const submitEdit = async () => {
+    if (!active || !editTarget) return;
+    const m = editTarget;
     const current = m.text_body ?? "";
-    const next = typeof window !== "undefined" ? window.prompt("Editar mensagem (até 15min após envio):", current) : null;
-    if (next === null) return;
-    const trimmed = next.trim();
-    if (!trimmed || trimmed === current) return;
+    const trimmed = editDraft.trim();
+    if (!trimmed) { toast.error("Texto não pode ficar vazio"); return; }
+    if (trimmed === current) { setEditTarget(null); return; }
     const prev = m.text_body;
+    setEditSaving(true);
     qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
       asArray<Msg>(old).map((x) =>
         x.id === m.id
@@ -489,12 +500,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     try {
       await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
       toast.success("Mensagem editada");
+      setEditTarget(null);
     } catch (e: any) {
       toast.error(errorToText(e, "Falha ao editar"));
       qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
         asArray<Msg>(old).map((x) => (x.id === m.id ? { ...x, text_body: prev } : x)),
       );
       qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -1683,6 +1697,35 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
             <Button onClick={confirmPreviewSend} disabled={sendMut.isPending}>
               {sendMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
               Enviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o && !editSaving) setEditTarget(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar mensagem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={5}
+              maxLength={4096}
+              placeholder="Nova mensagem"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submitEdit(); }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Só é possível editar textos enviados nos últimos 15 minutos. {editDraft.length}/4096
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditTarget(null)} disabled={editSaving}>Cancelar</Button>
+            <Button onClick={submitEdit} disabled={editSaving || !editDraft.trim()}>
+              {editSaving ? "Salvando…" : "Salvar edição"}
             </Button>
           </DialogFooter>
         </DialogContent>
