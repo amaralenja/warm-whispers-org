@@ -1382,6 +1382,27 @@ export type Database = {
         }
         Relationships: []
       }
+      uaz_config: {
+        Row: {
+          id: number
+          instance_token: string | null
+          server_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          instance_token?: string | null
+          server_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          instance_token?: string | null
+          server_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vendas: {
         Row: {
           Campanha: string | null
