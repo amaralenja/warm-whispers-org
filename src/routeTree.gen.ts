@@ -35,6 +35,7 @@ import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenti
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 import { Route as ApiPublicNotificationAiReplyRouteImport } from './routes/api/public/notification-ai/reply'
 import { Route as ApiPublicNotificationAiContinueRouteImport } from './routes/api/public/notification-ai/continue'
+import { Route as ApiPublicHtQuizSubmitRouteImport } from './routes/api/public/ht-quiz/submit'
 import { Route as ApiPublicHooksTaskDueCheckRouteImport } from './routes/api/public/hooks/task-due-check'
 import { Route as ApiPublicHooksSendCallAnalyticsRouteImport } from './routes/api/public/hooks/send-call-analytics'
 import { Route as ApiPublicHooksSendAdsAnalyticsRouteImport } from './routes/api/public/hooks/send-ads-analytics'
@@ -177,6 +178,11 @@ const ApiPublicNotificationAiContinueRoute =
     path: '/api/public/notification-ai/continue',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHtQuizSubmitRoute = ApiPublicHtQuizSubmitRouteImport.update({
+  id: '/api/public/ht-quiz/submit',
+  path: '/api/public/ht-quiz/submit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksTaskDueCheckRoute =
   ApiPublicHooksTaskDueCheckRouteImport.update({
     id: '/api/public/hooks/task-due-check',
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
+  '/api/public/ht-quiz/submit': typeof ApiPublicHtQuizSubmitRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
   '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
+  '/api/public/ht-quiz/submit': typeof ApiPublicHtQuizSubmitRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
   '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -310,6 +318,7 @@ export interface FileRoutesById {
   '/api/public/hooks/send-ads-analytics': typeof ApiPublicHooksSendAdsAnalyticsRoute
   '/api/public/hooks/send-call-analytics': typeof ApiPublicHooksSendCallAnalyticsRoute
   '/api/public/hooks/task-due-check': typeof ApiPublicHooksTaskDueCheckRoute
+  '/api/public/ht-quiz/submit': typeof ApiPublicHtQuizSubmitRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
   '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -345,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
+    | '/api/public/ht-quiz/submit'
     | '/api/public/notification-ai/continue'
     | '/api/public/notification-ai/reply'
     | '/api/public/whatsapp/webhook'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
+    | '/api/public/ht-quiz/submit'
     | '/api/public/notification-ai/continue'
     | '/api/public/notification-ai/reply'
     | '/api/public/whatsapp/webhook'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-ads-analytics'
     | '/api/public/hooks/send-call-analytics'
     | '/api/public/hooks/task-due-check'
+    | '/api/public/ht-quiz/submit'
     | '/api/public/notification-ai/continue'
     | '/api/public/notification-ai/reply'
     | '/api/public/whatsapp/webhook'
@@ -429,6 +441,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSendAdsAnalyticsRoute: typeof ApiPublicHooksSendAdsAnalyticsRoute
   ApiPublicHooksSendCallAnalyticsRoute: typeof ApiPublicHooksSendCallAnalyticsRoute
   ApiPublicHooksTaskDueCheckRoute: typeof ApiPublicHooksTaskDueCheckRoute
+  ApiPublicHtQuizSubmitRoute: typeof ApiPublicHtQuizSubmitRoute
   ApiPublicNotificationAiContinueRoute: typeof ApiPublicNotificationAiContinueRoute
   ApiPublicNotificationAiReplyRoute: typeof ApiPublicNotificationAiReplyRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
@@ -618,6 +631,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicNotificationAiContinueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ht-quiz/submit': {
+      id: '/api/public/ht-quiz/submit'
+      path: '/api/public/ht-quiz/submit'
+      fullPath: '/api/public/ht-quiz/submit'
+      preLoaderRoute: typeof ApiPublicHtQuizSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/task-due-check': {
       id: '/api/public/hooks/task-due-check'
       path: '/api/public/hooks/task-due-check'
@@ -720,6 +740,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSendAdsAnalyticsRoute: ApiPublicHooksSendAdsAnalyticsRoute,
   ApiPublicHooksSendCallAnalyticsRoute: ApiPublicHooksSendCallAnalyticsRoute,
   ApiPublicHooksTaskDueCheckRoute: ApiPublicHooksTaskDueCheckRoute,
+  ApiPublicHtQuizSubmitRoute: ApiPublicHtQuizSubmitRoute,
   ApiPublicNotificationAiContinueRoute: ApiPublicNotificationAiContinueRoute,
   ApiPublicNotificationAiReplyRoute: ApiPublicNotificationAiReplyRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,

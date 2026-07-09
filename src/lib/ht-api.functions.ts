@@ -15,7 +15,7 @@ export const listHtApiTokens = createServerFn({ method: "GET" })
       .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { tokens: (data ?? []) as Array<{
+    return { tokens: ((data ?? []) as unknown) as Array<{
       id: string;
       name: string;
       token_prefix: string;
