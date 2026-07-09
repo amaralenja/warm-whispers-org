@@ -53,7 +53,7 @@ export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<st
 
   const form = new FormData();
   form.append("params", paramsJson);
-  form.append("signature", signature);
+  form.append("signature", `sha384:${signature}`);
 
   const createRes = await fetch(`${API_BASE}/assemblies`, {
     method: "POST",
