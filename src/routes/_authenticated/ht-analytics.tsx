@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { HTContasReceber } from "@/components/ht-contas-receber";
 import { CalendarPage } from "@/routes/_authenticated/calendar";
+import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
@@ -1325,6 +1326,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [utmFilter, setUtmFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
 
   useEffect(() => { setStageMap(loadKanbanMap()); }, []);
 
@@ -1447,12 +1449,13 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
               {byStage[s.id].slice(0, 50).map((l) => (
                 <div key={l.id}
                   draggable
+                  onClick={() => setSelectedLead(l)}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/x-lead-id", l.id);
                     setDraggingId(l.id);
                   }}
                   onDragEnd={() => setDraggingId(null)}
-                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-grab active:cursor-grabbing ${
+                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-pointer active:cursor-grabbing ${
                     draggingId === l.id ? "opacity-40" : ""
                   }`}>
                   <div className="text-xs font-semibold truncate">{l.nome || "Sem nome"}</div>
@@ -1471,7 +1474,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                   <div className="text-[10px] text-muted-foreground mt-1.5 tabular-nums">
                     {new Date(l.data_criacao).toLocaleDateString("pt-BR")}
                   </div>
-                  <div className="mt-2 flex items-center gap-1">
+                  <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={stageMap[l.id] || "novos"}
                       onChange={(e) => moveTo(l.id, e.target.value)}
@@ -1483,6 +1486,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                     {l.whatsapp && (
                       <a href={`https://wa.me/${String(l.whatsapp).replace(/\D/g, "")}`}
                         target="_blank" rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-[10px] px-2 h-6 flex items-center rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30">
                         WA
                       </a>
@@ -1499,6 +1503,12 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
           </div>
         ))}
       </div>
+      <HtLeadDetailDialog
+        lead={selectedLead}
+        role="sdr"
+        open={!!selectedLead}
+        onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+      />
     </div>
   );
 }
@@ -1529,6 +1539,7 @@ type CloserCard = {
   id: string; nome: string; valor: number; created_at: string;
   closer?: string | null; source: "lead" | "venda"; defaultStage: string;
   caixa?: string | null; utm?: string | null;
+  lead?: QLead | null;
 };
 
 // Valor estimado do sinal/ticket a partir da caixa do quiz
@@ -1541,6 +1552,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [closerFilter, setCloserFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
 
   useEffect(() => { setStageMap(loadCloserMap()); }, []);
 
@@ -1573,6 +1585,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         defaultStage: mapCloserStage(l.crm_status),
         caixa: l.caixa_label,
         utm: l.utm_source,
+        lead: l,
       });
     }
     // Vendas confirmadas = fechado (ganho)
@@ -1683,12 +1696,13 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                 {items.slice(0, 60).map((c) => (
                   <div key={c.id}
                     draggable
+                    onClick={() => { if (c.lead) setSelectedLead(c.lead); }}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/x-closer-id", c.id);
                       setDraggingId(c.id);
                     }}
                     onDragEnd={() => setDraggingId(null)}
-                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-grab active:cursor-grabbing ${
+                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors ${c.lead ? "cursor-pointer" : "cursor-grab"} active:cursor-grabbing ${
                       draggingId === c.id ? "opacity-40" : ""
                     }`}>
                     <div className="text-xs font-semibold truncate">{c.nome}</div>
@@ -1708,6 +1722,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                     <select
                       value={stageMap[c.id] || c.defaultStage}
                       onChange={(e) => moveTo(c.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-full mt-2 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
                       {CLOSER_STAGES.map((ks) => (
                         <option key={ks.id} value={ks.id}>{ks.label}</option>
@@ -1725,6 +1740,12 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
           );
         })}
       </div>
+      <HtLeadDetailDialog
+        lead={selectedLead}
+        role="closer"
+        open={!!selectedLead}
+        onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+      />
     </div>
   );
 }

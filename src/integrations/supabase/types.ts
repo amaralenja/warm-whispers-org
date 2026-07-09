@@ -666,6 +666,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ht_lead_notes: {
+        Row: {
+          author: string | null
+          body: string
+          created_at: string
+          id: string
+          lead_id: string
+          role: string
+        }
+        Insert: {
+          author?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          role?: string
+        }
+        Update: {
+          author?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          role?: string
+        }
+        Relationships: []
+      }
       ht_leads: {
         Row: {
           closer: string | null
