@@ -225,6 +225,18 @@ export function KanbanLeadCard({
         )}
       </div>
 
+      {scheduledAt && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-300">
+          <span className="text-[10px]">📅</span>
+          <span className="text-[10px] font-mono tabular-nums">
+            {new Date(scheduledAt).toLocaleString("pt-BR", {
+              day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+            })}
+          </span>
+        </div>
+      )}
+
+
       {footer && (
         <div className="mt-2" onClick={(e) => e.stopPropagation()}>
           {footer}
