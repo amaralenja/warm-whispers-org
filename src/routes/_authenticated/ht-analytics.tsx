@@ -1503,6 +1503,12 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
           </div>
         ))}
       </div>
+      <HtLeadDetailDialog
+        lead={selectedLead}
+        role="sdr"
+        open={!!selectedLead}
+        onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+      />
     </div>
   );
 }
@@ -1533,6 +1539,7 @@ type CloserCard = {
   id: string; nome: string; valor: number; created_at: string;
   closer?: string | null; source: "lead" | "venda"; defaultStage: string;
   caixa?: string | null; utm?: string | null;
+  lead?: QLead | null;
 };
 
 // Valor estimado do sinal/ticket a partir da caixa do quiz
@@ -1545,6 +1552,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [closerFilter, setCloserFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
 
   useEffect(() => { setStageMap(loadCloserMap()); }, []);
 
