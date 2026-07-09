@@ -25,6 +25,7 @@ import {
   CheckSquare,
   BarChart3,
   KeyRound,
+  Settings2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -251,6 +252,7 @@ export function AppSidebar() {
             <SidebarMenu className="gap-1.5">
               {perm !== null && renderMenuItem({ title: "Meu Painel", url: "/vendor", icon: User })}
               {visibleMain.map(renderMenuItem)}
+              {perm === null && renderMenuItem({ title: "Administração", url: "/admin", icon: Settings2 })}
 
 
               {/* Operação X1 — colapsável */}
