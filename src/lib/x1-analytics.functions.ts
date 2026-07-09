@@ -1061,6 +1061,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     return {
       kpis: {
         novosLeads,
+        leadsAntigosAtivos: Math.max(0, conversations.length - novosLeads),
         conversas: conversations.length,
         msgsIn,
         msgsOut,
@@ -1077,5 +1078,14 @@ export const getX1Analytics = createServerFn({ method: "POST" })
       serieHoraria,
       operacoesDisponiveis: Array.from(operacoesSet).sort(),
       canaisDisponiveis,
+      vendedoresDisponiveis: vendedores
+        .filter((v: any) => v?.id && (v?.ativo ?? true))
+        .map((v: any) => ({
+          id: Number(v.id),
+          nome: safeString(v.nome, safeString(v.utm, "Vendedor")),
+          utm: safeNullableString(v.utm),
+          fotoUrl: safeNullableString(v.foto_url),
+        }))
+        .sort((a: X1VendedorOpcao, b: X1VendedorOpcao) => a.nome.localeCompare(b.nome)),
     };
   });
