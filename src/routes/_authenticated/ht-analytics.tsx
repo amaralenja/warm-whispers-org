@@ -1376,6 +1376,7 @@ const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
 ];
 
 const KANBAN_LS_KEY = "ht_kanban_sdr_v1";
+const FAKE_LS_KEY = "ht_kanban_fake_v1";
 
 function loadKanbanMap(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -1384,6 +1385,38 @@ function loadKanbanMap(): Record<string, string> {
 function saveKanbanMap(m: Record<string, string>) {
   try { localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m)); } catch {}
 }
+function loadFakeSet(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try { return new Set(JSON.parse(localStorage.getItem(FAKE_LS_KEY) || "[]")); } catch { return new Set(); }
+}
+function saveFakeSet(s: Set<string>) {
+  try {
+    localStorage.setItem(FAKE_LS_KEY, JSON.stringify(Array.from(s)));
+    window.dispatchEvent(new Event("ht-fake-updated"));
+  } catch {}
+}
+function useFakeSet(): [Set<string>, (leadId: string, fake: boolean) => void] {
+  const [set, setSet] = useState<Set<string>>(() => loadFakeSet());
+  useEffect(() => {
+    const sync = () => setSet(loadFakeSet());
+    window.addEventListener("storage", sync);
+    window.addEventListener("ht-fake-updated", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("ht-fake-updated", sync);
+    };
+  }, []);
+  const toggle = (leadId: string, fake: boolean) => {
+    setSet((prev) => {
+      const next = new Set(prev);
+      if (fake) next.add(leadId); else next.delete(leadId);
+      saveFakeSet(next);
+      return next;
+    });
+  };
+  return [set, toggle];
+}
+
 
 function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
