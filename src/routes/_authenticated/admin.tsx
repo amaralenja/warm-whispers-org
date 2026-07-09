@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Save, ShieldAlert, ShieldCheck, Wifi, ImageDown, Settings2 } from "lucide-react";
-import { getUazConfig, saveUazConfig, testUazConnection, getUazProfilePic } from "@/lib/uaz.functions";
+import { Loader2, Save, ShieldAlert, ShieldCheck, Wifi, ImageDown, Settings2, QrCode, LogOut, RefreshCw } from "lucide-react";
+import {
+  getUazConfig, saveUazConfig, testUazConnection, getUazProfilePic,
+  getUazInstanceStatus, connectUazInstance, disconnectUazInstance,
+} from "@/lib/uaz.functions";
 import { getVendorSession } from "@/lib/vendor-session";
 
 export const Route = createFileRoute("/_authenticated/admin")({
