@@ -124,6 +124,7 @@ export type X1SerieHora = { hora: string; msgsIn: number; msgsOut: number; venda
 export type X1AnalyticsPayload = {
   kpis: {
     novosLeads: number;
+    leadsAntigosAtivos: number; // conversas ativas no período que já existiam antes
     conversas: number;
     msgsIn: number;
     msgsOut: number;
@@ -140,12 +141,15 @@ export type X1AnalyticsPayload = {
   serieHoraria: X1SerieHora[];
   operacoesDisponiveis: string[];
   canaisDisponiveis: X1CanalRow[];
+  vendedoresDisponiveis: X1VendedorOpcao[];
 };
 
 const EMPTY: X1AnalyticsPayload = {
   kpis: {
     novosLeads: 0,
+    leadsAntigosAtivos: 0,
     conversas: 0,
+
     msgsIn: 0,
     msgsOut: 0,
     vendas: 0,
