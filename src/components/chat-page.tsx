@@ -82,6 +82,7 @@ import {
   updateConversationTags,
   updateConversationNotes,
   reactToWhatsappMessage,
+  editWhatsappMessage,
   setConversationArchived,
 } from "@/lib/whatsapp-chat.functions";
 import {
@@ -424,6 +425,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const updateTagsFn = useServerFn(updateConversationTags);
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
+  const editFn = useServerFn(editWhatsappMessage);
   const listAllTagsFn = useServerFn(listCrmTags);
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
@@ -465,6 +467,33 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       await reactFn({ data: { conversationId: String(active.id), messageId: String(m.id), emoji } });
     } catch (e: any) {
       toast.error(errorToText(e, "Falha ao reagir"));
+      qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
+    }
+  };
+
+  const handleEdit = async (m: Msg) => {
+    if (!active) return;
+    const current = m.text_body ?? "";
+    const next = typeof window !== "undefined" ? window.prompt("Editar mensagem (até 15min após envio):", current) : null;
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === current) return;
+    const prev = m.text_body;
+    qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
+      asArray<Msg>(old).map((x) =>
+        x.id === m.id
+          ? { ...x, text_body: trimmed, raw: { ...(x.raw as any || {}), edited_at: new Date().toISOString() } }
+          : x,
+      ),
+    );
+    try {
+      await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
+      toast.success("Mensagem editada");
+    } catch (e: any) {
+      toast.error(errorToText(e, "Falha ao editar"));
+      qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
+        asArray<Msg>(old).map((x) => (x.id === m.id ? { ...x, text_body: prev } : x)),
+      );
       qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
     }
   };
