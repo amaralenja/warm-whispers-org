@@ -1728,11 +1728,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             <Reply className="mr-2 h-4 w-4" /> Responder
           </DropdownMenuItem>
         )}
-        {canEdit && onEdit && (
-          <DropdownMenuItem onClick={() => onEdit(msg)}>
-            <Pencil className="mr-2 h-4 w-4" /> Editar
-          </DropdownMenuItem>
-        )}
+        {canEdit && onEdit && null}
       </DropdownMenuContent>
     </DropdownMenu>
   ) : null;
