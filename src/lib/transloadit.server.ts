@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, randomUUID } from "crypto";
 
 const API_BASE = "https://api2.transloadit.com";
 
@@ -23,7 +23,7 @@ export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<st
   const expires = new Date(Date.now() + 1000 * 60 * 10).toISOString();
 
   const params = {
-    auth: { key, expires, nonce: crypto.randomUUID() },
+    auth: { key, expires, nonce: randomUUID() },
     steps: {
       imported: {
         robot: "/http/import",
