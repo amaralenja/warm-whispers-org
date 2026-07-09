@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { HTContasReceber } from "@/components/ht-contas-receber";
 import { CalendarPage } from "@/routes/_authenticated/calendar";
+import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
@@ -1325,6 +1326,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [utmFilter, setUtmFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
 
   useEffect(() => { setStageMap(loadKanbanMap()); }, []);
 
@@ -1447,12 +1449,13 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
               {byStage[s.id].slice(0, 50).map((l) => (
                 <div key={l.id}
                   draggable
+                  onClick={() => setSelectedLead(l)}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/x-lead-id", l.id);
                     setDraggingId(l.id);
                   }}
                   onDragEnd={() => setDraggingId(null)}
-                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-grab active:cursor-grabbing ${
+                  className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors cursor-pointer active:cursor-grabbing ${
                     draggingId === l.id ? "opacity-40" : ""
                   }`}>
                   <div className="text-xs font-semibold truncate">{l.nome || "Sem nome"}</div>
