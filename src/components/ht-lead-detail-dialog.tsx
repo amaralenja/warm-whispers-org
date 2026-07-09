@@ -85,18 +85,33 @@ function fmtDate(iso?: string | null) {
 }
 
 export function HtLeadDetailDialog({
-  lead, role, open, onOpenChange,
+  lead, role, open, onOpenChange, scheduledAt, onSchedule,
 }: {
   lead: LeadLike | null;
   role: Role;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  scheduledAt?: string | null;
+  onSchedule?: (iso: string | null) => void;
 }) {
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
+  const [schedDraft, setSchedDraft] = useState<string>("");
+
+  useEffect(() => {
+    if (scheduledAt) {
+      const d = new Date(scheduledAt);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setSchedDraft(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    } else {
+      setSchedDraft("");
+    }
+  }, [scheduledAt, open]);
+
 
   const authorName = useMemo(() => {
     try {
@@ -227,6 +242,13 @@ export function HtLeadDetailDialog({
                       <Calendar className="h-3 w-3" /> {fmtDate(lead.crm_data_agendamento)}
                     </span>
                   )}
+                  {scheduledAt && (
+
+                    <span className="text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> Call: {fmtDate(scheduledAt)}
+                    </span>
+                  )}
+
                   {lead?.utm_source && (
                     <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-violet-500/10 text-violet-300 border border-violet-500/30">
                       UTM · {lead.utm_source}
@@ -282,6 +304,46 @@ export function HtLeadDetailDialog({
 
         {/* CONTEÚDO SCROLLÁVEL */}
         <div className="overflow-y-auto" style={{ maxHeight: "calc(90vh - 260px)" }}>
+          {onSchedule && (
+            <div className="px-6 py-4 border-b border-border/40 bg-emerald-500/5">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-emerald-300/90 mr-2">
+                  <Calendar className="h-3 w-3" />
+                  {scheduledAt ? "Call agendada" : "Agendar Call"}
+                </div>
+                <input
+                  type="datetime-local"
+                  value={schedDraft}
+                  onChange={(e) => setSchedDraft(e.target.value)}
+                  className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!schedDraft) return;
+                    const iso = new Date(schedDraft).toISOString();
+                    onSchedule(iso);
+                  }}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-md bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors"
+                >
+                  {scheduledAt ? "Atualizar" : "Agendar"}
+                </button>
+                {scheduledAt && (
+                  <button
+                    type="button"
+                    onClick={() => onSchedule(null)}
+                    className="text-[11px] px-3 py-1.5 rounded-md bg-muted/40 text-muted-foreground border border-border/60 hover:text-foreground transition-colors"
+                  >
+                    Desmarcar
+                  </button>
+                )}
+                <div className="ml-auto text-[10px] text-muted-foreground">
+                  Sincroniza automaticamente com o Kanban Closer.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-[1fr_1.1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40">
 
             {/* QUIZ */}

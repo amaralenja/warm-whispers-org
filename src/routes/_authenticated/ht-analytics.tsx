@@ -1417,6 +1417,42 @@ function useFakeSet(): [Set<string>, (leadId: string, fake: boolean) => void] {
   return [set, toggle];
 }
 
+const SCHED_LS_KEY = "ht_kanban_scheduled_v1";
+function loadSchedMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(SCHED_LS_KEY) || "{}"); } catch { return {}; }
+}
+function saveSchedMap(m: Record<string, string>) {
+  try {
+    localStorage.setItem(SCHED_LS_KEY, JSON.stringify(m));
+    window.dispatchEvent(new Event("ht-sched-updated"));
+  } catch {}
+}
+function useSchedMap(): [Record<string, string>, (leadId: string, iso: string | null) => void] {
+  const [map, setMap] = useState<Record<string, string>>(() => loadSchedMap());
+  useEffect(() => {
+    const sync = () => setMap(loadSchedMap());
+    window.addEventListener("storage", sync);
+    window.addEventListener("ht-sched-updated", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("ht-sched-updated", sync);
+    };
+  }, []);
+  const set = (leadId: string, iso: string | null) => {
+    setMap((prev) => {
+      const next = { ...prev };
+      if (iso) next[leadId] = iso; else delete next[leadId];
+      saveSchedMap(next);
+      return next;
+    });
+  };
+  return [map, set];
+}
+
+
+
+
 
 function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
@@ -1426,6 +1462,8 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
+  const [schedMap, setSched] = useSchedMap();
+
 
 
 
@@ -1479,14 +1517,17 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
       }
     };
     for (const l of eligible) {
-      const st = fakeSet.has(l.id) ? "fake" : (stageMap[l.id] || mapCrm(l.crm_status));
+      const st = fakeSet.has(l.id)
+        ? "fake"
+        : (schedMap[l.id] ? "agendado" : (stageMap[l.id] || mapCrm(l.crm_status)));
       (m[st] || m.novos).push(l);
     }
     for (const s of KANBAN_STAGES) {
       m[s.id].sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
     }
+
     return m;
-  }, [eligible, stageMap, fakeSet]);
+  }, [eligible, stageMap, fakeSet, schedMap]);
 
   function moveTo(leadId: string, stage: string) {
     setFake(leadId, stage === "fake");
@@ -1564,7 +1605,9 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                   key={l.id}
                   lead={l}
                   ig={igMap.get((l.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, ""))}
+                  scheduledAt={schedMap[l.id] ?? null}
                   dragging={draggingId === l.id}
+
                   onClick={() => setSelectedLead(l)}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/x-lead-id", l.id);
@@ -1598,10 +1641,13 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
         role="sdr"
         open={!!selectedLead}
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+        scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
+        onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
       />
     </div>
   );
 }
+
 
 // ============================================================
 // Kanban Closer
@@ -1646,6 +1692,9 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
+  const [schedMap, setSched] = useSchedMap();
+
+
 
 
   const igUsernames = useMemo(
@@ -1724,14 +1773,18 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
     for (const c of filtered) {
       const quizId = c.lead?.id;
       const isFake = quizId ? fakeSet.has(quizId) : false;
-      const st = isFake ? "fake" : (stageMap[c.id] || c.defaultStage);
+      const isScheduled = quizId ? !!schedMap[quizId] : false;
+      const st = isFake
+        ? "fake"
+        : (stageMap[c.id] || (isScheduled ? "agendado" : c.defaultStage));
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap, fakeSet]);
+  }, [filtered, stageMap, fakeSet, schedMap]);
+
 
   function moveTo(id: string, stage: string) {
     const card = filtered.find((c) => c.id === id);
@@ -1813,7 +1866,9 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                       key={c.id}
                       lead={leadObj as any}
                       ig={handle ? igMap.get(handle) : undefined}
+                      scheduledAt={c.lead ? (schedMap[c.lead.id] ?? null) : null}
                       dragging={draggingId === c.id}
+
                       onClick={c.lead ? () => setSelectedLead(c.lead!) : undefined}
                       onDragStart={(e) => {
                         e.dataTransfer.setData("text/x-closer-id", c.id);
@@ -1859,7 +1914,10 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         role="closer"
         open={!!selectedLead}
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+        scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
+        onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
       />
+
     </div>
   );
 }
