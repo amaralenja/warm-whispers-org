@@ -1661,7 +1661,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10">
+      <DragScroll className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10 cursor-grab active:cursor-grabbing select-none">
         {CLOSER_STAGES.map((s) => {
           const items = byStage[s.id];
           const total = items.reduce((a, c) => a + (c.valor || 0), 0);
