@@ -18,6 +18,7 @@ import { HTContasReceber } from "@/components/ht-contas-receber";
 import { CalendarPage } from "@/routes/_authenticated/calendar";
 import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
+import { DragScroll } from "@/components/drag-scroll";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
@@ -1432,7 +1433,8 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10">
+      <DragScroll className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10 cursor-grab active:cursor-grabbing select-none">
+
         {KANBAN_STAGES.map((s) => (
           <div key={s.id}
             onDragOver={(e) => e.preventDefault()}
@@ -1488,7 +1490,7 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
             </div>
           </div>
         ))}
-      </div>
+      </DragScroll>
       <HtLeadDetailDialog
         lead={selectedLead}
         role="sdr"
@@ -1659,7 +1661,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10">
+      <DragScroll className="flex gap-3 overflow-x-auto pb-4 -mx-6 md:-mx-10 px-6 md:px-10 cursor-grab active:cursor-grabbing select-none">
         {CLOSER_STAGES.map((s) => {
           const items = byStage[s.id];
           const total = items.reduce((a, c) => a + (c.valor || 0), 0);
@@ -1740,7 +1742,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
             </div>
           );
         })}
-      </div>
+      </DragScroll>
       <HtLeadDetailDialog
         lead={selectedLead}
         role="closer"
