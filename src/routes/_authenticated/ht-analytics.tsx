@@ -1737,7 +1737,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                 if (id) moveTo(id, s.id);
                 setDraggingId(null);
               }}
-              className="shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh]">
+              className={`shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh] ${s.id === "fake" ? "opacity-40 grayscale" : ""}`}>
               <div className="px-3 py-3 border-b border-border/40 sticky top-0 bg-card/60 rounded-t-xl">
                 <div className="flex items-center justify-between">
                   <div className={`text-xs font-semibold tracking-tight ${s.accent ?? ""}`}>{s.label}</div>
