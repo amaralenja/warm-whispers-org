@@ -3,8 +3,8 @@ import { createHmac } from "crypto";
 const API_BASE = "https://api2.transloadit.com";
 
 function getCreds() {
-  const key = process.env.TRANSLOADIT_AUTH_KEY;
-  const secret = process.env.TRANSLOADIT_AUTH_SECRET;
+  const key = process.env.TRANSLOADIT_AUTH_KEY?.trim();
+  const secret = process.env.TRANSLOADIT_AUTH_SECRET?.trim();
   if (!key || !secret) throw new Error("Transloadit credentials não configuradas");
   return { key, secret };
 }
@@ -20,13 +20,10 @@ function signParams(paramsJson: string, secret: string) {
 export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<string> {
   const { key, secret } = getCreds();
 
-  const expires = new Date(Date.now() + 1000 * 60 * 10) // 10 min
-    .toISOString()
-    .replace("T", " ")
-    .replace(/\.\d{3}Z$/, "+00:00");
+  const expires = new Date(Date.now() + 1000 * 60 * 10).toISOString();
 
   const params = {
-    auth: { key, expires },
+    auth: { key, expires, nonce: crypto.randomUUID() },
     steps: {
       imported: {
         robot: "/http/import",
