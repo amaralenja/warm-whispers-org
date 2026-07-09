@@ -1684,43 +1684,51 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                 {items.length === 0 && (
                   <div className="text-[11px] text-muted-foreground text-center py-6 opacity-60">Vazio</div>
                 )}
-                {items.slice(0, 60).map((c) => (
-                  <div key={c.id}
-                    draggable
-                    onClick={() => { if (c.lead) setSelectedLead(c.lead); }}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/x-closer-id", c.id);
-                      setDraggingId(c.id);
-                    }}
-                    onDragEnd={() => setDraggingId(null)}
-                    className={`p-3 rounded-lg bg-background/60 border border-border/50 hover:border-accent/50 transition-colors ${c.lead ? "cursor-pointer" : "cursor-grab"} active:cursor-grabbing ${
-                      draggingId === c.id ? "opacity-40" : ""
-                    }`}>
-                    <div className="text-xs font-semibold truncate">{c.nome}</div>
-                    {c.valor > 0 && (
-                      <div className="text-[11px] font-mono tabular-nums text-emerald-400 mt-1">{fmtBRL(c.valor)}</div>
-                    )}
-                    <div className="flex items-center justify-between mt-1.5">
-                      <div className="text-[10px] text-muted-foreground tabular-nums">
-                        {c.created_at ? new Date(c.created_at).toLocaleDateString("pt-BR") : "—"}
-                      </div>
-                      {c.closer && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate max-w-[100px]">
-                          {c.closer}
-                        </span>
-                      )}
-                    </div>
-                    <select
-                      value={stageMap[c.id] || c.defaultStage}
-                      onChange={(e) => moveTo(c.id, e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full mt-2 text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60">
-                      {CLOSER_STAGES.map((ks) => (
-                        <option key={ks.id} value={ks.id}>{ks.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                {items.slice(0, 60).map((c) => {
+                  const leadObj = c.lead ?? {
+                    id: c.id,
+                    nome: c.nome,
+                    caixa_label: c.caixa ?? null,
+                    utm_source: c.utm ?? null,
+                    data_criacao: c.created_at,
+                  };
+                  const handle = (c.lead?.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, "");
+                  return (
+                    <KanbanLeadCard
+                      key={c.id}
+                      lead={leadObj as any}
+                      ig={handle ? igMap.get(handle) : undefined}
+                      dragging={draggingId === c.id}
+                      onClick={c.lead ? () => setSelectedLead(c.lead!) : undefined}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/x-closer-id", c.id);
+                        setDraggingId(c.id);
+                      }}
+                      onDragEnd={() => setDraggingId(null)}
+                      footer={
+                        <div className="space-y-1.5">
+                          {c.valor > 0 && (
+                            <div className="text-[11px] font-mono tabular-nums text-emerald-400">{fmtBRL(c.valor)}</div>
+                          )}
+                          {c.closer && (
+                            <div className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate inline-block">
+                              {c.closer}
+                            </div>
+                          )}
+                          <select
+                            value={stageMap[c.id] || c.defaultStage}
+                            onChange={(e) => moveTo(c.id, e.target.value)}
+                            className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
+                          >
+                            {CLOSER_STAGES.map((ks) => (
+                              <option key={ks.id} value={ks.id}>{ks.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      }
+                    />
+                  );
+                })}
                 {items.length > 60 && (
                   <div className="text-[10px] text-center text-muted-foreground py-2">
                     + {items.length - 60} ocultos
