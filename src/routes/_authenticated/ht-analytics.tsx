@@ -1722,22 +1722,28 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
     const m: Record<string, CloserCard[]> = {};
     for (const s of CLOSER_STAGES) m[s.id] = [];
     for (const c of filtered) {
-      const st = stageMap[c.id] || c.defaultStage;
+      const quizId = c.lead?.id;
+      const isFake = quizId ? fakeSet.has(quizId) : false;
+      const st = isFake ? "fake" : (stageMap[c.id] || c.defaultStage);
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
       m[s.id].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     }
     return m;
-  }, [filtered, stageMap]);
+  }, [filtered, stageMap, fakeSet]);
 
   function moveTo(id: string, stage: string) {
+    const card = filtered.find((c) => c.id === id);
+    const quizId = card?.lead?.id;
+    if (quizId) setFake(quizId, stage === "fake");
     setStageMap((prev) => {
       const next = { ...prev, [id]: stage };
       saveCloserMap(next);
       return next;
     });
   }
+
 
   return (
     <div className="px-6 md:px-10 py-6 space-y-4">
