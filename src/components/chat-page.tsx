@@ -1166,9 +1166,16 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
                   const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
 
+                  const isArchived = Boolean((c as any).archived_at);
                   return (
-                    <div
+                    <ConversationRowContextMenu
                       key={String(c.id)}
+                      conversationId={String(c.id)}
+                      channelId={toText(c.channel_id)}
+                      currentVendorId={(c as any).assigned_vendor_id ?? null}
+                      archived={isArchived}
+                    >
+                    <div
                       role="button"
                       tabIndex={0}
                       onClick={() => setActiveId(String(c.id))}
@@ -1179,7 +1186,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       style={leadStage ? { borderLeft: `3px solid ${leadStage.cor}` } : undefined}
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
-                      }`}
+                      } ${isArchived ? "opacity-70" : ""}`}
                     >
 
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
@@ -1197,6 +1204,14 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             <span className="truncate text-[15px] font-semibold tracking-normal">
                               {contactName || contactWaId}
                             </span>
+                            {isArchived ? (
+                              <span
+                                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                title="Conversa arquivada"
+                              >
+                                <Archive className="h-3 w-3" /> Arquivada
+                              </span>
+                            ) : null}
                             {(() => {
                               const b = opBadgeFor((c as any).operacao_id);
                               return b ? (
@@ -1287,9 +1302,11 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           conversationId={String(c.id)}
                           channelId={toText(c.channel_id)}
                           currentVendorId={(c as any).assigned_vendor_id ?? null}
+                          archived={isArchived}
                         />
                       </div>
                     </div>
+                    </ConversationRowContextMenu>
                   );
                 })}
               </div>
