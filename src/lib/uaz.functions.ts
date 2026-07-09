@@ -91,13 +91,14 @@ export const getUazProfilePic = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const cfg = await loadConfig(context);
     if (!cfg) return { image: null as string | null, name: null as string | null, error: "uaz_not_configured" };
+    const { server_url, instance_token } = cfg;
 
     // uazapiGO V2 — POST /chat/GetNameAndImageURL  { number }
     async function callEndpoint(path: string, body: Record<string, unknown>) {
-      const res = await fetch(`${cfg.server_url}${path}`, {
+      const res = await fetch(`${server_url}${path}`, {
         method: "POST",
         headers: {
-          token: cfg.instance_token,
+          token: instance_token,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
