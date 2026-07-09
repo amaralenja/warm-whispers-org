@@ -31,6 +31,7 @@ import {
   ArrowUpDown,
   GripVertical,
   Columns3,
+  Pencil,
 } from "lucide-react";
 import {
   DndContext,
