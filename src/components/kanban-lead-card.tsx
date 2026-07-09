@@ -102,6 +102,7 @@ export function KanbanLeadCard({
   onDragEnd,
   dragging,
   footer,
+  scheduledAt,
 }: {
   lead: KanbanLeadLike;
   ig?: IgLite | null;
@@ -110,7 +111,9 @@ export function KanbanLeadCard({
   onDragEnd?: () => void;
   dragging?: boolean;
   footer?: React.ReactNode;
+  scheduledAt?: string | null;
 }) {
+
   const letter = (lead.caixa_letra ?? "").toUpperCase();
   const tier = TICKET_TIERS[letter];
   const isHigh = HIGH.has(letter);
