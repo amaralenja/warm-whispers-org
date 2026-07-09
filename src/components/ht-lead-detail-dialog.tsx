@@ -100,6 +100,18 @@ export function HtLeadDetailDialog({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
+  const [schedDraft, setSchedDraft] = useState<string>("");
+
+  useEffect(() => {
+    if (scheduledAt) {
+      const d = new Date(scheduledAt);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setSchedDraft(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    } else {
+      setSchedDraft("");
+    }
+  }, [scheduledAt, open]);
+
 
   const authorName = useMemo(() => {
     try {
