@@ -60,6 +60,7 @@ const fmtDate = (iso: string) => {
 
 type QLead = {
   id: string; data_criacao: string; nome: string | null; email: string | null; whatsapp: string | null;
+  instagram: string | null;
   caixa_letra: string | null; caixa_label: string | null;
   faturamento: string | null; momento: string | null; objetivo: string | null;
   investir: string | null; minicurso: string | null; socio: string | null;
