@@ -1605,7 +1605,9 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
                   key={l.id}
                   lead={l}
                   ig={igMap.get((l.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, ""))}
+                  scheduledAt={schedMap[l.id] ?? null}
                   dragging={draggingId === l.id}
+
                   onClick={() => setSelectedLead(l)}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/x-lead-id", l.id);
