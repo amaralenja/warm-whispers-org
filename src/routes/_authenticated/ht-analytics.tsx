@@ -1370,8 +1370,9 @@ const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
   { id: "no_grupo", label: "1-3k no Grupo" },
   { id: "agendado", label: "Agendado", accent: "text-emerald-400" },
   { id: "no_show", label: "No-show", accent: "text-red-400" },
-  { id: "fake", label: "Lead Fake", accent: "text-fuchsia-400" },
   { id: "descartado", label: "Descartado", accent: "text-muted-foreground" },
+  { id: "fake", label: "Lead Fake", accent: "text-fuchsia-400" },
+
 ];
 
 const KANBAN_LS_KEY = "ht_kanban_sdr_v1";
@@ -1504,7 +1505,8 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
               if (id) moveTo(id, s.id);
               setDraggingId(null);
             }}
-            className="shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh]">
+            className={`shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh] ${s.id === "fake" ? "opacity-40 grayscale" : ""}`}>
+
             <div className="px-3 py-3 border-b border-border/40 flex items-center justify-between sticky top-0 bg-card/60 rounded-t-xl">
               <div className={`text-xs font-semibold tracking-tight ${s.accent ?? ""}`}>{s.label}</div>
               <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground">
@@ -1570,8 +1572,9 @@ const CLOSER_STAGES: { id: string; label: string; accent?: string }[] = [
   { id: "remarcada", label: "Remarcada", accent: "text-amber-400" },
   { id: "sinal", label: "Sinal Recebido", accent: "text-violet-400" },
   { id: "fechado", label: "Fechado (Ganho)", accent: "text-emerald-400" },
-  { id: "fake", label: "Lead Fake", accent: "text-fuchsia-400" },
   { id: "descartado", label: "Descartado", accent: "text-red-400" },
+  { id: "fake", label: "Lead Fake", accent: "text-fuchsia-400" },
+
 ];
 
 const CLOSER_LS_KEY = "ht_kanban_closer_v1";
@@ -1734,7 +1737,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
                 if (id) moveTo(id, s.id);
                 setDraggingId(null);
               }}
-              className="shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh]">
+              className={`shrink-0 w-72 rounded-xl border border-border/50 bg-card/40 backdrop-blur flex flex-col max-h-[70vh] ${s.id === "fake" ? "opacity-40 grayscale" : ""}`}>
               <div className="px-3 py-3 border-b border-border/40 sticky top-0 bg-card/60 rounded-t-xl">
                 <div className="flex items-center justify-between">
                   <div className={`text-xs font-semibold tracking-tight ${s.accent ?? ""}`}>{s.label}</div>
