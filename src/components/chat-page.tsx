@@ -471,14 +471,25 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     }
   };
 
-  const handleEdit = async (m: Msg) => {
+  const [editTarget, setEditTarget] = useState<Msg | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const handleEdit = (m: Msg) => {
     if (!active) return;
+    setEditTarget(m);
+    setEditDraft(m.text_body ?? "");
+  };
+
+  const submitEdit = async () => {
+    if (!active || !editTarget) return;
+    const m = editTarget;
     const current = m.text_body ?? "";
-    const next = typeof window !== "undefined" ? window.prompt("Editar mensagem (até 15min após envio):", current) : null;
-    if (next === null) return;
-    const trimmed = next.trim();
-    if (!trimmed || trimmed === current) return;
+    const trimmed = editDraft.trim();
+    if (!trimmed) { toast.error("Texto não pode ficar vazio"); return; }
+    if (trimmed === current) { setEditTarget(null); return; }
     const prev = m.text_body;
+    setEditSaving(true);
     qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
       asArray<Msg>(old).map((x) =>
         x.id === m.id
@@ -489,12 +500,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     try {
       await editFn({ data: { conversationId: String(active.id), messageId: String(m.id), newText: trimmed } });
       toast.success("Mensagem editada");
+      setEditTarget(null);
     } catch (e: any) {
       toast.error(errorToText(e, "Falha ao editar"));
       qc.setQueryData(["wa-messages", active.id], (old: unknown) =>
         asArray<Msg>(old).map((x) => (x.id === m.id ? { ...x, text_body: prev } : x)),
       );
       qc.invalidateQueries({ queryKey: ["wa-messages", active.id] });
+    } finally {
+      setEditSaving(false);
     }
   };
 
