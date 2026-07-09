@@ -1645,6 +1645,8 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
+  const [fakeSet, setFake] = useFakeSet();
+
 
   const igUsernames = useMemo(
     () => (leads || []).map((l) => l.instagram || "").filter(Boolean),
