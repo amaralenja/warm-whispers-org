@@ -81,7 +81,19 @@ import {
   updateConversationTags,
   updateConversationNotes,
   reactToWhatsappMessage,
+  setConversationArchived,
 } from "@/lib/whatsapp-chat.functions";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Archive, ArchiveRestore } from "lucide-react";
 import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
@@ -469,7 +481,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const navigate = useNavigate();
   const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
-  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned">("all");
+  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned" | "archived">("all");
 
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
@@ -715,12 +727,22 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     [conversationList],
   );
 
+  const archivedTotal = useMemo(
+    () => conversationList.reduce((acc, c) => acc + ((c as any).archived_at ? 1 : 0), 0),
+    [conversationList],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = conversationList;
-    if (listFilter === "unread") list = list.filter((c) => Number((c as any).unread_count ?? 0) > 0);
-    else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
-    else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
+    if (listFilter === "archived") {
+      list = list.filter((c) => Boolean((c as any).archived_at));
+    } else {
+      list = list.filter((c) => !(c as any).archived_at);
+      if (listFilter === "unread") list = list.filter((c) => Number((c as any).unread_count ?? 0) > 0);
+      else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
+      else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
+    }
     if (!q) return list;
     return list.filter((c) =>
       toText(c.contact_name).toLowerCase().includes(q) ||
@@ -1087,7 +1109,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 { id: "all", label: "Todos", count: conversationList.length },
                 { id: "unread", label: "Não visualizados", count: unreadTotal },
                 { id: "flow", label: "Com fluxo", count: activeFlowConvIds.size },
-                { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null).length },
+                { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null && !(c as any).archived_at).length },
+                { id: "archived", label: "Arquivadas", count: archivedTotal },
               ] as const).map((f) => {
                 const active = listFilter === f.id;
                 return (
@@ -1143,9 +1166,16 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
                   const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
 
+                  const isArchived = Boolean((c as any).archived_at);
                   return (
-                    <div
+                    <ConversationRowContextMenu
                       key={String(c.id)}
+                      conversationId={String(c.id)}
+                      channelId={toText(c.channel_id)}
+                      currentVendorId={(c as any).assigned_vendor_id ?? null}
+                      archived={isArchived}
+                    >
+                    <div
                       role="button"
                       tabIndex={0}
                       onClick={() => setActiveId(String(c.id))}
@@ -1156,7 +1186,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       style={leadStage ? { borderLeft: `3px solid ${leadStage.cor}` } : undefined}
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
                         isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
-                      }`}
+                      } ${isArchived ? "opacity-70" : ""}`}
                     >
 
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
@@ -1174,6 +1204,14 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             <span className="truncate text-[15px] font-semibold tracking-normal">
                               {contactName || contactWaId}
                             </span>
+                            {isArchived ? (
+                              <span
+                                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                title="Conversa arquivada"
+                              >
+                                <Archive className="h-3 w-3" /> Arquivada
+                              </span>
+                            ) : null}
                             {(() => {
                               const b = opBadgeFor((c as any).operacao_id);
                               return b ? (
@@ -1264,9 +1302,11 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           conversationId={String(c.id)}
                           channelId={toText(c.channel_id)}
                           currentVendorId={(c as any).assigned_vendor_id ?? null}
+                          archived={isArchived}
                         />
                       </div>
                     </div>
+                    </ConversationRowContextMenu>
                   );
                 })}
               </div>
@@ -2698,15 +2738,18 @@ function ConversationActionsMenu({
   conversationId,
   channelId,
   currentVendorId,
+  archived,
 }: {
   conversationId: string;
   channelId: string;
   currentVendorId: number | null;
+  archived?: boolean;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const listVendorsFn = useServerFn(listVendorsForChannel);
   const transferFn = useServerFn(transferConversation);
+  const archiveFn = useServerFn(setConversationArchived);
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ["chat-transfer-vendors", channelId],
@@ -2722,6 +2765,18 @@ function ConversationActionsMenu({
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     } catch (e: any) {
       toast.error(`Falha ao transferir: ${errorToText(e, "erro")}`);
+    } finally {
+      setOpen(false);
+    }
+  };
+
+  const doArchive = async () => {
+    try {
+      await archiveFn({ data: { conversationId, archived: !archived } });
+      toast.success(archived ? "Conversa desarquivada" : "Conversa arquivada");
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+    } catch (e: any) {
+      toast.error(`Falha: ${errorToText(e, "erro")}`);
     } finally {
       setOpen(false);
     }
@@ -2765,8 +2820,103 @@ function ConversationActionsMenu({
         >
           Liberar (sem vendedor)
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(e) => { e.preventDefault(); doArchive(); }}
+          className="rounded-xl"
+        >
+          {archived ? (<><ArchiveRestore className="mr-2 h-4 w-4" /> Desarquivar conversa</>) : (<><Archive className="mr-2 h-4 w-4" /> Arquivar conversa</>)}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function ConversationRowContextMenu({
+  conversationId,
+  channelId,
+  currentVendorId,
+  archived,
+  children,
+}: {
+  conversationId: string;
+  channelId: string;
+  currentVendorId: number | null;
+  archived: boolean;
+  children: React.ReactNode;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const listVendorsFn = useServerFn(listVendorsForChannel);
+  const transferFn = useServerFn(transferConversation);
+  const archiveFn = useServerFn(setConversationArchived);
+
+  const { data: vendors = [] } = useQuery({
+    queryKey: ["chat-transfer-vendors", channelId],
+    queryFn: () => listVendorsFn({ data: { channelId } }),
+    enabled: open && !!channelId,
+    staleTime: 30_000,
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+
+  const doArchive = async () => {
+    try {
+      await archiveFn({ data: { conversationId, archived: !archived } });
+      toast.success(archived ? "Conversa desarquivada" : "Conversa arquivada");
+      invalidate();
+    } catch (e: any) {
+      toast.error(`Falha: ${errorToText(e, "erro")}`);
+    }
+  };
+  const doTransfer = async (vendorId: number | null) => {
+    try {
+      await transferFn({ data: { conversationId, vendorId } });
+      toast.success(vendorId ? "Lead transferido" : "Lead liberado");
+      invalidate();
+    } catch (e: any) {
+      toast.error(`Falha ao transferir: ${errorToText(e, "erro")}`);
+    }
+  };
+
+  return (
+    <ContextMenu onOpenChange={setOpen}>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-60 rounded-2xl border-chat-line bg-popover">
+        <ContextMenuItem onSelect={() => doArchive()} className="rounded-xl">
+          {archived ? (<><ArchiveRestore className="mr-2 h-4 w-4" /> Desarquivar</>) : (<><Archive className="mr-2 h-4 w-4" /> Arquivar</>)}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="rounded-xl">
+            <UserCog className="mr-2 h-4 w-4" /> Transferir para
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-56 rounded-2xl border-chat-line bg-popover">
+            {!Array.isArray(vendors) || vendors.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum vendedor.</div>
+            ) : (
+              (vendors as Array<{ id: number; nome: string }>).map((v) => (
+                <ContextMenuItem
+                  key={v.id}
+                  disabled={v.id === currentVendorId}
+                  onSelect={() => doTransfer(v.id)}
+                  className="rounded-xl"
+                >
+                  {toText(v.nome)}
+                  {v.id === currentVendorId && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
+                </ContextMenuItem>
+              ))
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onSelect={() => doTransfer(null)}
+              className="rounded-xl text-destructive focus:text-destructive"
+            >
+              Liberar (sem vendedor)
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

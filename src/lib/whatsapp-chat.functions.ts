@@ -615,6 +615,24 @@ export const transferConversation = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setConversationArchived = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; archived: boolean }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    archived: Boolean(d?.archived),
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId) throw new Error("conversationId obrigatório");
+    const db = await dbFor(context);
+    await assertConversationAccess(context, db, data.conversationId);
+    const { error } = await db
+      .from("wa_conversations" as any)
+      .update({ archived_at: data.archived ? new Date().toISOString() : null })
+      .eq("id", data.conversationId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const listVendorsForChannel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { channelId: string }) => ({ channelId: String(d?.channelId ?? "") }))
