@@ -17,6 +17,7 @@ import {
 import { HTContasReceber } from "@/components/ht-contas-receber";
 import { CalendarPage } from "@/routes/_authenticated/calendar";
 import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
+import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
