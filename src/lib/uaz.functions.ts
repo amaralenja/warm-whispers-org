@@ -66,7 +66,7 @@ export const saveUazConfig = createServerFn({ method: "POST" })
 
 export const testUazConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<{ ok: boolean; status: number; body: string }> => {
     const cfg = await loadConfig(context);
     if (!cfg) throw new Error("Configura server_url e token primeiro");
     try {
@@ -75,9 +75,7 @@ export const testUazConnection = createServerFn({ method: "POST" })
         headers: { token: cfg.instance_token, Accept: "application/json" },
       });
       const text = await res.text();
-      let body: unknown = text;
-      try { body = JSON.parse(text); } catch { /* keep raw */ }
-      return { ok: res.ok, status: res.status, body };
+      return { ok: res.ok, status: res.status, body: text };
     } catch (e: any) {
       return { ok: false, status: 0, body: String(e?.message ?? e) };
     }
