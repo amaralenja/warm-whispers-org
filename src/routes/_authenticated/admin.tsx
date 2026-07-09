@@ -36,7 +36,7 @@ function AdminPage() {
   const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; status: number; body: unknown } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; status: number; body: string } | null>(null);
 
   const [testPhone, setTestPhone] = useState("");
   const [picLoading, setPicLoading] = useState(false);
