@@ -681,6 +681,7 @@ async function getVendorX1Analytics(
   }
 
   const novosLeads = leadKeys.size;
+  const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(db, assignedConversations, fromIso, toIso);
   return {
     kpis: {
       novosLeads,
@@ -694,7 +695,7 @@ async function getVendorX1Analytics(
       conversao: novosLeads > 0 ? vendas / novosLeads : 0,
       contatosUnicos,
       tempoRespostaMedio,
-      janelasFechadasSemAtendimento: computeJanelasFechadasSemAtendimento(assignedConversations, fromIso, toIso),
+      janelasFechadasSemAtendimento,
     },
     porOperacao: opRows,
     porVendedor,
