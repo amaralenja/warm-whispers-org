@@ -2442,6 +2442,33 @@ export type Database = {
         }
       }
       login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
+      submit_ht_quiz_submission: {
+        Args: {
+          _email: string
+          _fbc: string
+          _fbclid: string
+          _fbp: string
+          _gclid: string
+          _instagram: string
+          _nome: string
+          _raw: Json
+          _respostas: Json
+          _session_id: string
+          _status: string
+          _token_hash: string
+          _utm_campaign: string
+          _utm_content: string
+          _utm_medium: string
+          _utm_source: string
+          _whatsapp: string
+        }
+        Returns: {
+          error: string
+          id: string
+          ok: boolean
+          received_at: string
+        }[]
+      }
       update_wa_flow_run: {
         Args: { _patch?: Json; _run_id: string }
         Returns: boolean
