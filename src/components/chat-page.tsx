@@ -55,7 +55,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -1197,6 +1197,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
+                          {(c as any).contact_avatar_url ? (
+                            <AvatarImage src={(c as any).contact_avatar_url} alt={contactName || contactWaId} className="rounded-full object-cover" />
+                          ) : null}
                           <AvatarFallback
                             className="rounded-full"
                             style={avatarStyle(contactName, contactWaId)}
@@ -1352,6 +1355,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
                 <div className="flex min-w-0 items-center gap-4">
                   <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
+                    {(active as any).contact_avatar_url ? (
+                      <AvatarImage src={(active as any).contact_avatar_url} alt={toText(active.contact_name) || toText(active.contact_wa_id)} className="rounded-2xl object-cover" />
+                    ) : null}
                     <AvatarFallback
                       className="rounded-2xl"
                       style={avatarStyle(active.contact_name, active.contact_wa_id)}
