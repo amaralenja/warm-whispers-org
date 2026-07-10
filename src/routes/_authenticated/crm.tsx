@@ -534,11 +534,13 @@ function Kanban({
                     lead={lead}
                     stageColor={s.cor}
                     tagColors={tagColors}
+                    avatarUrl={avatarFor(avatarMap, lead.telefone)}
                     onEdit={() => onEdit(lead)}
                     onOpenChat={() => openChatForLead(lead)}
                     onDragStart={onDragStart}
                   />
                 ))}
+
 
                 {items.length > shown && (
                   <button
