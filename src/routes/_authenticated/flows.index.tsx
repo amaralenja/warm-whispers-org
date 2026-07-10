@@ -189,36 +189,76 @@ function FlowsListPage() {
     const docsIdx = byId(parsed.docs);
     const objectsIdx = byId(parsed.objectsList);
 
-    toast.loading(`Importando 0 / ${total} funis…`, { id: t });
-    try {
-      for (let i = 0; i < allFunnels.length; i += CHUNK) {
-        const chunkFunnels = allFunnels.slice(i, i + CHUNK);
-        const chunkIdx = Math.floor(i / CHUNK);
-        setZvProgress(`${i} / ${total}`);
-        toast.loading(`Importando ${i} / ${total} funis…`, { id: t });
-
-        // Coleta apenas os itemIds referenciados pelos funis deste chunk
-        const itemIds = new Set<string>();
-        for (const f of chunkFunnels) {
-          const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
-          for (const s of seq) if (s?.itemId) itemIds.add(String(s.itemId));
+    // --- Pre-upload: sobe base64 pesado (áudios/mídias/docs) uma vez só,
+    // pra evitar "Request Entity Too Large" nos chunks.
+    const extractB64 = (obj: any): { base64: string; mime?: string; filename?: string } | null => {
+      if (!obj || typeof obj !== "object") return null;
+      const filename = obj.filename || obj.name || obj.fileName || undefined;
+      const mime = obj.mimeType || obj.mimetype || obj.type || obj.contentType || undefined;
+      const cands = [obj.base64, obj.data, obj.dataUrl, obj.url, obj.content, obj.file, obj.buffer, obj.payload, obj.media, obj.audio, obj.document];
+      for (const c of cands) {
+        if (typeof c !== "string" || c.length < 20) continue;
+        if (c.startsWith("data:")) {
+          const m = c.match(/^data:([^;]+);base64,(.+)$/);
+          if (m) return { base64: m[2], mime: m[1] ?? mime, filename };
         }
-        const pick = (idx: Map<string, any>) => {
-          const out: any[] = [];
-          for (const id of itemIds) {
-            const v = idx.get(id);
-            if (v) out.push(v);
-          }
-          return out;
-        };
-        const slimBackup = {
-          funnels: chunkFunnels,
-          messages: pick(messagesIdx),
-          audios: pick(audiosIdx),
-          medias: pick(mediasIdx),
-          docs: pick(docsIdx),
-          objectsList: pick(objectsIdx),
-        };
+        if (/^[A-Za-z0-9+/=\r\n]+$/.test(c) && c.length > 200) {
+          return { base64: c.replace(/\s+/g, ""), mime, filename };
+        }
+      }
+      for (const k of Object.keys(obj)) {
+        const v = (obj as any)[k];
+        if (v && typeof v === "object") {
+          const r = extractB64(v);
+          if (r) return { ...r, filename: r.filename ?? filename, mime: r.mime ?? mime };
+        }
+      }
+      return null;
+    };
+
+    const preuploaded = new Map<string, { url: string; mime: string | null; filename: string | null }>();
+    const allItemIds = new Set<string>();
+    for (const f of allFunnels) {
+      const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
+      for (const s of seq) if (s?.itemId && s?.type !== "message") allItemIds.add(String(s.itemId));
+    }
+    let mediaDone = 0;
+    const mediaTotal = allItemIds.size;
+    if (mediaTotal > 0) toast.loading(`Enviando mídias 0 / ${mediaTotal}…`, { id: t });
+
+    for (const itemId of allItemIds) {
+      const src = objectsIdx.get(itemId) ?? audiosIdx.get(itemId) ?? mediasIdx.get(itemId) ?? docsIdx.get(itemId);
+      if (!src) { mediaDone++; continue; }
+      const ex = extractB64(src);
+      if (!ex) { mediaDone++; continue; }
+      try {
+        const up: any = await uploadZvMediaFn({
+          data: { itemId, base64: ex.base64, mime: ex.mime ?? null, filename: ex.filename ?? null },
+        });
+        preuploaded.set(itemId, { url: up.url, mime: up.mime ?? null, filename: up.filename ?? null });
+      } catch (upErr: any) {
+        console.error("[zv-import] preupload fail", itemId, upErr);
+      }
+      mediaDone++;
+      if (mediaDone % 3 === 0 || mediaDone === mediaTotal) {
+        toast.loading(`Enviando mídias ${mediaDone} / ${mediaTotal}…`, { id: t });
+      }
+    }
+
+    // Substitui itens no objectsList/etc por versão slim (sem base64)
+    const slimItem = (itemId: string, orig: any) => {
+      const pu = preuploaded.get(itemId);
+      if (!pu) return orig; // sem base64 detectado, envia como estava
+      return {
+        id: itemId,
+        filename: pu.filename ?? orig?.filename ?? orig?.name,
+        mimeType: pu.mime ?? orig?.mimeType ?? orig?.mimetype,
+        preuploaded_url: pu.url,
+        preuploaded_mime: pu.mime,
+        preuploaded_filename: pu.filename,
+      };
+    };
+
 
         try {
           const r: any = await importZvFn({
