@@ -94,14 +94,35 @@ function PV24HAnalyticsPage() {
 
   const cfg = configQ.data;
 
+  const isConfigured = !!cfg?.hasToken && !!cfg?.adAccountId;
+  const showSettings = !isConfigured || settingsOpen;
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <BarChart3 className="h-7 w-7 text-accent" />
-        <h1 className="text-2xl font-semibold">Operação PV24H</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <BarChart3 className="h-7 w-7 text-accent" />
+          <div>
+            <h1 className="text-2xl font-semibold">Operação PV24H</h1>
+            {isConfigured && cfg?.adAccountName && (
+              <p className="text-xs text-muted-foreground">Conta: <strong>{cfg.adAccountName}</strong></p>
+            )}
+          </div>
+        </div>
+        {isConfigured && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSettingsOpen((v) => !v)}
+            title="Configurações"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Config */}
+      {showSettings && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -166,8 +187,14 @@ function PV24HAnalyticsPage() {
               )}
             </div>
           )}
+          {isConfigured && (
+            <div className="flex justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(false)}>Fechar</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+      )}
 
       {/* Campaigns */}
       {cfg?.hasToken && cfg?.adAccountId && (
