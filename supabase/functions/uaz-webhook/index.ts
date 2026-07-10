@@ -236,31 +236,40 @@ Deno.serve(async (req) => {
     console.error("[uaz-webhook] persist error", e);
   }
 
-  // Atualiza foto de perfil do contato nas conversas ao vivo (só daqui pra frente).
+  // Atualiza foto de perfil do contato — só busca UMA vez por contato (cache).
   try {
     const contact = pickContactId(payload);
-      console.info("[uaz-webhook] avatar contact", { hasContact: Boolean(contact), contact });
     if (contact) {
-      let avatar = pickAvatar(payload);
+      const variants = phoneVariants(contact);
 
-      // Fallback: se o payload não trouxe foto, busca via API UAZ
-      if (!avatar) {
-        try {
-          avatar = await fetchUazAvatar(supabase, contact);
-        } catch (e) {
-          console.error("[uaz-webhook] avatar fetch error", e);
-        }
-      }
+      // Cache: se já existe qualquer conversa com esse contato COM avatar salvo, pula.
+      const { data: existing } = await supabase
+        .from("wa_conversations")
+        .select("id, contact_avatar_url")
+        .in("contact_wa_id", variants)
+        .not("contact_avatar_url", "is", null)
+        .limit(1);
 
-      if (avatar) {
-        const variants = phoneVariants(contact);
-        await supabase
-          .from("wa_conversations")
-          .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
-          .in("contact_wa_id", variants);
-        console.info("[uaz-webhook] avatar saved", { contact, variants: variants.length });
+      if (existing && existing.length > 0) {
+        console.info("[uaz-webhook] avatar já em cache, skip", { contact });
       } else {
-        console.warn("[uaz-webhook] avatar not found", { contact });
+        let avatar = pickAvatar(payload);
+        if (!avatar) {
+          try {
+            avatar = await fetchUazAvatar(supabase, contact);
+          } catch (e) {
+            console.error("[uaz-webhook] avatar fetch error", e);
+          }
+        }
+        if (avatar) {
+          await supabase
+            .from("wa_conversations")
+            .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
+            .in("contact_wa_id", variants);
+          console.info("[uaz-webhook] avatar saved", { contact, variants: variants.length });
+        } else {
+          console.warn("[uaz-webhook] avatar not found", { contact });
+        }
       }
     }
   } catch (e) {
