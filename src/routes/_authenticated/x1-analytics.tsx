@@ -625,25 +625,40 @@ function X1AnalyticsPage() {
       </div>
 
       <Dialog open={showJanelaLeads} onOpenChange={setShowJanelaLeads}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Leads com janela fechada sem atendimento</DialogTitle>
+        <DialogContent className="max-w-2xl overflow-hidden border-rose-500/30 bg-gradient-to-b from-rose-950/30 via-background to-background p-0">
+          <DialogHeader className="border-b border-border/50 bg-gradient-to-r from-rose-500/10 to-transparent px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/15 ring-1 ring-rose-500/30">
+                <Flame className="h-5 w-5 text-rose-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold">Janelas fechadas sem atendimento</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Leads que a janela de 24h fechou e o vendedor nunca respondeu
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[65vh] overflow-y-auto px-3 py-3">
             {(payload?.janelasFechadasSemAtendimentoLeads?.length ?? 0) === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">Nenhum lead nesse período.</p>
-            ) : (
-              <div className="divide-y divide-border/50">
-                <div className="grid grid-cols-[1fr_1fr_auto] gap-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <span>Vendedor</span>
-                  <span>Telefone</span>
-                  <span>Fechou em</span>
+              <div className="flex flex-col items-center gap-2 py-12 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15">
+                  <Trophy className="h-6 w-6 text-emerald-400" />
                 </div>
+                <p className="text-sm font-medium">Nenhum lead ficou sem atendimento 🎉</p>
+                <p className="text-xs text-muted-foreground">No período selecionado, todas as janelas foram respondidas.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
                 {(payload?.janelasFechadasSemAtendimentoLeads ?? []).map((lead) => {
                   const vendor = (payload?.vendedoresDisponiveis ?? []).find(
                     (v) => Number(v.id) === Number(lead.vendorId),
                   );
-                  const vendorNome = vendor?.nome ?? (lead.vendorId ? `#${lead.vendorId}` : "— sem vendedor");
+                  const vendorNome = vendor?.nome ?? (lead.vendorId ? `#${lead.vendorId}` : "Sem vendedor");
+                  const vendorFoto = (vendor as any)?.fotoUrl ?? null;
+                  const leadNome = lead.contactName || lead.telefone || "Lead sem nome";
+                  const leadInitials = (leadNome.trim()[0] || "?").toUpperCase();
+                  const vendorInitials = (vendorNome.trim()[0] || "?").toUpperCase();
                   const closedAt = new Date(lead.closedAt).toLocaleString("pt-BR", {
                     day: "2-digit",
                     month: "2-digit",
@@ -653,11 +668,39 @@ function X1AnalyticsPage() {
                   return (
                     <div
                       key={lead.conversationId}
-                      className="grid grid-cols-[1fr_1fr_auto] items-center gap-3 py-2 text-sm"
+                      className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card/40 p-3 transition-colors hover:border-rose-500/40 hover:bg-rose-500/5"
                     >
-                      <span className="truncate">{vendorNome}</span>
-                      <span className="font-mono">{lead.telefone || "—"}</span>
-                      <span className="text-xs text-muted-foreground">{closedAt}</span>
+                      <Avatar className="h-12 w-12 ring-2 ring-rose-500/20">
+                        {lead.contactAvatarUrl ? (
+                          <AvatarImage src={lead.contactAvatarUrl} alt={leadNome} />
+                        ) : null}
+                        <AvatarFallback className="bg-rose-500/15 text-rose-300">
+                          {lead.contactAvatarUrl ? leadInitials : <UserIcon className="h-5 w-5" />}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{leadNome}</p>
+                        <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 font-mono">
+                            <Phone className="h-3 w-3" /> {lead.telefone || "—"}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {closedAt}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/60 px-2.5 py-1.5">
+                        <Avatar className="h-7 w-7">
+                          {vendorFoto ? <AvatarImage src={vendorFoto} alt={vendorNome} /> : null}
+                          <AvatarFallback className="bg-primary/15 text-[10px] text-primary">
+                            {vendorInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="text-right">
+                          <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Vendedor</p>
+                          <p className="max-w-[120px] truncate text-xs font-semibold">{vendorNome}</p>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -666,6 +709,7 @@ function X1AnalyticsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
