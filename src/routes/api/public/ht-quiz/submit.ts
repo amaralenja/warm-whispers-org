@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
+
+const SUPABASE_URL = "https://wvcwrozwnwdlpandwubp.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2Y3dyb3p3bndkbHBhbmR3dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNDQ0ODksImV4cCI6MjA4NzcyMDQ4OX0.1eHNkL6pfcRpfrWsh_UyYTcnuNIT6LQLCrpmV2EgyFg";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -35,17 +39,6 @@ export const Route = createFileRoute("/api/public/ht-quiz/submit")({
 
           const token_hash = createHash("sha256").update(token, "utf8").digest("hex");
 
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-          const { data: tok, error: tokErr } = await supabaseAdmin
-            .from("ht_api_tokens" as any)
-            .select("id, revoked_at")
-            .eq("token_hash", token_hash)
-            .maybeSingle();
-
-          if (tokErr) return json(500, { ok: false, error: "Erro ao validar token" });
-          if (!tok || (tok as any).revoked_at) return json(401, { ok: false, error: "Token inválido ou revogado" });
-
           const body = await request.json().catch(() => null);
           if (!body || typeof body !== "object") return json(400, { ok: false, error: "JSON inválido" });
           const b = body as Record<string, unknown>;
@@ -55,9 +48,40 @@ export const Route = createFileRoute("/api/public/ht-quiz/submit")({
           const rawStatus = pickStr(b.status);
           const status = rawStatus === "completed" ? "completed" : "partial";
 
+          const supabasePublic = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+            auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+          });
+
+          const { data: saved, error: saveErr } = await supabasePublic
+            .rpc("submit_ht_quiz_submission" as any, {
+              _token_hash: token_hash,
+              _session_id: session_id,
+              _status: status,
+              _nome: pickStr(b.nome ?? b.name),
+              _email: pickStr(b.email),
+              _whatsapp: pickStr(b.whatsapp ?? b.phone ?? b.telefone),
+              _instagram: pickStr(b.instagram),
+              _utm_source: pickStr(b.utm_source),
+              _utm_medium: pickStr(b.utm_medium),
+              _utm_campaign: pickStr(b.utm_campaign),
+              _utm_content: pickStr(b.utm_content),
+              _fbc: pickStr(b.fbc),
+              _fbp: pickStr(b.fbp),
+              _fbclid: pickStr(b.fbclid),
+              _gclid: pickStr(b.gclid),
+              _respostas: respostas,
+              _raw: b,
+            })
+            .single();
+
+          if (saveErr) return json(500, { ok: false, error: "Erro ao salvar submissão: " + saveErr.message });
+
+          const result = saved as { ok?: boolean; id?: string; received_at?: string; error?: string } | null;
+          if (!result?.ok) return json(401, { ok: false, error: result?.error ?? "Token inválido ou revogado" });
+
+          return json(200, { ok: true, id: result.id, received_at: result.received_at });
+
           const insert: Record<string, unknown> = {
-            token_id: (tok as any).id as string,
-            session_id,
             status,
             nome: pickStr(b.nome ?? b.name),
             email: pickStr(b.email),
