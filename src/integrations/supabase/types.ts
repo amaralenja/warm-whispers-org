@@ -1830,6 +1830,7 @@ export type Database = {
           archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
+          contact_avatar_url: string | null
           contact_name: string | null
           contact_wa_id: string
           created_at: string
@@ -1849,6 +1850,7 @@ export type Database = {
           archived_at?: string | null
           assigned_vendor_id?: number | null
           channel_id: string
+          contact_avatar_url?: string | null
           contact_name?: string | null
           contact_wa_id: string
           created_at?: string
@@ -1868,6 +1870,7 @@ export type Database = {
           archived_at?: string | null
           assigned_vendor_id?: number | null
           channel_id?: string
+          contact_avatar_url?: string | null
           contact_name?: string | null
           contact_wa_id?: string
           created_at?: string
@@ -2915,6 +2918,7 @@ export type Database = {
           archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
+          contact_avatar_url: string | null
           contact_name: string | null
           contact_wa_id: string
           created_at: string
@@ -3017,6 +3021,7 @@ export type Database = {
           archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
+          contact_avatar_url: string | null
           contact_name: string | null
           contact_wa_id: string
           created_at: string
@@ -3102,6 +3107,7 @@ export type Database = {
           archived_at: string | null
           assigned_vendor_id: number | null
           channel_id: string
+          contact_avatar_url: string | null
           contact_name: string | null
           contact_wa_id: string
           created_at: string
