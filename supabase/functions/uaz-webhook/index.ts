@@ -112,11 +112,12 @@ async function loadUazConfig(supabase: any): Promise<{ serverUrl: string; token:
 async function fetchUazAvatar(supabase: any, contact: string): Promise<string | null> {
   const cfg = await loadUazConfig(supabase);
   if (!cfg) return null;
-  const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/GetContactInfo", "/chat/getContactInfo"];
+  const paths = ["/chat/details", "/chat/GetNameAndImageURL", "/chat/getNameAndImageURL"];
   const numbers = phoneVariants(contact);
   for (const number of numbers) {
     const payloads = [
       { number },
+      { number, preview: true },
       { Number: number },
       { phone: number },
       { Phone: number },

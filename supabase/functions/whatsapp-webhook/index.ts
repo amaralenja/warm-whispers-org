@@ -508,11 +508,12 @@ async function fetchContactAvatarFromUaz(supabase: any, contactWaId: string): Pr
   const cfg = await loadUazAvatarConfig(supabase);
   if (!cfg) return null;
 
-  const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/GetContactInfo", "/chat/getContactInfo"];
+  const paths = ["/chat/details", "/chat/GetNameAndImageURL", "/chat/getNameAndImageURL"];
   const numbers = brPhoneVariants(contactWaId);
   for (const number of numbers) {
     const payloads = [
       { number },
+      { number, preview: true },
       { Number: number },
       { phone: number },
       { Phone: number },
