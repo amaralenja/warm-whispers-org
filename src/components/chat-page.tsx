@@ -501,6 +501,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const [mediaCache, setMediaCache] = useState<Record<string, { url?: string; mime?: string; loading?: boolean; error?: string }>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ file: File; url: string; type: "image" | "video" | "document" } | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<{ src: string; alt: string } | null>(null);
   const [previewCaption, setPreviewCaption] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
@@ -1196,18 +1197,32 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     >
 
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                        <Avatar className="h-12 w-12 shrink-0 rounded-full border border-chat-line">
-                          {(c as any).contact_avatar_url ? (
-                            <AvatarImage src={(c as any).contact_avatar_url} alt={contactName || contactWaId} className="rounded-full object-cover" />
-                          ) : null}
-                          <AvatarFallback
-                            className="rounded-full"
-                            style={avatarStyle(contactName, contactWaId)}
-                          >
-                            <User className="h-6 w-6 opacity-80" />
-                          </AvatarFallback>
-
-                        </Avatar>
+                        <button
+                          type="button"
+                          className={`shrink-0 rounded-full transition ${toText((c as any).contact_avatar_url) ? "cursor-zoom-in hover:scale-105 hover:ring-2 hover:ring-chat-accent/60" : "cursor-default"}`}
+                          title={toText((c as any).contact_avatar_url) ? "Abrir foto do lead" : undefined}
+                          aria-label={toText((c as any).contact_avatar_url) ? `Abrir foto de ${contactName || contactWaId}` : undefined}
+                          onClick={(e) => {
+                            const src = toText((c as any).contact_avatar_url);
+                            if (!src) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setProfilePhotoPreview({ src, alt: contactName || contactWaId || "Foto do lead" });
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <Avatar className="h-12 w-12 rounded-full border border-chat-line">
+                            {(c as any).contact_avatar_url ? (
+                              <AvatarImage src={(c as any).contact_avatar_url} alt={contactName || contactWaId} className="rounded-full object-cover" />
+                            ) : null}
+                            <AvatarFallback
+                              className="rounded-full"
+                              style={avatarStyle(contactName, contactWaId)}
+                            >
+                              <User className="h-6 w-6 opacity-80" />
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="truncate text-[15px] font-semibold tracking-normal">
@@ -1354,18 +1369,29 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
             <>
               <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
                 <div className="flex min-w-0 items-center gap-4">
-                  <Avatar className="h-14 w-14 shrink-0 rounded-2xl border border-chat-line">
-                    {(active as any).contact_avatar_url ? (
-                      <AvatarImage src={(active as any).contact_avatar_url} alt={toText(active.contact_name) || toText(active.contact_wa_id)} className="rounded-2xl object-cover" />
-                    ) : null}
-                    <AvatarFallback
-                      className="rounded-2xl"
-                      style={avatarStyle(active.contact_name, active.contact_wa_id)}
-                    >
-                      <User className="h-7 w-7 opacity-80" />
-                    </AvatarFallback>
-
-                  </Avatar>
+                  <button
+                    type="button"
+                    className={`shrink-0 rounded-2xl transition ${toText((active as any).contact_avatar_url) ? "cursor-zoom-in hover:scale-105 hover:ring-2 hover:ring-chat-accent/60" : "cursor-default"}`}
+                    title={toText((active as any).contact_avatar_url) ? "Abrir foto do lead" : undefined}
+                    aria-label={toText((active as any).contact_avatar_url) ? `Abrir foto de ${toText(active.contact_name) || toText(active.contact_wa_id)}` : undefined}
+                    onClick={() => {
+                      const src = toText((active as any).contact_avatar_url);
+                      if (!src) return;
+                      setProfilePhotoPreview({ src, alt: toText(active.contact_name) || toText(active.contact_wa_id) || "Foto do lead" });
+                    }}
+                  >
+                    <Avatar className="h-14 w-14 rounded-2xl border border-chat-line">
+                      {(active as any).contact_avatar_url ? (
+                        <AvatarImage src={(active as any).contact_avatar_url} alt={toText(active.contact_name) || toText(active.contact_wa_id)} className="rounded-2xl object-cover" />
+                      ) : null}
+                      <AvatarFallback
+                        className="rounded-2xl"
+                        style={avatarStyle(active.contact_name, active.contact_wa_id)}
+                      >
+                        <User className="h-7 w-7 opacity-80" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <h3 className="truncate text-lg font-semibold tracking-normal">
@@ -1669,6 +1695,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {profilePhotoPreview ? (
+        <ImageLightbox
+          src={profilePhotoPreview.src}
+          alt={profilePhotoPreview.alt}
+          onClose={() => setProfilePhotoPreview(null)}
+        />
+      ) : null}
     </div>
   );
 }
