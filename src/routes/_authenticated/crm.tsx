@@ -435,6 +435,9 @@ function Kanban({
     return map;
   }, [leads, stages]);
 
+  const avatarMap = useLeadAvatars(useMemo(() => leads.map((l) => l.telefone), [leads]));
+
+
 
   function onDragStart(e: DragEvent<HTMLDivElement>, lead: Lead) {
     e.dataTransfer.setData("application/x-lead-id", lead.id);
