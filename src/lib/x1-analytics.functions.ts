@@ -134,6 +134,7 @@ export type X1AnalyticsPayload = {
     conversao: number;
     contatosUnicos: number;
     tempoRespostaMedio: number; // segundos
+    janelasFechadasSemAtendimento: number; // leads cuja janela WhatsApp fechou no período sem resposta
   };
   porOperacao: X1OperacaoRow[];
   porVendedor: X1VendedorRow[];
@@ -158,6 +159,7 @@ const EMPTY: X1AnalyticsPayload = {
     conversao: 0,
     contatosUnicos: 0,
     tempoRespostaMedio: 0,
+    janelasFechadasSemAtendimento: 0,
   },
   porOperacao: [],
   porVendedor: [],
@@ -167,6 +169,32 @@ const EMPTY: X1AnalyticsPayload = {
   canaisDisponiveis: [],
   vendedoresDisponiveis: [],
 };
+
+// Janela WhatsApp fecha 24h após o último inbound sem resposta.
+// Considera "sem atendimento" quando a última mensagem da conversa foi inbound
+// (nenhum outbound depois) e o horário de fechamento (last_in + 24h) cai no período.
+function computeJanelasFechadasSemAtendimento(
+  conversations: any[],
+  fromIso: string | null,
+  toIso: string | null,
+): number {
+  const now = Date.now();
+  const fromT = fromIso ? Date.parse(fromIso) : null;
+  const toT = toIso ? Date.parse(toIso) : null;
+  let count = 0;
+  for (const c of conversations) {
+    const dir = safeString(c?.last_message_direction).toLowerCase();
+    if (dir !== "in") continue;
+    const t = Date.parse(safeString(c?.last_message_at));
+    if (!Number.isFinite(t)) continue;
+    const closeAt = t + 24 * 60 * 60 * 1000;
+    if (closeAt > now) continue;
+    if (fromT != null && closeAt < fromT) continue;
+    if (toT != null && closeAt > toT) continue;
+    count += 1;
+  }
+  return count;
+}
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
 const OP_UTM_PREFIX: Record<string, string[]> = {
