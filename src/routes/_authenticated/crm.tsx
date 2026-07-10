@@ -35,7 +35,71 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DragScroll } from "@/components/drag-scroll";
 import { ChatEmbed } from "@/components/chat-page";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+function phoneVariants(raw: string | null | undefined): string[] {
+  const digits = String(raw ?? "").replace(/\D+/g, "");
+  if (!digits) return [];
+  const set = new Set<string>([digits]);
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (local.length === 10 || local.length === 11) set.add(`55${local}`);
+  if (digits.startsWith("55")) set.add(local);
+  if (local.length === 10) {
+    const withNine = `${local.slice(0, 2)}9${local.slice(2)}`;
+    set.add(withNine); set.add(`55${withNine}`);
+  }
+  if (local.length === 11 && local[2] === "9") {
+    const withoutNine = `${local.slice(0, 2)}${local.slice(3)}`;
+    set.add(withoutNine); set.add(`55${withoutNine}`);
+  }
+  return Array.from(set);
+}
+
+function useLeadAvatars(phones: (string | null | undefined)[]): Map<string, string> {
+  const [map, setMap] = useState<Map<string, string>>(new Map());
+  const key = useMemo(() => {
+    const all = new Set<string>();
+    for (const p of phones) for (const v of phoneVariants(p)) all.add(v);
+    return Array.from(all).sort().join(",");
+  }, [phones]);
+
+  useEffect(() => {
+    if (!key) { setMap(new Map()); return; }
+    let cancelled = false;
+    (async () => {
+      const ids = key.split(",").filter(Boolean);
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 200) chunks.push(ids.slice(i, i + 200));
+      const m = new Map<string, string>();
+      for (const c of chunks) {
+        const { data } = await supabase
+          .from("wa_conversations")
+          .select("contact_wa_id, contact_avatar_url")
+          .in("contact_wa_id", c)
+          .not("contact_avatar_url", "is", null);
+        for (const row of data ?? []) {
+          const digits = String((row as any).contact_wa_id ?? "").replace(/\D+/g, "");
+          const url = String((row as any).contact_avatar_url ?? "");
+          if (digits && url) m.set(digits, url);
+        }
+      }
+      if (!cancelled) setMap(m);
+    })();
+    return () => { cancelled = true; };
+  }, [key]);
+
+  return map;
+}
+
+function avatarFor(map: Map<string, string>, phone: string | null | undefined): string | null {
+  for (const v of phoneVariants(phone)) {
+    const hit = map.get(v);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 
 export const Route = createFileRoute("/_authenticated/crm")({
   component: CRMPage,
@@ -371,6 +435,9 @@ function Kanban({
     return map;
   }, [leads, stages]);
 
+  const avatarMap = useLeadAvatars(useMemo(() => leads.map((l) => l.telefone), [leads]));
+
+
 
   function onDragStart(e: DragEvent<HTMLDivElement>, lead: Lead) {
     e.dataTransfer.setData("application/x-lead-id", lead.id);
@@ -467,11 +534,13 @@ function Kanban({
                     lead={lead}
                     stageColor={s.cor}
                     tagColors={tagColors}
+                    avatarUrl={avatarFor(avatarMap, lead.telefone)}
                     onEdit={() => onEdit(lead)}
                     onOpenChat={() => openChatForLead(lead)}
                     onDragStart={onDragStart}
                   />
                 ))}
+
 
                 {items.length > shown && (
                   <button
@@ -513,11 +582,12 @@ function Kanban({
 
 
 function KanbanCard({
-  lead, stageColor, tagColors, onEdit, onOpenChat, onDragStart,
+  lead, stageColor, tagColors, avatarUrl, onEdit, onOpenChat, onDragStart,
 }: {
   lead: Lead;
   stageColor: string;
   tagColors: Map<string, string>;
+  avatarUrl?: string | null;
   onEdit: () => void;
   onOpenChat: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
@@ -548,12 +618,24 @@ function KanbanCard({
       </button>
 
       <div className="flex items-start gap-2.5">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
-          style={{ background: avatarColor, boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
-        >
-          {initials}
-        </div>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={lead.nome}
+            loading="lazy"
+            className="h-9 w-9 shrink-0 rounded-full object-cover ring-2"
+            style={{ boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
+            style={{ background: avatarColor, boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
+          >
+            {initials}
+          </div>
+        )}
+
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
