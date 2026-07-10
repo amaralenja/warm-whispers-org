@@ -46,7 +46,7 @@ export const getUazConfig = createServerFn({ method: "GET" })
       .maybeSingle();
     const row = (data ?? null) as { server_url: string | null; instance_token: string | null; updated_at: string | null } | null;
     return {
-      server_url: envServerUrl || row?.server_url ?? "",
+      server_url: envServerUrl || (row?.server_url ?? ""),
       // mascarado — não devolve o token cru
       has_token: hasEnvToken || !!row?.instance_token,
       token_preview: hasEnvToken ? "configurado no ambiente" : row?.instance_token ? `${row.instance_token.slice(0, 6)}…${row.instance_token.slice(-4)}` : "",
