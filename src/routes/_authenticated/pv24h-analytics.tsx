@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   BarChart3, Loader2, RefreshCw, Save, KeyRound, Check, Settings,
   ChevronRight, TrendingUp, DollarSign, ShoppingCart, Percent, Wallet, Layers, Megaphone, ImageIcon,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,11 +22,39 @@ import {
   togglePv24hStatus,
   type Pv24hCampaign, type Pv24hAdSet, type Pv24hAd, type Pv24hInsights,
 } from "@/lib/pv24h.functions";
+import { getVendorSession } from "@/lib/vendor-session";
 
 export const Route = createFileRoute("/_authenticated/pv24h-analytics")({
   head: () => ({ meta: [{ title: "Operação PV24H" }] }),
-  component: PV24HAnalyticsPage,
+  component: PV24HGate,
 });
+
+function PV24HGate() {
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  useEffect(() => { setIsAdmin(getVendorSession() === null); }, []);
+
+  if (isAdmin === null) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto max-w-xl p-8">
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <ShieldAlert className="h-10 w-10 text-amber-400" />
+            <h2 className="text-lg font-semibold">Área restrita</h2>
+            <p className="text-sm text-muted-foreground">Só administradores acessam a Operação PV24H.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  return <PV24HAnalyticsPage />;
+}
 
 const PRESETS = [
   { v: "today", label: "Hoje" },
