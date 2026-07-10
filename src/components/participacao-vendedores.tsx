@@ -18,8 +18,9 @@ const PALETTE = [
 ];
 
 function colorFor(i: number) {
+  const palette = Array.isArray(PALETTE) && PALETTE.length > 0 ? PALETTE : ["#10b981"];
   const idx = Number.isFinite(Number(i)) ? Math.abs(Math.trunc(Number(i))) : 0;
-  return PALETTE[idx % PALETTE.length] ?? PALETTE[0];
+  return palette[idx % palette.length] ?? palette[0];
 }
 
 function initials(s: unknown) {
@@ -257,21 +258,22 @@ export function ParticipacaoVendedores(props?: {
 function Donut({
   segments,
 }: {
-  segments: { label: string; value: number; color: string; pct: number }[];
+  segments?: { label: string; value: number; color: string; pct: number }[] | null;
 }) {
+  const safeSegments = Array.isArray(segments) ? segments : [];
   const SIZE = 176;
   const C = SIZE / 2;
   const R = 68;
   const INNER = 50;
-  const total = segments.reduce((a, s) => a + s.value, 0) || 1;
+  const total = safeSegments.reduce((a, s) => a + asNum(s?.value), 0) || 1;
 
   let start = -Math.PI / 2; // começa no topo
   return (
     <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="h-full w-full">
       {/* fundo */}
       <circle cx={C} cy={C} r={R} fill="none" stroke="hsl(var(--border) / 0.4)" strokeWidth={R - INNER} />
-      {segments.map((s, i) => {
-        const angle = (s.value / total) * Math.PI * 2;
+      {safeSegments.map((s, i) => {
+        const angle = (asNum(s?.value) / total) * Math.PI * 2;
         const end = start + angle;
         const large = angle > Math.PI ? 1 : 0;
         const x1 = C + R * Math.cos(start);
