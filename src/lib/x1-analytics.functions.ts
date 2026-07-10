@@ -191,7 +191,11 @@ async function computeJanelasFechadasSemAtendimento(
   toIso: string | null,
 ): Promise<{ count: number; leads: X1JanelaFechadaLead[] }> {
   const now = Date.now();
-  const fromT = fromIso ? Date.parse(fromIso) : null;
+  // Piso fixo: só contamos janelas fechadas a partir de 2026-07-10 (dados antigos
+  // eram atendidos por WhatsApp fora do sistema).
+  const FLOOR_MS = Date.parse("2026-07-10T00:00:00-03:00");
+  const fromRaw = fromIso ? Date.parse(fromIso) : null;
+  const fromT = Math.max(fromRaw ?? FLOOR_MS, FLOOR_MS);
   const toT = toIso ? Date.parse(toIso) : null;
   const candidates: Array<{ id: string; row: any; closeAt: number }> = [];
   for (const c of conversations) {
@@ -199,8 +203,9 @@ async function computeJanelasFechadasSemAtendimento(
     if (!Number.isFinite(t)) continue;
     const closeAt = t + 24 * 60 * 60 * 1000;
     if (closeAt > now) continue;
-    if (fromT != null && closeAt < fromT) continue;
+    if (closeAt < fromT) continue;
     if (toT != null && closeAt > toT) continue;
+
     const id = safeString(c?.id).trim();
     if (id) candidates.push({ id, row: c, closeAt });
   }
