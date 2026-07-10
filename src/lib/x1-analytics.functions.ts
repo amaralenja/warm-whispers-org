@@ -775,7 +775,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     // Conversas (todas com created_at no período OU last_message_at no período)
     const convQuery = supabase
       .from("wa_conversations")
-      .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, assigned_vendor_id")
+      .select("id, channel_id, contact_wa_id, operacao_id, created_at, last_message_at, last_message_direction, assigned_vendor_id")
       .order("id", { ascending: true });
     const allConversationsRaw = await pageAll<any>((from, to) => convQuery.range(from, to));
     const allConversations = allConversationsRaw.filter((c: any) => {
