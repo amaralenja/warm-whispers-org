@@ -311,14 +311,26 @@ function X1AnalyticsPage() {
             loading={isLoading}
           />
           <HeroMetric
-            title="Tempo de Resposta"
-            value={fmtDur(safeNumber(k?.tempoRespostaMedio))}
-            subtitle="Média no período"
-            icon={<Timer className="h-5 w-5" />}
-            tone="sky"
+            title="Janela fechada s/ atendimento"
+            value={fmtInt(safeNumber(k?.janelasFechadasSemAtendimento))}
+            subtitle="Leads sem NENHUMA resposta do vendedor"
+            icon={<Flame className="h-5 w-5" />}
+            tone="rose"
             loading={isLoading}
+            action={
+              (payload?.janelasFechadasSemAtendimentoLeads?.length ?? 0) > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowJanelaLeads(true)}
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-300 hover:bg-rose-500/20"
+                >
+                  Ver leads →
+                </button>
+              ) : null
+            }
           />
         </div>
+
 
         {/* FUNIL — leads → conversas → vendas */}
         <Card className="border-border/60">
