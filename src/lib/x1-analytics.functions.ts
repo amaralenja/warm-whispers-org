@@ -143,6 +143,7 @@ export type X1AnalyticsPayload = {
   operacoesDisponiveis: string[];
   canaisDisponiveis: X1CanalRow[];
   vendedoresDisponiveis: X1VendedorOpcao[];
+  janelasFechadasSemAtendimentoLeads: X1JanelaFechadaLead[];
 };
 
 const EMPTY: X1AnalyticsPayload = {
