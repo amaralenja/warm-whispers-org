@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getX1Analytics, type X1AnalyticsPayload } from "@/lib/x1-analytics.functions";
 import { generateX1AnalyticsPdf } from "@/lib/x1-analytics-pdf";
 import { toast } from "sonner";
@@ -94,6 +95,7 @@ function X1AnalyticsPage() {
   const [operacao, setOperacao] = useState<string>("all");
   const [channelId, setChannelId] = useState<string>("all");
   const [vendedorId, setVendedorId] = useState<string>("all");
+  const [showJanelaLeads, setShowJanelaLeads] = useState(false);
 
   const range = { from: dateRange.from ?? "", to: dateRange.to ?? dateRange.from ?? "" };
 
@@ -311,14 +313,26 @@ function X1AnalyticsPage() {
             loading={isLoading}
           />
           <HeroMetric
-            title="Tempo de Resposta"
-            value={fmtDur(safeNumber(k?.tempoRespostaMedio))}
-            subtitle="Média no período"
-            icon={<Timer className="h-5 w-5" />}
-            tone="sky"
+            title="Janela fechada s/ atendimento"
+            value={fmtInt(safeNumber(k?.janelasFechadasSemAtendimento))}
+            subtitle="Leads sem NENHUMA resposta do vendedor"
+            icon={<Flame className="h-5 w-5" />}
+            tone="rose"
             loading={isLoading}
+            action={
+              (payload?.janelasFechadasSemAtendimentoLeads?.length ?? 0) > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowJanelaLeads(true)}
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-300 hover:bg-rose-500/20"
+                >
+                  Ver leads →
+                </button>
+              ) : null
+            }
           />
         </div>
+
 
         {/* FUNIL — leads → conversas → vendas */}
         <Card className="border-border/60">
@@ -451,10 +465,10 @@ function X1AnalyticsPage() {
                 tone="indigo"
               />
               <MiniStat
-                icon={<Flame className="h-4 w-4" />}
-                label="Janela fechada s/ atendimento"
-                value={fmtInt(safeNumber(k?.janelasFechadasSemAtendimento))}
-                tone="rose"
+                icon={<Timer className="h-4 w-4" />}
+                label="Tempo de resposta médio"
+                value={fmtDur(safeNumber(k?.tempoRespostaMedio))}
+                tone="sky"
               />
               <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -603,6 +617,49 @@ function X1AnalyticsPage() {
           </Card>
         ) : null}
       </div>
+
+      <Dialog open={showJanelaLeads} onOpenChange={setShowJanelaLeads}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Leads com janela fechada sem atendimento</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {(payload?.janelasFechadasSemAtendimentoLeads?.length ?? 0) === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Nenhum lead nesse período.</p>
+            ) : (
+              <div className="divide-y divide-border/50">
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>Vendedor</span>
+                  <span>Telefone</span>
+                  <span>Fechou em</span>
+                </div>
+                {(payload?.janelasFechadasSemAtendimentoLeads ?? []).map((lead) => {
+                  const vendor = (payload?.vendedoresDisponiveis ?? []).find(
+                    (v) => Number(v.id) === Number(lead.vendorId),
+                  );
+                  const vendorNome = vendor?.nome ?? (lead.vendorId ? `#${lead.vendorId}` : "— sem vendedor");
+                  const closedAt = new Date(lead.closedAt).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <div
+                      key={lead.conversationId}
+                      className="grid grid-cols-[1fr_1fr_auto] items-center gap-3 py-2 text-sm"
+                    >
+                      <span className="truncate">{vendorNome}</span>
+                      <span className="font-mono">{lead.telefone || "—"}</span>
+                      <span className="text-xs text-muted-foreground">{closedAt}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -626,6 +683,7 @@ function HeroMetric({
   icon,
   tone,
   loading,
+  action,
 }: {
   title: string;
   value: string;
@@ -633,6 +691,7 @@ function HeroMetric({
   icon: React.ReactNode;
   tone: keyof typeof TONES;
   loading?: boolean;
+  action?: React.ReactNode;
 }) {
   const t = TONES[tone];
   return (
@@ -652,10 +711,12 @@ function HeroMetric({
           <p className="font-mono text-3xl font-black tracking-tight tabular-nums">{value}</p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        {action}
       </div>
     </div>
   );
 }
+
 
 function FunnelStep({
   label,

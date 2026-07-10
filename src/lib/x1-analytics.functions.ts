@@ -143,6 +143,7 @@ export type X1AnalyticsPayload = {
   operacoesDisponiveis: string[];
   canaisDisponiveis: X1CanalRow[];
   vendedoresDisponiveis: X1VendedorOpcao[];
+  janelasFechadasSemAtendimentoLeads: X1JanelaFechadaLead[];
 };
 
 const EMPTY: X1AnalyticsPayload = {
@@ -168,21 +169,29 @@ const EMPTY: X1AnalyticsPayload = {
   operacoesDisponiveis: [],
   canaisDisponiveis: [],
   vendedoresDisponiveis: [],
+  janelasFechadasSemAtendimentoLeads: [],
 };
 
 // "Sem atendimento" = vendedor NUNCA mandou mensagem nessa conversa.
 // A janela WhatsApp fecha 24h após o último inbound; contamos quando esse
 // fechamento cai no período selecionado.
+export type X1JanelaFechadaLead = {
+  conversationId: string;
+  telefone: string;
+  vendorId: number | null;
+  closedAt: string; // ISO
+};
+
 async function computeJanelasFechadasSemAtendimento(
   db: any,
   conversations: any[],
   fromIso: string | null,
   toIso: string | null,
-): Promise<number> {
+): Promise<{ count: number; leads: X1JanelaFechadaLead[] }> {
   const now = Date.now();
   const fromT = fromIso ? Date.parse(fromIso) : null;
   const toT = toIso ? Date.parse(toIso) : null;
-  const candidates: string[] = [];
+  const candidates: Array<{ id: string; row: any; closeAt: number }> = [];
   for (const c of conversations) {
     const t = Date.parse(safeString(c?.last_message_at));
     if (!Number.isFinite(t)) continue;
@@ -191,12 +200,12 @@ async function computeJanelasFechadasSemAtendimento(
     if (fromT != null && closeAt < fromT) continue;
     if (toT != null && closeAt > toT) continue;
     const id = safeString(c?.id).trim();
-    if (id) candidates.push(id);
+    if (id) candidates.push({ id, row: c, closeAt });
   }
-  if (candidates.length === 0) return 0;
+  if (candidates.length === 0) return { count: 0, leads: [] };
 
   const withOutbound = new Set<string>();
-  for (const chunk of chunkArray(candidates, 200)) {
+  for (const chunk of chunkArray(candidates.map((c) => c.id), 200)) {
     const { data, error } = await db
       .from("wa_messages")
       .select("conversation_id")
@@ -210,7 +219,16 @@ async function computeJanelasFechadasSemAtendimento(
       if (id) withOutbound.add(id);
     }
   }
-  return candidates.filter((id) => !withOutbound.has(id)).length;
+  const leads: X1JanelaFechadaLead[] = candidates
+    .filter((c) => !withOutbound.has(c.id))
+    .map((c) => ({
+      conversationId: c.id,
+      telefone: safeString(c.row?.contact_wa_id),
+      vendorId: numericId(c.row?.assigned_vendor_id),
+      closedAt: new Date(c.closeAt).toISOString(),
+    }))
+    .sort((a, b) => b.closedAt.localeCompare(a.closedAt));
+  return { count: leads.length, leads };
 }
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
@@ -681,7 +699,7 @@ async function getVendorX1Analytics(
   }
 
   const novosLeads = leadKeys.size;
-  const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(db, assignedConversations, fromIso, toIso);
+  const janelaResult = await computeJanelasFechadasSemAtendimento(db, assignedConversations, fromIso, toIso);
   return {
     kpis: {
       novosLeads,
@@ -695,7 +713,7 @@ async function getVendorX1Analytics(
       conversao: novosLeads > 0 ? vendas / novosLeads : 0,
       contatosUnicos,
       tempoRespostaMedio,
-      janelasFechadasSemAtendimento,
+      janelasFechadasSemAtendimento: janelaResult.count,
     },
     porOperacao: opRows,
     porVendedor,
@@ -704,6 +722,7 @@ async function getVendorX1Analytics(
     operacoesDisponiveis: Array.from(operacoesSet).sort(),
     canaisDisponiveis,
     vendedoresDisponiveis: [],
+    janelasFechadasSemAtendimentoLeads: janelaResult.leads,
   };
 }
 
@@ -1133,7 +1152,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const serieHoraria = Array.from(hourMap.values());
 
     const novosLeads = allLeadKeys.size;
-    const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(supabase, allConversations, fromIso, toIso);
+    const janelaResult = await computeJanelasFechadasSemAtendimento(supabase, allConversations, fromIso, toIso);
     return {
       kpis: {
         novosLeads,
@@ -1147,7 +1166,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         conversao: novosLeads > 0 ? vendasScoped.length / novosLeads : 0,
         contatosUnicos,
         tempoRespostaMedio,
-        janelasFechadasSemAtendimento,
+        janelasFechadasSemAtendimento: janelaResult.count,
       },
       porOperacao: opRows,
       porVendedor,
@@ -1164,5 +1183,6 @@ export const getX1Analytics = createServerFn({ method: "POST" })
           fotoUrl: safeNullableString(v.foto_url),
         }))
         .sort((a: X1VendedorOpcao, b: X1VendedorOpcao) => a.nome.localeCompare(b.nome)),
+      janelasFechadasSemAtendimentoLeads: janelaResult.leads,
     };
   });
