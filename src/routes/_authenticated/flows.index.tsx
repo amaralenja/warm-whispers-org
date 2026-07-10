@@ -735,7 +735,33 @@ function FlowsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk delete confirmation */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500">
+              <Trash2 className="h-5 w-5" /> Apagar {selected.size} fluxo{selected.size === 1 ? "" : "s"}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground pt-2">
+            Essa ação não pode ser desfeita. Os fluxos selecionados e seus gatilhos serão removidos.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} disabled={bulkDelMut.isPending}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={bulkDelMut.isPending}
+              onClick={() => bulkDelMut.mutate(Array.from(selected))}
+            >
+              {bulkDelMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Apagar {selected.size}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
