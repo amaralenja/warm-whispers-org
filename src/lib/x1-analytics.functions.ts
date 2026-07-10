@@ -1152,7 +1152,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const serieHoraria = Array.from(hourMap.values());
 
     const novosLeads = allLeadKeys.size;
-    const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(supabase, allConversations, fromIso, toIso);
+    const janelaResult = await computeJanelasFechadasSemAtendimento(supabase, allConversations, fromIso, toIso);
     return {
       kpis: {
         novosLeads,
@@ -1166,7 +1166,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         conversao: novosLeads > 0 ? vendasScoped.length / novosLeads : 0,
         contatosUnicos,
         tempoRespostaMedio,
-        janelasFechadasSemAtendimento,
+        janelasFechadasSemAtendimento: janelaResult.count,
       },
       porOperacao: opRows,
       porVendedor,
@@ -1183,5 +1183,6 @@ export const getX1Analytics = createServerFn({ method: "POST" })
           fotoUrl: safeNullableString(v.foto_url),
         }))
         .sort((a: X1VendedorOpcao, b: X1VendedorOpcao) => a.nome.localeCompare(b.nome)),
+      janelasFechadasSemAtendimentoLeads: janelaResult.leads,
     };
   });
