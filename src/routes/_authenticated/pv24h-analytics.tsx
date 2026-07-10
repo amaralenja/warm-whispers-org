@@ -44,6 +44,7 @@ function PV24HAnalyticsPage() {
 
   const [tokenInput, setTokenInput] = useState("");
   const [preset, setPreset] = useState<Preset>("last_7d");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const configQ = useQuery({
     queryKey: ["pv24h", "config"],
