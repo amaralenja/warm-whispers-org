@@ -95,6 +95,7 @@ function X1AnalyticsPage() {
   const [operacao, setOperacao] = useState<string>("all");
   const [channelId, setChannelId] = useState<string>("all");
   const [vendedorId, setVendedorId] = useState<string>("all");
+  const [showJanelaLeads, setShowJanelaLeads] = useState(false);
 
   const range = { from: dateRange.from ?? "", to: dateRange.to ?? dateRange.from ?? "" };
 
