@@ -80,56 +80,6 @@ export const Route = createFileRoute("/api/public/ht-quiz/submit")({
           if (!result?.ok) return json(401, { ok: false, error: result?.error ?? "Token inválido ou revogado" });
 
           return json(200, { ok: true, id: result.id, received_at: result.received_at });
-
-          const insert: Record<string, unknown> = {
-            status,
-            nome: pickStr(b.nome ?? b.name),
-            email: pickStr(b.email),
-            whatsapp: pickStr(b.whatsapp ?? b.phone ?? b.telefone),
-            instagram: pickStr(b.instagram),
-            utm_source: pickStr(b.utm_source),
-            utm_medium: pickStr(b.utm_medium),
-            utm_campaign: pickStr(b.utm_campaign),
-            utm_content: pickStr(b.utm_content),
-            fbc: pickStr(b.fbc),
-            fbp: pickStr(b.fbp),
-            fbclid: pickStr(b.fbclid),
-            gclid: pickStr(b.gclid),
-            respostas,
-            raw: b,
-            updated_at: new Date().toISOString(),
-          };
-
-          // Se veio session_id: upsert por (token_id, session_id) — nunca duplica o mesmo lead
-          // e vai atualizando parcialmente até o completed.
-          let sub: any = null;
-          let insErr: any = null;
-          if (session_id) {
-            const res = await supabaseAdmin
-              .from("ht_quiz_submissions" as any)
-              .upsert(insert, { onConflict: "token_id,session_id" })
-              .select("id, received_at")
-              .single();
-            sub = res.data; insErr = res.error;
-          } else {
-            const res = await supabaseAdmin
-              .from("ht_quiz_submissions" as any)
-              .insert(insert)
-              .select("id, received_at")
-              .single();
-            sub = res.data; insErr = res.error;
-          }
-
-          if (insErr) return json(500, { ok: false, error: "Erro ao salvar submissão: " + insErr.message });
-
-
-          // fire-and-forget update last_used_at
-          void supabaseAdmin
-            .from("ht_api_tokens" as any)
-            .update({ last_used_at: new Date().toISOString() })
-            .eq("id", (tok as any).id);
-
-          return json(200, { ok: true, id: (sub as any).id, received_at: (sub as any).received_at });
         } catch (e: any) {
           return json(500, { ok: false, error: e?.message ?? "erro interno" });
         }
