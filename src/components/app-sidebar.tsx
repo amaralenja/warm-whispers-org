@@ -180,13 +180,17 @@ export function AppSidebar() {
   const visibleMain = mainItems.filter((i) => i.url === "/tasks" || canSee(perm, keyFromUrl(i.url)));
   const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
   const visibleHT = highTicketItems.filter((i) => canSee(perm, "high-ticket", keyFromUrl(i.url)));
+  const visiblePV24H = pv24hItems.filter((i) => canSee(perm, "pv24h", keyFromUrl(i.url)));
   const showOpX1Group = canSee(perm, "operacao-x1") && visibleOpX1.length > 0;
   const showHTGroup = canSee(perm, "high-ticket") && visibleHT.length > 0;
+  const showPV24HGroup = canSee(perm, "pv24h") && visiblePV24H.length > 0;
 
   const highTicketActive = visibleHT.some((i) => pathname === i.url);
   const [highTicketOpen, setHighTicketOpen] = useState(highTicketActive);
   const operacaoX1Active = visibleOpX1.some((i) => pathname === i.url);
   const [operacaoX1Open, setOperacaoX1Open] = useState(operacaoX1Active);
+  const pv24hActive = visiblePV24H.some((i) => pathname === i.url);
+  const [pv24hOpen, setPv24hOpen] = useState(pv24hActive);
 
 
   async function handleSignOut() {
