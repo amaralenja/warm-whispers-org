@@ -699,7 +699,7 @@ async function getVendorX1Analytics(
   }
 
   const novosLeads = leadKeys.size;
-  const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(db, assignedConversations, fromIso, toIso);
+  const janelaResult = await computeJanelasFechadasSemAtendimento(db, assignedConversations, fromIso, toIso);
   return {
     kpis: {
       novosLeads,
@@ -713,7 +713,7 @@ async function getVendorX1Analytics(
       conversao: novosLeads > 0 ? vendas / novosLeads : 0,
       contatosUnicos,
       tempoRespostaMedio,
-      janelasFechadasSemAtendimento,
+      janelasFechadasSemAtendimento: janelaResult.count,
     },
     porOperacao: opRows,
     porVendedor,
@@ -722,6 +722,7 @@ async function getVendorX1Analytics(
     operacoesDisponiveis: Array.from(operacoesSet).sort(),
     canaisDisponiveis,
     vendedoresDisponiveis: [],
+    janelasFechadasSemAtendimentoLeads: janelaResult.leads,
   };
 }
 
