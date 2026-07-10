@@ -617,6 +617,49 @@ function X1AnalyticsPage() {
           </Card>
         ) : null}
       </div>
+
+      <Dialog open={showJanelaLeads} onOpenChange={setShowJanelaLeads}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Leads com janela fechada sem atendimento</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {(payload?.janelasFechadasSemAtendimentoLeads?.length ?? 0) === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Nenhum lead nesse período.</p>
+            ) : (
+              <div className="divide-y divide-border/50">
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>Vendedor</span>
+                  <span>Telefone</span>
+                  <span>Fechou em</span>
+                </div>
+                {(payload?.janelasFechadasSemAtendimentoLeads ?? []).map((lead) => {
+                  const vendor = (payload?.vendedoresDisponiveis ?? []).find(
+                    (v) => Number(v.id) === Number(lead.vendorId),
+                  );
+                  const vendorNome = vendor?.nome ?? (lead.vendorId ? `#${lead.vendorId}` : "— sem vendedor");
+                  const closedAt = new Date(lead.closedAt).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <div
+                      key={lead.conversationId}
+                      className="grid grid-cols-[1fr_1fr_auto] items-center gap-3 py-2 text-sm"
+                    >
+                      <span className="truncate">{vendorNome}</span>
+                      <span className="font-mono">{lead.telefone || "—"}</span>
+                      <span className="text-xs text-muted-foreground">{closedAt}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
