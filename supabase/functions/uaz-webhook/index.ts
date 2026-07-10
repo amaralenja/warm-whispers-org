@@ -69,22 +69,60 @@ Deno.serve(async (req) => {
 
   // Atualiza foto de perfil do contato nas conversas ao vivo (só daqui pra frente).
   try {
-    const avatar = pickAvatar(payload);
     const contact = pickContactId(payload);
-    if (avatar && contact) {
-      const variants = Array.from(new Set([
-        contact,
-        contact.replace(/^55/, ""),
-        `55${contact.replace(/^55/, "")}`,
-      ])).filter(Boolean);
-      await supabase
-        .from("wa_conversations")
-        .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
-        .in("contact_wa_id", variants);
+    if (contact) {
+      let avatar = pickAvatar(payload);
+
+      // Fallback: se o payload não trouxe foto, busca via API UAZ
+      if (!avatar) {
+        try {
+          const { data: cfg } = await supabase
+            .from("uaz_config")
+            .select("server_url, instance_token")
+            .eq("id", 1)
+            .maybeSingle();
+          const serverUrl = String(cfg?.server_url ?? "").trim().replace(/\/+$/, "");
+          const token = String(cfg?.instance_token ?? "").trim();
+          if (serverUrl && token) {
+            const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/getContactInfo"];
+            for (const path of paths) {
+              try {
+                const r = await fetch(`${serverUrl}${path}`, {
+                  method: "POST",
+                  headers: { token, "Content-Type": "application/json", Accept: "application/json" },
+                  body: JSON.stringify({ number: contact }),
+                });
+                if (!r.ok) continue;
+                const j: any = await r.json().catch(() => null);
+                const img = j?.imgUrl ?? j?.image ?? j?.imageUrl ?? j?.picture ?? j?.profilePicUrl ?? null;
+                if (img && typeof img === "string" && /^https?:\/\//i.test(img)) {
+                  avatar = img;
+                  break;
+                }
+              } catch { /* try next */ }
+            }
+          }
+        } catch (e) {
+          console.error("[uaz-webhook] avatar fetch error", e);
+        }
+      }
+
+      if (avatar) {
+        const variants = Array.from(new Set([
+          contact,
+          contact.replace(/^55/, ""),
+          `55${contact.replace(/^55/, "")}`,
+        ])).filter(Boolean);
+        await supabase
+          .from("wa_conversations")
+          .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
+          .in("contact_wa_id", variants);
+      }
     }
   } catch (e) {
     console.error("[uaz-webhook] avatar update error", e);
   }
+
 
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
