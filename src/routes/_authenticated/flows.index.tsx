@@ -463,6 +463,40 @@ function FlowsListPage() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card/40 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox
+            checked={filtered.length > 0 && filtered.every((f: any) => selected.has(f.id))}
+            onCheckedChange={(v) => {
+              if (v) setSelected(new Set(filtered.map((f: any) => f.id)));
+              else clearSel();
+            }}
+          />
+          <span>
+            {selected.size > 0
+              ? `${selected.size} selecionado${selected.size === 1 ? "" : "s"}`
+              : `Selecionar todos os ${filtered.length} filtrado${filtered.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {selected.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={clearSel}>Limpar</Button>
+          )}
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={selected.size === 0 || bulkDelMut.isPending}
+            onClick={() => setBulkConfirmOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Apagar selecionados</span>
+          </Button>
+        </div>
+      </div>
+
+
+
       {filtered.length === 0 ? (
         <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground">
           Nenhum fluxo criado ainda. Clique em <strong>Novo fluxo</strong> ou <strong>Importar código</strong>.
