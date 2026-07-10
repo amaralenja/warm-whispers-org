@@ -508,13 +508,18 @@ async function fetchContactAvatarFromUaz(supabase: any, contactWaId: string): Pr
   const cfg = await loadUazAvatarConfig(supabase);
   if (!cfg) return null;
 
-  const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/GetContactInfo", "/chat/getContactInfo"];
+  const paths = ["/chat/details", "/chat/GetNameAndImageURL", "/chat/getNameAndImageURL"];
   const numbers = brPhoneVariants(contactWaId);
   for (const number of numbers) {
     const payloads = [
       { number },
+      { number, preview: true },
+      { Number: number },
       { phone: number },
+      { Phone: number },
+      { contact: number },
       { chatid: `${number}@s.whatsapp.net` },
+      { chatId: `${number}@s.whatsapp.net` },
       { jid: `${number}@s.whatsapp.net` },
     ];
     for (const path of paths) {
@@ -525,10 +530,14 @@ async function fetchContactAvatarFromUaz(supabase: any, contactWaId: string): Pr
             headers: { token: cfg.token, "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify(body),
           });
-          if (!res.ok) continue;
+          if (!res.ok) {
+            console.info("[wa-webhook] avatar attempt failed", { path, status: res.status, bodyKeys: Object.keys(body) });
+            continue;
+          }
           const json = await res.json().catch(() => null);
           const avatar = pickUazAvatar(json);
           if (avatar) return avatar;
+          console.info("[wa-webhook] avatar attempt without image", { path, bodyKeys: Object.keys(body), responseKeys: json && typeof json === "object" ? Object.keys(json).slice(0, 8) : [] });
         } catch {
           // tenta a próxima combinação
         }

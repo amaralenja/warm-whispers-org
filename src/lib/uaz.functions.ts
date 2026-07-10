@@ -194,7 +194,7 @@ export const getUazProfilePic = createServerFn({ method: "POST" })
     if (!cfg) return { image: null as string | null, name: null as string | null, error: "uaz_not_configured" };
     const { server_url, instance_token } = cfg;
 
-    // uazapiGO V2 — POST /chat/GetNameAndImageURL  { number }
+    // uazapiGO V2 — POST /chat/details  { number, preview }
     async function callEndpoint(path: string, body: Record<string, unknown>) {
       const res = await fetch(`${server_url}${path}`, {
         method: "POST",
@@ -212,9 +212,9 @@ export const getUazProfilePic = createServerFn({ method: "POST" })
     }
 
     const attempts = [
+      { path: "/chat/details", body: { number: data.phone, preview: true } },
       { path: "/chat/GetNameAndImageURL", body: { number: data.phone } },
       { path: "/chat/getNameAndImageURL", body: { number: data.phone } },
-      { path: "/chat/getContactInfo", body: { number: data.phone } },
     ];
 
     for (const a of attempts) {
@@ -222,8 +222,13 @@ export const getUazProfilePic = createServerFn({ method: "POST" })
         const r = await callEndpoint(a.path, a.body);
         if (!r.ok || !r.json) continue;
         const j = r.json;
-        const image = j.imgUrl ?? j.image ?? j.imageUrl ?? j.picture ?? j.profilePicUrl ?? null;
-        const name = j.name ?? j.pushname ?? j.verifiedName ?? null;
+        const image =
+          j.imgUrl ?? j.image ?? j.imageUrl ?? j.picture ?? j.profilePicUrl ?? j.profilePictureUrl ?? j.wa_profilePicUrl ??
+          j.data?.imgUrl ?? j.data?.image ?? j.data?.imageUrl ?? j.data?.picture ?? j.data?.profilePicUrl ?? j.data?.profilePictureUrl ?? j.data?.wa_profilePicUrl ??
+          j.result?.imgUrl ?? j.result?.image ?? j.result?.imageUrl ?? j.result?.picture ?? j.result?.profilePicUrl ?? j.result?.profilePictureUrl ?? j.result?.wa_profilePicUrl ??
+          j.contact?.imgUrl ?? j.contact?.image ?? j.contact?.imageUrl ?? j.contact?.picture ?? j.contact?.profilePicUrl ?? j.contact?.profilePictureUrl ?? j.contact?.wa_profilePicUrl ??
+          null;
+        const name = j.name ?? j.pushname ?? j.verifiedName ?? j.data?.name ?? j.data?.pushname ?? j.result?.name ?? j.contact?.name ?? null;
         if (image || name) return { image, name, error: null };
       } catch { /* try next */ }
     }
