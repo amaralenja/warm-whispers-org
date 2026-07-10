@@ -212,9 +212,8 @@ function AdminPage() {
             Cola essa URL no campo <b>Webhook</b> da sua instância no painel da UAZ. Aceita POST, sem auth, sem CORS.
           </p>
           {(() => {
-            const webhookUrl = typeof window !== "undefined"
-              ? `${window.location.origin}/api/public/uaz/webhook`
-              : "/api/public/uaz/webhook";
+            const webhookUrl = `https://wvcwrozwnwdlpandwubp.supabase.co/functions/v1/uaz-webhook`;
+
             return (
               <div className="flex gap-2">
                 <Input readOnly value={webhookUrl} className="font-mono text-xs" />

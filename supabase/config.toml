@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.calls-tick]
 verify_jwt = false
+
+[functions.uaz-webhook]
+verify_jwt = false
+
