@@ -582,11 +582,12 @@ function Kanban({
 
 
 function KanbanCard({
-  lead, stageColor, tagColors, onEdit, onOpenChat, onDragStart,
+  lead, stageColor, tagColors, avatarUrl, onEdit, onOpenChat, onDragStart,
 }: {
   lead: Lead;
   stageColor: string;
   tagColors: Map<string, string>;
+  avatarUrl?: string | null;
   onEdit: () => void;
   onOpenChat: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
@@ -617,12 +618,24 @@ function KanbanCard({
       </button>
 
       <div className="flex items-start gap-2.5">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
-          style={{ background: avatarColor, boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
-        >
-          {initials}
-        </div>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={lead.nome}
+            loading="lazy"
+            className="h-9 w-9 shrink-0 rounded-full object-cover ring-2"
+            style={{ boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm ring-2"
+            style={{ background: avatarColor, boxShadow: `0 0 0 2px ${hexToRgba(avatarColor, 0.25)}` }}
+          >
+            {initials}
+          </div>
+        )}
+
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
