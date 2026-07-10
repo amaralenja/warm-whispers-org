@@ -95,10 +95,6 @@ function pickUazAvatar(j: any): string | null {
 }
 
 async function loadUazConfig(supabase: any): Promise<{ serverUrl: string; token: string } | null> {
-  const envUrl = normalizeServer(Deno.env.get("UAZ_SERVER_URL"));
-  const envToken = String(Deno.env.get("UAZ_INSTANCE_TOKEN") ?? "").trim();
-  if (envUrl && envToken) return { serverUrl: envUrl, token: envToken };
-
   const { data: cfg } = await supabase
     .from("uaz_config")
     .select("server_url, instance_token")
@@ -106,7 +102,11 @@ async function loadUazConfig(supabase: any): Promise<{ serverUrl: string; token:
     .maybeSingle();
   const serverUrl = normalizeServer(cfg?.server_url);
   const token = String(cfg?.instance_token ?? "").trim();
-  return serverUrl && token ? { serverUrl, token } : null;
+  if (serverUrl && token) return { serverUrl, token };
+
+  const envUrl = normalizeServer(Deno.env.get("UAZ_SERVER_URL"));
+  const envToken = String(Deno.env.get("UAZ_INSTANCE_TOKEN") ?? "").trim();
+  return envUrl && envToken ? { serverUrl: envUrl, token: envToken } : null;
 }
 
 async function fetchUazAvatar(supabase: any, contact: string): Promise<string | null> {
