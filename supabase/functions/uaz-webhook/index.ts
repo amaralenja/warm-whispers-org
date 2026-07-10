@@ -181,6 +181,52 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Backfill: atualiza avatars das conversas de hoje (00:00 até agora).
+  if (payload?.action === "backfill_today") {
+    const since = payload?.since
+      ? new Date(payload.since).toISOString()
+      : new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const { data: convs, error } = await supabase
+      .from("wa_conversations")
+      .select("id, contact_wa_id, contact_avatar_url, updated_at")
+      .gte("updated_at", since)
+      .order("updated_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      return new Response(JSON.stringify({ ok: false, error: error.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    const force = Boolean(payload?.force);
+    let updated = 0, missed = 0, skipped = 0;
+    for (const c of convs ?? []) {
+      if (!force && c.contact_avatar_url) { skipped++; continue; }
+      const contact = digits(String(c.contact_wa_id ?? "").split("@")[0]);
+      if (!contact) { missed++; continue; }
+      try {
+        const avatar = await fetchUazAvatar(supabase, contact);
+        if (avatar) {
+          const variants = phoneVariants(contact);
+          await supabase
+            .from("wa_conversations")
+            .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
+            .in("contact_wa_id", variants);
+          updated++;
+        } else {
+          missed++;
+        }
+      } catch (e) {
+        console.error("[uaz-webhook] backfill error", contact, e);
+        missed++;
+      }
+    }
+    return new Response(JSON.stringify({ ok: true, total: convs?.length ?? 0, updated, missed, skipped, since }), {
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+
   try {
     await supabase.from("uaz_webhook_events").insert({
       event_type: payload?.event ?? payload?.type ?? "unknown",
