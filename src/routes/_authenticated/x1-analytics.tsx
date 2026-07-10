@@ -42,7 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import { getX1Analytics, type X1AnalyticsPayload } from "@/lib/x1-analytics.functions";
 import { generateX1AnalyticsPdf } from "@/lib/x1-analytics-pdf";
 import { toast } from "sonner";
