@@ -1128,6 +1128,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         conversao: novosLeads > 0 ? vendasScoped.length / novosLeads : 0,
         contatosUnicos,
         tempoRespostaMedio,
+        janelasFechadasSemAtendimento: computeJanelasFechadasSemAtendimento(allConversations, fromIso, toIso),
       },
       porOperacao: opRows,
       porVendedor,
