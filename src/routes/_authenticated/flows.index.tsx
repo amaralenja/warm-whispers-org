@@ -121,6 +121,24 @@ function FlowsListPage() {
     },
   });
 
+  const bulkDelMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      let ok = 0, fail = 0;
+      for (const id of ids) {
+        try { await deleteFlowFn({ data: { id } }); ok++; }
+        catch (e) { console.error("[bulk-del] fail", id, e); fail++; }
+      }
+      return { ok, fail };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+      clearSel();
+      setBulkConfirmOpen(false);
+      if (r.fail === 0) toast.success(`${r.ok} fluxo${r.ok === 1 ? "" : "s"} removido${r.ok === 1 ? "" : "s"}`);
+      else toast.warning(`${r.ok} removidos, ${r.fail} falharam`);
+    },
+  });
+
   const toggleMut = useMutation({
     mutationFn: (v: { id: string; ativo: boolean }) => saveFn({ data: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-flows"] }),
