@@ -23,7 +23,7 @@ import {
   listFlows, createFlow, deleteFlow, saveFlow,
   duplicateFlow, exportFlow, importFlow,
 } from "@/lib/flow-engine.functions";
-import { importZapVoiceBackup } from "@/lib/zapvoice-import.functions";
+import { importZapVoiceBackup, uploadZapVoiceMedia } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 
 export const Route = createFileRoute("/_authenticated/flows/")({
