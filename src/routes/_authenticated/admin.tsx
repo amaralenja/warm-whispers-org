@@ -202,6 +202,40 @@ function AdminPage() {
       </header>
 
       <Card>
+        <CardContent className="space-y-3 pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <LinkIcon className="h-4 w-4" /> Webhook URL da instância UAZ
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cola essa URL no campo <b>Webhook</b> da sua instância no painel da UAZ. Aceita POST, sem auth, sem CORS.
+          </p>
+          {(() => {
+            const webhookUrl = typeof window !== "undefined"
+              ? `${window.location.origin}/api/public/uaz/webhook`
+              : "/api/public/uaz/webhook";
+            return (
+              <div className="flex gap-2">
+                <Input readOnly value={webhookUrl} className="font-mono text-xs" />
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(webhookUrl);
+                    toast.success("URL copiada");
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Copiar
+                </Button>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+
+      <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
