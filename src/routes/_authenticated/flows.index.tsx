@@ -42,6 +42,7 @@ function FlowsListPage() {
   const exportFn = useServerFn(exportFlow);
   const importFn = useServerFn(importFlow);
   const importZvFn = useServerFn(importZapVoiceBackup);
+  const uploadZvMediaFn = useServerFn(uploadZapVoiceMedia);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
