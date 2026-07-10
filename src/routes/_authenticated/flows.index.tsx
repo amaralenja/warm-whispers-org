@@ -71,10 +71,20 @@ function FlowsListPage() {
     if (preferred && (!zvOp || !allowedOps.has(zvOp))) setZvOp(preferred);
   }, [workspace.id, workspaces, op, importOp, zvOp]);
 
-  // Export
   const [exportOpen, setExportOpen] = useState(false);
   const [exportCode, setExportCode] = useState("");
   const [exportFlowName, setExportFlowName] = useState("");
+
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const toggleSel = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  const clearSel = () => setSelected(new Set());
 
   const { data: flows = [] } = useQuery({
     queryKey: ["wa-flows"],
