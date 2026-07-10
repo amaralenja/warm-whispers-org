@@ -1460,6 +1460,27 @@ export type Database = {
         }
         Relationships: []
       }
+      uaz_webhook_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json | null
+        }
+        Insert: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json | null
+        }
+        Relationships: []
+      }
       vendas: {
         Row: {
           Campanha: string | null
