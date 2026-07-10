@@ -22,6 +22,7 @@ import { Route as AuthenticatedSopsRouteImport } from './routes/_authenticated/s
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
+import { Route as AuthenticatedPv24hAnalyticsRouteImport } from './routes/_authenticated/pv24h-analytics'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
 import { Route as AuthenticatedHtKanbanSdrRouteImport } from './routes/_authenticated/ht-kanban-sdr'
 import { Route as AuthenticatedHtKanbanCloserRouteImport } from './routes/_authenticated/ht-kanban-closer'
@@ -112,6 +113,12 @@ const AuthenticatedQuizRoute = AuthenticatedQuizRouteImport.update({
   path: '/quiz',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPv24hAnalyticsRoute =
+  AuthenticatedPv24hAnalyticsRouteImport.update({
+    id: '/pv24h-analytics',
+    path: '/pv24h-analytics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMetaAdsRoute = AuthenticatedMetaAdsRouteImport.update({
   id: '/meta-ads',
   path: '/meta-ads',
@@ -260,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
+  '/pv24h-analytics': typeof AuthenticatedPv24hAnalyticsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -298,6 +306,7 @@ export interface FileRoutesByTo {
   '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
+  '/pv24h-analytics': typeof AuthenticatedPv24hAnalyticsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -338,6 +347,7 @@ export interface FileRoutesById {
   '/_authenticated/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/_authenticated/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
+  '/_authenticated/pv24h-analytics': typeof AuthenticatedPv24hAnalyticsRoute
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/ht-kanban-closer'
     | '/ht-kanban-sdr'
     | '/meta-ads'
+    | '/pv24h-analytics'
     | '/quiz'
     | '/ranking'
     | '/relatorios'
@@ -416,6 +427,7 @@ export interface FileRouteTypes {
     | '/ht-kanban-closer'
     | '/ht-kanban-sdr'
     | '/meta-ads'
+    | '/pv24h-analytics'
     | '/quiz'
     | '/ranking'
     | '/relatorios'
@@ -455,6 +467,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ht-kanban-closer'
     | '/_authenticated/ht-kanban-sdr'
     | '/_authenticated/meta-ads'
+    | '/_authenticated/pv24h-analytics'
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
@@ -588,6 +601,13 @@ declare module '@tanstack/react-router' {
       path: '/quiz'
       fullPath: '/quiz'
       preLoaderRoute: typeof AuthenticatedQuizRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pv24h-analytics': {
+      id: '/_authenticated/pv24h-analytics'
+      path: '/pv24h-analytics'
+      fullPath: '/pv24h-analytics'
+      preLoaderRoute: typeof AuthenticatedPv24hAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/meta-ads': {
@@ -773,6 +793,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHtKanbanCloserRoute: typeof AuthenticatedHtKanbanCloserRoute
   AuthenticatedHtKanbanSdrRoute: typeof AuthenticatedHtKanbanSdrRoute
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
+  AuthenticatedPv24hAnalyticsRoute: typeof AuthenticatedPv24hAnalyticsRoute
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
@@ -798,6 +819,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHtKanbanCloserRoute: AuthenticatedHtKanbanCloserRoute,
   AuthenticatedHtKanbanSdrRoute: AuthenticatedHtKanbanSdrRoute,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
+  AuthenticatedPv24hAnalyticsRoute: AuthenticatedPv24hAnalyticsRoute,
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,

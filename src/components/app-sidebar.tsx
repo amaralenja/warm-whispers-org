@@ -28,6 +28,7 @@ import {
   Settings2,
   Kanban,
   Target,
+  Zap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -82,6 +83,10 @@ const highTicketItems: Item[] = [
   { title: "API", url: "/ht-api", icon: KeyRound },
 ];
 
+const pv24hItems: Item[] = [
+  { title: "Analytics", url: "/pv24h-analytics", icon: BarChart3 },
+];
+
 const URL_TO_KEY: Record<string, string> = {
   "/dashboard": "dashboard",
   "/relatorios": "relatorios",
@@ -103,6 +108,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/sops": "sops",
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",
+  "/pv24h-analytics": "pv24h-analytics",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 
@@ -174,13 +180,17 @@ export function AppSidebar() {
   const visibleMain = mainItems.filter((i) => i.url === "/tasks" || canSee(perm, keyFromUrl(i.url)));
   const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
   const visibleHT = highTicketItems.filter((i) => canSee(perm, "high-ticket", keyFromUrl(i.url)));
+  const visiblePV24H = pv24hItems.filter((i) => canSee(perm, "pv24h", keyFromUrl(i.url)));
   const showOpX1Group = canSee(perm, "operacao-x1") && visibleOpX1.length > 0;
   const showHTGroup = canSee(perm, "high-ticket") && visibleHT.length > 0;
+  const showPV24HGroup = canSee(perm, "pv24h") && visiblePV24H.length > 0;
 
   const highTicketActive = visibleHT.some((i) => pathname === i.url);
   const [highTicketOpen, setHighTicketOpen] = useState(highTicketActive);
   const operacaoX1Active = visibleOpX1.some((i) => pathname === i.url);
   const [operacaoX1Open, setOperacaoX1Open] = useState(operacaoX1Active);
+  const pv24hActive = visiblePV24H.some((i) => pathname === i.url);
+  const [pv24hOpen, setPv24hOpen] = useState(pv24hActive);
 
 
   async function handleSignOut() {
@@ -379,6 +389,77 @@ export function AppSidebar() {
                 {!collapsed && highTicketOpen && (
                   <SidebarMenuSub className="mt-1 gap-1">
                     {visibleHT.map((sub) => {
+                      const subActive = pathname === sub.url;
+                      return (
+                        <SidebarMenuSubItem key={sub.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={subActive}
+                            className={[
+                              "h-9 rounded-md px-3 text-[0.9rem]",
+                              subActive
+                                ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                                : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                            ].join(" ")}
+                          >
+                            <Link to={sub.url} className="flex items-center gap-2">
+                              <sub.icon className="!h-4 !w-4 shrink-0" />
+                              <span className="truncate">{sub.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
+              )}
+
+              {/* Operação PV24H — colapsável */}
+              {showPV24HGroup && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Operação PV24H"
+                  isActive={pv24hActive && !pv24hOpen}
+                  onClick={() => {
+                    if (collapsed) {
+                      setPv24hOpen(true);
+                      return;
+                    }
+                    setPv24hOpen((v) => !v);
+                  }}
+                  className={[
+                    "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+                    pv24hActive
+                      ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
+                      : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {pv24hActive && (
+                    <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+                  )}
+                  <Zap
+                    className={[
+                      "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                      pv24hActive ? "text-accent" : "",
+                    ].join(" ")}
+                  />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 truncate text-left">Operação PV24H</span>
+                      <ChevronDown
+                        className={[
+                          "h-4 w-4 transition-transform",
+                          pv24hOpen ? "rotate-180" : "",
+                        ].join(" ")}
+                      />
+                    </>
+                  )}
+                </SidebarMenuButton>
+
+                {!collapsed && pv24hOpen && (
+                  <SidebarMenuSub className="mt-1 gap-1">
+                    {visiblePV24H.map((sub) => {
                       const subActive = pathname === sub.url;
                       return (
                         <SidebarMenuSubItem key={sub.title}>
