@@ -117,8 +117,12 @@ async function fetchUazAvatar(supabase: any, contact: string): Promise<string | 
   for (const number of numbers) {
     const payloads = [
       { number },
+      { Number: number },
       { phone: number },
+      { Phone: number },
+      { contact: number },
       { chatid: `${number}@s.whatsapp.net` },
+      { chatId: `${number}@s.whatsapp.net` },
       { jid: `${number}@s.whatsapp.net` },
     ];
     for (const path of paths) {
@@ -129,10 +133,14 @@ async function fetchUazAvatar(supabase: any, contact: string): Promise<string | 
             headers: { token: cfg.token, "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify(body),
           });
-          if (!r.ok) continue;
+          if (!r.ok) {
+            console.info("[uaz-webhook] avatar attempt failed", { path, status: r.status, bodyKeys: Object.keys(body) });
+            continue;
+          }
           const j: any = await r.json().catch(() => null);
           const img = pickUazAvatar(j);
           if (img) return img;
+          console.info("[uaz-webhook] avatar attempt without image", { path, bodyKeys: Object.keys(body), responseKeys: j && typeof j === "object" ? Object.keys(j).slice(0, 8) : [] });
         } catch {
           // tenta a próxima combinação
         }
@@ -184,6 +192,7 @@ Deno.serve(async (req) => {
   // Atualiza foto de perfil do contato nas conversas ao vivo (só daqui pra frente).
   try {
     const contact = pickContactId(payload);
+      console.info("[uaz-webhook] avatar contact", { hasContact: Boolean(contact), contact });
     if (contact) {
       let avatar = pickAvatar(payload);
 
@@ -202,6 +211,9 @@ Deno.serve(async (req) => {
           .from("wa_conversations")
           .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
           .in("contact_wa_id", variants);
+        console.info("[uaz-webhook] avatar saved", { contact, variants: variants.length });
+      } else {
+        console.warn("[uaz-webhook] avatar not found", { contact });
       }
     }
   } catch (e) {
