@@ -260,6 +260,36 @@ function FlowsListPage() {
     };
 
 
+    toast.loading(`Importando 0 / ${total} funis…`, { id: t });
+    try {
+      for (let i = 0; i < allFunnels.length; i += CHUNK) {
+        const chunkFunnels = allFunnels.slice(i, i + CHUNK);
+        const chunkIdx = Math.floor(i / CHUNK);
+        setZvProgress(`${i} / ${total}`);
+        toast.loading(`Importando ${i} / ${total} funis…`, { id: t });
+
+        const itemIds = new Set<string>();
+        for (const f of chunkFunnels) {
+          const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
+          for (const s of seq) if (s?.itemId) itemIds.add(String(s.itemId));
+        }
+        const pickSlim = (idx: Map<string, any>) => {
+          const out: any[] = [];
+          for (const id of itemIds) {
+            const v = idx.get(id);
+            if (v) out.push(slimItem(id, v));
+          }
+          return out;
+        };
+        const slimBackup = {
+          funnels: chunkFunnels,
+          messages: pickSlim(messagesIdx),
+          audios: pickSlim(audiosIdx),
+          medias: pickSlim(mediasIdx),
+          docs: pickSlim(docsIdx),
+          objectsList: pickSlim(objectsIdx),
+        };
+
         try {
           const r: any = await importZvFn({
             data: {
