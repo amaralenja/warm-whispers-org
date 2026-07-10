@@ -170,30 +170,47 @@ const EMPTY: X1AnalyticsPayload = {
   vendedoresDisponiveis: [],
 };
 
-// Janela WhatsApp fecha 24h após o último inbound sem resposta.
-// Considera "sem atendimento" quando a última mensagem da conversa foi inbound
-// (nenhum outbound depois) e o horário de fechamento (last_in + 24h) cai no período.
-function computeJanelasFechadasSemAtendimento(
+// "Sem atendimento" = vendedor NUNCA mandou mensagem nessa conversa.
+// A janela WhatsApp fecha 24h após o último inbound; contamos quando esse
+// fechamento cai no período selecionado.
+async function computeJanelasFechadasSemAtendimento(
+  db: any,
   conversations: any[],
   fromIso: string | null,
   toIso: string | null,
-): number {
+): Promise<number> {
   const now = Date.now();
   const fromT = fromIso ? Date.parse(fromIso) : null;
   const toT = toIso ? Date.parse(toIso) : null;
-  let count = 0;
+  const candidates: string[] = [];
   for (const c of conversations) {
-    const dir = safeString(c?.last_message_direction).toLowerCase();
-    if (dir !== "in") continue;
     const t = Date.parse(safeString(c?.last_message_at));
     if (!Number.isFinite(t)) continue;
     const closeAt = t + 24 * 60 * 60 * 1000;
     if (closeAt > now) continue;
     if (fromT != null && closeAt < fromT) continue;
     if (toT != null && closeAt > toT) continue;
-    count += 1;
+    const id = safeString(c?.id).trim();
+    if (id) candidates.push(id);
   }
-  return count;
+  if (candidates.length === 0) return 0;
+
+  const withOutbound = new Set<string>();
+  for (const chunk of chunkArray(candidates, 200)) {
+    const { data, error } = await db
+      .from("wa_messages")
+      .select("conversation_id")
+      .eq("direction", "out")
+      .is("deleted_at", null)
+      .in("conversation_id", chunk)
+      .limit(chunk.length);
+    if (error) continue;
+    for (const r of (data ?? []) as any[]) {
+      const id = safeString(r?.conversation_id).trim();
+      if (id) withOutbound.add(id);
+    }
+  }
+  return candidates.filter((id) => !withOutbound.has(id)).length;
 }
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
@@ -664,6 +681,7 @@ async function getVendorX1Analytics(
   }
 
   const novosLeads = leadKeys.size;
+  const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(db, assignedConversations, fromIso, toIso);
   return {
     kpis: {
       novosLeads,
@@ -677,7 +695,7 @@ async function getVendorX1Analytics(
       conversao: novosLeads > 0 ? vendas / novosLeads : 0,
       contatosUnicos,
       tempoRespostaMedio,
-      janelasFechadasSemAtendimento: computeJanelasFechadasSemAtendimento(assignedConversations, fromIso, toIso),
+      janelasFechadasSemAtendimento,
     },
     porOperacao: opRows,
     porVendedor,
@@ -1115,6 +1133,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const serieHoraria = Array.from(hourMap.values());
 
     const novosLeads = allLeadKeys.size;
+    const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(supabase, allConversations, fromIso, toIso);
     return {
       kpis: {
         novosLeads,
@@ -1128,7 +1147,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         conversao: novosLeads > 0 ? vendasScoped.length / novosLeads : 0,
         contatosUnicos,
         tempoRespostaMedio,
-        janelasFechadasSemAtendimento: computeJanelasFechadasSemAtendimento(allConversations, fromIso, toIso),
+        janelasFechadasSemAtendimento,
       },
       porOperacao: opRows,
       porVendedor,
