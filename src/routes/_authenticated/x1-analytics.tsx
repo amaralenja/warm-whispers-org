@@ -638,6 +638,7 @@ function HeroMetric({
   icon,
   tone,
   loading,
+  action,
 }: {
   title: string;
   value: string;
@@ -645,6 +646,7 @@ function HeroMetric({
   icon: React.ReactNode;
   tone: keyof typeof TONES;
   loading?: boolean;
+  action?: React.ReactNode;
 }) {
   const t = TONES[tone];
   return (
@@ -664,10 +666,12 @@ function HeroMetric({
           <p className="font-mono text-3xl font-black tracking-tight tabular-nums">{value}</p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        {action}
       </div>
     </div>
   );
 }
+
 
 function FunnelStep({
   label,
