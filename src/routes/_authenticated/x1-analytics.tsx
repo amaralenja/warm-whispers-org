@@ -450,6 +450,12 @@ function X1AnalyticsPage() {
                 value={fmtInt(safeNumber(k?.conversas))}
                 tone="indigo"
               />
+              <MiniStat
+                icon={<Flame className="h-4 w-4" />}
+                label="Janela fechada s/ atendimento"
+                value={fmtInt(safeNumber(k?.janelasFechadasSemAtendimento))}
+                tone="rose"
+              />
               <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   Ratio resposta
@@ -610,6 +616,7 @@ const TONES: Record<string, { bg: string; text: string; ring: string }> = {
   sky: { bg: "from-sky-500/15 to-sky-500/0", text: "text-sky-400", ring: "ring-sky-500/20" },
   blue: { bg: "from-blue-500/15 to-blue-500/0", text: "text-blue-400", ring: "ring-blue-500/20" },
   indigo: { bg: "from-indigo-500/15 to-indigo-500/0", text: "text-indigo-400", ring: "ring-indigo-500/20" },
+  rose: { bg: "from-rose-500/15 to-rose-500/0", text: "text-rose-400", ring: "ring-rose-500/20" },
 };
 
 function HeroMetric({
