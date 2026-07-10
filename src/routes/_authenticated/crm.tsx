@@ -35,7 +35,71 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DragScroll } from "@/components/drag-scroll";
 import { ChatEmbed } from "@/components/chat-page";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+function phoneVariants(raw: string | null | undefined): string[] {
+  const digits = String(raw ?? "").replace(/\D+/g, "");
+  if (!digits) return [];
+  const set = new Set<string>([digits]);
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (local.length === 10 || local.length === 11) set.add(`55${local}`);
+  if (digits.startsWith("55")) set.add(local);
+  if (local.length === 10) {
+    const withNine = `${local.slice(0, 2)}9${local.slice(2)}`;
+    set.add(withNine); set.add(`55${withNine}`);
+  }
+  if (local.length === 11 && local[2] === "9") {
+    const withoutNine = `${local.slice(0, 2)}${local.slice(3)}`;
+    set.add(withoutNine); set.add(`55${withoutNine}`);
+  }
+  return Array.from(set);
+}
+
+function useLeadAvatars(phones: (string | null | undefined)[]): Map<string, string> {
+  const [map, setMap] = useState<Map<string, string>>(new Map());
+  const key = useMemo(() => {
+    const all = new Set<string>();
+    for (const p of phones) for (const v of phoneVariants(p)) all.add(v);
+    return Array.from(all).sort().join(",");
+  }, [phones]);
+
+  useEffect(() => {
+    if (!key) { setMap(new Map()); return; }
+    let cancelled = false;
+    (async () => {
+      const ids = key.split(",").filter(Boolean);
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 200) chunks.push(ids.slice(i, i + 200));
+      const m = new Map<string, string>();
+      for (const c of chunks) {
+        const { data } = await supabase
+          .from("wa_conversations")
+          .select("contact_wa_id, contact_avatar_url")
+          .in("contact_wa_id", c)
+          .not("contact_avatar_url", "is", null);
+        for (const row of data ?? []) {
+          const digits = String((row as any).contact_wa_id ?? "").replace(/\D+/g, "");
+          const url = String((row as any).contact_avatar_url ?? "");
+          if (digits && url) m.set(digits, url);
+        }
+      }
+      if (!cancelled) setMap(m);
+    })();
+    return () => { cancelled = true; };
+  }, [key]);
+
+  return map;
+}
+
+function avatarFor(map: Map<string, string>, phone: string | null | undefined): string | null {
+  for (const v of phoneVariants(phone)) {
+    const hit = map.get(v);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 
 export const Route = createFileRoute("/_authenticated/crm")({
   component: CRMPage,
