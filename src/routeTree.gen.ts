@@ -38,6 +38,7 @@ import { Route as AuthenticatedFlowsIndexRouteImport } from './routes/_authentic
 import { Route as ApiPublicIgImageRouteImport } from './routes/api/public/ig-image'
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
+import { Route as ApiPublicUazWebhookRouteImport } from './routes/api/public/uaz/webhook'
 import { Route as ApiPublicNotificationAiReplyRouteImport } from './routes/api/public/notification-ai/reply'
 import { Route as ApiPublicNotificationAiContinueRouteImport } from './routes/api/public/notification-ai/continue'
 import { Route as ApiPublicHtQuizSubmitRouteImport } from './routes/api/public/ht-quiz/submit'
@@ -199,6 +200,11 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicUazWebhookRoute = ApiPublicUazWebhookRouteImport.update({
+  id: '/api/public/uaz/webhook',
+  path: '/api/public/uaz/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicNotificationAiReplyRoute =
   ApiPublicNotificationAiReplyRouteImport.update({
     id: '/api/public/notification-ai/reply',
@@ -289,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ht-quiz/submit': typeof ApiPublicHtQuizSubmitRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
   '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
+  '/api/public/uaz/webhook': typeof ApiPublicUazWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -328,6 +335,7 @@ export interface FileRoutesByTo {
   '/api/public/ht-quiz/submit': typeof ApiPublicHtQuizSubmitRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
   '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
+  '/api/public/uaz/webhook': typeof ApiPublicUazWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
@@ -369,6 +377,7 @@ export interface FileRoutesById {
   '/api/public/ht-quiz/submit': typeof ApiPublicHtQuizSubmitRoute
   '/api/public/notification-ai/continue': typeof ApiPublicNotificationAiContinueRoute
   '/api/public/notification-ai/reply': typeof ApiPublicNotificationAiReplyRoute
+  '/api/public/uaz/webhook': typeof ApiPublicUazWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
@@ -410,6 +419,7 @@ export interface FileRouteTypes {
     | '/api/public/ht-quiz/submit'
     | '/api/public/notification-ai/continue'
     | '/api/public/notification-ai/reply'
+    | '/api/public/uaz/webhook'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/api/public/ht-quiz/submit'
     | '/api/public/notification-ai/continue'
     | '/api/public/notification-ai/reply'
+    | '/api/public/uaz/webhook'
     | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/api/public/ht-quiz/submit'
     | '/api/public/notification-ai/continue'
     | '/api/public/notification-ai/reply'
+    | '/api/public/uaz/webhook'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -507,6 +519,7 @@ export interface RootRouteChildren {
   ApiPublicHtQuizSubmitRoute: typeof ApiPublicHtQuizSubmitRoute
   ApiPublicNotificationAiContinueRoute: typeof ApiPublicNotificationAiContinueRoute
   ApiPublicNotificationAiReplyRoute: typeof ApiPublicNotificationAiReplyRoute
+  ApiPublicUazWebhookRoute: typeof ApiPublicUazWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
@@ -715,6 +728,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/uaz/webhook': {
+      id: '/api/public/uaz/webhook'
+      path: '/api/public/uaz/webhook'
+      fullPath: '/api/public/uaz/webhook'
+      preLoaderRoute: typeof ApiPublicUazWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/notification-ai/reply': {
       id: '/api/public/notification-ai/reply'
       path: '/api/public/notification-ai/reply'
@@ -851,6 +871,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHtQuizSubmitRoute: ApiPublicHtQuizSubmitRoute,
   ApiPublicNotificationAiContinueRoute: ApiPublicNotificationAiContinueRoute,
   ApiPublicNotificationAiReplyRoute: ApiPublicNotificationAiReplyRoute,
+  ApiPublicUazWebhookRoute: ApiPublicUazWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport

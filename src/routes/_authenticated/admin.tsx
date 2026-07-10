@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Save, ShieldAlert, ShieldCheck, Wifi, ImageDown, Settings2, QrCode, LogOut, RefreshCw } from "lucide-react";
+import { Loader2, Save, ShieldAlert, ShieldCheck, Wifi, ImageDown, Settings2, QrCode, LogOut, RefreshCw, Copy, Link as LinkIcon } from "lucide-react";
 import {
   getUazConfig, saveUazConfig, testUazConnection, getUazProfilePic,
   getUazInstanceStatus, connectUazInstance, disconnectUazInstance,
@@ -200,6 +200,40 @@ function AdminPage() {
           Integrações internas. A UAZ API é usada só pra puxar foto de perfil do WhatsApp (a API oficial não expõe isso).
         </p>
       </header>
+
+      <Card>
+        <CardContent className="space-y-3 pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <LinkIcon className="h-4 w-4" /> Webhook URL da instância UAZ
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cola essa URL no campo <b>Webhook</b> da sua instância no painel da UAZ. Aceita POST, sem auth, sem CORS.
+          </p>
+          {(() => {
+            const webhookUrl = typeof window !== "undefined"
+              ? `${window.location.origin}/api/public/uaz/webhook`
+              : "/api/public/uaz/webhook";
+            return (
+              <div className="flex gap-2">
+                <Input readOnly value={webhookUrl} className="font-mono text-xs" />
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(webhookUrl);
+                    toast.success("URL copiada");
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Copiar
+                </Button>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardContent className="space-y-4 pt-6">
