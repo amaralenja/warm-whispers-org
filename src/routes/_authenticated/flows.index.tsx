@@ -509,13 +509,20 @@ function FlowsListPage() {
           renderCard={(f: any) => {
             const triggers = f.wa_flow_triggers ?? [];
             return (
-              <div key={f.id} className="border border-border rounded-lg p-4 bg-card hover:border-emerald-500/40 transition-colors">
+              <div key={f.id} className={`border rounded-lg p-4 bg-card transition-colors ${selected.has(f.id) ? "border-emerald-500/70 ring-1 ring-emerald-500/40" : "border-border hover:border-emerald-500/40"}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{f.nome}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {(f.nodes?.length ?? 0)} nós · {(f.edges?.length ?? 0)} conexões
-                    </p>
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <Checkbox
+                      className="mt-1"
+                      checked={selected.has(f.id)}
+                      onCheckedChange={() => toggleSel(f.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{f.nome}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {(f.nodes?.length ?? 0)} nós · {(f.edges?.length ?? 0)} conexões
+                      </p>
+                    </div>
                   </div>
                   <Badge className={f.ativo ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30" : "bg-muted text-muted-foreground"}>
                     {f.ativo ? "Ativo" : "Inativo"}
