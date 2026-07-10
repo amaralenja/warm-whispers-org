@@ -677,6 +677,7 @@ async function getVendorX1Analytics(
       conversao: novosLeads > 0 ? vendas / novosLeads : 0,
       contatosUnicos,
       tempoRespostaMedio,
+      janelasFechadasSemAtendimento: computeJanelasFechadasSemAtendimento(assignedConversations, fromIso, toIso),
     },
     porOperacao: opRows,
     porVendedor,
