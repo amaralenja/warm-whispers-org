@@ -417,6 +417,13 @@ function normalizeBrWhatsappNumber(raw: string): string {
   return digits;
 }
 
+function normalizeUazServer(raw: unknown): string {
+  let s = String(raw ?? "").trim();
+  if (!s) return "";
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  return s.replace(/\/+$/, "");
+}
+
 function brPhoneVariants(raw: string): string[] {
   const digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return [];
@@ -437,6 +444,118 @@ function brPhoneVariants(raw: string): string[] {
     out.add(`${ddd}${com9}`);
   }
   return Array.from(out);
+}
+
+function pickUazAvatar(j: any): string | null {
+  const candidates = [
+    j?.imgUrl,
+    j?.image,
+    j?.imageUrl,
+    j?.picture,
+    j?.profilePicUrl,
+    j?.profilePictureUrl,
+    j?.wa_profilePicUrl,
+    j?.url,
+    j?.data?.imgUrl,
+    j?.data?.image,
+    j?.data?.imageUrl,
+    j?.data?.picture,
+    j?.data?.profilePicUrl,
+    j?.data?.profilePictureUrl,
+    j?.data?.wa_profilePicUrl,
+    j?.result?.imgUrl,
+    j?.result?.image,
+    j?.result?.imageUrl,
+    j?.result?.picture,
+    j?.result?.profilePicUrl,
+    j?.result?.profilePictureUrl,
+    j?.result?.wa_profilePicUrl,
+    j?.contact?.imgUrl,
+    j?.contact?.image,
+    j?.contact?.imageUrl,
+    j?.contact?.picture,
+    j?.contact?.profilePicUrl,
+    j?.contact?.profilePictureUrl,
+    j?.contact?.wa_profilePicUrl,
+  ];
+  for (const cand of candidates) {
+    const s = typeof cand === "string" ? cand.trim() : "";
+    if (s && /^https?:\/\//i.test(s)) return s;
+  }
+  return null;
+}
+
+async function loadUazAvatarConfig(supabase: any): Promise<{ serverUrl: string; token: string } | null> {
+  const envUrl = normalizeUazServer(Deno.env.get("UAZ_SERVER_URL"));
+  const envToken = String(Deno.env.get("UAZ_INSTANCE_TOKEN") ?? "").trim();
+  if (envUrl && envToken) return { serverUrl: envUrl, token: envToken };
+
+  const { data: cfg, error } = await supabase
+    .from("uaz_config")
+    .select("server_url, instance_token")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) {
+    console.error("[wa-webhook] uaz_config read error", error);
+    return null;
+  }
+  const serverUrl = normalizeUazServer((cfg as any)?.server_url);
+  const token = String((cfg as any)?.instance_token ?? "").trim();
+  return serverUrl && token ? { serverUrl, token } : null;
+}
+
+async function fetchContactAvatarFromUaz(supabase: any, contactWaId: string): Promise<string | null> {
+  const cfg = await loadUazAvatarConfig(supabase);
+  if (!cfg) return null;
+
+  const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/GetContactInfo", "/chat/getContactInfo"];
+  const numbers = brPhoneVariants(contactWaId);
+  for (const number of numbers) {
+    const payloads = [
+      { number },
+      { phone: number },
+      { chatid: `${number}@s.whatsapp.net` },
+      { jid: `${number}@s.whatsapp.net` },
+    ];
+    for (const path of paths) {
+      for (const body of payloads) {
+        try {
+          const res = await fetch(`${cfg.serverUrl}${path}`, {
+            method: "POST",
+            headers: { token: cfg.token, "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) continue;
+          const json = await res.json().catch(() => null);
+          const avatar = pickUazAvatar(json);
+          if (avatar) return avatar;
+        } catch {
+          // tenta a próxima combinação
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function ensureConversationAvatar(supabase: any, conversationId: string, contactWaId: string) {
+  if (!conversationId || !contactWaId) return;
+  try {
+    const avatar = await fetchContactAvatarFromUaz(supabase, contactWaId);
+    if (!avatar) {
+      console.warn("[wa-webhook] avatar não encontrado na UAZ", { contactWaId });
+      return;
+    }
+
+    await supabase
+      .from("wa_conversations")
+      .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
+    console.log("[wa-webhook] avatar salvo", { conversationId, contactWaId });
+  } catch (e) {
+    console.error("[wa-webhook] avatar fetch/update error", e);
+  }
 }
 
 async function isAiAllowedContact(supabase: any, contactWa: string): Promise<boolean> {
@@ -1412,12 +1531,16 @@ Deno.serve(async (req) => {
             last_message_preview: previewFor(m),
             last_message_direction: "in",
           }, { onConflict: "channel_id,contact_wa_id" })
-          .select("id, unread_count, assigned_vendor_id")
+          .select("id, unread_count, assigned_vendor_id, contact_avatar_url")
           .single();
 
         if (convErr || !conv) {
           console.error("[wa-webhook] upsert conv error", convErr);
           continue;
+        }
+
+        if (!(conv as any).contact_avatar_url) {
+          runInBackground(ensureConversationAvatar(supabase, (conv as any).id, String(m.from)));
         }
 
         const conversationPatch: Record<string, unknown> = {

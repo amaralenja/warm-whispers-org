@@ -12,6 +12,33 @@ function digits(s: unknown): string {
   return String(s ?? "").replace(/\D+/g, "");
 }
 
+function normalizeServer(raw: unknown): string {
+  let s = String(raw ?? "").trim();
+  if (!s) return "";
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  return s.replace(/\/+$/, "");
+}
+
+function phoneVariants(raw: unknown): string[] {
+  const value = digits(raw);
+  if (!value) return [];
+  const set = new Set<string>([value]);
+  const local = value.startsWith("55") ? value.slice(2) : value;
+  if (local.length === 10 || local.length === 11) set.add(`55${local}`);
+  if (value.startsWith("55")) set.add(local);
+  if (local.length === 10) {
+    const withNine = `${local.slice(0, 2)}9${local.slice(2)}`;
+    set.add(withNine);
+    set.add(`55${withNine}`);
+  }
+  if (local.length === 11 && local[2] === "9") {
+    const withoutNine = `${local.slice(0, 2)}${local.slice(3)}`;
+    set.add(withoutNine);
+    set.add(`55${withoutNine}`);
+  }
+  return Array.from(set).filter(Boolean);
+}
+
 function pickAvatar(p: any): string | null {
   const cand =
     p?.chat?.imagePreview ??
@@ -26,6 +53,93 @@ function pickAvatar(p: any): string | null {
     null;
   const s = typeof cand === "string" ? cand.trim() : "";
   return s && /^https?:\/\//i.test(s) ? s : null;
+}
+
+function pickUazAvatar(j: any): string | null {
+  const candidates = [
+    j?.imgUrl,
+    j?.image,
+    j?.imageUrl,
+    j?.picture,
+    j?.profilePicUrl,
+    j?.profilePictureUrl,
+    j?.wa_profilePicUrl,
+    j?.url,
+    j?.data?.imgUrl,
+    j?.data?.image,
+    j?.data?.imageUrl,
+    j?.data?.picture,
+    j?.data?.profilePicUrl,
+    j?.data?.profilePictureUrl,
+    j?.data?.wa_profilePicUrl,
+    j?.result?.imgUrl,
+    j?.result?.image,
+    j?.result?.imageUrl,
+    j?.result?.picture,
+    j?.result?.profilePicUrl,
+    j?.result?.profilePictureUrl,
+    j?.result?.wa_profilePicUrl,
+    j?.contact?.imgUrl,
+    j?.contact?.image,
+    j?.contact?.imageUrl,
+    j?.contact?.picture,
+    j?.contact?.profilePicUrl,
+    j?.contact?.profilePictureUrl,
+    j?.contact?.wa_profilePicUrl,
+  ];
+  for (const cand of candidates) {
+    const s = typeof cand === "string" ? cand.trim() : "";
+    if (s && /^https?:\/\//i.test(s)) return s;
+  }
+  return null;
+}
+
+async function loadUazConfig(supabase: any): Promise<{ serverUrl: string; token: string } | null> {
+  const envUrl = normalizeServer(Deno.env.get("UAZ_SERVER_URL"));
+  const envToken = String(Deno.env.get("UAZ_INSTANCE_TOKEN") ?? "").trim();
+  if (envUrl && envToken) return { serverUrl: envUrl, token: envToken };
+
+  const { data: cfg } = await supabase
+    .from("uaz_config")
+    .select("server_url, instance_token")
+    .eq("id", 1)
+    .maybeSingle();
+  const serverUrl = normalizeServer(cfg?.server_url);
+  const token = String(cfg?.instance_token ?? "").trim();
+  return serverUrl && token ? { serverUrl, token } : null;
+}
+
+async function fetchUazAvatar(supabase: any, contact: string): Promise<string | null> {
+  const cfg = await loadUazConfig(supabase);
+  if (!cfg) return null;
+  const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/GetContactInfo", "/chat/getContactInfo"];
+  const numbers = phoneVariants(contact);
+  for (const number of numbers) {
+    const payloads = [
+      { number },
+      { phone: number },
+      { chatid: `${number}@s.whatsapp.net` },
+      { jid: `${number}@s.whatsapp.net` },
+    ];
+    for (const path of paths) {
+      for (const body of payloads) {
+        try {
+          const r = await fetch(`${cfg.serverUrl}${path}`, {
+            method: "POST",
+            headers: { token: cfg.token, "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!r.ok) continue;
+          const j: any = await r.json().catch(() => null);
+          const img = pickUazAvatar(j);
+          if (img) return img;
+        } catch {
+          // tenta a próxima combinação
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function pickContactId(p: any): string {
@@ -76,43 +190,14 @@ Deno.serve(async (req) => {
       // Fallback: se o payload não trouxe foto, busca via API UAZ
       if (!avatar) {
         try {
-          const { data: cfg } = await supabase
-            .from("uaz_config")
-            .select("server_url, instance_token")
-            .eq("id", 1)
-            .maybeSingle();
-          const serverUrl = String(cfg?.server_url ?? "").trim().replace(/\/+$/, "");
-          const token = String(cfg?.instance_token ?? "").trim();
-          if (serverUrl && token) {
-            const paths = ["/chat/GetNameAndImageURL", "/chat/getNameAndImageURL", "/chat/getContactInfo"];
-            for (const path of paths) {
-              try {
-                const r = await fetch(`${serverUrl}${path}`, {
-                  method: "POST",
-                  headers: { token, "Content-Type": "application/json", Accept: "application/json" },
-                  body: JSON.stringify({ number: contact }),
-                });
-                if (!r.ok) continue;
-                const j: any = await r.json().catch(() => null);
-                const img = j?.imgUrl ?? j?.image ?? j?.imageUrl ?? j?.picture ?? j?.profilePicUrl ?? null;
-                if (img && typeof img === "string" && /^https?:\/\//i.test(img)) {
-                  avatar = img;
-                  break;
-                }
-              } catch { /* try next */ }
-            }
-          }
+          avatar = await fetchUazAvatar(supabase, contact);
         } catch (e) {
           console.error("[uaz-webhook] avatar fetch error", e);
         }
       }
 
       if (avatar) {
-        const variants = Array.from(new Set([
-          contact,
-          contact.replace(/^55/, ""),
-          `55${contact.replace(/^55/, "")}`,
-        ])).filter(Boolean);
+        const variants = phoneVariants(contact);
         await supabase
           .from("wa_conversations")
           .update({ contact_avatar_url: avatar, updated_at: new Date().toISOString() })

@@ -13,7 +13,17 @@ function normalizeServer(raw: string): string {
   return s.replace(/\/+$/, "");
 }
 
+function readEnv(name: string): string {
+  return typeof process !== "undefined" ? String(process.env?.[name] ?? "") : "";
+}
+
 async function loadConfig(context: any): Promise<{ server_url: string; instance_token: string } | null> {
+  const envServerUrl = normalizeServer(readEnv("UAZ_SERVER_URL"));
+  const envToken = readEnv("UAZ_INSTANCE_TOKEN").trim();
+  if (envServerUrl && envToken) {
+    return { server_url: envServerUrl, instance_token: envToken };
+  }
+
   const { data } = await context.supabase
     .from("uaz_config" as any)
     .select("server_url, instance_token")
@@ -27,6 +37,8 @@ async function loadConfig(context: any): Promise<{ server_url: string; instance_
 export const getUazConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const envServerUrl = normalizeServer(readEnv("UAZ_SERVER_URL"));
+    const hasEnvToken = Boolean(readEnv("UAZ_INSTANCE_TOKEN").trim());
     const { data } = await context.supabase
       .from("uaz_config" as any)
       .select("server_url, instance_token, updated_at")
@@ -34,10 +46,10 @@ export const getUazConfig = createServerFn({ method: "GET" })
       .maybeSingle();
     const row = (data ?? null) as { server_url: string | null; instance_token: string | null; updated_at: string | null } | null;
     return {
-      server_url: row?.server_url ?? "",
+      server_url: envServerUrl || (row?.server_url ?? ""),
       // mascarado — não devolve o token cru
-      has_token: !!row?.instance_token,
-      token_preview: row?.instance_token ? `${row.instance_token.slice(0, 6)}…${row.instance_token.slice(-4)}` : "",
+      has_token: hasEnvToken || !!row?.instance_token,
+      token_preview: hasEnvToken ? "configurado no ambiente" : row?.instance_token ? `${row.instance_token.slice(0, 6)}…${row.instance_token.slice(-4)}` : "",
       updated_at: row?.updated_at ?? null,
     };
   });
