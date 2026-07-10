@@ -138,7 +138,7 @@ function PV24HAnalyticsPage() {
               <Select
                 value={cfg.adAccountId ?? ""}
                 onValueChange={(v) => {
-                  const acc = accountsQ.data?.find((a) => a.id === v);
+                  const acc = (accountsQ.data ?? []).find((a: any) => a.id === v);
                   if (acc) selectAccountMut.mutate({ id: acc.id, name: acc.name });
                 }}
               >
@@ -150,7 +150,7 @@ function PV24HAnalyticsPage() {
                   } />
                 </SelectTrigger>
                 <SelectContent>
-                  {(accountsQ.data ?? []).map((a) => (
+                  {(accountsQ.data ?? []).map((a: any) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name} — {a.currency} ({a.accountId})
                     </SelectItem>
