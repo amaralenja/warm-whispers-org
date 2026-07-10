@@ -217,7 +217,19 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         : kind === "document" ? docsById.get(itemId)
         : mediasById.get(itemId);
       const obj = objectsById.get(itemId) ?? itemRef;
-      const merged = { ...(itemRef ?? {}), ...(obj ?? {}) };
+      const merged: any = { ...(itemRef ?? {}), ...(obj ?? {}) };
+
+      // Pre-uploaded from client (evita estourar limite de request body)
+      if (typeof merged?.preuploaded_url === "string" && merged.preuploaded_url) {
+        const result = {
+          url: merged.preuploaded_url as string,
+          filename: merged.preuploaded_filename ?? merged.filename ?? merged.name,
+          mime: merged.preuploaded_mime ?? merged.mimeType ?? merged.mimetype ?? merged.type,
+        };
+        uploadCache.set(itemId, result);
+        return result;
+      }
+
       const extracted = extractBase64(merged);
       if (!extracted) return null;
 
