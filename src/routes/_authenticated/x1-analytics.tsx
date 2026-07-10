@@ -14,6 +14,10 @@ import {
   Flame,
   ArrowRight,
   FileDown,
+  User as UserIcon,
+  Phone,
+  Clock,
+
 } from "lucide-react";
 import {
   Line,
