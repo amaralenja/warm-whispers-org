@@ -71,10 +71,20 @@ function FlowsListPage() {
     if (preferred && (!zvOp || !allowedOps.has(zvOp))) setZvOp(preferred);
   }, [workspace.id, workspaces, op, importOp, zvOp]);
 
-  // Export
   const [exportOpen, setExportOpen] = useState(false);
   const [exportCode, setExportCode] = useState("");
   const [exportFlowName, setExportFlowName] = useState("");
+
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const toggleSel = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  const clearSel = () => setSelected(new Set());
 
   const { data: flows = [] } = useQuery({
     queryKey: ["wa-flows"],
@@ -108,6 +118,24 @@ function FlowsListPage() {
     onSuccess: () => {
       toast.success("Fluxo removido");
       qc.invalidateQueries({ queryKey: ["wa-flows"] });
+    },
+  });
+
+  const bulkDelMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      let ok = 0, fail = 0;
+      for (const id of ids) {
+        try { await deleteFlowFn({ data: { id } }); ok++; }
+        catch (e) { console.error("[bulk-del] fail", id, e); fail++; }
+      }
+      return { ok, fail };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["wa-flows"] });
+      clearSel();
+      setBulkConfirmOpen(false);
+      if (r.fail === 0) toast.success(`${r.ok} fluxo${r.ok === 1 ? "" : "s"} removido${r.ok === 1 ? "" : "s"}`);
+      else toast.warning(`${r.ok} removidos, ${r.fail} falharam`);
     },
   });
 
@@ -435,6 +463,40 @@ function FlowsListPage() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card/40 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox
+            checked={filtered.length > 0 && filtered.every((f: any) => selected.has(f.id))}
+            onCheckedChange={(v) => {
+              if (v) setSelected(new Set(filtered.map((f: any) => f.id)));
+              else clearSel();
+            }}
+          />
+          <span>
+            {selected.size > 0
+              ? `${selected.size} selecionado${selected.size === 1 ? "" : "s"}`
+              : `Selecionar todos os ${filtered.length} filtrado${filtered.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {selected.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={clearSel}>Limpar</Button>
+          )}
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={selected.size === 0 || bulkDelMut.isPending}
+            onClick={() => setBulkConfirmOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Apagar selecionados</span>
+          </Button>
+        </div>
+      </div>
+
+
+
       {filtered.length === 0 ? (
         <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground">
           Nenhum fluxo criado ainda. Clique em <strong>Novo fluxo</strong> ou <strong>Importar código</strong>.
@@ -447,13 +509,20 @@ function FlowsListPage() {
           renderCard={(f: any) => {
             const triggers = f.wa_flow_triggers ?? [];
             return (
-              <div key={f.id} className="border border-border rounded-lg p-4 bg-card hover:border-emerald-500/40 transition-colors">
+              <div key={f.id} className={`border rounded-lg p-4 bg-card transition-colors ${selected.has(f.id) ? "border-emerald-500/70 ring-1 ring-emerald-500/40" : "border-border hover:border-emerald-500/40"}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{f.nome}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {(f.nodes?.length ?? 0)} nós · {(f.edges?.length ?? 0)} conexões
-                    </p>
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <Checkbox
+                      className="mt-1"
+                      checked={selected.has(f.id)}
+                      onCheckedChange={() => toggleSel(f.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{f.nome}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {(f.nodes?.length ?? 0)} nós · {(f.edges?.length ?? 0)} conexões
+                      </p>
+                    </div>
                   </div>
                   <Badge className={f.ativo ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30" : "bg-muted text-muted-foreground"}>
                     {f.ativo ? "Ativo" : "Inativo"}
@@ -666,7 +735,33 @@ function FlowsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk delete confirmation */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500">
+              <Trash2 className="h-5 w-5" /> Apagar {selected.size} fluxo{selected.size === 1 ? "" : "s"}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground pt-2">
+            Essa ação não pode ser desfeita. Os fluxos selecionados e seus gatilhos serão removidos.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} disabled={bulkDelMut.isPending}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={bulkDelMut.isPending}
+              onClick={() => bulkDelMut.mutate(Array.from(selected))}
+            >
+              {bulkDelMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Apagar {selected.size}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
