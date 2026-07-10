@@ -169,6 +169,7 @@ const EMPTY: X1AnalyticsPayload = {
   operacoesDisponiveis: [],
   canaisDisponiveis: [],
   vendedoresDisponiveis: [],
+  janelasFechadasSemAtendimentoLeads: [],
 };
 
 // "Sem atendimento" = vendedor NUNCA mandou mensagem nessa conversa.
