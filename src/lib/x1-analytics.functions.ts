@@ -173,16 +173,23 @@ const EMPTY: X1AnalyticsPayload = {
 // "Sem atendimento" = vendedor NUNCA mandou mensagem nessa conversa.
 // A janela WhatsApp fecha 24h após o último inbound; contamos quando esse
 // fechamento cai no período selecionado.
+export type X1JanelaFechadaLead = {
+  conversationId: string;
+  telefone: string;
+  vendorId: number | null;
+  closedAt: string; // ISO
+};
+
 async function computeJanelasFechadasSemAtendimento(
   db: any,
   conversations: any[],
   fromIso: string | null,
   toIso: string | null,
-): Promise<number> {
+): Promise<{ count: number; leads: X1JanelaFechadaLead[] }> {
   const now = Date.now();
   const fromT = fromIso ? Date.parse(fromIso) : null;
   const toT = toIso ? Date.parse(toIso) : null;
-  const candidates: string[] = [];
+  const candidates: Array<{ id: string; row: any; closeAt: number }> = [];
   for (const c of conversations) {
     const t = Date.parse(safeString(c?.last_message_at));
     if (!Number.isFinite(t)) continue;
@@ -191,12 +198,12 @@ async function computeJanelasFechadasSemAtendimento(
     if (fromT != null && closeAt < fromT) continue;
     if (toT != null && closeAt > toT) continue;
     const id = safeString(c?.id).trim();
-    if (id) candidates.push(id);
+    if (id) candidates.push({ id, row: c, closeAt });
   }
-  if (candidates.length === 0) return 0;
+  if (candidates.length === 0) return { count: 0, leads: [] };
 
   const withOutbound = new Set<string>();
-  for (const chunk of chunkArray(candidates, 200)) {
+  for (const chunk of chunkArray(candidates.map((c) => c.id), 200)) {
     const { data, error } = await db
       .from("wa_messages")
       .select("conversation_id")
@@ -210,7 +217,16 @@ async function computeJanelasFechadasSemAtendimento(
       if (id) withOutbound.add(id);
     }
   }
-  return candidates.filter((id) => !withOutbound.has(id)).length;
+  const leads: X1JanelaFechadaLead[] = candidates
+    .filter((c) => !withOutbound.has(c.id))
+    .map((c) => ({
+      conversationId: c.id,
+      telefone: safeString(c.row?.contact_wa_id),
+      vendorId: numericId(c.row?.assigned_vendor_id),
+      closedAt: new Date(c.closeAt).toISOString(),
+    }))
+    .sort((a, b) => b.closedAt.localeCompare(a.closedAt));
+  return { count: leads.length, leads };
 }
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
