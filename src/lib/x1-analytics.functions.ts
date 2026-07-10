@@ -180,6 +180,8 @@ export type X1JanelaFechadaLead = {
   telefone: string;
   vendorId: number | null;
   closedAt: string; // ISO
+  contactName: string | null;
+  contactAvatarUrl: string | null;
 };
 
 async function computeJanelasFechadasSemAtendimento(
@@ -219,17 +221,41 @@ async function computeJanelasFechadasSemAtendimento(
       if (id) withOutbound.add(id);
     }
   }
-  const leads: X1JanelaFechadaLead[] = candidates
-    .filter((c) => !withOutbound.has(c.id))
-    .map((c) => ({
-      conversationId: c.id,
-      telefone: safeString(c.row?.contact_wa_id),
-      vendorId: numericId(c.row?.assigned_vendor_id),
-      closedAt: new Date(c.closeAt).toISOString(),
-    }))
+  const filtered = candidates.filter((c) => !withOutbound.has(c.id));
+  if (filtered.length === 0) return { count: 0, leads: [] };
+
+  // enriquecer com nome/foto do contato
+  const meta = new Map<string, { name: string | null; avatar: string | null }>();
+  for (const chunk of chunkArray(filtered.map((c) => c.id), 200)) {
+    const { data } = await db
+      .from("wa_conversations")
+      .select("id, contact_name, contact_avatar_url")
+      .in("id", chunk);
+    for (const r of (data ?? []) as any[]) {
+      const id = safeString(r?.id).trim();
+      if (id) meta.set(id, {
+        name: safeNullableString(r?.contact_name),
+        avatar: safeNullableString(r?.contact_avatar_url),
+      });
+    }
+  }
+
+  const leads: X1JanelaFechadaLead[] = filtered
+    .map((c) => {
+      const m = meta.get(c.id);
+      return {
+        conversationId: c.id,
+        telefone: safeString(c.row?.contact_wa_id),
+        vendorId: numericId(c.row?.assigned_vendor_id),
+        closedAt: new Date(c.closeAt).toISOString(),
+        contactName: m?.name ?? safeNullableString(c.row?.contact_name) ?? null,
+        contactAvatarUrl: m?.avatar ?? safeNullableString(c.row?.contact_avatar_url) ?? null,
+      };
+    })
     .sort((a, b) => b.closedAt.localeCompare(a.closedAt));
   return { count: leads.length, leads };
 }
+
 
 // mapping UTM → operação (compatível com operacoes.functions.ts)
 const OP_UTM_PREFIX: Record<string, string[]> = {
