@@ -413,3 +413,73 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
 
     return summary;
   });
+
+// Upload individual de mídia base64 (chamado pelo client antes de enviar os chunks,
+// pra não estourar o limite de request body do Worker).
+export const uploadZapVoiceMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    itemId: string;
+    base64: string;
+    mime?: string | null;
+    filename?: string | null;
+  }) => ({
+    itemId: String(d?.itemId ?? "").trim(),
+    base64: String(d?.base64 ?? ""),
+    mime: d?.mime ?? null,
+    filename: d?.filename ?? null,
+  }))
+  .handler(async ({ context, data }) => {
+    if (!data.itemId) throw new Error("itemId obrigatório");
+    if (!data.base64) throw new Error("base64 obrigatório");
+
+    const isVendor = Boolean((context as any)?.vendor);
+    let db: any = context.supabase as any;
+    if (isVendor) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      db = supabaseAdmin as any;
+    }
+
+    // Aceita data URL ou base64 puro
+    let base64 = data.base64;
+    let mime = data.mime ?? undefined;
+    const dataUrlMatch = base64.match(/^data:([^;]+);base64,(.+)$/);
+    if (dataUrlMatch) {
+      mime = mime ?? dataUrlMatch[1];
+      base64 = dataUrlMatch[2];
+    }
+    base64 = base64.replace(/\s+/g, "");
+
+    let bytes: Uint8Array;
+    try {
+      const bin = typeof Buffer !== "undefined"
+        ? Buffer.from(base64, "base64")
+        : Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      bytes = bin instanceof Uint8Array ? bin : new Uint8Array(bin);
+    } catch (e: any) {
+      throw new Error(`base64 inválido: ${e?.message ?? e}`);
+    }
+
+    const ext = extOf(mime, data.filename ?? undefined);
+    const safeUser = String(context.userId ?? "shared").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const path = `zapvoice/${safeUser}/${data.itemId}${ext}`;
+
+    const { error: upErr } = await db.storage
+      .from("wa-media")
+      .upload(path, bytes, {
+        contentType: mime ?? "application/octet-stream",
+        upsert: true,
+      });
+    if (upErr) throw new Error(`upload falhou: ${upErr.message}`);
+
+    const { data: signed, error: signErr } = await db.storage
+      .from("wa-media")
+      .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+    if (signErr || !signed?.signedUrl) throw new Error(`signed url falhou: ${signErr?.message ?? "?"}`);
+
+    return {
+      url: signed.signedUrl,
+      mime: mime ?? null,
+      filename: data.filename ?? null,
+    };
+  });
