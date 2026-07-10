@@ -1133,6 +1133,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
     const serieHoraria = Array.from(hourMap.values());
 
     const novosLeads = allLeadKeys.size;
+    const janelasFechadasSemAtendimento = await computeJanelasFechadasSemAtendimento(supabase, allConversations, fromIso, toIso);
     return {
       kpis: {
         novosLeads,
@@ -1146,7 +1147,7 @@ export const getX1Analytics = createServerFn({ method: "POST" })
         conversao: novosLeads > 0 ? vendasScoped.length / novosLeads : 0,
         contatosUnicos,
         tempoRespostaMedio,
-        janelasFechadasSemAtendimento: computeJanelasFechadasSemAtendimento(allConversations, fromIso, toIso),
+        janelasFechadasSemAtendimento,
       },
       porOperacao: opRows,
       porVendedor,
