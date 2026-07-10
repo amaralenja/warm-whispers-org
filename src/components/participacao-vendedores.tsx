@@ -89,13 +89,12 @@ function toSafeVendors(input: unknown): SafeVendor[] {
   return out;
 }
 
-export function ParticipacaoVendedores({
-  vendedores: vendedoresProp,
-  loading,
-}: {
+export function ParticipacaoVendedores(props?: {
   vendedores?: VendedorStat[] | null;
   loading?: boolean;
 }) {
+  const vendedoresProp = props?.vendedores ?? [];
+  const loading = Boolean(props?.loading);
   const vendedores = toSafeVendors(vendedoresProp);
   const total = vendedores.reduce((acc, v) => acc + v.faturamento, 0);
 
