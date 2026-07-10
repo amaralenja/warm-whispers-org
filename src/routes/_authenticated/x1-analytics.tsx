@@ -463,10 +463,10 @@ function X1AnalyticsPage() {
                 tone="indigo"
               />
               <MiniStat
-                icon={<Flame className="h-4 w-4" />}
-                label="Janela fechada s/ atendimento"
-                value={fmtInt(safeNumber(k?.janelasFechadasSemAtendimento))}
-                tone="rose"
+                icon={<Timer className="h-4 w-4" />}
+                label="Tempo de resposta médio"
+                value={fmtDur(safeNumber(k?.tempoRespostaMedio))}
+                tone="sky"
               />
               <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
