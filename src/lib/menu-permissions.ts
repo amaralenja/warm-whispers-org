@@ -38,6 +38,13 @@ export const MENU_TREE: MenuNode[] = [
       { key: "ht-api", title: "API", url: "/ht-api" },
     ],
   },
+  {
+    key: "pv24h",
+    title: "Operação PV24H",
+    children: [
+      { key: "pv24h-analytics", title: "Analytics", url: "/pv24h-analytics" },
+    ],
+  },
 
 ];
 
