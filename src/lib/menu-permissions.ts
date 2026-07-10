@@ -72,9 +72,21 @@ export function defaultPermissoes(): Permissoes {
   return p;
 }
 
-/** Default = true se não setado (admin enxerga tudo). */
+/** Grupos/leaves que são exclusivos do admin — vendedor NUNCA vê, mesmo sem permissão setada. */
+const ADMIN_ONLY_GROUPS = new Set(["pv24h"]);
+const ADMIN_ONLY_LEAVES = new Set(["pv24h-analytics"]);
+
+/** Default = true se não setado (admin enxerga tudo), exceto grupos/leaves admin-only. */
 export function canSee(perm: Permissoes | null | undefined, groupKey: string, leafKey?: string): boolean {
+  // Sem perm = admin. Admin vê tudo.
   if (!perm || typeof perm !== "object") return true;
+  // Vendedor: bloqueia áreas admin-only por padrão.
+  if (ADMIN_ONLY_GROUPS.has(groupKey) && perm[groupKey] === undefined) return false;
+  if (leafKey && ADMIN_ONLY_LEAVES.has(leafKey)) {
+    const node = perm[groupKey];
+    if (node === undefined || typeof node === "boolean") return false;
+    return node[leafKey] === true;
+  }
   const node = perm[groupKey];
   if (node === undefined) return true;
   if (typeof node === "boolean") return node;
@@ -85,3 +97,4 @@ export function canSee(perm: Permissoes | null | undefined, groupKey: string, le
   const v = node[leafKey];
   return v === undefined ? true : !!v;
 }
+
