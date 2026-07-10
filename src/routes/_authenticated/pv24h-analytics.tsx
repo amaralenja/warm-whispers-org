@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BarChart3, Loader2, RefreshCw, Save, KeyRound, Check } from "lucide-react";
+import { BarChart3, Loader2, RefreshCw, Save, KeyRound, Check, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ function PV24HAnalyticsPage() {
 
   const [tokenInput, setTokenInput] = useState("");
   const [preset, setPreset] = useState<Preset>("last_7d");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const configQ = useQuery({
     queryKey: ["pv24h", "config"],
@@ -93,14 +94,35 @@ function PV24HAnalyticsPage() {
 
   const cfg = configQ.data;
 
+  const isConfigured = !!cfg?.hasToken && !!cfg?.adAccountId;
+  const showSettings = !isConfigured || settingsOpen;
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <BarChart3 className="h-7 w-7 text-accent" />
-        <h1 className="text-2xl font-semibold">Operação PV24H</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <BarChart3 className="h-7 w-7 text-accent" />
+          <div>
+            <h1 className="text-2xl font-semibold">Operação PV24H</h1>
+            {isConfigured && cfg?.adAccountName && (
+              <p className="text-xs text-muted-foreground">Conta: <strong>{cfg.adAccountName}</strong></p>
+            )}
+          </div>
+        </div>
+        {isConfigured && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSettingsOpen((v) => !v)}
+            title="Configurações"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Config */}
+      {showSettings && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -165,8 +187,14 @@ function PV24HAnalyticsPage() {
               )}
             </div>
           )}
+          {isConfigured && (
+            <div className="flex justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(false)}>Fechar</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+      )}
 
       {/* Campaigns */}
       {cfg?.hasToken && cfg?.adAccountId && (
