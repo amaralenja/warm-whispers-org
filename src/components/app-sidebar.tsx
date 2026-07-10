@@ -28,6 +28,7 @@ import {
   Settings2,
   Kanban,
   Target,
+  Zap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -82,6 +83,10 @@ const highTicketItems: Item[] = [
   { title: "API", url: "/ht-api", icon: KeyRound },
 ];
 
+const pv24hItems: Item[] = [
+  { title: "Analytics", url: "/pv24h-analytics", icon: BarChart3 },
+];
+
 const URL_TO_KEY: Record<string, string> = {
   "/dashboard": "dashboard",
   "/relatorios": "relatorios",
@@ -103,6 +108,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/sops": "sops",
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",
+  "/pv24h-analytics": "pv24h-analytics",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 
