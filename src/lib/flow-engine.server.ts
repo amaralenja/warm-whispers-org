@@ -1371,6 +1371,7 @@ export async function dispatchNewLead(args: { leadId: string; db?: any }) {
   const seenFlowChannel = new Set<string>();
   for (const trg of (triggers ?? []) as any[]) {
     if (!trg.wa_flows?.ativo) continue;
+    if (!triggerScheduleAllows(trg)) continue;
     const flowOp = trg.wa_flows?.operacao_id;
     if (flowOp && l.expert && String(flowOp) !== String(l.expert) && String(flowOp) !== String(l.operacao_id ?? "")) continue;
     if (!trg.channel_id) continue;
