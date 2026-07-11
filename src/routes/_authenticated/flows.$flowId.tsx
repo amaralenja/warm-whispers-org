@@ -616,120 +616,192 @@ function Palette({
   ];
 
   return (
-    <aside className="w-64 border-r overflow-y-auto bg-card">
-      <div className="p-3 border-b">
-        <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Gatilhos</h3>
-        <div className="rounded border border-border/50 bg-muted/30 p-2 mb-2 space-y-1 text-[10px] leading-relaxed text-muted-foreground">
-          <p><b className="text-foreground">Palavra-chave:</b> uma única palavra. Dispara quando aparecer em qualquer lugar da mensagem (maiúscula/minúscula/acento ignorados).</p>
-          <p><b className="text-foreground">Frase-chave:</b> frase exata. A mensagem inteira precisa ser igual à frase (case-insensitive).</p>
-          <p><b className="text-foreground">Lead novo:</b> dispara na primeira vez que o lead chegar no CRM, independente de mensagem.</p>
+    <aside className="w-80 border-r overflow-y-auto bg-card">
+      <div className="p-4 border-b bg-gradient-to-br from-primary/5 to-transparent">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Zap className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Gatilhos</h3>
+            <p className="text-[10px] text-muted-foreground">O que inicia esse fluxo</p>
+          </div>
         </div>
-        <div className="space-y-2">
-          {triggers.map((t, i) => (
-            <div key={i} className="border rounded p-2 space-y-1.5 bg-background">
-              <div className="flex items-center justify-between">
-                <Select
-                  value={t.tipo === "keyword" && t.match_mode === "equals" ? "phrase" : (t.tipo === "new_conversation" || t.tipo === "any_message" || t.tipo === "manual" ? "keyword" : t.tipo)}
-                  onValueChange={(v) => {
-                    const copy = [...triggers];
-                    if (v === "phrase") copy[i] = { ...t, tipo: "keyword", match_mode: "equals" };
-                    else if (v === "keyword") copy[i] = { ...t, tipo: "keyword", match_mode: "word" };
-                    else copy[i] = { ...t, tipo: v, valor: null, match_mode: null };
-                    setTriggers(copy);
-                  }}
-                >
-                  <SelectTrigger className="h-7 text-xs flex-1 mr-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="keyword">Palavra-chave</SelectItem>
-                    <SelectItem value="phrase">Frase-chave (exata)</SelectItem>
-                    <SelectItem value="new_lead">Lead novo</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setTriggers(triggers.filter((_, j) => j !== i))}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              {t.tipo === "keyword" && (
-                <Input
-                  value={t.valor ?? ""}
-                  onChange={(e) => { const c = [...triggers]; c[i] = { ...t, valor: e.target.value }; setTriggers(c); }}
-                  placeholder={t.match_mode === "equals" ? "frase exata (ex: quero comprar)" : "palavra (ex: menu)"}
-                  className="h-7 text-xs"
-                />
-              )}
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase text-muted-foreground">Número (WhatsApp)</Label>
-                <Select
-                  value={t.channel_id ?? "__any__"}
-                  onValueChange={(v) => { const c = [...triggers]; c[i] = { ...t, channel_id: v === "__any__" ? null : v }; setTriggers(c); }}
-                >
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Selecionar número" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__any__">Qualquer número da operação</SelectItem>
-                    {channels.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name ?? c.display_phone_number ?? c.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!operacaoId && (
-                  <p className="text-[10px] text-amber-500">Defina a operação do fluxo para listar apenas os números dela.</p>
-                )}
-                {operacaoId && channels.length === 0 && (
-                  <p className="text-[10px] text-muted-foreground">Nenhum número conectado nessa operação.</p>
-                )}
-              </div>
 
-              {/* Janela opcional de dias/horário */}
-              <div className="space-y-1 border-t border-border/40 pt-1.5">
-                <Label className="text-[10px] uppercase text-muted-foreground">Janela (opcional)</Label>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    { d: 1, l: "S" }, { d: 2, l: "T" }, { d: 3, l: "Q" },
-                    { d: 4, l: "Q" }, { d: 5, l: "S" }, { d: 6, l: "S" }, { d: 0, l: "D" },
-                  ].map(({ d, l }) => {
-                    const days: number[] = Array.isArray(t.days_of_week) ? t.days_of_week : [];
-                    const on = days.includes(d);
-                    return (
-                      <button
-                        key={d} type="button"
-                        onClick={() => {
-                          const next = on ? days.filter((x) => x !== d) : [...days, d];
-                          const c = [...triggers]; c[i] = { ...t, days_of_week: next.length ? next : null }; setTriggers(c);
-                        }}
-                        className={`h-6 w-6 text-[10px] rounded border ${on ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 border-border text-muted-foreground"}`}
-                      >{l}</button>
-                    );
-                  })}
+        <div className="space-y-3">
+          {triggers.map((t, i) => {
+            const kind = t.tipo === "keyword" && t.match_mode === "equals"
+              ? "phrase"
+              : (t.tipo === "new_conversation" || t.tipo === "any_message" || t.tipo === "manual" || t.tipo === "new_lead")
+                ? (t.tipo === "new_lead" ? "new_lead" : "keyword")
+                : t.tipo;
+            const meta =
+              kind === "phrase"   ? { icon: Quote,    color: "#8b5cf6", label: "Frase-chave",   hint: "Mensagem inteira igual à frase (case-insensitive)" }
+            : kind === "new_lead" ? { icon: UserPlus, color: "#10b981", label: "Lead novo",     hint: "Dispara na primeira vez que o lead chegar" }
+                                  : { icon: Hash,     color: "#3b82f6", label: "Palavra-chave", hint: "Uma palavra que aparece em qualquer lugar da mensagem" };
+            const Icon = meta.icon;
+
+            return (
+              <div key={i} className="border rounded-lg bg-background shadow-sm overflow-hidden">
+                {/* Cabeçalho colorido */}
+                <div
+                  className="flex items-center gap-2 px-3 py-2 border-b"
+                  style={{ backgroundColor: `${meta.color}12`, borderColor: `${meta.color}30` }}
+                >
+                  <div
+                    className="h-7 w-7 rounded-md flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold leading-tight">{meta.label}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight truncate">Gatilho #{i + 1}</div>
+                  </div>
+                  <Button
+                    size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => setTriggers(triggers.filter((_, j) => j !== i))}
+                    title="Remover gatilho"
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <div className="flex gap-1 items-center">
-                  <Input
-                    type="time" value={t.time_start ?? ""}
-                    onChange={(e) => { const c = [...triggers]; c[i] = { ...t, time_start: e.target.value || null }; setTriggers(c); }}
-                    className="h-7 text-xs flex-1"
-                  />
-                  <span className="text-[10px] text-muted-foreground">até</span>
-                  <Input
-                    type="time" value={t.time_end ?? ""}
-                    onChange={(e) => { const c = [...triggers]; c[i] = { ...t, time_end: e.target.value || null }; setTriggers(c); }}
-                    className="h-7 text-xs flex-1"
-                  />
+
+                <div className="p-3 space-y-3">
+                  {/* Tipo */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Tipo</Label>
+                    <Select
+                      value={kind}
+                      onValueChange={(v) => {
+                        const copy = [...triggers];
+                        if (v === "phrase") copy[i] = { ...t, tipo: "keyword", match_mode: "equals" };
+                        else if (v === "keyword") copy[i] = { ...t, tipo: "keyword", match_mode: "word" };
+                        else copy[i] = { ...t, tipo: v, valor: null, match_mode: null };
+                        setTriggers(copy);
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="keyword"><div className="flex items-center gap-2"><Hash className="h-3.5 w-3.5" />Palavra-chave</div></SelectItem>
+                        <SelectItem value="phrase"><div className="flex items-center gap-2"><Quote className="h-3.5 w-3.5" />Frase-chave (exata)</div></SelectItem>
+                        <SelectItem value="new_lead"><div className="flex items-center gap-2"><UserPlus className="h-3.5 w-3.5" />Lead novo</div></SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{meta.hint}</p>
+                  </div>
+
+                  {/* Valor */}
+                  {t.tipo === "keyword" && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {t.match_mode === "equals" ? "Frase exata" : "Palavra"}
+                      </Label>
+                      <Input
+                        value={t.valor ?? ""}
+                        onChange={(e) => { const c = [...triggers]; c[i] = { ...t, valor: e.target.value }; setTriggers(c); }}
+                        placeholder={t.match_mode === "equals" ? "ex: quero comprar" : "ex: menu"}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Canal */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-3 w-3" /> Número (WhatsApp)
+                    </Label>
+                    <Select
+                      value={t.channel_id ?? "__any__"}
+                      onValueChange={(v) => { const c = [...triggers]; c[i] = { ...t, channel_id: v === "__any__" ? null : v }; setTriggers(c); }}
+                    >
+                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecionar número" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__any__">Qualquer número da operação</SelectItem>
+                        {channels.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name ?? c.display_phone_number ?? c.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!operacaoId && (
+                      <p className="text-[10px] text-amber-500">Defina a operação do fluxo para listar apenas os números dela.</p>
+                    )}
+                    {operacaoId && channels.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground">Nenhum número conectado nessa operação.</p>
+                    )}
+                  </div>
+
+                  {/* Janela opcional */}
+                  <div className="space-y-2 rounded-md border border-dashed border-border/60 bg-muted/20 p-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Janela (opcional)</Label>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Dias da semana</p>
+                      <div className="grid grid-cols-7 gap-1">
+                        {[
+                          { d: 0, l: "D" }, { d: 1, l: "S" }, { d: 2, l: "T" }, { d: 3, l: "Q" },
+                          { d: 4, l: "Q" }, { d: 5, l: "S" }, { d: 6, l: "S" },
+                        ].map(({ d, l }) => {
+                          const days: number[] = Array.isArray(t.days_of_week) ? t.days_of_week : [];
+                          const on = days.includes(d);
+                          return (
+                            <button
+                              key={d} type="button"
+                              onClick={() => {
+                                const next = on ? days.filter((x) => x !== d) : [...days, d];
+                                const c = [...triggers]; c[i] = { ...t, days_of_week: next.length ? next : null }; setTriggers(c);
+                              }}
+                              className={`h-7 text-[11px] font-semibold rounded border transition ${
+                                on
+                                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                  : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                              }`}
+                            >{l}</button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Horário</p>
+                      <div className="flex gap-1.5 items-center">
+                        <Input
+                          type="time" value={t.time_start ?? ""}
+                          onChange={(e) => { const c = [...triggers]; c[i] = { ...t, time_start: e.target.value || null }; setTriggers(c); }}
+                          className="h-8 text-xs flex-1"
+                        />
+                        <span className="text-[10px] text-muted-foreground px-0.5">até</span>
+                        <Input
+                          type="time" value={t.time_end ?? ""}
+                          onChange={(e) => { const c = [...triggers]; c[i] = { ...t, time_end: e.target.value || null }; setTriggers(c); }}
+                          className="h-8 text-xs flex-1"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Vazio = roda o tempo todo · Fuso: America/Sao_Paulo
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Vazio = roda o tempo todo. Fuso: America/Sao_Paulo.
-                </p>
               </div>
-            </div>
-          ))}
+            );
+          })}
+
           <Button
-            variant="outline" size="sm" className="w-full"
+            variant="outline" size="sm" className="w-full border-dashed hover:border-primary hover:text-primary"
             onClick={() => setTriggers([...triggers, { tipo: "keyword", valor: "", match_mode: "word", ativo: true }])}
           >
-            <Plus className="h-3 w-3 mr-1" /> Gatilho
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Adicionar gatilho
           </Button>
         </div>
       </div>
+
 
       <div className="p-3">
         <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Blocos</h3>
