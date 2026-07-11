@@ -354,23 +354,46 @@ function HtApiPage() {
                     <th className="p-3 text-left">Nome</th>
                     <th className="p-3 text-left">Email</th>
                     <th className="p-3 text-left">WhatsApp</th>
+                    <th className="p-3 text-left">Instagram</th>
+                    <th className="p-3 text-left">Respostas</th>
                     <th className="p-3 text-left">Origem</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {subs.map((s: any) => (
-                    <tr key={s.id} className="border-b border-border/50 last:border-0">
-                      <td className="p-3 text-xs text-muted-foreground">
-                        {new Date(s.received_at).toLocaleString("pt-BR")}
-                      </td>
-                      <td className="p-3">{s.nome ?? "—"}</td>
-                      <td className="p-3">{s.email ?? "—"}</td>
-                      <td className="p-3 font-mono text-xs">{s.whatsapp ?? "—"}</td>
-                      <td className="p-3 text-xs text-muted-foreground">
-                        {[s.utm_source, s.utm_campaign].filter(Boolean).join(" · ") || "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {subs.map((s: any) => {
+                    const r = (s.respostas && typeof s.respostas === "object") ? s.respostas : null;
+                    const respEntries = r ? Object.entries(r).filter(([, v]) => v != null && v !== "") : [];
+                    return (
+                      <tr key={s.id} className="border-b border-border/50 last:border-0 align-top">
+                        <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(s.received_at).toLocaleString("pt-BR")}
+                        </td>
+                        <td className="p-3">{s.nome ?? "—"}</td>
+                        <td className="p-3">{s.email ?? "—"}</td>
+                        <td className="p-3 font-mono text-xs">{s.whatsapp ?? "—"}</td>
+                        <td className="p-3 text-xs">{s.instagram ?? "—"}</td>
+                        <td className="p-3 text-xs max-w-[280px]">
+                          {respEntries.length === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <details>
+                              <summary className="cursor-pointer text-accent">
+                                {respEntries.length} campo{respEntries.length > 1 ? "s" : ""}
+                              </summary>
+                              <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                                {respEntries.map(([k, v]) => (
+                                  <li key={k}><b className="text-foreground">{k}:</b> {String(v)}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                        </td>
+                        <td className="p-3 text-xs text-muted-foreground">
+                          {[s.utm_source, s.utm_campaign].filter(Boolean).join(" · ") || "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
