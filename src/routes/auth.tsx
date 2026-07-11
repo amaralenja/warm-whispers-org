@@ -216,6 +216,8 @@ function AuthPage() {
                   ? "Aguarde…"
                   : role === "vendedor"
                   ? "Entrar como vendedor"
+                  : role === "ht"
+                  ? "Entrar SDR / Closer"
                   : mode === "signin"
                   ? "Entrar"
                   : "Criar conta"}
