@@ -177,7 +177,6 @@ export const listCalendars = createServerFn({ method: "POST" })
 
 
 export const listEvents = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { timeMin?: string; timeMax?: string; q?: string }) => d)
   .handler(async ({ data }) => {
     const params = new URLSearchParams({
