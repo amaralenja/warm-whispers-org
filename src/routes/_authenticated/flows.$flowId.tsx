@@ -798,7 +798,7 @@ function Palette({
             variant="outline" size="sm" className="w-full border-dashed hover:border-primary hover:text-primary"
             onClick={() => {
               const vs = typeof window !== "undefined" ? getVendorSession() : null;
-              const vendorCh = vs?.wa_channel_ids?.find((id) => channels.some((c) => String(c.id) === String(id))) ?? null;
+              const vendorCh = vs?.wa_channel_ids?.find((id: string) => channels.some((c) => String(c.id) === String(id))) ?? null;
               setTriggers([...triggers, { tipo: "keyword", valor: "", match_mode: "word", ativo: true, channel_id: vendorCh }]);
             }}
           >
