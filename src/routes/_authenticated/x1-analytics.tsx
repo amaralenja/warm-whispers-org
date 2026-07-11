@@ -183,7 +183,7 @@ function X1AnalyticsPage() {
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">
               Operação X1
             </p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">
+            <h1 className="mt-1 text-2xl font-black tracking-tight md:text-4xl">
               Analytics X1
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
