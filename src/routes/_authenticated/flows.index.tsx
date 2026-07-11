@@ -799,6 +799,52 @@ function FlowsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Duplicate delete confirmation */}
+      <Dialog open={dupConfirmOpen} onOpenChange={setDupConfirmOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-500">
+              <Copy className="h-5 w-5" /> Apagar fluxos duplicados?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2 text-sm">
+            <p className="text-muted-foreground">
+              Encontramos <strong>{dupPreview.reduce((a, g) => a + g.remove.length, 0)}</strong> fluxo(s) duplicado(s)
+              em <strong>{dupPreview.length}</strong> grupo(s). Vamos manter apenas <strong>1 versão</strong> de cada
+              (a com mais nós, ou a mais recente) e apagar as demais. Essa ação não pode ser desfeita.
+            </p>
+            <div className="max-h-72 overflow-auto rounded border border-border/60 divide-y divide-border/60">
+              {dupPreview.map((g, i) => (
+                <div key={i} className="p-2.5 text-xs space-y-1">
+                  <div className="font-semibold truncate">{String(g.keep?.nome ?? "")}</div>
+                  <div className="text-emerald-500">
+                    ✔ Manter: {g.keep?.nodes?.length ?? 0} nós
+                  </div>
+                  <div className="text-red-500">
+                    ✖ Apagar: {g.remove.length} cópia(s) — {g.remove.map((r) => `${r?.nodes?.length ?? 0} nós`).join(", ")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDupConfirmOpen(false)} disabled={bulkDelMut.isPending}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={bulkDelMut.isPending}
+              onClick={() => {
+                const ids = dupPreview.flatMap((g) => g.remove.map((r: any) => String(r.id)));
+                bulkDelMut.mutate(ids);
+                setDupConfirmOpen(false);
+              }}
+            >
+              {bulkDelMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Apagar {dupPreview.reduce((a, g) => a + g.remove.length, 0)} duplicado(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
 
   );
