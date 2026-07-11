@@ -537,6 +537,13 @@ function Kanban({
                   <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                     {items.length}
                   </span>
+                  <BulkDispatchButton
+                    operacao={operacao}
+                    stageId={s.id}
+                    stageLabel={s.label}
+                    stageColor={s.cor}
+                    leadCount={items.length}
+                  />
                 </div>
                 {totalValor > 0 && (
                   <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
