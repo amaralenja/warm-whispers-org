@@ -230,7 +230,7 @@ export function AppSidebar() {
   async function handleSignOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
-    try { localStorage.removeItem("vendor_session"); } catch { /* noop */ }
+    try { localStorage.removeItem("vendor_session"); localStorage.removeItem("ht_team_session"); } catch { /* noop */ }
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
