@@ -174,15 +174,16 @@ function X1AnalyticsPage() {
   const k = payload?.kpis;
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
+    <div className="min-h-screen bg-background p-3 md:p-6">
+      <div className="mx-auto max-w-[1400px] space-y-4 md:space-y-6">
+
         {/* Header enxuto */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">
               Operação X1
             </p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">
+            <h1 className="mt-1 text-2xl font-black tracking-tight md:text-4xl">
               Analytics X1
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -190,18 +191,20 @@ function X1AnalyticsPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
-            <DateRangeFilter
-              value={dateRange}
-              onChange={setDateRange}
-              presets={["hoje", "ontem", "7d", "15d", "30d", "mes"]}
-            />
-            <div>
+          <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+            <div className="col-span-2">
+              <DateRangeFilter
+                value={dateRange}
+                onChange={setDateRange}
+                presets={["hoje", "ontem", "7d", "15d", "30d", "mes"]}
+              />
+            </div>
+            <div className="min-w-0">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Operação
               </Label>
               <Select value={operacao} onValueChange={(v) => { setOperacao(v); setChannelId("all"); }}>
-                <SelectTrigger className="h-9 w-40 bg-card">
+                <SelectTrigger className="h-9 w-full bg-card sm:w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -214,12 +217,12 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="min-w-0">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Canal
               </Label>
               <Select value={channelId} onValueChange={setChannelId}>
-                <SelectTrigger className="h-9 w-52 bg-card">
+                <SelectTrigger className="h-9 w-full bg-card sm:w-52">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -236,12 +239,12 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="col-span-2 min-w-0">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Vendedor
               </Label>
               <Select value={vendedorId} onValueChange={setVendedorId}>
-                <SelectTrigger className="h-9 w-48 bg-card">
+                <SelectTrigger className="h-9 w-full bg-card sm:w-48">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,6 +279,7 @@ function X1AnalyticsPage() {
               PDF
             </Button>
           </div>
+
         </div>
 
         {dataUpdatedAt ? (
@@ -517,7 +521,7 @@ function X1AnalyticsPage() {
                   return (
                     <div
                       key={`${v.vendedorId}-${v.utm}-${idx}`}
-                      className={`group grid grid-cols-[2rem_2.5rem_1fr_auto] items-center gap-3 rounded-xl border px-3 py-2.5 transition-all ${
+                      className={`group grid grid-cols-[1.5rem_2.25rem_1fr_auto] items-center gap-2 rounded-xl border px-2 py-2 transition-all md:grid-cols-[2rem_2.5rem_1fr_auto] md:gap-3 md:px-3 md:py-2.5 ${
                         isTop
                           ? "border-amber-500/40 bg-amber-500/5"
                           : "border-transparent hover:border-border hover:bg-muted/30"
@@ -536,32 +540,30 @@ function X1AnalyticsPage() {
                         <img
                           src={v.fotoUrl}
                           alt=""
-                          className="h-10 w-10 rounded-full object-cover ring-2 ring-border"
+                          className="h-9 w-9 rounded-full object-cover ring-2 ring-border md:h-10 md:w-10"
                         />
                       ) : (
-                        <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-2 ring-border">
+                        <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-2 ring-border md:h-10 md:w-10">
                           {v.nome.slice(0, 2).toUpperCase()}
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{v.nome}</p>
-                            <p className="truncate text-[10px] font-mono uppercase text-muted-foreground">
-                              {v.utm || "sem UTM"}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-baseline gap-3 text-xs text-muted-foreground">
-                            <span>
-                              <span className="font-semibold text-foreground">{fmtInt(v.vendas)}</span> vendas
-                            </span>
-                            <span>
-                              <span className="font-semibold text-foreground">{fmtPct(v.conversao)}</span> conv.
-                            </span>
-                            <span>
-                              TM <span className="font-semibold text-foreground">{fmtBRL(v.ticketMedio)}</span>
-                            </span>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{v.nome}</p>
+                          <p className="truncate text-[10px] font-mono uppercase text-muted-foreground">
+                            {v.utm || "sem UTM"}
+                          </p>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground md:text-xs">
+                          <span>
+                            <span className="font-semibold text-foreground">{fmtInt(v.vendas)}</span> vendas
+                          </span>
+                          <span>
+                            <span className="font-semibold text-foreground">{fmtPct(v.conversao)}</span> conv.
+                          </span>
+                          <span className="hidden sm:inline">
+                            TM <span className="font-semibold text-foreground">{fmtBRL(v.ticketMedio)}</span>
+                          </span>
                         </div>
                         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                           <div
@@ -571,14 +573,15 @@ function X1AnalyticsPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono text-sm font-bold tabular-nums">
+                        <p className="font-mono text-xs font-bold tabular-nums md:text-sm">
                           {fmtBRL(v.faturamento)}
                         </p>
                         <p className="text-[10px] text-muted-foreground">
-                          {share.toFixed(1)}% do total
+                          {share.toFixed(1)}%
                         </p>
                       </div>
                     </div>
+
                   );
                 })}
               </div>
@@ -745,25 +748,26 @@ function HeroMetric({
 }) {
   const t = TONES[tone];
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br ${t.bg} p-5`}>
-      <div className="flex items-start justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+    <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br ${t.bg} p-3 md:p-5`}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground md:text-[10px] md:tracking-[0.2em]">
           {title}
         </p>
-        <div className={`grid h-8 w-8 place-items-center rounded-lg bg-background/60 ring-1 ${t.ring} ${t.text}`}>
+        <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-background/60 ring-1 md:h-8 md:w-8 ${t.ring} ${t.text}`}>
           {icon}
         </div>
       </div>
-      <div className="mt-3">
+      <div className="mt-2 md:mt-3">
         {loading ? (
-          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-8 w-24 md:h-9 md:w-32" />
         ) : (
-          <p className="font-mono text-3xl font-black tracking-tight tabular-nums">{value}</p>
+          <p className="font-mono text-xl font-black tracking-tight tabular-nums md:text-3xl">{value}</p>
         )}
-        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground md:mt-1 md:text-xs">{subtitle}</p>
         {action}
       </div>
     </div>
+
   );
 }
 
@@ -784,18 +788,19 @@ function FunnelStep({
   const t = TONES[tone];
   return (
     <div
-      className={`rounded-xl border p-4 text-center ${
+      className={`rounded-xl border p-3 text-center md:p-4 ${
         highlight
           ? "border-emerald-500/40 bg-emerald-500/5"
           : "border-border/60 bg-muted/20"
       }`}
     >
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground md:text-[10px]">
         {label}
       </p>
-      <p className={`mt-1 font-mono text-3xl font-black tabular-nums ${t.text}`}>{value}</p>
-      <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
+      <p className={`mt-1 font-mono text-xl font-black tabular-nums md:text-3xl ${t.text}`}>{value}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground md:text-[11px]">{sub}</p>
     </div>
+
   );
 }
 
