@@ -1,14 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Upload, UserRound } from "lucide-react";
+import { Copy, KeyRound, Loader2, Mail, Pencil, Plus, RefreshCw, Search, Settings2, Trash2, Upload, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MENU_TREE, htDefaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/ht-team")({
