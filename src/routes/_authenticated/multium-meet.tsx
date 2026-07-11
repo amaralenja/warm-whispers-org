@@ -32,8 +32,8 @@ const DOWNLOADS = {
 
 const downloadOptions = [
   { label: "Baixar pra Windows", href: DOWNLOADS.windows, icon: Monitor },
-  { label: "Baixar pra Mac (Apple Silicon)", href: DOWNLOADS.macArm, icon: Apple, variant: "outline" as const },
-  { label: "Mac (Intel)", href: DOWNLOADS.macIntel, icon: Apple, variant: "outline" as const },
+  { label: "Baixar pra Mac (Apple Silicon)", href: DOWNLOADS.macArm, icon: Laptop, variant: "outline" as const },
+  { label: "Mac (Intel)", href: DOWNLOADS.macIntel, icon: Laptop, variant: "outline" as const },
 ];
 
 const featureCards = [
