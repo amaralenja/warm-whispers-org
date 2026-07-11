@@ -226,37 +226,86 @@ function ComissoesPage() {
                             <td colSpan={7} className="p-3">
                               {r.dias.length === 0 ? (
                                 <div className="text-xs text-muted-foreground">Sem vendas no período.</div>
-                              ) : (
-                                <table className="w-full text-xs">
-                                  <thead className="text-muted-foreground">
-                                    <tr>
-                                      <th className="px-2 py-1 text-left">Dia</th>
-                                      <th className="px-2 py-1 text-right">Vendas</th>
-                                      <th className="px-2 py-1 text-right">Fat. dia</th>
-                                      <th className="px-2 py-1 text-right">Acumulado mês</th>
-                                      <th className="px-2 py-1 text-right">R$ / mil</th>
-                                      <th className="px-2 py-1 text-right">Milhares</th>
-                                      <th className="px-2 py-1 text-right">Comissão</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {r.dias.map((d) => (
-                                      <tr key={d.data} className="border-t border-border/40">
-                                        <td className="px-2 py-1">{fmtDate(d.data)}</td>
-                                        <td className="px-2 py-1 text-right">{d.vendas}</td>
-                                        <td className="px-2 py-1 text-right">{fmtBRL(d.faturamento)}</td>
-                                        <td className="px-2 py-1 text-right">{fmtBRL(d.cumulativo)}</td>
-                                        <td className="px-2 py-1 text-right">{fmtBRL(d.rate)}</td>
-                                        <td className="px-2 py-1 text-right">{d.milhares}</td>
-                                        <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              )}
+                              ) : (() => {
+                                const sel = selectedDays[r.id] ?? {};
+                                const selDias = r.dias.filter((d) => sel[d.data]);
+                                const allOn = selDias.length === r.dias.length;
+                                const selFat = selDias.reduce((a, d) => a + d.faturamento, 0);
+                                const selCom = selDias.reduce((a, d) => a + d.comissao, 0);
+                                const selVendas = selDias.reduce((a, d) => a + d.vendas, 0);
+                                const copyReport = async () => {
+                                  const base = selDias.length ? selDias : r.dias;
+                                  const lines = [
+                                    `Comissões — ${r.nome} (${r.utm})`,
+                                    `Período: ${fmtDate(from)} até ${fmtDate(to)}`,
+                                    "",
+                                    ...base.map((d) => `${fmtDate(d.data)} — Fat ${fmtBRL(d.faturamento)} | ${d.milhares}k × ${fmtBRL(d.rate)} = ${fmtBRL(d.comissao)}`),
+                                    "",
+                                    `Total: ${base.reduce((a, d) => a + d.faturamento, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} → Comissão ${base.reduce((a, d) => a + d.comissao, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+                                  ].join("\n");
+                                  try { await navigator.clipboard.writeText(lines); toast.success("Relatório copiado"); }
+                                  catch { toast.error("Falha ao copiar"); }
+                                };
+                                return (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button size="sm" variant="outline" onClick={() => setAllDays(r.id, r.dias.map((d) => d.data), !allOn)}>
+                                        {allOn ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>}
+                                      </Button>
+                                      <Button size="sm" variant="outline" onClick={copyReport}>
+                                        <Copy className="mr-1 h-3.5 w-3.5" /> Copiar relatório
+                                      </Button>
+                                      {selDias.length > 0 && (
+                                        <div className="ml-auto flex flex-wrap items-center gap-3 text-xs">
+                                          <span><span className="text-muted-foreground">Dias:</span> <b>{selDias.length}</b></span>
+                                          <span><span className="text-muted-foreground">Vendas:</span> <b>{selVendas}</b></span>
+                                          <span><span className="text-muted-foreground">Fat:</span> <b>{fmtBRL(selFat)}</b></span>
+                                          <span><span className="text-muted-foreground">Comissão:</span> <b className="text-accent">{fmtBRL(selCom)}</b></span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <table className="w-full text-xs">
+                                      <thead className="text-muted-foreground">
+                                        <tr>
+                                          <th className="w-8 px-2 py-1"></th>
+                                          <th className="px-2 py-1 text-left">Dia</th>
+                                          <th className="px-2 py-1 text-right">Vendas</th>
+                                          <th className="px-2 py-1 text-right">Fat. dia</th>
+                                          <th className="px-2 py-1 text-right">Acumulado mês</th>
+                                          <th className="px-2 py-1 text-right">R$ / mil</th>
+                                          <th className="px-2 py-1 text-right">Milhares</th>
+                                          <th className="px-2 py-1 text-right">Comissão</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {r.dias.map((d) => {
+                                          const checked = !!sel[d.data];
+                                          return (
+                                            <tr
+                                              key={d.data}
+                                              className={`cursor-pointer border-t border-border/40 hover:bg-muted/20 ${checked ? "bg-accent/5" : ""}`}
+                                              onClick={() => toggleDay(r.id, d.data)}
+                                            >
+                                              <td className="px-2 py-1"><Checkbox checked={checked} onCheckedChange={() => toggleDay(r.id, d.data)} onClick={(e) => e.stopPropagation()} /></td>
+                                              <td className="px-2 py-1">{fmtDate(d.data)}</td>
+                                              <td className="px-2 py-1 text-right">{d.vendas}</td>
+                                              <td className="px-2 py-1 text-right">{fmtBRL(d.faturamento)}</td>
+                                              <td className="px-2 py-1 text-right">{fmtBRL(d.cumulativo)}</td>
+                                              <td className="px-2 py-1 text-right">{fmtBRL(d.rate)}</td>
+                                              <td className="px-2 py-1 text-right">{d.milhares}</td>
+                                              <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                );
+                              })()}
                             </td>
                           </tr>
                         )}
+
                       </>
                     );
                   })}
