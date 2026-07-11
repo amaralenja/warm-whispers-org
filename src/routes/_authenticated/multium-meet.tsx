@@ -13,38 +13,39 @@ import {
   CheckCircle2,
   Github,
 } from "lucide-react";
+
 const PAGE_TITLE = "Multium Meet — Transcrição de calls com IA";
 const PAGE_DESCRIPTION =
   "App desktop da Multium para gravar, transcrever e resumir calls de vendas localmente na máquina do closer.";
 
 const logoUrl = "/favicon.webp";
-
-const DOWNLOADS = {
-  windows: "#", // TODO: link do release do GitHub após primeiro build
-  macIntel: "#",
-  macArm: "#",
-};
+const windowsDownloadUrl = "#";
+const macAppleSiliconDownloadUrl = "#";
+const macIntelDownloadUrl = "#";
 
 type DownloadButtonProps = {
   label: string;
-  href: string;
+  href?: string | null;
   icon: typeof Monitor;
   variant?: "default" | "outline";
 };
 
 function DownloadButton({ label, href, icon: Icon, variant = "default" }: DownloadButtonProps) {
-  const disabled = href === "#";
+  const safeHref = typeof href === "string" && href.trim() ? href : "#";
+  const unavailable = safeHref === "#";
 
   return (
-    <Button size="lg" variant={variant} asChild disabled={disabled}>
+    <Button size="lg" variant={variant} asChild>
       <a
-        href={href}
+        href={safeHref}
         target="_blank"
         rel="noreferrer"
-        aria-disabled={disabled}
+        aria-disabled={unavailable}
+        data-disabled={unavailable ? "true" : undefined}
         onClick={(event) => {
-          if (disabled) event.preventDefault();
+          if (unavailable) event.preventDefault();
         }}
+        className={unavailable ? "pointer-events-auto opacity-50" : undefined}
       >
         <Icon className="mr-2 h-5 w-5" />
         {label}
@@ -110,7 +111,6 @@ function MultiumMeetPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
       <div className="mx-auto max-w-5xl px-6 py-12">
-        {/* Hero */}
         <div className="flex flex-col items-center text-center">
           <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-3xl bg-foreground/95 p-4 shadow-xl">
             <img
@@ -132,16 +132,15 @@ function MultiumMeetPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <DownloadButton label="Baixar pra Windows" href={DOWNLOADS.windows} icon={Monitor} />
-            <DownloadButton label="Baixar pra Mac (Apple Silicon)" href={DOWNLOADS.macArm} icon={Laptop} variant="outline" />
-            <DownloadButton label="Mac (Intel)" href={DOWNLOADS.macIntel} icon={Laptop} variant="outline" />
+            <DownloadButton label="Baixar pra Windows" href={windowsDownloadUrl} icon={Monitor} />
+            <DownloadButton label="Baixar pra Mac (Apple Silicon)" href={macAppleSiliconDownloadUrl} icon={Laptop} variant="outline" />
+            <DownloadButton label="Mac (Intel)" href={macIntelDownloadUrl} icon={Laptop} variant="outline" />
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
             Precisa de ~4GB livres pra baixar o modelo Whisper na primeira vez.
           </p>
         </div>
 
-        {/* Features */}
         <div className="mt-16 grid gap-4 md:grid-cols-3">
           <FeatureCard
             icon={Mic}
@@ -160,7 +159,6 @@ function MultiumMeetPage() {
           />
         </div>
 
-        {/* Setup */}
         <div className="mt-16">
           <h2 className="text-2xl font-bold">Como começar</h2>
           <div className="mt-6 space-y-4">
@@ -171,7 +169,6 @@ function MultiumMeetPage() {
           </div>
         </div>
 
-        {/* Status / roadmap */}
         <Card className="mt-16 border-primary/30 bg-primary/5">
           <CardContent className="p-6">
             <div className="flex items-start gap-3">
