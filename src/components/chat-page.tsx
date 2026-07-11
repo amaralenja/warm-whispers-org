@@ -1544,14 +1544,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     </Button>
                   </div>
                 )}
-                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
+                <div className="mx-auto flex max-w-5xl items-end gap-1 md:gap-3 rounded-2xl border border-chat-line bg-chat-thread p-1 md:p-2">
 
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
+                      <Button variant="ghost" size="icon" className="hidden md:grid h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
                         <Smile className="h-5 w-5" />
                       </Button>
                     </PopoverTrigger>
+
                     <PopoverContent align="start" side="top" className="w-auto border-0 bg-transparent p-0 shadow-xl">
                       <EmojiPicker
                         onEmojiClick={(emoji) => setDraft((d) => d + emoji.emoji)}
