@@ -23,6 +23,7 @@ export const MENU_TREE: MenuNode[] = [
       { key: "chat", title: "Chat ao Vivo", url: "/chat" },
       { key: "flows", title: "Fluxos", url: "/flows" },
       { key: "x1-analytics", title: "Analytics X1", url: "/x1-analytics" },
+      { key: "comissoes", title: "Comissões", url: "/comissoes" },
     ],
   },
   {
