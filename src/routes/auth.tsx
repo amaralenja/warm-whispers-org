@@ -106,9 +106,9 @@ function AuthPage() {
               <img src={logoMultium} alt="MULTIUM" className="h-12 w-auto object-contain" />
             </div>
 
-            {/* Toggle Admin / Vendedor */}
-            <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-border bg-background/40 p-1">
-              {(["admin", "vendedor"] as const).map((r) => (
+            {/* Toggle Admin / Vendedor / SDR•Closer */}
+            <div className="mb-6 grid grid-cols-3 gap-1 rounded-full border border-border bg-background/40 p-1">
+              {(["admin", "vendedor", "ht"] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -117,13 +117,13 @@ function AuthPage() {
                     setError(null);
                     setInfo(null);
                   }}
-                  className={`rounded-full py-2 text-xs font-semibold uppercase tracking-wider transition-all ${
+                  className={`rounded-full py-2 text-[0.65rem] font-semibold uppercase tracking-wider transition-all ${
                     role === r
                       ? "bg-foreground text-background shadow"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {r === "admin" ? "Admin" : "Vendedor"}
+                  {r === "admin" ? "Admin" : r === "vendedor" ? "Vendedor" : "SDR/Closer"}
                 </button>
               ))}
             </div>
@@ -131,12 +131,14 @@ function AuthPage() {
             <h2 className="font-display text-3xl text-foreground">
               {role === "vendedor"
                 ? "Acesso do vendedor"
+                : role === "ht"
+                ? "Acesso SDR / Closer"
                 : mode === "signin"
                 ? "Bem-vindo de volta"
                 : "Criar conta"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {role === "vendedor"
+              {role === "vendedor" || role === "ht"
                 ? "Digite seu código de 6 dígitos para entrar."
                 : mode === "signin"
                 ? "Entre com suas credenciais para continuar."
@@ -144,7 +146,7 @@ function AuthPage() {
             </p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-              {role === "vendedor" ? (
+              {role === "vendedor" || role === "ht" ? (
                 <div>
                   <label className="block text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Código de acesso
