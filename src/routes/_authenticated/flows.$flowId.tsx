@@ -15,7 +15,10 @@ import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
   MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle, Tag as TagIcon,
+  Menu, SlidersHorizontal,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { useCrmTags, type CrmTag } from "@/components/tags-manager-dialog";
 import { Input } from "@/components/ui/input";
