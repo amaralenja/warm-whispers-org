@@ -74,6 +74,7 @@ const operacaoX1Items: Item[] = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },
+  { title: "Remarketing 24h", url: "/remarketing", icon: Zap },
 ];
 
 const highTicketItems: Item[] = [
@@ -114,6 +115,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/x1-analytics": "x1-analytics",
   "/pv24h-analytics": "pv24h-analytics",
   "/comissoes": "comissoes",
+  "/remarketing": "remarketing",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 

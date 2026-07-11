@@ -22,15 +22,17 @@ export const Route = createFileRoute("/api/public/hooks/dispatch-worker")({
         try {
           const { processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningDelayRuns, processExpiredWaitingRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
           const { processDueBulkDispatchItems } = await import("@/lib/crm-bulk-dispatch.server");
+          const { processDueRemarketing } = await import("@/lib/remarketing.server");
           const stale = await processStaleRunningDelayRuns(10, 20);
-          const [queued, timers, expiredWaiting, staleSend, bulk] = await Promise.all([
+          const [queued, timers, expiredWaiting, staleSend, bulk, remarketing] = await Promise.all([
             processQueuedFlowRuns(20),
             processExpiredTimerRuns(20),
             processExpiredWaitingRuns(60, 100),
             processStaleRunningSendRuns(60, 20),
             processDueBulkDispatchItems(10),
+            processDueRemarketing(),
           ]);
-          return new Response(JSON.stringify({ ok: true, stale, queued, timers, expiredWaiting, staleSend, bulk }), {
+          return new Response(JSON.stringify({ ok: true, stale, queued, timers, expiredWaiting, staleSend, bulk, remarketing }), {
             headers: { "Content-Type": "application/json" },
           });
 
