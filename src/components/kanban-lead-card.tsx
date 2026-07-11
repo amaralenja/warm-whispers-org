@@ -136,13 +136,17 @@ export function KanbanLeadCard({
   const pic = ig?.profile_pic_url
     ? `/api/public/ig-image?u=${encodeURIComponent(ig.profile_pic_url)}`
     : null;
-  const name = ig?.full_name || lead.nome || "sem nome";
+  const name = safeStr(ig?.full_name) || safeStr(lead.nome) || "sem nome";
+  const caixaLabel = safeStr(lead.caixa_label);
+  const utmSource = safeStr(lead.utm_source);
+  const whatsappStr = safeStr(lead.whatsapp);
   const initials = (name || "?")
     .split(/\s+/)
     .slice(0, 2)
     .map((s) => s[0] || "")
     .join("")
     .toUpperCase();
+
 
   return (
     <div
