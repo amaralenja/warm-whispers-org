@@ -1110,8 +1110,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar contato ou mensagem"
-                className="h-12 rounded-2xl border-chat-line bg-chat-panel pl-11 text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
+                className="h-11 rounded-2xl border-chat-line bg-chat-panel pl-11 text-base md:h-12 md:text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
               />
+
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
