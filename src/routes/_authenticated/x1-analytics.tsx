@@ -789,18 +789,19 @@ function FunnelStep({
   const t = TONES[tone];
   return (
     <div
-      className={`rounded-xl border p-4 text-center ${
+      className={`rounded-xl border p-3 text-center md:p-4 ${
         highlight
           ? "border-emerald-500/40 bg-emerald-500/5"
           : "border-border/60 bg-muted/20"
       }`}
     >
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground md:text-[10px]">
         {label}
       </p>
-      <p className={`mt-1 font-mono text-3xl font-black tabular-nums ${t.text}`}>{value}</p>
-      <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
+      <p className={`mt-1 font-mono text-xl font-black tabular-nums md:text-3xl ${t.text}`}>{value}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground md:text-[11px]">{sub}</p>
     </div>
+
   );
 }
 
