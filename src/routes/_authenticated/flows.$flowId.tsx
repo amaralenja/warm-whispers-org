@@ -675,6 +675,46 @@ function Palette({
                   <p className="text-[10px] text-muted-foreground">Nenhum número conectado nessa operação.</p>
                 )}
               </div>
+
+              {/* Janela opcional de dias/horário */}
+              <div className="space-y-1 border-t border-border/40 pt-1.5">
+                <Label className="text-[10px] uppercase text-muted-foreground">Janela (opcional)</Label>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { d: 1, l: "S" }, { d: 2, l: "T" }, { d: 3, l: "Q" },
+                    { d: 4, l: "Q" }, { d: 5, l: "S" }, { d: 6, l: "S" }, { d: 0, l: "D" },
+                  ].map(({ d, l }) => {
+                    const days: number[] = Array.isArray(t.days_of_week) ? t.days_of_week : [];
+                    const on = days.includes(d);
+                    return (
+                      <button
+                        key={d} type="button"
+                        onClick={() => {
+                          const next = on ? days.filter((x) => x !== d) : [...days, d];
+                          const c = [...triggers]; c[i] = { ...t, days_of_week: next.length ? next : null }; setTriggers(c);
+                        }}
+                        className={`h-6 w-6 text-[10px] rounded border ${on ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 border-border text-muted-foreground"}`}
+                      >{l}</button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-1 items-center">
+                  <Input
+                    type="time" value={t.time_start ?? ""}
+                    onChange={(e) => { const c = [...triggers]; c[i] = { ...t, time_start: e.target.value || null }; setTriggers(c); }}
+                    className="h-7 text-xs flex-1"
+                  />
+                  <span className="text-[10px] text-muted-foreground">até</span>
+                  <Input
+                    type="time" value={t.time_end ?? ""}
+                    onChange={(e) => { const c = [...triggers]; c[i] = { ...t, time_end: e.target.value || null }; setTriggers(c); }}
+                    className="h-7 text-xs flex-1"
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Vazio = roda o tempo todo. Fuso: America/Sao_Paulo.
+                </p>
+              </div>
             </div>
           ))}
           <Button
