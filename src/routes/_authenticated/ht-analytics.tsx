@@ -1810,7 +1810,8 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
   }, [cards]);
 
   const filtered = useMemo(() => cards.filter((c) => {
-    if (closerFilter !== "all" && c.closer !== closerFilter) return false;
+    // Leads sem closer atribuído (source: "lead") aparecem para todos os closers.
+    if (closerFilter !== "all" && c.closer && c.closer !== closerFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!`${c.nome} ${c.closer ?? ""}`.toLowerCase().includes(q)) return false;
