@@ -24,6 +24,7 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
 import { Route as AuthenticatedPv24hAnalyticsRouteImport } from './routes/_authenticated/pv24h-analytics'
+import { Route as AuthenticatedMultiumMeetRouteImport } from './routes/_authenticated/multium-meet'
 import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticated/meta-ads'
 import { Route as AuthenticatedHtTeamRouteImport } from './routes/_authenticated/ht-team'
 import { Route as AuthenticatedHtKanbanSdrRouteImport } from './routes/_authenticated/ht-kanban-sdr'
@@ -125,6 +126,12 @@ const AuthenticatedPv24hAnalyticsRoute =
   AuthenticatedPv24hAnalyticsRouteImport.update({
     id: '/pv24h-analytics',
     path: '/pv24h-analytics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMultiumMeetRoute =
+  AuthenticatedMultiumMeetRouteImport.update({
+    id: '/multium-meet',
+    path: '/multium-meet',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedMetaAdsRoute = AuthenticatedMetaAdsRouteImport.update({
@@ -281,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/ht-team': typeof AuthenticatedHtTeamRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
+  '/multium-meet': typeof AuthenticatedMultiumMeetRoute
   '/pv24h-analytics': typeof AuthenticatedPv24hAnalyticsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
@@ -322,6 +330,7 @@ export interface FileRoutesByTo {
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/ht-team': typeof AuthenticatedHtTeamRoute
   '/meta-ads': typeof AuthenticatedMetaAdsRoute
+  '/multium-meet': typeof AuthenticatedMultiumMeetRoute
   '/pv24h-analytics': typeof AuthenticatedPv24hAnalyticsRoute
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
@@ -365,6 +374,7 @@ export interface FileRoutesById {
   '/_authenticated/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/_authenticated/ht-team': typeof AuthenticatedHtTeamRoute
   '/_authenticated/meta-ads': typeof AuthenticatedMetaAdsRoute
+  '/_authenticated/multium-meet': typeof AuthenticatedMultiumMeetRoute
   '/_authenticated/pv24h-analytics': typeof AuthenticatedPv24hAnalyticsRoute
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/ht-kanban-sdr'
     | '/ht-team'
     | '/meta-ads'
+    | '/multium-meet'
     | '/pv24h-analytics'
     | '/quiz'
     | '/ranking'
@@ -449,6 +460,7 @@ export interface FileRouteTypes {
     | '/ht-kanban-sdr'
     | '/ht-team'
     | '/meta-ads'
+    | '/multium-meet'
     | '/pv24h-analytics'
     | '/quiz'
     | '/ranking'
@@ -491,6 +503,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ht-kanban-sdr'
     | '/_authenticated/ht-team'
     | '/_authenticated/meta-ads'
+    | '/_authenticated/multium-meet'
     | '/_authenticated/pv24h-analytics'
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
@@ -640,6 +653,13 @@ declare module '@tanstack/react-router' {
       path: '/pv24h-analytics'
       fullPath: '/pv24h-analytics'
       preLoaderRoute: typeof AuthenticatedPv24hAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/multium-meet': {
+      id: '/_authenticated/multium-meet'
+      path: '/multium-meet'
+      fullPath: '/multium-meet'
+      preLoaderRoute: typeof AuthenticatedMultiumMeetRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/meta-ads': {
@@ -833,6 +853,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHtKanbanSdrRoute: typeof AuthenticatedHtKanbanSdrRoute
   AuthenticatedHtTeamRoute: typeof AuthenticatedHtTeamRoute
   AuthenticatedMetaAdsRoute: typeof AuthenticatedMetaAdsRoute
+  AuthenticatedMultiumMeetRoute: typeof AuthenticatedMultiumMeetRoute
   AuthenticatedPv24hAnalyticsRoute: typeof AuthenticatedPv24hAnalyticsRoute
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
@@ -861,6 +882,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHtKanbanSdrRoute: AuthenticatedHtKanbanSdrRoute,
   AuthenticatedHtTeamRoute: AuthenticatedHtTeamRoute,
   AuthenticatedMetaAdsRoute: AuthenticatedMetaAdsRoute,
+  AuthenticatedMultiumMeetRoute: AuthenticatedMultiumMeetRoute,
   AuthenticatedPv24hAnalyticsRoute: AuthenticatedPv24hAnalyticsRoute,
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
@@ -899,13 +921,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
