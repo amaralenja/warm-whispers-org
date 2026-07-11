@@ -53,7 +53,7 @@ function HtTeamPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ht_team")
-        .select("id, nome, tipo, telefone, foto_url, codigo, ativo")
+        .select("id, nome, tipo, telefone, email, foto_url, codigo, ativo, permissoes")
         .order("nome", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Membro[];
