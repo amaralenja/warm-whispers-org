@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { getVendorSession } from "@/lib/vendor-session";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -795,7 +796,11 @@ function Palette({
 
           <Button
             variant="outline" size="sm" className="w-full border-dashed hover:border-primary hover:text-primary"
-            onClick={() => setTriggers([...triggers, { tipo: "keyword", valor: "", match_mode: "word", ativo: true }])}
+            onClick={() => {
+              const vs = typeof window !== "undefined" ? getVendorSession() : null;
+              const vendorCh = vs?.wa_channel_ids?.find((id: string) => channels.some((c) => String(c.id) === String(id))) ?? null;
+              setTriggers([...triggers, { tipo: "keyword", valor: "", match_mode: "word", ativo: true, channel_id: vendorCh }]);
+            }}
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" /> Adicionar gatilho
           </Button>
