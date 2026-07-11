@@ -46,6 +46,7 @@ function HtTeamPage() {
   const [filter, setFilter] = useState<"todos" | "sdr" | "closer">("todos");
   const [editing, setEditing] = useState<Membro | null>(null);
   const [creating, setCreating] = useState(false);
+  const [permMember, setPermMember] = useState<Membro | null>(null);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
