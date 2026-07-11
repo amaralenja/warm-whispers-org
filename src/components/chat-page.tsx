@@ -1627,7 +1627,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     }}
                     placeholder="Digite uma mensagem"
                     rows={1}
-                    className="max-h-36 min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-3 text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+                    className="max-h-36 min-h-10 md:min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-2 md:py-3 text-base md:text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
                   />
                   {sendError && (
                     <div className="max-w-72 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
@@ -1637,12 +1637,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   {draft.trim() ? (
                     <Button
                       size="icon"
-                      className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
+                      className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
                       onClick={handleSendText}
                       disabled={sendMut.isPending}
                     >
                       {sendMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                     </Button>
+
                   ) : (
                     <WhatsappRecorder
                       disabled={sendMut.isPending}
