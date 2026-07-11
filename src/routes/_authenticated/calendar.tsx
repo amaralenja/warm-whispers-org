@@ -74,6 +74,7 @@ import {
   type CalendarEvent,
 } from "@/lib/google-calendar.functions";
 import { sendMetaEvent } from "@/lib/meta-ads.functions";
+import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
