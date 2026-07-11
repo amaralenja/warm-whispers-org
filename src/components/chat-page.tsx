@@ -1394,7 +1394,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       setProfilePhotoPreview({ src, alt: toText(active.contact_name) || toText(active.contact_wa_id) || "Foto do lead" });
                     }}
                   >
-                    <Avatar className="h-14 w-14 rounded-2xl border border-chat-line">
+                    <Avatar className="h-10 w-10 rounded-2xl border border-chat-line md:h-14 md:w-14">
                       {(active as any).contact_avatar_url ? (
                         <AvatarImage src={(active as any).contact_avatar_url} alt={toText(active.contact_name) || toText(active.contact_wa_id)} className="rounded-2xl object-cover" />
                       ) : null}
@@ -1411,14 +1411,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       <h3 className="truncate text-lg font-semibold tracking-normal">
                         {toText(active.contact_name) || toText(active.contact_wa_id)}
                       </h3>
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
+                      <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
+
                       {(() => {
                         const b = opBadgeFor((active as any).operacao_id);
                         return b ? (
                           <span
-                            className="inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                            className="hidden sm:inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                             style={{ color: b.hex, borderColor: `${b.hex}66`, backgroundColor: `${b.hex}1f` }}
                             title={`Operação: ${b.nome}`}
                           >
@@ -1433,7 +1434,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                         if (!stage) return null;
                         return (
                           <span
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                            className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                             style={{ color: stage.cor, borderColor: `${stage.cor}66`, backgroundColor: `${stage.cor}1f` }}
                             title={`CRM: ${stage.nome}`}
                           >
@@ -1450,7 +1451,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       const ch = channelById.get(active.channel_id);
                       if (!ch) return null;
                       return (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        <p className="mt-0.5 hidden md:block truncate text-xs text-muted-foreground">
                           <span className="opacity-70">Atendido por:</span>{" "}
                           <span className="font-medium text-foreground">{ch.label}</span>
                           {ch.phone && ch.phone !== ch.label ? <span className="ml-1 opacity-70">({ch.phone})</span> : null}
@@ -3047,12 +3048,13 @@ function ConversationMetaControls({
     <div className="flex shrink-0 items-center gap-2">
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
-            <Tag className="h-4 w-4" /> Etiquetas
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-2 text-xs md:px-3">
+            <Tag className="h-4 w-4" /> <span className="hidden md:inline">Etiquetas</span>
             {tags.length > 0 ? (
               <span className="rounded-full bg-chat-accent/20 px-1.5 text-[10px] font-semibold text-chat-accent">{tags.length}</span>
             ) : null}
           </Button>
+
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80 border-chat-line bg-chat-panel p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas do contato</div>
@@ -3114,12 +3116,13 @@ function ConversationMetaControls({
 
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
-            <StickyNote className="h-4 w-4" /> Nota
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-2 text-xs md:px-3">
+            <StickyNote className="h-4 w-4" /> <span className="hidden md:inline">Nota</span>
             {(conv.notes ?? "").trim().length > 0 ? (
               <span className="h-1.5 w-1.5 rounded-full bg-chat-accent" />
             ) : null}
           </Button>
+
         </PopoverTrigger>
         <PopoverContent align="end" className="w-96 border-chat-line bg-chat-panel p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anotações internas</div>
