@@ -7,7 +7,7 @@ const KEY = z.string().min(1).max(200);
 export const getUserPref = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ key: KEY }).parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<{ value: string | null }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("user_prefs")
@@ -16,21 +16,28 @@ export const getUserPref = createServerFn({ method: "GET" })
       .eq("pref_key", data.key)
       .maybeSingle();
     if (error) throw error;
-    return { value: (row?.value ?? null) as unknown as null };
+    if (!row?.value) return { value: null };
+    return { value: JSON.stringify(row.value) };
   });
 
 export const setUserPref = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ key: KEY, value: z.unknown() }).parse(d))
-  .handler(async ({ data, context }) => {
+  .inputValidator((d) => z.object({ key: KEY, valueJson: z.string() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data.valueJson);
+    } catch {
+      parsed = null;
+    }
     const { error } = await supabaseAdmin
       .from("user_prefs")
       .upsert(
         {
           owner_key: context.userId,
           pref_key: data.key,
-          value: (data.value ?? null) as never,
+          value: parsed as never,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "owner_key,pref_key" },
@@ -38,3 +45,4 @@ export const setUserPref = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
