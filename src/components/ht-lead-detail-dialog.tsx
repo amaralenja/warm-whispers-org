@@ -431,6 +431,45 @@ export function HtLeadDetailDialog({
             </div>
           )}
 
+          {/* Registrar Venda — só pro closer */}
+          {role === "closer" && (
+            <div className="px-6 py-4 border-b border-border/40 bg-gradient-to-r from-amber-500/[0.06] via-yellow-500/[0.04] to-transparent">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-amber-300/90">
+                  <DollarSign className="h-3 w-3" />
+                  {Number(lead?.crm_valor || 0) > 0 ? "Venda registrada" : "Fechamento"}
+                </div>
+                {Number(lead?.crm_valor || 0) > 0 && (
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="font-mono tabular-nums text-amber-200 font-semibold">
+                      {Number(lead!.crm_valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                    {Number(lead?.crm_valor_recebido || 0) > 0 && Number(lead?.crm_valor_recebido || 0) < Number(lead?.crm_valor || 0) && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                        Sinal · {Number(lead!.crm_valor_recebido).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} recebidos · falta {(Number(lead!.crm_valor) - Number(lead!.crm_valor_recebido || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
+                    {Number(lead?.crm_valor_recebido || 0) >= Number(lead?.crm_valor || 0) && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <CheckCircle2 className="h-2.5 w-2.5" /> Quitado
+                      </span>
+                    )}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSaleOpen(true)}
+                  className="ml-auto text-[11px] font-bold px-3.5 py-2 rounded-md bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:from-amber-400 hover:to-yellow-400 transition-all shadow-[0_0_20px_-6px_rgba(234,179,8,0.6)] hover:shadow-[0_0_28px_-4px_rgba(234,179,8,0.8)] flex items-center gap-1.5"
+                >
+                  <Handshake className="h-3.5 w-3.5" />
+                  {Number(lead?.crm_valor || 0) > 0 ? "Editar venda" : "Registrar venda"}
+                </button>
+              </div>
+            </div>
+          )}
+
+
+
           <div className="grid md:grid-cols-[1fr_1.1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40">
 
             {/* QUIZ */}
