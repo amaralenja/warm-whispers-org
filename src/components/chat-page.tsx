@@ -1074,7 +1074,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         <aside className={`min-h-0 flex-col border-r border-chat-line bg-chat-sidebar ${active ? "hidden md:flex" : "flex"}`}>
 
 
-          <div className="shrink-0 border-b border-chat-line p-5">
+          <div className="shrink-0 border-b border-chat-line p-3 md:p-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-chat-soft text-chat-accent">
