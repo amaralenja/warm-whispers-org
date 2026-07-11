@@ -77,7 +77,7 @@ function VendorPortal() {
     (v.nome ?? "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?";
 
   const stats = data;
-  const maxSerie = Math.max(1, ...(stats?.serieDiaria?.map((d) => d.total) ?? [0]));
+
 
   // meta no banco = meta DIÁRIA. Multiplica pelos dias do período.
   const diasPeriodo = Math.max(
