@@ -1,9 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Pencil, Trash2, Zap, Tag as TagIcon, Columns3, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, Tag as TagIcon, Columns3, X, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { getVendorSession } from "@/lib/vendor-session";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
