@@ -203,8 +203,8 @@ function FlowsListPage() {
     setZvSummary(null);
     const allFunnels: any[] = parsed.funnels;
     const total = allFunnels.length;
-    // Reduzido: cada request carrega o backup enxuto só dos funis do chunk (mídias base64 são pesadas)
-    const CHUNK = 3;
+    // Reduzido: 1 funil por request pra evitar "Request Entity Too Large".
+    const CHUNK = 1;
     const acc: any = { funnels: 0, steps: 0, uploads: 0, errors: [] };
 
     // Index helpers para montar backup slim por chunk
@@ -250,7 +250,8 @@ function FlowsListPage() {
     const allItemIds = new Set<string>();
     for (const f of allFunnels) {
       const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
-      for (const s of seq) if (s?.itemId && s?.type !== "message") allItemIds.add(String(s.itemId));
+      // Pre-upa TODO item que tiver base64, independente do tipo.
+      for (const s of seq) if (s?.itemId) allItemIds.add(String(s.itemId));
     }
     let mediaDone = 0;
     const mediaTotal = allItemIds.size;
