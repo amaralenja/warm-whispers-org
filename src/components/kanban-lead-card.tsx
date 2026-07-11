@@ -218,21 +218,21 @@ export function KanbanLeadCard({
         >
           <div className="flex items-center gap-1.5 min-w-0">
             <Wallet className="h-3 w-3 shrink-0 opacity-70" />
-            <span className="text-[10px] font-bold truncate">{lead.caixa_label || tier.label}</span>
+            <span className="text-[10px] font-bold truncate">{caixaLabel || tier.label}</span>
           </div>
           <span className="text-[10px] font-mono font-bold opacity-70">{letter}</span>
         </div>
       )}
 
       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-        {lead.utm_source && (
+        {utmSource && (
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate max-w-[110px]">
-            {lead.utm_source}
+            {utmSource}
           </span>
         )}
-        {lead.whatsapp && (
+        {whatsappStr && (
           <a
-            href={`https://wa.me/${String(lead.whatsapp).replace(/\D/g, "")}`}
+            href={`https://wa.me/${whatsappStr.replace(/\D/g, "")}`}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -242,6 +242,7 @@ export function KanbanLeadCard({
           </a>
         )}
       </div>
+
 
       {scheduledAt && (
         <div className="mt-2 flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-300">
