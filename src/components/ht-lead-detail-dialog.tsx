@@ -1,14 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import { getVendorSession } from "@/lib/vendor-session";
 import {
   MessageSquare, Trash2, Phone, Mail, Instagram, Send,
   Wallet, TrendingUp, Target, Rocket, Lightbulb, Users, Flame,
-  Calendar, X, Crown,
+  Calendar, X, Crown, DollarSign, Handshake, CheckCircle2,
 } from "lucide-react";
+
+// Quiz supabase (mesmo que ht-analytics usa) — o lead vive lá, então salvamos lá também.
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
 
 export type LeadLike = {
   id: string;
@@ -31,8 +44,11 @@ export type LeadLike = {
   data_criacao?: string | null;
   crm_status?: string | null;
   crm_valor?: number | null;
+  crm_valor_recebido?: number | null;
+  crm_data_pagamento_restante?: string | null;
   crm_data_agendamento?: string | null;
 };
+
 
 type Note = {
   id: string;
@@ -85,7 +101,7 @@ function fmtDate(iso?: string | null) {
 }
 
 export function HtLeadDetailDialog({
-  lead, role, open, onOpenChange, scheduledAt, onSchedule,
+  lead, role, open, onOpenChange, scheduledAt, onSchedule, onSaleSaved,
 }: {
   lead: LeadLike | null;
   role: Role;
@@ -93,6 +109,7 @@ export function HtLeadDetailDialog({
   onOpenChange: (v: boolean) => void;
   scheduledAt?: string | null;
   onSchedule?: (iso: string | null) => void;
+  onSaleSaved?: () => void;
 }) {
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -100,7 +117,16 @@ export function HtLeadDetailDialog({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
+
   const [schedDraft, setSchedDraft] = useState<string>("");
+
+  // Registro de venda
+  const [saleOpen, setSaleOpen] = useState(false);
+  const [saleType, setSaleType] = useState<"direta" | "sinal">("direta");
+  const [valorTotal, setValorTotal] = useState<string>("");
+  const [valorRecebido, setValorRecebido] = useState<string>("");
+  const [dataRestante, setDataRestante] = useState<string>("");
+  const [savingSale, setSavingSale] = useState(false);
 
   useEffect(() => {
     if (scheduledAt) {
@@ -111,6 +137,49 @@ export function HtLeadDetailDialog({
       setSchedDraft("");
     }
   }, [scheduledAt, open]);
+
+  // Preenche o dialog de venda com o que já existe no lead
+  useEffect(() => {
+    if (!saleOpen) return;
+    const total = Number(lead?.crm_valor || 0);
+    const rec = Number(lead?.crm_valor_recebido || 0);
+    setValorTotal(total > 0 ? String(total) : "");
+    setValorRecebido(rec > 0 ? String(rec) : "");
+    setDataRestante(lead?.crm_data_pagamento_restante ?? "");
+    if (total > 0 && rec > 0 && rec < total) setSaleType("sinal");
+    else setSaleType("direta");
+  }, [saleOpen, lead?.id, lead?.crm_valor, lead?.crm_valor_recebido, lead?.crm_data_pagamento_restante]);
+
+  async function saveSale() {
+    if (!lead?.id) return;
+    const total = Number(String(valorTotal).replace(/\./g, "").replace(",", ".")) || 0;
+    if (total <= 0) { toast.error("Informa o valor da venda"); return; }
+    let recebido = total;
+    let dataRest: string | null = null;
+    if (saleType === "sinal") {
+      recebido = Number(String(valorRecebido).replace(/\./g, "").replace(",", ".")) || 0;
+      if (recebido <= 0) { toast.error("Informa o valor do sinal recebido"); return; }
+      if (recebido > total) { toast.error("Sinal não pode ser maior que o total"); return; }
+      dataRest = dataRestante || null;
+    }
+    setSavingSale(true);
+    const { error } = await quizSb
+      .from("leads")
+      .update({
+        crm_status: "fechado",
+        crm_valor: total,
+        crm_valor_recebido: recebido,
+        crm_data_pagamento_restante: dataRest,
+      })
+      .eq("id", lead.id);
+    setSavingSale(false);
+    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+    toast.success(saleType === "direta" ? "Venda registrada 🚀" : "Sinal registrado 💰");
+    setSaleOpen(false);
+    onSaleSaved?.();
+    onOpenChange(false);
+  }
+
 
 
   const authorName = useMemo(() => {
@@ -362,6 +431,45 @@ export function HtLeadDetailDialog({
             </div>
           )}
 
+          {/* Registrar Venda — só pro closer */}
+          {role === "closer" && (
+            <div className="px-6 py-4 border-b border-border/40 bg-gradient-to-r from-amber-500/[0.06] via-yellow-500/[0.04] to-transparent">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-amber-300/90">
+                  <DollarSign className="h-3 w-3" />
+                  {Number(lead?.crm_valor || 0) > 0 ? "Venda registrada" : "Fechamento"}
+                </div>
+                {Number(lead?.crm_valor || 0) > 0 && (
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="font-mono tabular-nums text-amber-200 font-semibold">
+                      {Number(lead!.crm_valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                    {Number(lead?.crm_valor_recebido || 0) > 0 && Number(lead?.crm_valor_recebido || 0) < Number(lead?.crm_valor || 0) && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                        Sinal · {Number(lead!.crm_valor_recebido).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} recebidos · falta {(Number(lead!.crm_valor) - Number(lead!.crm_valor_recebido || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
+                    {Number(lead?.crm_valor_recebido || 0) >= Number(lead?.crm_valor || 0) && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <CheckCircle2 className="h-2.5 w-2.5" /> Quitado
+                      </span>
+                    )}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSaleOpen(true)}
+                  className="ml-auto text-[11px] font-bold px-3.5 py-2 rounded-md bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:from-amber-400 hover:to-yellow-400 transition-all shadow-[0_0_20px_-6px_rgba(234,179,8,0.6)] hover:shadow-[0_0_28px_-4px_rgba(234,179,8,0.8)] flex items-center gap-1.5"
+                >
+                  <Handshake className="h-3.5 w-3.5" />
+                  {Number(lead?.crm_valor || 0) > 0 ? "Editar venda" : "Registrar venda"}
+                </button>
+              </div>
+            </div>
+          )}
+
+
+
           <div className="grid md:grid-cols-[1fr_1.1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40">
 
             {/* QUIZ */}
@@ -503,6 +611,151 @@ export function HtLeadDetailDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* Dialog aninhado: Registrar Venda */}
+      <Dialog open={saleOpen} onOpenChange={setSaleOpen}>
+        <DialogContent className="max-w-md border-border/60 bg-background">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-black tracking-tight">
+              <Handshake className="h-5 w-5 text-amber-400" />
+              Registrar Venda
+            </DialogTitle>
+            <div className="text-xs text-muted-foreground truncate">
+              {lead?.nome || "Lead"}
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Tipo — cards grandes */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSaleType("direta")}
+                className={`relative rounded-lg border p-3 text-left transition-all ${
+                  saleType === "direta"
+                    ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_25px_-8px_rgba(16,185,129,0.55)]"
+                    : "border-border/60 bg-card/40 hover:border-border"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-emerald-300 font-bold">
+                  <CheckCircle2 className="h-3 w-3" /> Venda Direta
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                  100% pago. Vai direto pro Dashboard.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaleType("sinal")}
+                className={`relative rounded-lg border p-3 text-left transition-all ${
+                  saleType === "sinal"
+                    ? "border-violet-500/60 bg-violet-500/10 shadow-[0_0_25px_-8px_rgba(139,92,246,0.55)]"
+                    : "border-border/60 bg-card/40 hover:border-border"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-violet-300 font-bold">
+                  <Wallet className="h-3 w-3" /> Sinal
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                  Pagamento parcial. Vai pra Contas a Receber.
+                </div>
+              </button>
+            </div>
+
+            {/* Valor total */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Valor total da venda (R$)
+              </Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                placeholder="Ex: 15000"
+                value={valorTotal}
+                onChange={(e) => setValorTotal(e.target.value)}
+                className="text-lg font-mono tabular-nums h-11"
+                autoFocus
+              />
+            </div>
+
+            {/* Se sinal: valor recebido + data restante */}
+            {saleType === "sinal" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase tracking-wider text-violet-300">
+                    Sinal recebido (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    placeholder="Ex: 800"
+                    value={valorRecebido}
+                    onChange={(e) => setValorRecebido(e.target.value)}
+                    className="text-sm font-mono tabular-nums h-10 border-violet-500/40 focus:border-violet-500/70"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Restante em
+                  </Label>
+                  <Input
+                    type="date"
+                    value={dataRestante}
+                    onChange={(e) => setDataRestante(e.target.value)}
+                    className="text-sm h-10"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Preview */}
+            {Number(valorTotal) > 0 && (
+              <div className="rounded-md border border-border/50 bg-card/30 px-3 py-2 text-[11px] font-mono tabular-nums text-muted-foreground space-y-0.5">
+                <div className="flex justify-between">
+                  <span>Total</span>
+                  <span className="text-foreground font-semibold">
+                    {Number(valorTotal).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </span>
+                </div>
+                {saleType === "sinal" && Number(valorRecebido) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Sinal</span>
+                      <span className="text-emerald-300">
+                        {Number(valorRecebido).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Falta</span>
+                      <span className="text-amber-300">
+                        {Math.max(0, Number(valorTotal) - Number(valorRecebido)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSaleOpen(false)} disabled={savingSale}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={saveSale}
+              disabled={savingSale || !valorTotal}
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:from-amber-400 hover:to-yellow-400 font-bold"
+            >
+              {savingSale ? "Salvando…" : saleType === "direta" ? "Confirmar venda" : "Registrar sinal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
+

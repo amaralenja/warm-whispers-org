@@ -368,27 +368,33 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
 
       {/* Tabs */}
       <div className="border-b border-border/50 bg-background/60 backdrop-blur sticky top-0 z-10">
-        <div className="px-6 md:px-10 flex items-center gap-1">
-          {([
-            { id: "dashboard", label: "Dashboard" },
-            { id: "receber", label: "Contas a Receber" },
-            { id: "leads", label: "Lista de Leads" },
-          ] as const).map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative ${
-                tab === t.id ? "text-accent" : "text-muted-foreground hover:text-foreground"
-              }`}>
-              {t.label}
-              {tab === t.id && <span className="absolute bottom-0 left-0 right-0 h-px bg-accent" />}
-            </button>
-          ))}
+        <div className="px-6 md:px-10 flex items-center gap-1 overflow-x-auto">
+          {(() => {
+            const s = getHtTeamSession();
+            const tabs: { id: HTTab; label: string }[] = [];
+            if (!s || s.tipo === "sdr") tabs.push({ id: "kanban", label: "Kanban SDR" });
+            if (!s || s.tipo === "closer") tabs.push({ id: "closer", label: "Kanban Closer" });
+            tabs.push({ id: "dashboard", label: "Dashboard" });
+            tabs.push({ id: "receber", label: "Contas a Receber" });
+            tabs.push({ id: "leads", label: "Lista de Leads" });
+            return tabs.map((t) => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative whitespace-nowrap ${
+                  tab === t.id ? "text-accent" : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {t.label}
+                {tab === t.id && <span className="absolute bottom-0 left-0 right-0 h-px bg-accent" />}
+              </button>
+            ));
+          })()}
         </div>
       </div>
 
       {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
       {tab === "closer" && (
         <>
-          <KanbanCloser leads={leads} vendas={vendas} loading={loading} />
+          <KanbanCloser leads={leads} vendas={vendas} loading={loading} onReload={() => setNonce((n) => n + 1)} />
+
           <div className="border-t border-border/50 mt-6">
             <div className="px-6 md:px-10 pt-6 pb-2">
               <h2 className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -1720,7 +1726,7 @@ const CAIXA_VALOR: Record<string, number> = {
   D: 3000, E: 5000, F: 8000, G: 15000,
 };
 
-function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[]; loading: boolean }) {
+function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void }) {
   const htSession = useMemo(() => getHtTeamSession(), []);
   const isCloserSession = htSession?.tipo === "closer";
   const vendasScoped = useMemo(
@@ -1982,7 +1988,9 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
+        onSaleSaved={onReload}
       />
+
 
     </div>
   );

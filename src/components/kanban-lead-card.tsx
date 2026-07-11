@@ -94,6 +94,20 @@ function timeAgo(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
+/** Coerce arbitrary values (às vezes vem objeto {} do quiz) pra string renderizável. */
+function safeStr(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (typeof v === "object") {
+    const o = v as any;
+    const s = o.label ?? o.value ?? o.text ?? o.name ?? "";
+    return typeof s === "string" || typeof s === "number" ? String(s) : "";
+  }
+  return String(v);
+}
+
+
 export function KanbanLeadCard({
   lead,
   ig,
@@ -122,13 +136,17 @@ export function KanbanLeadCard({
   const pic = ig?.profile_pic_url
     ? `/api/public/ig-image?u=${encodeURIComponent(ig.profile_pic_url)}`
     : null;
-  const name = ig?.full_name || lead.nome || "sem nome";
+  const name = safeStr(ig?.full_name) || safeStr(lead.nome) || "sem nome";
+  const caixaLabel = safeStr(lead.caixa_label);
+  const utmSource = safeStr(lead.utm_source);
+  const whatsappStr = safeStr(lead.whatsapp);
   const initials = (name || "?")
     .split(/\s+/)
     .slice(0, 2)
     .map((s) => s[0] || "")
     .join("")
     .toUpperCase();
+
 
   return (
     <div
@@ -200,21 +218,21 @@ export function KanbanLeadCard({
         >
           <div className="flex items-center gap-1.5 min-w-0">
             <Wallet className="h-3 w-3 shrink-0 opacity-70" />
-            <span className="text-[10px] font-bold truncate">{lead.caixa_label || tier.label}</span>
+            <span className="text-[10px] font-bold truncate">{caixaLabel || tier.label}</span>
           </div>
           <span className="text-[10px] font-mono font-bold opacity-70">{letter}</span>
         </div>
       )}
 
       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-        {lead.utm_source && (
+        {utmSource && (
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate max-w-[110px]">
-            {lead.utm_source}
+            {utmSource}
           </span>
         )}
-        {lead.whatsapp && (
+        {whatsappStr && (
           <a
-            href={`https://wa.me/${String(lead.whatsapp).replace(/\D/g, "")}`}
+            href={`https://wa.me/${whatsappStr.replace(/\D/g, "")}`}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -224,6 +242,7 @@ export function KanbanLeadCard({
           </a>
         )}
       </div>
+
 
       {scheduledAt && (
         <div className="mt-2 flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-300">
