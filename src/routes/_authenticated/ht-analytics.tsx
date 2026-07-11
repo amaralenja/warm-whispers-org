@@ -1726,7 +1726,7 @@ const CAIXA_VALOR: Record<string, number> = {
   D: 3000, E: 5000, F: 8000, G: 15000,
 };
 
-function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[]; loading: boolean }) {
+function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void }) {
   const htSession = useMemo(() => getHtTeamSession(), []);
   const isCloserSession = htSession?.tipo === "closer";
   const vendasScoped = useMemo(
