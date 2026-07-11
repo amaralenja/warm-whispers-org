@@ -1988,7 +1988,9 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
+        onSaleSaved={onReload}
       />
+
 
     </div>
   );
