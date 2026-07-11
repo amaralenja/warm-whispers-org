@@ -120,6 +120,14 @@ export function HtLeadDetailDialog({
 
   const [schedDraft, setSchedDraft] = useState<string>("");
 
+  // Registro de venda
+  const [saleOpen, setSaleOpen] = useState(false);
+  const [saleType, setSaleType] = useState<"direta" | "sinal">("direta");
+  const [valorTotal, setValorTotal] = useState<string>("");
+  const [valorRecebido, setValorRecebido] = useState<string>("");
+  const [dataRestante, setDataRestante] = useState<string>("");
+  const [savingSale, setSavingSale] = useState(false);
+
   useEffect(() => {
     if (scheduledAt) {
       const d = new Date(scheduledAt);
@@ -129,6 +137,49 @@ export function HtLeadDetailDialog({
       setSchedDraft("");
     }
   }, [scheduledAt, open]);
+
+  // Preenche o dialog de venda com o que já existe no lead
+  useEffect(() => {
+    if (!saleOpen) return;
+    const total = Number(lead?.crm_valor || 0);
+    const rec = Number(lead?.crm_valor_recebido || 0);
+    setValorTotal(total > 0 ? String(total) : "");
+    setValorRecebido(rec > 0 ? String(rec) : "");
+    setDataRestante(lead?.crm_data_pagamento_restante ?? "");
+    if (total > 0 && rec > 0 && rec < total) setSaleType("sinal");
+    else setSaleType("direta");
+  }, [saleOpen, lead?.id, lead?.crm_valor, lead?.crm_valor_recebido, lead?.crm_data_pagamento_restante]);
+
+  async function saveSale() {
+    if (!lead?.id) return;
+    const total = Number(String(valorTotal).replace(/\./g, "").replace(",", ".")) || 0;
+    if (total <= 0) { toast.error("Informa o valor da venda"); return; }
+    let recebido = total;
+    let dataRest: string | null = null;
+    if (saleType === "sinal") {
+      recebido = Number(String(valorRecebido).replace(/\./g, "").replace(",", ".")) || 0;
+      if (recebido <= 0) { toast.error("Informa o valor do sinal recebido"); return; }
+      if (recebido > total) { toast.error("Sinal não pode ser maior que o total"); return; }
+      dataRest = dataRestante || null;
+    }
+    setSavingSale(true);
+    const { error } = await quizSb
+      .from("leads")
+      .update({
+        crm_status: "fechado",
+        crm_valor: total,
+        crm_valor_recebido: recebido,
+        crm_data_pagamento_restante: dataRest,
+      })
+      .eq("id", lead.id);
+    setSavingSale(false);
+    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+    toast.success(saleType === "direta" ? "Venda registrada 🚀" : "Sinal registrado 💰");
+    setSaleOpen(false);
+    onSaleSaved?.();
+    onOpenChange(false);
+  }
+
 
 
   const authorName = useMemo(() => {
