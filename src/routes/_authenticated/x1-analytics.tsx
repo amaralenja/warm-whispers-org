@@ -174,8 +174,9 @@ function X1AnalyticsPage() {
   const k = payload?.kpis;
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
+    <div className="min-h-screen bg-background p-3 md:p-6">
+      <div className="mx-auto max-w-[1400px] space-y-4 md:space-y-6">
+
         {/* Header enxuto */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
