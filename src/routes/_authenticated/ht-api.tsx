@@ -417,14 +417,10 @@ function HtApiPage() {
                         </td>
                         <td className="p-3 text-xs max-w-[280px]">
                           {(() => {
-                            const hasFb = !!(s.fbc || s.fbp || s.fbclid);
-                            const hasG = !!s.gclid;
-                            const src = (s.utm_source ?? "").toLowerCase();
-                            const isPaid = hasFb || hasG || ["fb","facebook","ig","instagram","meta","google","tiktok","ads","paid"].some((k) => src.includes(k));
+                            const isPaid = !!(s.fbc && s.fbp && s.utm_campaign);
                             const badge = isPaid
                               ? { label: "PAGO", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30" }
-                              : (s.utm_source ? { label: "REFERRAL", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" }
-                                              : { label: "ORGÂNICO", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" });
+                              : { label: "ORGÂNICO", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
                             const parts = [
                               s.utm_source && ["source", s.utm_source],
                               s.utm_medium && ["medium", s.utm_medium],
