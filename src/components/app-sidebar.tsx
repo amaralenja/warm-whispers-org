@@ -108,6 +108,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/ht-kanban-sdr": "ht-kanban-sdr",
   "/ht-kanban-closer": "ht-kanban-closer",
   "/ht-api": "ht-api",
+  "/ht-team": "ht-team",
   "/sops": "sops",
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",
