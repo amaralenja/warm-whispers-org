@@ -3115,12 +3115,13 @@ function ConversationMetaControls({
 
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
-            <StickyNote className="h-4 w-4" /> Nota
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-2 text-xs md:px-3">
+            <StickyNote className="h-4 w-4" /> <span className="hidden md:inline">Nota</span>
             {(conv.notes ?? "").trim().length > 0 ? (
               <span className="h-1.5 w-1.5 rounded-full bg-chat-accent" />
             ) : null}
           </Button>
+
         </PopoverTrigger>
         <PopoverContent align="end" className="w-96 border-chat-line bg-chat-panel p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anotações internas</div>
