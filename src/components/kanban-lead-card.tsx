@@ -94,6 +94,20 @@ function timeAgo(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
+/** Coerce arbitrary values (às vezes vem objeto {} do quiz) pra string renderizável. */
+function safeStr(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (typeof v === "object") {
+    const o = v as any;
+    const s = o.label ?? o.value ?? o.text ?? o.name ?? "";
+    return typeof s === "string" || typeof s === "number" ? String(s) : "";
+  }
+  return String(v);
+}
+
+
 export function KanbanLeadCard({
   lead,
   ig,
