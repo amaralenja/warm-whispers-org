@@ -1394,7 +1394,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       setProfilePhotoPreview({ src, alt: toText(active.contact_name) || toText(active.contact_wa_id) || "Foto do lead" });
                     }}
                   >
-                    <Avatar className="h-14 w-14 rounded-2xl border border-chat-line">
+                    <Avatar className="h-10 w-10 rounded-2xl border border-chat-line md:h-14 md:w-14">
                       {(active as any).contact_avatar_url ? (
                         <AvatarImage src={(active as any).contact_avatar_url} alt={toText(active.contact_name) || toText(active.contact_wa_id)} className="rounded-2xl object-cover" />
                       ) : null}
