@@ -100,6 +100,7 @@ import {
 import { Archive, ArchiveRestore } from "lucide-react";
 import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
+import { getUserPref, setUserPref } from "@/lib/user-prefs.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { ImageLightbox } from "@/components/image-lightbox";
