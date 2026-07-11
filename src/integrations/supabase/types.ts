@@ -214,6 +214,116 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_bulk_dispatch_items: {
+        Row: {
+          contact_wa_id: string
+          conversation_id: string | null
+          created_at: string
+          dispatch_id: string
+          error: string | null
+          id: string
+          lead_id: string
+          processed_at: string | null
+          run_id: string | null
+          scheduled_at: string
+          status: string
+        }
+        Insert: {
+          contact_wa_id: string
+          conversation_id?: string | null
+          created_at?: string
+          dispatch_id: string
+          error?: string | null
+          id?: string
+          lead_id: string
+          processed_at?: string | null
+          run_id?: string | null
+          scheduled_at: string
+          status?: string
+        }
+        Update: {
+          contact_wa_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          dispatch_id?: string
+          error?: string | null
+          id?: string
+          lead_id?: string
+          processed_at?: string | null
+          run_id?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_bulk_dispatch_items_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "crm_bulk_dispatches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_bulk_dispatches: {
+        Row: {
+          channel_id: string
+          created_at: string
+          created_by: string | null
+          delay_seconds: number
+          eligible_leads: number
+          failed_count: number
+          finished_at: string | null
+          flow_id: string
+          id: string
+          operacao: string
+          sent_count: number
+          skipped_count: number
+          stage_id: string
+          started_at: string
+          status: string
+          total_leads: number
+          updated_at: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          created_by?: string | null
+          delay_seconds?: number
+          eligible_leads?: number
+          failed_count?: number
+          finished_at?: string | null
+          flow_id: string
+          id?: string
+          operacao: string
+          sent_count?: number
+          skipped_count?: number
+          stage_id: string
+          started_at?: string
+          status?: string
+          total_leads?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          created_by?: string | null
+          delay_seconds?: number
+          eligible_leads?: number
+          failed_count?: number
+          finished_at?: string | null
+          flow_id?: string
+          id?: string
+          operacao?: string
+          sent_count?: number
+          skipped_count?: number
+          stage_id?: string
+          started_at?: string
+          status?: string
+          total_leads?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       crm_fontes: {
         Row: {
           created_at: string | null
