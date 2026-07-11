@@ -1,6 +1,7 @@
 import { Check, ChevronsUpDown, ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkspace, ACCENTS, type Workspace } from "@/lib/workspace-context";
+import { getVendorSession } from "@/lib/vendor-session";
 import {
   Popover,
   PopoverContent,
@@ -25,6 +26,11 @@ export function WorkspaceSwitcher() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isVendor, setIsVendor] = useState(false);
+
+  useEffect(() => {
+    setIsVendor(!!getVendorSession());
+  }, []);
 
   function handleCreate() {
     const n = name.trim();
@@ -84,18 +90,20 @@ export function WorkspaceSwitcher() {
                     <span className="flex-1 truncate text-sm text-foreground">{w.nome}</span>
                     {active && <Check className="h-4 w-4 text-muted-foreground" />}
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingId(isEditing ? null : w.id);
-                    }}
-                    className="rounded p-1 text-muted-foreground opacity-0 transition hover:bg-secondary/70 hover:text-foreground group-hover/item:opacity-100"
-                    aria-label={`Editar ${w.nome}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  {w.custom && (
+                  {!isVendor && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(isEditing ? null : w.id);
+                      }}
+                      className="rounded p-1 text-muted-foreground opacity-0 transition hover:bg-secondary/70 hover:text-foreground group-hover/item:opacity-100"
+                      aria-label={`Editar ${w.nome}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {!isVendor && w.custom && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -109,7 +117,7 @@ export function WorkspaceSwitcher() {
                     </button>
                   )}
                 </div>
-                {isEditing && (
+                {!isVendor && isEditing && (
                   <EditPanel
                     ws={w}
                     onClose={() => setEditingId(null)}
@@ -121,6 +129,7 @@ export function WorkspaceSwitcher() {
           })}
         </div>
 
+        {!isVendor && (
         <div className="mt-1 border-t border-border p-1">
           {creating ? (
             <div className="flex items-center gap-1.5 p-1">
@@ -162,6 +171,7 @@ export function WorkspaceSwitcher() {
             </button>
           )}
         </div>
+        )}
       </PopoverContent>
     </Popover>
   );
