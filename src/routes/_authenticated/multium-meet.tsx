@@ -106,7 +106,7 @@ function MultiumMeetPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {downloadOptions.map((option) => {
+            {(downloadOptions ?? []).map((option) => {
               const Icon = option.icon;
               const disabled = option.href === "#";
               return (
@@ -140,7 +140,7 @@ function MultiumMeetPage() {
 
         {/* Features */}
         <div className="mt-16 grid gap-4 md:grid-cols-3">
-          {featureCards.map((f) => (
+          {(featureCards ?? []).map((f) => (
             <Card key={f.title} className="border-border/60">
               <CardContent className="p-6">
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -157,7 +157,7 @@ function MultiumMeetPage() {
         <div className="mt-16">
           <h2 className="text-2xl font-bold">Como começar</h2>
           <div className="mt-6 space-y-4">
-            {setupSteps.map((step, i) => (
+            {(setupSteps ?? []).map((step, i) => (
               <div key={i} className="flex gap-4">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                   {i + 1}
@@ -191,7 +191,7 @@ function MultiumMeetPage() {
                   (open-source, Apache 2.0), com fork rebrandeado pra Multium.
                 </p>
                 <div className="mt-4 space-y-2 text-sm">
-                  {statusItems.map((item) => (
+                  {(statusItems ?? []).map((item) => (
                     <div key={item} className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-primary" />
                       <span>{item}</span>
