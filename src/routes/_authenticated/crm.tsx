@@ -36,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DragScroll } from "@/components/drag-scroll";
 import { ChatEmbed } from "@/components/chat-page";
+import { BulkDispatchButton } from "@/components/crm-bulk-dispatch-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -406,7 +407,7 @@ function CRMPage() {
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Carregando leads…</div>
       ) : view === "kanban" ? (
-        <Kanban stages={stages} leads={filtered} tagColors={tagColorMap} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} onReorderStages={handleReorderStages} />
+        <Kanban operacao={stageOperacao} stages={stages} leads={filtered} tagColors={tagColorMap} onMove={(id, status) => moveStage.mutate({ id, status })} onEdit={setEditing} onReorderStages={handleReorderStages} />
       ) : (
         <Lista stages={stages} leads={filtered} tagColors={tagColorMap} onEdit={setEditing} onRemove={(id) => remove.mutate(id)} />
 
@@ -433,8 +434,9 @@ function CRMPage() {
 
 // ---------- Kanban ----------
 function Kanban({
-  stages, leads, tagColors, onMove, onEdit, onReorderStages,
+  operacao, stages, leads, tagColors, onMove, onEdit, onReorderStages,
 }: {
+  operacao: string;
   stages: StageView[];
   leads: Lead[];
   tagColors: Map<string, string>;
@@ -536,6 +538,13 @@ function Kanban({
                   <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                     {items.length}
                   </span>
+                  <BulkDispatchButton
+                    operacao={operacao}
+                    stageId={s.id}
+                    stageLabel={s.label}
+                    stageColor={s.cor}
+                    leadCount={items.length}
+                  />
                 </div>
                 {totalValor > 0 && (
                   <span className="text-[10px] font-bold text-muted-foreground">{BRL(totalValor)}</span>
