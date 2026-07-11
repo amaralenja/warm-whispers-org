@@ -431,10 +431,27 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : [];
               for (const s of statuses) {
                 if (!s?.id || !s?.status) continue;
-                await supabaseAdmin
+                const statusError = Array.isArray(s.errors) && s.errors.length > 0 ? s.errors : null;
+                const { data: currentMessages } = await supabaseAdmin
                   .from("wa_messages" as any)
-                  .update({ status: s.status })
-                  .eq("wa_message_id", s.id);
+                  .select("id,raw")
+                  .eq("wa_message_id", s.id)
+                  .limit(20);
+                for (const msg of (currentMessages ?? []) as any[]) {
+                  const raw = msg?.raw && typeof msg.raw === "object" ? msg.raw : {};
+                  const statusesLog = Array.isArray(raw.statuses) ? raw.statuses.slice(-9) : [];
+                  await supabaseAdmin
+                    .from("wa_messages" as any)
+                    .update({
+                      status: s.status,
+                      raw: {
+                        ...raw,
+                        statuses: [...statusesLog, s],
+                        ...(statusError ? { last_status_error: statusError } : {}),
+                      },
+                    })
+                    .eq("id", msg.id);
+                }
                 await supabaseAdmin
                   .from("wa_call_reminders" as any)
                   .update({ status: s.status })

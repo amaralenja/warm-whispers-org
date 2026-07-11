@@ -91,6 +91,11 @@ function jsonArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function shouldNormalizeWhatsappImage(url: string): boolean {
+  const clean = String(url ?? "").split("?")[0].toLowerCase();
+  return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif");
+}
+
 async function resolveStageFromTags(db: any, tags: string[], operation?: unknown) {
   const tagNames = [...new Set(jsonArray<string>(tags).map((t) => String(t ?? "").trim()).filter(Boolean))];
   if (tagNames.length === 0) return null;
@@ -631,6 +636,23 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         inner.link = finalUrl;
         inner.voice = true;
       } else {
+        if (mediaType === "image" && shouldNormalizeWhatsappImage(finalUrl)) {
+          const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
+          let lastErr: unknown = null;
+          for (let i = 0; i < 3; i++) {
+            try {
+              finalUrl = await convertImageToWhatsappJpeg(finalUrl);
+              break;
+            } catch (e) {
+              lastErr = e;
+              console.error(`Flow image conversion attempt ${i + 1} failed:`, e);
+              await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+            }
+          }
+          if (shouldNormalizeWhatsappImage(finalUrl)) {
+            throw new Error(`Falha ao otimizar imagem pra WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
+          }
+        }
         inner.link = finalUrl;
         if (mediaType !== "sticker" && caption) inner.caption = caption;
         if (mediaType === "document" && filename) inner.filename = filename;
@@ -640,7 +662,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       if (await shouldStopFlowRun(ctx)) return {};
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
-      return { log: { url: finalUrl } };
+      return { log: { url: finalUrl, originalUrl: finalUrl === url ? undefined : url } };
     }
 
 

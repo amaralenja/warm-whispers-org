@@ -159,6 +159,8 @@ export function HtLeadDetailDialog({
     if (error) setNotes(prev);
   }
 
+  if (!open || !lead) return null;
+
   const letter = (lead?.caixa_letra ?? "").toUpperCase();
   const tier = CAIXA_TIER[letter];
   const name = lead?.nome || "Sem nome";
