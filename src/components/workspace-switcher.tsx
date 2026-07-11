@@ -90,18 +90,20 @@ export function WorkspaceSwitcher() {
                     <span className="flex-1 truncate text-sm text-foreground">{w.nome}</span>
                     {active && <Check className="h-4 w-4 text-muted-foreground" />}
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingId(isEditing ? null : w.id);
-                    }}
-                    className="rounded p-1 text-muted-foreground opacity-0 transition hover:bg-secondary/70 hover:text-foreground group-hover/item:opacity-100"
-                    aria-label={`Editar ${w.nome}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  {w.custom && (
+                  {!isVendor && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(isEditing ? null : w.id);
+                      }}
+                      className="rounded p-1 text-muted-foreground opacity-0 transition hover:bg-secondary/70 hover:text-foreground group-hover/item:opacity-100"
+                      aria-label={`Editar ${w.nome}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {!isVendor && w.custom && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -115,7 +117,7 @@ export function WorkspaceSwitcher() {
                     </button>
                   )}
                 </div>
-                {isEditing && (
+                {!isVendor && isEditing && (
                   <EditPanel
                     ws={w}
                     onClose={() => setEditingId(null)}
