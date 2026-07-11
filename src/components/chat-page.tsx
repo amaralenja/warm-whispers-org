@@ -1074,7 +1074,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         <aside className={`min-h-0 flex-col border-r border-chat-line bg-chat-sidebar ${active ? "hidden md:flex" : "flex"}`}>
 
 
-          <div className="shrink-0 border-b border-chat-line p-5">
+          <div className="shrink-0 border-b border-chat-line p-3 md:p-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-chat-soft text-chat-accent">
@@ -1110,8 +1110,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar contato ou mensagem"
-                className="h-12 rounded-2xl border-chat-line bg-chat-panel pl-11 text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
+                className="h-11 rounded-2xl border-chat-line bg-chat-panel pl-11 text-base md:h-12 md:text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
               />
+
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1528,7 +1529,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
 
-              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-2 py-2 md:px-5 md:py-4">
+              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-1.5 py-1.5 md:px-5 md:py-4">
                 {replyTo && (
                   <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
                     <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
@@ -1543,14 +1544,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     </Button>
                   </div>
                 )}
-                <div className="mx-auto flex max-w-5xl items-end gap-3 rounded-2xl border border-chat-line bg-chat-thread p-2">
+                <div className="mx-auto flex max-w-5xl items-end gap-1 md:gap-3 rounded-2xl border border-chat-line bg-chat-thread p-1 md:p-2">
 
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
+                      <Button variant="ghost" size="icon" className="hidden md:grid h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
                         <Smile className="h-5 w-5" />
                       </Button>
                     </PopoverTrigger>
+
                     <PopoverContent align="start" side="top" className="w-auto border-0 bg-transparent p-0 shadow-xl">
                       <EmojiPicker
                         onEmojiClick={(emoji) => setDraft((d) => d + emoji.emoji)}
@@ -1591,7 +1593,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
+                      <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
                         <Paperclip className="h-5 w-5" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1625,7 +1627,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     }}
                     placeholder="Digite uma mensagem"
                     rows={1}
-                    className="max-h-36 min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-3 text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+                    className="max-h-36 min-h-10 md:min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-2 md:py-3 text-base md:text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
                   />
                   {sendError && (
                     <div className="max-w-72 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
@@ -1635,12 +1637,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   {draft.trim() ? (
                     <Button
                       size="icon"
-                      className="h-12 w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
+                      className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
                       onClick={handleSendText}
                       disabled={sendMut.isPending}
                     >
                       {sendMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                     </Button>
+
                   ) : (
                     <WhatsappRecorder
                       disabled={sendMut.isPending}
