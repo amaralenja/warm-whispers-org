@@ -21,6 +21,13 @@ export const Route = createFileRoute("/_authenticated")({
           if (s?.id) return { user: null, vendor: s };
         } catch { /* noop */ }
       }
+      const rawHt = window.localStorage.getItem("ht_team_session");
+      if (rawHt) {
+        try {
+          const s = JSON.parse(rawHt);
+          if (s?.id) return { user: null, htTeam: s };
+        } catch { /* noop */ }
+      }
     }
     throw redirect({ to: "/auth" });
   },
