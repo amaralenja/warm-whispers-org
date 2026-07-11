@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Multium Meet</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d10;
+        --panel: #14181d;
+        --border: #262b33;
+        --text: #f4f5f7;
+        --muted: #8b95a5;
+        --primary: #ff5b1f;
+        --primary-hover: #ff7a44;
+        --danger: #ef4444;
+        --success: #22c55e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 340px;
+        margin: 0;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        display: flex; align-items: center; gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      header img { width: 28px; height: 28px; border-radius: 6px; background: #fff; padding: 2px; }
+      header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+      header p { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+      .content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+      .status {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 12px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+      .dot.rec { background: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
+      .dot.ok { background: var(--success); }
+      @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+      button {
+        width: 100%;
+        padding: 12px 14px;
+        border: 0;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .15s;
+      }
+      button.primary { background: var(--primary); color: #fff; }
+      button.primary:hover { background: var(--primary-hover); }
+      button.danger { background: var(--danger); color: #fff; }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      .row { display: flex; gap: 8px; }
+      .row button { flex: 1; }
+      label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+      }
+      .transcript {
+        max-height: 180px; overflow-y: auto;
+        padding: 10px 12px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        color: var(--text);
+      }
+      .transcript:empty::before {
+        content: "A transcrição aparece aqui após parar de gravar.";
+        color: var(--muted);
+      }
+      .footer { font-size: 10px; color: var(--muted); text-align: center; }
+      details { font-size: 11px; color: var(--muted); }
+      details summary { cursor: pointer; user-select: none; }
+      details > div { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icon.png" alt="Multium" />
+      <div>
+        <h1>Multium Meet</h1>
+        <p>Grava call + transcreve com IA</p>
+      </div>
+    </header>
+    <div class="content">
+      <div class="status" id="status">
+        <span class="dot" id="dot"></span>
+        <span id="statusText">Pronto pra gravar</span>
+      </div>
+      <button id="startBtn" class="primary">🎙️ Iniciar gravação</button>
+      <button id="stopBtn" class="danger" style="display:none">⏹️ Parar e transcrever</button>
+      <div>
+        <label>Transcrição</label>
+        <div class="transcript" id="transcript"></div>
+      </div>
+      <div class="row">
+        <button id="copyBtn" style="background:#262b33;color:#fff">Copiar</button>
+        <button id="clearBtn" style="background:#262b33;color:#fff">Limpar</button>
+      </div>
+      <details>
+        <summary>Configuração avançada</summary>
+        <div>
+          <label>Endpoint de transcrição</label>
+          <input type="text" id="endpoint" placeholder="https://.../api/public/transcribe" />
+          <button id="saveEndpoint" style="background:#262b33;color:#fff;padding:6px">Salvar endpoint</button>
+        </div>
+      </details>
+      <p class="footer">Fica na aba do Meet/Zoom Web enquanto grava.</p>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
