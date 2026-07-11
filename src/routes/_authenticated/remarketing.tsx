@@ -178,13 +178,20 @@ function RuleDialog({
   const listStagesFn = useServerFn(listCrmStages);
   const listTagsFn = useServerFn(listCrmTags);
 
+  // Prefill do vendedor (operação + canal) — só quando é criação nova
+  const vendorSession = typeof window !== "undefined" ? getVendorSession() : null;
+  const isVendor = !!vendorSession;
+  const vendorExpert = vendorSession?.expert ?? null;
+  const vendorFirstChannel = vendorSession?.wa_channel_ids?.[0] ?? null;
+
   const [nome, setNome] = useState(rule?.nome ?? "");
   const [ativo, setAtivo] = useState(rule?.ativo ?? true);
-  const [operacao, setOperacao] = useState(rule?.operacao ?? "");
-  const [channelId, setChannelId] = useState<string>(rule?.channel_id ?? "");
+  const [operacao, setOperacao] = useState(rule?.operacao ?? vendorExpert ?? "");
+  const [channelId, setChannelId] = useState<string>(rule?.channel_id ?? vendorFirstChannel ?? "");
   const [flowId, setFlowId] = useState<string>(rule?.flow_id ?? "");
   const [minutesBefore, setMinutesBefore] = useState<number>(rule?.minutes_before_close ?? 30);
   const [conditions, setConditions] = useState<RemarketingCondition[]>(rule?.conditions ?? []);
+  const [flowPickerOpen, setFlowPickerOpen] = useState(false);
 
   const expertsQ = useQuery({ queryKey: ["crm-experts-all"], queryFn: () => listExpertsFn({}) });
   const flowsQ = useQuery({ queryKey: ["flows-all"], queryFn: () => listFlowsFn({}) });
@@ -201,8 +208,19 @@ function RuleDialog({
   });
 
   const availableChannels = useMemo(() => {
-    return (channelsQ.data ?? []).filter((c: any) => !operacao || c.operacao_id === operacao || !c.operacao_id);
-  }, [channelsQ.data, operacao]);
+    const list = (channelsQ.data ?? []) as any[];
+    // Vendedor: só os canais dele
+    if (isVendor && Array.isArray(vendorSession?.wa_channel_ids) && vendorSession!.wa_channel_ids!.length > 0) {
+      const allowed = new Set(vendorSession!.wa_channel_ids!.map(String));
+      return list.filter((c) => allowed.has(String(c.id)));
+    }
+    return list.filter((c) => !operacao || c.operacao_id === operacao || !c.operacao_id);
+  }, [channelsQ.data, operacao, isVendor, vendorSession]);
+
+  const selectedFlow = useMemo(
+    () => (flowsQ.data ?? []).find((f: any) => f.id === flowId),
+    [flowsQ.data, flowId],
+  );
 
   const upsertMut = useMutation({
     mutationFn: async () => upsertFn({
