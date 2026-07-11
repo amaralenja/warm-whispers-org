@@ -36,12 +36,21 @@ function AuthPage() {
       if (role === "vendedor") {
         const code = codigo.trim();
         if (!/^\d{6}$/.test(code)) throw new Error("Código deve ter 6 dígitos");
-        const { data, error } = await supabase.rpc("login_vendedor_by_codigo", { _codigo: code });
-        if (error) throw error;
-        if (!data) throw new Error("Código inválido ou vendedor inativo");
-        localStorage.setItem("vendor_session", JSON.stringify(data));
+        // Tenta vendedor primeiro; se não achar, tenta SDR/Closer (HT)
+        const { data: vData, error: vErr } = await supabase.rpc("login_vendedor_by_codigo", { _codigo: code });
+        if (vErr) throw vErr;
+        if (vData) {
+          localStorage.setItem("vendor_session", JSON.stringify(vData));
+          window.dispatchEvent(new Event("vendor-session-updated"));
+          navigate({ to: "/vendor" });
+          return;
+        }
+        const { data: htData, error: htErr } = await supabase.rpc("login_ht_team_by_codigo", { _codigo: code });
+        if (htErr) throw htErr;
+        if (!htData) throw new Error("Código inválido ou inativo");
+        localStorage.setItem("ht_team_session", JSON.stringify(htData));
         window.dispatchEvent(new Event("vendor-session-updated"));
-        navigate({ to: "/vendor" });
+        navigate({ to: "/ht-analytics" });
         return;
       }
       if (mode === "signin") {
