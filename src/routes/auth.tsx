@@ -82,7 +82,7 @@ function AuthPage() {
 
       <header className="relative z-10 flex items-center justify-end px-8 py-7">
         <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          {role === "admin" ? (mode === "signin" ? "Acesso" : "Cadastro") : "Vendedor"}
+          {role === "admin" ? (mode === "signin" ? "Acesso" : "Cadastro") : role === "ht" ? "SDR / Closer" : "Vendedor"}
         </div>
       </header>
 
