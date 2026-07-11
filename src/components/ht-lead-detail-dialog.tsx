@@ -1,14 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import { getVendorSession } from "@/lib/vendor-session";
 import {
   MessageSquare, Trash2, Phone, Mail, Instagram, Send,
   Wallet, TrendingUp, Target, Rocket, Lightbulb, Users, Flame,
-  Calendar, X, Crown,
+  Calendar, X, Crown, DollarSign, Handshake, CheckCircle2,
 } from "lucide-react";
+
+// Quiz supabase (mesmo que ht-analytics usa) — o lead vive lá, então salvamos lá também.
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
 
 export type LeadLike = {
   id: string;
