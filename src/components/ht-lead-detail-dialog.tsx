@@ -165,15 +165,31 @@ export function HtLeadDetailDialog({
   const igHandle = (lead?.instagram || "").replace(/^@/, "").replace(/\/+$/, "");
   const isHigh = "EFG".includes(letter);
 
+  const safeStr = (v: unknown): string | null => {
+    if (v == null) return null;
+    if (typeof v === "string") return v.trim() || null;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (typeof v === "object") {
+      const o = v as any;
+      const s = o.label ?? o.value ?? o.text ?? o.name ?? null;
+      if (typeof s === "string" || typeof s === "number") return String(s);
+      try { return JSON.stringify(o); } catch { return null; }
+    }
+    return String(v);
+  };
+  const caixaValue = lead
+    ? ([safeStr(lead.caixa_label), letter ? `Faixa ${letter}` : null].filter(Boolean).join(" · ") || null)
+    : null;
   const answers: { key: string; label: string; value?: string | null }[] = lead
     ? [
-        { key: "faturamento", label: "Faturamento atual", value: lead.faturamento },
-        { key: "momento", label: "Momento atual", value: lead.momento },
-        { key: "objetivo", label: "Meta / Objetivo", value: lead.objetivo },
-        { key: "investir", label: "Já investiu em SaaS?", value: lead.investir },
-        { key: "minicurso", label: "Tem ideia de SaaS?", value: lead.minicurso },
-        { key: "socio", label: "Sócio / Cônjuge", value: lead.socio },
-        { key: "comprometimento", label: "Comprometimento", value: lead.comprometimento },
+        { key: "caixa", label: "Caixa disponível", value: caixaValue },
+        { key: "faturamento", label: "Faturamento atual", value: safeStr(lead.faturamento) },
+        { key: "momento", label: "Momento atual", value: safeStr(lead.momento) },
+        { key: "objetivo", label: "Meta / Objetivo", value: safeStr(lead.objetivo) },
+        { key: "investir", label: "Já investiu em SaaS?", value: safeStr(lead.investir) },
+        { key: "minicurso", label: "Tem ideia de SaaS?", value: safeStr(lead.minicurso) },
+        { key: "socio", label: "Sócio / Cônjuge", value: safeStr(lead.socio) },
+        { key: "comprometimento", label: "Comprometimento", value: safeStr(lead.comprometimento) },
       ].filter((x) => x.value)
     : [];
 
