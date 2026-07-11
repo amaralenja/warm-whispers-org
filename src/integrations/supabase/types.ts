@@ -2072,9 +2072,13 @@ export type Database = {
           ativo: boolean
           channel_id: string | null
           created_at: string
+          days_of_week: number[] | null
           flow_id: string
           id: string
           match_mode: string
+          time_end: string | null
+          time_start: string | null
+          timezone: string
           tipo: string
           valor: string | null
         }
@@ -2082,9 +2086,13 @@ export type Database = {
           ativo?: boolean
           channel_id?: string | null
           created_at?: string
+          days_of_week?: number[] | null
           flow_id: string
           id?: string
           match_mode?: string
+          time_end?: string | null
+          time_start?: string | null
+          timezone?: string
           tipo: string
           valor?: string | null
         }
@@ -2092,9 +2100,13 @@ export type Database = {
           ativo?: boolean
           channel_id?: string | null
           created_at?: string
+          days_of_week?: number[] | null
           flow_id?: string
           id?: string
           match_mode?: string
+          time_end?: string | null
+          time_start?: string | null
+          timezone?: string
           tipo?: string
           valor?: string | null
         }
@@ -3018,9 +3030,13 @@ export type Database = {
           ativo: boolean
           channel_id: string | null
           created_at: string
+          days_of_week: number[] | null
           flow_id: string
           id: string
           match_mode: string
+          time_end: string | null
+          time_start: string | null
+          timezone: string
           tipo: string
           valor: string | null
         }[]
