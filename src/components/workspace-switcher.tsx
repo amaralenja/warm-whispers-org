@@ -26,6 +26,11 @@ export function WorkspaceSwitcher() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isVendor, setIsVendor] = useState(false);
+
+  useEffect(() => {
+    setIsVendor(!!getVendorSession());
+  }, []);
 
   function handleCreate() {
     const n = name.trim();
