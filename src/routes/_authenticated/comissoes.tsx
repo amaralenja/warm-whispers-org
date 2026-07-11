@@ -256,21 +256,23 @@ function ComissoesPage() {
                                     ? fmtDate(base[0].data)
                                     : `${fmtDate(base[0].data)} até ${fmtDate(base[base.length - 1].data)}`;
                                   const pix = r.pixChave?.trim();
+                                  const BR = "\u200B"; // zero-width space p/ WhatsApp não colapsar linhas em branco
                                   const lines = [
                                     `💰 *Relatório de Comissão*`,
-                                    ``,
+                                    BR,
                                     `👤 *Vendedor:* ${r.nome}`,
                                     r.expert ? `🏷️ *Expert:* ${r.expert}` : null,
                                     `📅 *Período:* ${periodo}`,
-                                    ``,
+                                    BR,
                                     `📊 *Detalhamento por dia:*`,
                                     ...base.map((d) => `• ${fmtDate(d.data)} — ${fmtBRL(d.faturamento)}  →  ${d.milhares} × ${fmtBRL(d.rate)} = *${fmtBRL(d.comissao)}*`),
-                                    ``,
+                                    BR,
                                     `🧾 *Faturamento total:* ${fmtBRL(totalFat)}`,
                                     `✅ *Comissão a receber:* *${fmtBRL(totalCom)}*`,
-                                    ``,
+                                    BR,
                                     pix ? `🔑 *Chave PIX:* ${pix}` : `⚠️ _Chave PIX não cadastrada_`,
                                   ].filter(Boolean).join("\n");
+
                                   try { await navigator.clipboard.writeText(lines); toast.success("Relatório copiado"); }
                                   catch { toast.error("Falha ao copiar"); }
                                 };
