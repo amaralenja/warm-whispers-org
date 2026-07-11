@@ -614,23 +614,30 @@ function Palette({
     <aside className="w-64 border-r overflow-y-auto bg-card">
       <div className="p-3 border-b">
         <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Gatilhos</h3>
+        <div className="rounded border border-border/50 bg-muted/30 p-2 mb-2 space-y-1 text-[10px] leading-relaxed text-muted-foreground">
+          <p><b className="text-foreground">Palavra-chave:</b> uma única palavra. Dispara quando aparecer em qualquer lugar da mensagem (maiúscula/minúscula/acento ignorados).</p>
+          <p><b className="text-foreground">Frase-chave:</b> frase exata. A mensagem inteira precisa ser igual à frase (case-insensitive).</p>
+          <p><b className="text-foreground">Lead novo:</b> dispara na primeira vez que o lead chegar no CRM, independente de mensagem.</p>
+        </div>
         <div className="space-y-2">
           {triggers.map((t, i) => (
             <div key={i} className="border rounded p-2 space-y-1.5 bg-background">
               <div className="flex items-center justify-between">
                 <Select
-                  value={t.tipo}
+                  value={t.tipo === "keyword" && t.match_mode === "equals" ? "phrase" : (t.tipo === "new_conversation" || t.tipo === "any_message" || t.tipo === "manual" ? "keyword" : t.tipo)}
                   onValueChange={(v) => {
-                    const copy = [...triggers]; copy[i] = { ...t, tipo: v }; setTriggers(copy);
+                    const copy = [...triggers];
+                    if (v === "phrase") copy[i] = { ...t, tipo: "keyword", match_mode: "equals" };
+                    else if (v === "keyword") copy[i] = { ...t, tipo: "keyword", match_mode: "word" };
+                    else copy[i] = { ...t, tipo: v, valor: null, match_mode: null };
+                    setTriggers(copy);
                   }}
                 >
                   <SelectTrigger className="h-7 text-xs flex-1 mr-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="keyword">Palavra-chave</SelectItem>
-                    <SelectItem value="new_conversation">Nova conversa</SelectItem>
-                    <SelectItem value="any_message">Qualquer mensagem</SelectItem>
-                    <SelectItem value="new_lead">Novo lead no CRM</SelectItem>
-                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="phrase">Frase-chave (exata)</SelectItem>
+                    <SelectItem value="new_lead">Lead novo</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setTriggers(triggers.filter((_, j) => j !== i))}>
@@ -638,24 +645,12 @@ function Palette({
                 </Button>
               </div>
               {t.tipo === "keyword" && (
-                <>
-                  <Select
-                    value={t.match_mode ?? "contains"}
-                    onValueChange={(v) => { const c = [...triggers]; c[i] = { ...t, match_mode: v }; setTriggers(c); }}
-                  >
-                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="contains">Contém</SelectItem>
-                      <SelectItem value="equals">Igual a</SelectItem>
-                      <SelectItem value="starts_with">Começa com</SelectItem>
-                      <SelectItem value="regex">Regex</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={t.valor ?? ""} onChange={(e) => { const c = [...triggers]; c[i] = { ...t, valor: e.target.value }; setTriggers(c); }}
-                    placeholder="ex: oi, menu" className="h-7 text-xs"
-                  />
-                </>
+                <Input
+                  value={t.valor ?? ""}
+                  onChange={(e) => { const c = [...triggers]; c[i] = { ...t, valor: e.target.value }; setTriggers(c); }}
+                  placeholder={t.match_mode === "equals" ? "frase exata (ex: quero comprar)" : "palavra (ex: menu)"}
+                  className="h-7 text-xs"
+                />
               )}
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Número (WhatsApp)</Label>
@@ -684,7 +679,7 @@ function Palette({
           ))}
           <Button
             variant="outline" size="sm" className="w-full"
-            onClick={() => setTriggers([...triggers, { tipo: "keyword", valor: "", match_mode: "contains", ativo: true }])}
+            onClick={() => setTriggers([...triggers, { tipo: "keyword", valor: "", match_mode: "word", ativo: true }])}
           >
             <Plus className="h-3 w-3 mr-1" /> Gatilho
           </Button>

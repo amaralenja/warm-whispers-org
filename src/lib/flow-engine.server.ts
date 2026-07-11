@@ -1272,7 +1272,8 @@ export async function dispatchIncomingForFlows(args: {
     .eq("ativo", true);
 
   const t = (triggers ?? []) as any[];
-  const text = (args.text ?? "").toLowerCase();
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const text = norm(args.text ?? "");
 
   for (const trg of t) {
     if (!trg.wa_flows?.ativo) continue;
@@ -1282,13 +1283,24 @@ export async function dispatchIncomingForFlows(args: {
     if (trg.tipo === "any_message") match = true;
     else if (trg.tipo === "new_conversation") match = args.isFirstMessage;
     else if (trg.tipo === "keyword") {
-      const v = String(trg.valor ?? "").toLowerCase();
+      const v = norm(String(trg.valor ?? ""));
       if (!v) continue;
-      if (trg.match_mode === "equals") match = text === v;
-      else if (trg.match_mode === "starts_with") match = text.startsWith(v);
-      else if (trg.match_mode === "regex") {
+      const mode = trg.match_mode ?? "word";
+      if (mode === "equals") {
+        // Frase-chave: mensagem inteira precisa bater exato (após normalizar)
+        match = text === v;
+      } else if (mode === "starts_with") match = text.startsWith(v);
+      else if (mode === "regex") {
         try { match = new RegExp(trg.valor, "i").test(args.text ?? ""); } catch { match = false; }
-      } else match = text.includes(v);
+      } else if (mode === "word") {
+        // Palavra-chave: match por borda de palavra (não pega substring)
+        const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        try { match = new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`, "u").test(text); }
+        catch { match = new RegExp(`\\b${escaped}\\b`).test(text); }
+      } else {
+        // legado: contains
+        match = text.includes(v);
+      }
     }
 
     if (match) {
