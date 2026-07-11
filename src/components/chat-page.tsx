@@ -100,6 +100,7 @@ import {
 import { Archive, ArchiveRestore } from "lucide-react";
 import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
+import { getUserPref, setUserPref } from "@/lib/user-prefs.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -2360,12 +2361,29 @@ function FlowInlineBar({
   const vendorSession = useMemo(() => getVendorSession(), []);
   const vendorKey = vendorSession?.id ?? "admin";
   const opKey = conversation.operacao_id ?? "all";
+  const remoteKey = `chat:flow-order:${opKey}`;
+  const getPref = useServerFn(getUserPref);
+  const setPref = useServerFn(setUserPref);
 
   const [orderIds, setOrderIds] = useState<string[]>(() => loadFlowOrder(vendorKey, opKey));
 
   useEffect(() => {
     setOrderIds(loadFlowOrder(vendorKey, opKey));
-  }, [vendorKey, opKey]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getPref({ data: { key: remoteKey } });
+        if (cancelled || !res?.value) return;
+        const parsed = JSON.parse(res.value);
+        if (Array.isArray(parsed)) {
+          const ids = parsed.map(String);
+          setOrderIds(ids);
+          saveFlowOrder(vendorKey, opKey, ids);
+        }
+      } catch { /* noop */ }
+    })();
+    return () => { cancelled = true; };
+  }, [vendorKey, opKey, remoteKey, getPref]);
 
   const { data: flows = [] } = useQuery({
     queryKey: ["flows-for-dispatch"],
@@ -2423,6 +2441,7 @@ function FlowInlineBar({
   function handleSaveOrder(newIds: string[]) {
     setOrderIds(newIds);
     saveFlowOrder(vendorKey, opKey, newIds);
+    setPref({ data: { key: remoteKey, valueJson: JSON.stringify(newIds) } }).catch(() => {});
     toast.success("Ordem dos fluxos salva");
   }
 
