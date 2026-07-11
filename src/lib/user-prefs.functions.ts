@@ -16,7 +16,7 @@ export const getUserPref = createServerFn({ method: "GET" })
       .eq("pref_key", data.key)
       .maybeSingle();
     if (error) throw error;
-    return { value: (row?.value ?? null) as unknown };
+    return { value: (row?.value ?? null) as unknown as null };
   });
 
 export const setUserPref = createServerFn({ method: "POST" })
