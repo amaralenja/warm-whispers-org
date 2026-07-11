@@ -75,7 +75,7 @@ export function defaultPermissoes(): Permissoes {
 
 /** Grupos/leaves que são exclusivos do admin — vendedor NUNCA vê, mesmo sem permissão setada. */
 const ADMIN_ONLY_GROUPS = new Set(["pv24h"]);
-const ADMIN_ONLY_LEAVES = new Set(["pv24h-analytics"]);
+const ADMIN_ONLY_LEAVES = new Set(["pv24h-analytics", "comissoes"]);
 
 /** Default = true se não setado (admin enxerga tudo), exceto grupos/leaves admin-only. */
 export function canSee(perm: Permissoes | null | undefined, groupKey: string, leafKey?: string): boolean {
