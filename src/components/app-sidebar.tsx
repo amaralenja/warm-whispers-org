@@ -161,11 +161,10 @@ export function AppSidebar() {
       const rawHt = typeof window !== "undefined" ? localStorage.getItem("ht_team_session") : null;
       if (rawHt) {
         const s = JSON.parse(rawHt);
+        const tipo = (s?.tipo === "sdr" || s?.tipo === "closer") ? s.tipo : "closer";
         const initial = (s?.permissoes && typeof s.permissoes === "object")
-          ? s.permissoes
-          : (s?.tipo === "sdr" || s?.tipo === "closer"
-              ? (require("@/lib/menu-permissions") as typeof import("@/lib/menu-permissions")).htDefaultPermissoes(s.tipo)
-              : {});
+          ? (s.permissoes as Permissoes)
+          : htDefaultPermissoes(tipo);
         setPerm(initial);
         if (s?.codigo) {
           supabase
@@ -174,9 +173,10 @@ export function AppSidebar() {
               if (cancelled || !data) return;
               const row = data as any;
               if (Number(row.id) !== Number(s.id)) return;
+              const rowTipo = (row.tipo === "sdr" || row.tipo === "closer") ? row.tipo : tipo;
               const next = (row.permissoes && typeof row.permissoes === "object")
                 ? (row.permissoes as Permissoes)
-                : ((require("@/lib/menu-permissions") as typeof import("@/lib/menu-permissions")).htDefaultPermissoes(row.tipo ?? "closer"));
+                : htDefaultPermissoes(rowTipo);
               setPerm(next);
               try {
                 localStorage.setItem("ht_team_session", JSON.stringify({ ...s, ...row, permissoes: next }));
