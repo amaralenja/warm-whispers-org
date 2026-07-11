@@ -1370,8 +1370,19 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
             </div>
           ) : (
             <>
-              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
-                <div className="flex min-w-0 items-center gap-4">
+              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-chat-line bg-chat-panel/80 px-3 py-3 backdrop-blur md:gap-4 md:px-6 md:py-4">
+                <div className="flex min-w-0 items-center gap-2 md:gap-4">
+                  {!searchParams.embed && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveId(null)}
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-chat-soft md:hidden"
+                      aria-label="Voltar para lista de conversas"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     className={`shrink-0 rounded-2xl transition ${toText((active as any).contact_avatar_url) ? "cursor-zoom-in hover:scale-105 hover:ring-2 hover:ring-chat-accent/60" : "cursor-default"}`}
