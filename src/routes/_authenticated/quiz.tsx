@@ -325,6 +325,40 @@ function sanitizeLead(raw: unknown): Lead {
   return out as Lead;
 }
 
+// Mapeia uma submissão vinda do endpoint /api/public/ht-quiz/submit
+// para o shape Lead usado pela aba de Quiz.
+function apiSubToLead(s: any): Lead {
+  const r = (s?.respostas && typeof s.respostas === "object") ? s.respostas : {};
+  const pick = (k: string): string | null => {
+    const v = (r as any)[k];
+    if (v == null) return null;
+    if (typeof v === "object") {
+      const o: any = v;
+      const s2 = o.label ?? o.value ?? o.text ?? null;
+      return typeof s2 === "string" || typeof s2 === "number" ? String(s2) : null;
+    }
+    return typeof v === "string" || typeof v === "number" ? String(v) : null;
+  };
+  const caixaRaw = pick("caixa") ?? pick("caixa_label");
+  const letra = (pick("caixa_letra") ?? (caixaRaw && /^[A-G]$/i.test(caixaRaw) ? caixaRaw : "") ?? "").toUpperCase() || null;
+  const label = caixaRaw && !/^[A-G]$/i.test(caixaRaw) ? caixaRaw : (letra ? TICKET_TIERS[letra]?.label ?? null : null);
+  return sanitizeLead({
+    id: `api:${s.id}`,
+    data_criacao: s.received_at ?? s.updated_at ?? new Date().toISOString(),
+    nome: s.nome, email: s.email, whatsapp: s.whatsapp, instagram: s.instagram,
+    utm_source: s.utm_source, utm_medium: s.utm_medium, utm_campaign: s.utm_campaign, utm_content: s.utm_content,
+    fbc: s.fbc, fbp: s.fbp, fbclid: s.fbclid, gclid: s.gclid,
+    caixa_letra: letra, caixa_label: label,
+    faturamento: pick("faturamento"), momento: pick("momento"),
+    objetivo: pick("objetivo"), socio: pick("socio"),
+    investir: pick("investir"), comprometimento: pick("comprometimento"),
+    minicurso: pick("minicurso"), situacao: pick("situacao"),
+    renda: pick("renda"), porque: pick("porque"),
+    respostas_json: r as Record<string, unknown>,
+    status: s.status, origem: "api",
+  });
+}
+
 function QuizPage() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();
