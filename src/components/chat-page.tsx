@@ -1411,9 +1411,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       <h3 className="truncate text-lg font-semibold tracking-normal">
                         {toText(active.contact_name) || toText(active.contact_wa_id)}
                       </h3>
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
+                      <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
+
                       {(() => {
                         const b = opBadgeFor((active as any).operacao_id);
                         return b ? (
