@@ -273,7 +273,7 @@ export function AppSidebar() {
             <SidebarMenu className="gap-1.5">
               {perm !== null && renderMenuItem({ title: "Meu Painel", url: "/vendor", icon: User })}
               {visibleMain.map(renderMenuItem)}
-              {perm === null && renderMenuItem({ title: "Administração", url: "/admin", icon: Settings2 })}
+              
 
 
               {/* Operação X1 — colapsável */}
