@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, UserRound } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { Copy, KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Upload, UserRound } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -251,8 +251,10 @@ function MembroDialog({
   const [telefone, setTelefone] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useMemo(() => {
+  useEffect(() => {
     if (open) {
       setNome(member?.nome ?? "");
       setTipo(member?.tipo ?? "closer");
@@ -260,6 +262,30 @@ function MembroDialog({
       setFotoUrl(member?.foto_url ?? "");
     }
   }, [open, member]);
+
+  async function uploadPhoto(file: File) {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `ht-team-photos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage.from("wa-media").upload(path, file, {
+        cacheControl: "31536000",
+        upsert: false,
+        contentType: file.type || "image/jpeg",
+      });
+      if (error) throw error;
+      const { data, error: signErr } = await supabase.storage
+        .from("wa-media")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signErr) throw signErr;
+      setFotoUrl(data.signedUrl);
+      toast.success("Foto enviada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha no upload");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -290,7 +316,38 @@ function MembroDialog({
         <DialogHeader>
           <DialogTitle>{member ? "Editar membro" : "Novo membro"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-4">
+          <div className="flex items-center gap-4">
+            {fotoUrl ? (
+              <img src={fotoUrl} alt="" className="h-20 w-20 rounded-full border border-border object-cover" />
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-lg font-bold text-white">
+                {initials(nome)}
+              </div>
+            )}
+            <div className="flex-1 space-y-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => e.target.files?.[0] && uploadPhoto(e.target.files[0])}
+              />
+              <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                {uploading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
+                {fotoUrl ? "Trocar foto" : "Enviar foto"}
+              </Button>
+              {fotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setFotoUrl("")}
+                  className="block text-xs text-muted-foreground hover:text-destructive"
+                >
+                  Remover foto
+                </button>
+              )}
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label>Nome</Label>
             <Input value={nome} onChange={(e) => setNome(e.target.value)} required />
@@ -306,13 +363,10 @@ function MembroDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Telefone</Label>
-            <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="opcional" />
+            <Label>Telefone <span className="text-xs text-muted-foreground">(opcional)</span></Label>
+            <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" />
           </div>
-          <div className="space-y-1.5">
-            <Label>Foto (URL)</Label>
-            <Input value={fotoUrl} onChange={(e) => setFotoUrl(e.target.value)} placeholder="opcional" />
-          </div>
+
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button type="submit" disabled={saving} className="bg-violet-500 hover:bg-violet-600 text-white">
