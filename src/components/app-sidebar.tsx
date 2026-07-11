@@ -73,6 +73,7 @@ const operacaoX1Items: Item[] = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },
+  { title: "Comissões", url: "/comissoes", icon: Percent },
 ];
 
 const highTicketItems: Item[] = [
