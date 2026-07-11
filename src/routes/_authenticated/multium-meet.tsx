@@ -157,7 +157,7 @@ function MultiumMeetPage() {
         <div className="mt-16">
           <h2 className="text-2xl font-bold">Como começar</h2>
           <div className="mt-6 space-y-4">
-            {setupSteps.map((step, i) => (
+            {(setupSteps ?? []).map((step, i) => (
               <div key={i} className="flex gap-4">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                   {i + 1}
