@@ -140,7 +140,7 @@ function MultiumMeetPage() {
 
         {/* Features */}
         <div className="mt-16 grid gap-4 md:grid-cols-3">
-          {featureCards.map((f) => (
+          {(featureCards ?? []).map((f) => (
             <Card key={f.title} className="border-border/60">
               <CardContent className="p-6">
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
