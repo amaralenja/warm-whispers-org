@@ -1529,7 +1529,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
 
-              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-2 py-2 md:px-5 md:py-4">
+              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-1.5 py-1.5 md:px-5 md:py-4">
                 {replyTo && (
                   <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
                     <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
