@@ -433,8 +433,9 @@ function CRMPage() {
 
 // ---------- Kanban ----------
 function Kanban({
-  stages, leads, tagColors, onMove, onEdit, onReorderStages,
+  operacao, stages, leads, tagColors, onMove, onEdit, onReorderStages,
 }: {
+  operacao: string;
   stages: StageView[];
   leads: Lead[];
   tagColors: Map<string, string>;
