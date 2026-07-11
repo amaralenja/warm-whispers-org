@@ -36,6 +36,30 @@ function parseDataField(raw: unknown): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+// Regras: R$ por R$1.000 vendidos no dia, tier definido pelo acumulado no mês.
+export const TIERS: { min: number; rate: number }[] = [
+  { min: 25000, rate: 250 },
+  { min: 20000, rate: 200 },
+  { min: 15000, rate: 120 },
+  { min: 10000, rate: 80 },
+  { min: 0, rate: 60 },
+];
+
+function tierRate(cumulativo: number): number {
+  for (const t of TIERS) if (cumulativo >= t.min) return t.rate;
+  return 0;
+}
+
+export type DiaComissao = {
+  data: string;
+  vendas: number;
+  faturamento: number;
+  cumulativo: number;
+  rate: number;
+  milhares: number;
+  comissao: number;
+};
+
 export type ComissaoRow = {
   id: number;
   utm: string;
@@ -44,8 +68,9 @@ export type ComissaoRow = {
   fotoUrl: string | null;
   faturamento: number;
   vendas: number;
-  comissaoPct: number;
-  comissaoValor: number;
+  comissao: number;
+  tierAtual: number;
+  dias: DiaComissao[];
 };
 
 export type ComissoesPayload = {
@@ -93,7 +118,7 @@ export const getComissoes = createServerFn({ method: "POST" })
     }
 
     const [vendedoresRes, vendasAll] = await Promise.all([
-      supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo, comissao_pct"),
+      supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo"),
       fetchAll<any>((from, to) =>
         supabase
           .from("vendas")
@@ -105,57 +130,72 @@ export const getComissoes = createServerFn({ method: "POST" })
 
     const vendedores = (vendedoresRes.data ?? []) as any[];
 
-    const vendaByUtm = new Map<string, { faturamento: number; vendas: number }>();
+    // Agrupa vendas por UTM + dia (ISO)
+    const byUtm = new Map<string, Map<string, { faturamento: number; vendas: number }>>();
     for (const v of vendasAll) {
-      if (!inRange(parseDataField(v.Data))) continue;
+      const t = parseDataField(v.Data);
+      if (!inRange(t)) continue;
+      if (t == null) continue;
       const utm = String(v.UTM ?? "").toUpperCase().trim();
       if (!utm) continue;
-      const entry = vendaByUtm.get(utm) ?? { faturamento: 0, vendas: 0 };
+      const d = new Date(t);
+      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      let daysMap = byUtm.get(utm);
+      if (!daysMap) { daysMap = new Map(); byUtm.set(utm, daysMap); }
+      const entry = daysMap.get(iso) ?? { faturamento: 0, vendas: 0 };
       entry.faturamento += parseTicket(v.Ticket);
       entry.vendas += 1;
-      vendaByUtm.set(utm, entry);
+      daysMap.set(iso, entry);
     }
 
     const rows: ComissaoRow[] = vendedores
       .filter((v) => v.utm)
       .map((v) => {
         const key = String(v.utm).toUpperCase();
-        const stats = vendaByUtm.get(key) ?? { faturamento: 0, vendas: 0 };
-        const pct = Number(v.comissao_pct ?? 0);
+        const daysMap = byUtm.get(key) ?? new Map();
+        const dias: DiaComissao[] = [];
+        let faturamento = 0;
+        let vendas = 0;
+        let comissao = 0;
+        let cumulativo = 0;
+        const isoDays = Array.from(daysMap.keys()).sort();
+        for (const iso of isoDays) {
+          const day = daysMap.get(iso)!;
+          cumulativo += day.faturamento;
+          const rate = tierRate(cumulativo);
+          const milhares = Math.floor(day.faturamento / 1000);
+          const valor = milhares * rate;
+          dias.push({
+            data: iso,
+            vendas: day.vendas,
+            faturamento: day.faturamento,
+            cumulativo,
+            rate,
+            milhares,
+            comissao: valor,
+          });
+          faturamento += day.faturamento;
+          vendas += day.vendas;
+          comissao += valor;
+        }
         return {
           id: Number(v.id),
           utm: key,
           nome: v.nome ?? key,
           expert: v.expert ?? null,
           fotoUrl: v.foto_url ?? null,
-          faturamento: stats.faturamento,
-          vendas: stats.vendas,
-          comissaoPct: pct,
-          comissaoValor: stats.faturamento * (pct / 100),
+          faturamento,
+          vendas,
+          comissao,
+          tierAtual: tierRate(faturamento),
+          dias,
         };
       })
+      .filter((r) => r.faturamento > 0 || r.dias.length > 0)
       .sort((a, b) => b.faturamento - a.faturamento);
 
     const totalFaturamento = rows.reduce((a, r) => a + r.faturamento, 0);
-    const totalComissao = rows.reduce((a, r) => a + r.comissaoValor, 0);
+    const totalComissao = rows.reduce((a, r) => a + r.comissao, 0);
 
     return { rows, totalFaturamento, totalComissao };
-  });
-
-export const setComissaoPct = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: number; pct: number }) => ({
-    id: Number(input.id),
-    pct: Math.max(0, Math.min(100, Number(input.pct) || 0)),
-  }))
-  .handler(async (opts) => {
-    const context = opts?.context;
-    assertAdmin(context);
-    const supabase = context.supabase as any;
-    const { error } = await supabase
-      .from("vendedores")
-      .update({ comissao_pct: opts.data.pct })
-      .eq("id", opts.data.id);
-    if (error) throw error;
-    return { ok: true };
   });
