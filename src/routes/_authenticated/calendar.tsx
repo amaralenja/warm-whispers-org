@@ -181,7 +181,25 @@ export function CalendarPage() {
     refetchInterval: 60_000,
   });
 
-  const events = data?.items || [];
+  const rawEvents = data?.items || [];
+
+  // Se um closer/SDR do HT Team está logado, mostra só as calls onde ele
+  // aparece como participante (por email ou primeiro nome).
+  const [htSession, setHtSession] = useState<import("@/lib/ht-team-session").HtTeamSession | null>(null);
+  useEffect(() => {
+    import("@/lib/ht-team-session").then((m) => setHtSession(m.getHtTeamSession()));
+  }, []);
+  const events = useMemo(() => {
+    if (!htSession || (htSession.tipo !== "closer" && htSession.tipo !== "sdr")) return rawEvents;
+    // Import lazy só pra ter a fn de match — resolvida ao montar o efeito acima.
+    const mod = require("@/lib/ht-team-session") as typeof import("@/lib/ht-team-session");
+    return rawEvents.filter((ev) => {
+      const atts = ev.attendees ?? [];
+      if (atts.some((a) => mod.matchesHtCloser(htSession, { email: a.email, displayName: a.displayName }))) return true;
+      // fallback: nome do closer no título/descrição
+      return mod.matchesHtCloser(htSession, { nome: `${ev.summary ?? ""} ${ev.description ?? ""}` });
+    });
+  }, [rawEvents, htSession]);
 
   useEffect(() => {
     const refresh = () => refreshMarkers((n) => n + 1);
