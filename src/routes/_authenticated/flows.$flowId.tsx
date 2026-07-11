@@ -15,6 +15,7 @@ import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
   MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle, Tag as TagIcon,
+  Zap, Hash, Quote, UserPlus, Phone, CalendarClock, Trash,
   Menu, SlidersHorizontal,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
