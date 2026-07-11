@@ -1275,9 +1275,42 @@ export async function dispatchIncomingForFlows(args: {
   const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const text = norm(args.text ?? "");
 
+  // Verifica janela opcional de dias/horário do gatilho.
+  // Se days_of_week/time_start/time_end estiverem NULL, o gatilho roda o tempo todo.
+  const isWithinSchedule = (trg: any): boolean => {
+    const days = Array.isArray(trg.days_of_week) ? trg.days_of_week : null;
+    const start = trg.time_start || null;
+    const end = trg.time_end || null;
+    if (!days && !start && !end) return true;
+    const tz = trg.timezone || "America/Sao_Paulo";
+    let parts: Record<string, string> = {};
+    try {
+      const fmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+      });
+      for (const p of fmt.formatToParts(new Date())) parts[p.type] = p.value;
+    } catch { return true; }
+    const DOW: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dow = DOW[parts.weekday as string] ?? new Date().getDay();
+    if (days && days.length && !days.includes(dow)) return false;
+    if (start || end) {
+      const hh = parseInt(parts.hour ?? "0", 10);
+      const mm = parseInt(parts.minute ?? "0", 10);
+      const cur = hh * 60 + mm;
+      const toMin = (s: string) => { const [a, b] = s.split(":").map((x) => parseInt(x, 10)); return (a || 0) * 60 + (b || 0); };
+      const s = start ? toMin(start) : 0;
+      const e = end ? toMin(end) : 24 * 60;
+      // suporta janela que cruza meia-noite (ex: 22:00-06:00)
+      if (s <= e) { if (cur < s || cur > e) return false; }
+      else { if (cur < s && cur > e) return false; }
+    }
+    return true;
+  };
+
   for (const trg of t) {
     if (!trg.wa_flows?.ativo) continue;
     if (trg.channel_id && trg.channel_id !== args.channelId) continue;
+    if (!isWithinSchedule(trg)) continue;
 
     let match = false;
     if (trg.tipo === "any_message") match = true;
@@ -1318,6 +1351,36 @@ export async function dispatchIncomingForFlows(args: {
   return null;
 }
 
+// Verifica janela opcional de dias/horário do gatilho (compartilhada).
+function triggerScheduleAllows(trg: any): boolean {
+  const days = Array.isArray(trg.days_of_week) ? trg.days_of_week : null;
+  const start = trg.time_start || null;
+  const end = trg.time_end || null;
+  if (!days && !start && !end) return true;
+  const tz = trg.timezone || "America/Sao_Paulo";
+  const parts: Record<string, string> = {};
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+    for (const p of fmt.formatToParts(new Date())) parts[p.type] = p.value;
+  } catch { return true; }
+  const DOW: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dow = DOW[parts.weekday as string] ?? new Date().getDay();
+  if (days && days.length && !days.includes(dow)) return false;
+  if (start || end) {
+    const hh = parseInt(parts.hour ?? "0", 10);
+    const mm = parseInt(parts.minute ?? "0", 10);
+    const cur = hh * 60 + mm;
+    const toMin = (s: string) => { const [a, b] = s.split(":").map((x) => parseInt(x, 10)); return (a || 0) * 60 + (b || 0); };
+    const s = start ? toMin(start) : 0;
+    const e = end ? toMin(end) : 24 * 60;
+    if (s <= e) { if (cur < s || cur > e) return false; }
+    else { if (cur < s && cur > e) return false; }
+  }
+  return true;
+}
+
 // Dispatch flows tied to "new_lead" trigger when a CRM lead is inserted.
 export async function dispatchNewLead(args: { leadId: string; db?: any }) {
   const db = args.db ?? await getAdminDb();
@@ -1338,6 +1401,7 @@ export async function dispatchNewLead(args: { leadId: string; db?: any }) {
   const seenFlowChannel = new Set<string>();
   for (const trg of (triggers ?? []) as any[]) {
     if (!trg.wa_flows?.ativo) continue;
+    if (!triggerScheduleAllows(trg)) continue;
     const flowOp = trg.wa_flows?.operacao_id;
     if (flowOp && l.expert && String(flowOp) !== String(l.expert) && String(flowOp) !== String(l.operacao_id ?? "")) continue;
     if (!trg.channel_id) continue;
