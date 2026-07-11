@@ -51,6 +51,7 @@ import {
 import { useWorkspace } from "@/lib/workspace-context";
 import { useServerFn } from "@tanstack/react-start";
 import { fetchInstagramProfile, listInstagramLeads } from "@/lib/instagram.functions";
+import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
 import { toast } from "sonner";
 import { DragScroll } from "@/components/drag-scroll";
 
