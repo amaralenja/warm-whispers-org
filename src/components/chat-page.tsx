@@ -1451,7 +1451,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       const ch = channelById.get(active.channel_id);
                       if (!ch) return null;
                       return (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        <p className="mt-0.5 hidden md:block truncate text-xs text-muted-foreground">
                           <span className="opacity-70">Atendido por:</span>{" "}
                           <span className="font-medium text-foreground">{ch.label}</span>
                           {ch.phone && ch.phone !== ch.label ? <span className="ml-1 opacity-70">({ch.phone})</span> : null}
