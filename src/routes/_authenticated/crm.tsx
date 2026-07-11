@@ -19,6 +19,7 @@ import {
   updateCrmLeadStage,
   upsertCrmLead,
 } from "@/lib/crm.functions";
+import { getUserPref, setUserPref } from "@/lib/user-prefs.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
