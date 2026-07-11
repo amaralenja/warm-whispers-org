@@ -415,8 +415,48 @@ function HtApiPage() {
                             </details>
                           )}
                         </td>
-                        <td className="p-3 text-xs text-muted-foreground">
-                          {[s.utm_source, s.utm_campaign].filter(Boolean).join(" · ") || "—"}
+                        <td className="p-3 text-xs max-w-[280px]">
+                          {(() => {
+                            const hasFb = !!(s.fbc || s.fbp || s.fbclid);
+                            const hasG = !!s.gclid;
+                            const src = (s.utm_source ?? "").toLowerCase();
+                            const isPaid = hasFb || hasG || ["fb","facebook","ig","instagram","meta","google","tiktok","ads","paid"].some((k) => src.includes(k));
+                            const badge = isPaid
+                              ? { label: "PAGO", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30" }
+                              : (s.utm_source ? { label: "REFERRAL", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" }
+                                              : { label: "ORGÂNICO", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" });
+                            const parts = [
+                              s.utm_source && ["source", s.utm_source],
+                              s.utm_medium && ["medium", s.utm_medium],
+                              s.utm_campaign && ["campaign", s.utm_campaign],
+                              s.utm_content && ["content", s.utm_content],
+                              s.fbclid && ["fbclid", String(s.fbclid).slice(0, 20) + "…"],
+                              s.gclid && ["gclid", String(s.gclid).slice(0, 20) + "…"],
+                              s.fbc && ["fbc", "✓"],
+                              s.fbp && ["fbp", "✓"],
+                            ].filter(Boolean) as [string, string][];
+                            return (
+                              <div className="space-y-1">
+                                <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${badge.cls}`}>
+                                  {badge.label}
+                                </span>
+                                {parts.length === 0 ? (
+                                  <div className="text-muted-foreground">Sem UTM/pixel</div>
+                                ) : (
+                                  <details>
+                                    <summary className="cursor-pointer text-accent">
+                                      {parts.length} parâmetro{parts.length > 1 ? "s" : ""}
+                                    </summary>
+                                    <ul className="mt-1 space-y-0.5 text-muted-foreground break-all">
+                                      {parts.map(([k, v]) => (
+                                        <li key={k}><b className="text-foreground">{k}:</b> {v}</li>
+                                      ))}
+                                    </ul>
+                                  </details>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );
