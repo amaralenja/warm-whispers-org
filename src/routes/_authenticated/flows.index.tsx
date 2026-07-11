@@ -258,7 +258,7 @@ function FlowsListPage() {
     if (mediaTotal > 0) toast.loading(`Enviando mídias 0 / ${mediaTotal}…`, { id: t });
 
     for (const itemId of allItemIds) {
-      const src = objectsIdx.get(itemId) ?? audiosIdx.get(itemId) ?? mediasIdx.get(itemId) ?? docsIdx.get(itemId);
+      const src = objectsIdx.get(itemId) ?? audiosIdx.get(itemId) ?? mediasIdx.get(itemId) ?? docsIdx.get(itemId) ?? messagesIdx.get(itemId);
       if (!src) { mediaDone++; continue; }
       const ex = extractB64(src);
       if (!ex) { mediaDone++; continue; }
