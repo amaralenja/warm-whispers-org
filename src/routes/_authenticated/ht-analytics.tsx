@@ -1705,8 +1705,19 @@ const CAIXA_VALOR: Record<string, number> = {
 };
 
 function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[]; loading: boolean }) {
+  const htSession = useMemo(() => getHtTeamSession(), []);
+  const isCloserSession = htSession?.tipo === "closer";
+  const vendasScoped = useMemo(
+    () => (isCloserSession ? (vendas || []).filter((v) => matchesHtCloser(htSession, { nome: v.closer })) : vendas),
+    [vendas, htSession, isCloserSession],
+  );
+  const leadsScoped = useMemo(() => {
+    if (!isCloserSession) return leads;
+    // Sem coluna de closer nos leads do quiz — só some se o vendedor está claramente identificado em outro
+    return (leads || []).filter((l) => !l.crm_status || matchesHtCloser(htSession, { nome: `${l.nome ?? ""}` }));
+  }, [leads, htSession, isCloserSession]);
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
-  const [closerFilter, setCloserFilter] = useState<string>("all");
+  const [closerFilter, setCloserFilter] = useState<string>(isCloserSession ? (htSession?.nome ?? "all") : "all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
