@@ -206,23 +206,41 @@ function CRMPage() {
     ];
   }, [customStages, hiddenDefaults]);
 
-  // Per-user column ordering (persisted in localStorage)
+  // Per-user column ordering (persisted no servidor, cache local pra abertura instantânea)
   const orderStorageKey = useMemo(() => {
     const vendor = typeof window !== "undefined" ? getVendorSession() : null;
     const who = vendor?.id ? `v${vendor.id}` : "admin";
     return `crm-col-order:${who}:${stageOperacao}`;
   }, [stageOperacao]);
+  const remoteKey = useMemo(() => `crm-col-order:${stageOperacao}`, [stageOperacao]);
+  const getPref = useServerFn(getUserPref);
+  const setPref = useServerFn(setUserPref);
 
   const [colOrder, setColOrder] = useState<string[]>([]);
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // 1) cache local imediato
     try {
       const raw = window.localStorage.getItem(orderStorageKey);
       setColOrder(raw ? (JSON.parse(raw) as string[]) : []);
     } catch {
       setColOrder([]);
     }
-  }, [orderStorageKey]);
+    // 2) sincroniza do servidor
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getPref({ data: { key: remoteKey } });
+        if (cancelled || !res?.value) return;
+        const parsed = JSON.parse(res.value) as string[];
+        if (Array.isArray(parsed)) {
+          setColOrder(parsed);
+          try { window.localStorage.setItem(orderStorageKey, JSON.stringify(parsed)); } catch {}
+        }
+      } catch { /* noop */ }
+    })();
+    return () => { cancelled = true; };
+  }, [orderStorageKey, remoteKey, getPref]);
 
   const stages: StageView[] = useMemo(() => {
     if (colOrder.length === 0) return baseStages;
@@ -249,6 +267,7 @@ function CRMPage() {
     try {
       window.localStorage.setItem(orderStorageKey, JSON.stringify(next));
     } catch { /* noop */ }
+    setPref({ data: { key: remoteKey, valueJson: JSON.stringify(next) } }).catch(() => {});
   };
 
   const { data: crmTags = [] } = useCrmTags(stageOperacao);
