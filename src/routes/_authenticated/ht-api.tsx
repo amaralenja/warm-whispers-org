@@ -362,7 +362,32 @@ function HtApiPage() {
                 <tbody>
                   {subs.map((s: any) => {
                     const r = (s.respostas && typeof s.respostas === "object") ? s.respostas : null;
-                    const respEntries = r ? Object.entries(r).filter(([, v]) => v != null && v !== "") : [];
+                    const CAIXA_LABELS: Record<string, string> = {
+                      A: "Até R$ 1k", B: "R$ 1k–5k", C: "R$ 5k–10k",
+                      D: "R$ 10k–30k", E: "R$ 30k–50k", F: "R$ 50k–100k", G: "R$ 100k+",
+                    };
+                    const KEY_LABELS: Record<string, string> = {
+                      caixa: "Caixa", caixa_letra: "Caixa", caixa_label: "Caixa",
+                      faturamento: "Faturamento", momento: "Momento", objetivo: "Objetivo",
+                      investir: "Já investiu?", minicurso: "Ideia SaaS",
+                      socio: "Sócio/Cônjuge", comprometimento: "Comprometimento",
+                    };
+                    const prettyVal = (k: string, v: any): string => {
+                      if (v == null || v === "") return "";
+                      if (typeof v === "object") {
+                        v = (v as any).label ?? (v as any).value ?? JSON.stringify(v);
+                      }
+                      const str = String(v).trim();
+                      if (/^caixa/i.test(k) && /^[A-G]$/i.test(str)) {
+                        return `${str.toUpperCase()} · ${CAIXA_LABELS[str.toUpperCase()]}`;
+                      }
+                      return str;
+                    };
+                    const respEntries = r
+                      ? Object.entries(r)
+                          .map(([k, v]) => [k, prettyVal(k, v)] as [string, string])
+                          .filter(([, v]) => v !== "")
+                      : [];
                     return (
                       <tr key={s.id} className="border-b border-border/50 last:border-0 align-top">
                         <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
@@ -382,7 +407,9 @@ function HtApiPage() {
                               </summary>
                               <ul className="mt-1 space-y-0.5 text-muted-foreground">
                                 {respEntries.map(([k, v]) => (
-                                  <li key={k}><b className="text-foreground">{k}:</b> {String(v)}</li>
+                                  <li key={k}>
+                                    <b className="text-foreground">{KEY_LABELS[k] ?? k}:</b> {v}
+                                  </li>
                                 ))}
                               </ul>
                             </details>
