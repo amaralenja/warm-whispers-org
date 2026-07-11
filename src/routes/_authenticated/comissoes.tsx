@@ -40,6 +40,20 @@ function ComissoesPage() {
   const [to, setTo] = useState(today());
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [selectedDays, setSelectedDays] = useState<Record<number, Record<string, boolean>>>({});
+  const [pixDraft, setPixDraft] = useState<Record<number, string>>({});
+  const qc = useQueryClient();
+  const savePix = useServerFn(setPixChave);
+  const handleSavePix = async (id: number) => {
+    const pix = (pixDraft[id] ?? "").trim();
+    try {
+      await savePix({ data: { id, pix } });
+      toast.success("Chave PIX salva");
+      setPixDraft((s) => { const n = { ...s }; delete n[id]; return n; });
+      qc.invalidateQueries({ queryKey: ["comissoes"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar PIX");
+    }
+  };
 
   const toggleDay = (id: number, iso: string) =>
     setSelectedDays((s) => {
