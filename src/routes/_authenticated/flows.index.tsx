@@ -249,13 +249,13 @@ function FlowsListPage() {
     const base64ToBlob = (base64: string, mime?: string | null) => {
       const clean = base64.replace(/\s+/g, "");
       const chunkSize = 64 * 1024;
-      const chunks: Uint8Array[] = [];
+      const chunks: BlobPart[] = [];
       for (let offset = 0; offset < clean.length; offset += chunkSize) {
         const slice = clean.slice(offset, offset + chunkSize);
         const binary = atob(slice);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        chunks.push(bytes);
+        chunks.push(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
       }
       return new Blob(chunks, { type: mime ?? "application/octet-stream" });
     };
