@@ -31,6 +31,8 @@ import {
   ArrowUpDown,
   GripVertical,
   Columns3,
+  ArrowLeft,
+  
   
 } from "lucide-react";
 import {
@@ -1065,11 +1067,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
   return (
     <div className={(searchParams.embed ? "h-full" : "h-[calc(100vh-3.5rem)]") + " w-full overflow-hidden bg-chat-shell text-foreground"}>
-      <div className={"grid h-full min-h-0 " + (searchParams.embed ? "grid-cols-1" : "grid-cols-[380px_minmax(0,1fr)]") + " overflow-hidden bg-chat-thread"}>
+      <div className={"grid h-full min-h-0 " + (searchParams.embed ? "grid-cols-1" : "grid-cols-1 md:grid-cols-[380px_minmax(0,1fr)]") + " overflow-hidden bg-chat-thread"}>
 
 
         {!searchParams.embed && (
-        <aside className="flex min-h-0 flex-col border-r border-chat-line bg-chat-sidebar">
+        <aside className={`min-h-0 flex-col border-r border-chat-line bg-chat-sidebar ${active ? "hidden md:flex" : "flex"}`}>
+
 
           <div className="shrink-0 border-b border-chat-line p-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -1341,7 +1344,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         )}
 
 
-        <main className="flex min-h-0 min-w-0 flex-col bg-chat-thread">
+        <main className={`min-h-0 min-w-0 flex-col bg-chat-thread ${!active && !searchParams.embed ? "hidden md:flex" : "flex"}`}>
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
               <div className="max-w-sm text-center">
@@ -1367,8 +1370,19 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
             </div>
           ) : (
             <>
-              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-chat-line bg-chat-panel/80 px-6 py-4 backdrop-blur">
-                <div className="flex min-w-0 items-center gap-4">
+              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-chat-line bg-chat-panel/80 px-3 py-3 backdrop-blur md:gap-4 md:px-6 md:py-4">
+                <div className="flex min-w-0 items-center gap-2 md:gap-4">
+                  {!searchParams.embed && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveId(null)}
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-chat-soft md:hidden"
+                      aria-label="Voltar para lista de conversas"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     className={`shrink-0 rounded-2xl transition ${toText((active as any).contact_avatar_url) ? "cursor-zoom-in hover:scale-105 hover:ring-2 hover:ring-chat-accent/60" : "cursor-default"}`}
@@ -1481,7 +1495,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               <CurrentConversationProvider value={{ conversationId: String(active.id), phone: (active as any).contact_wa_id ?? null, title: (active as any).contact_name ?? (active as any).contact_wa_id ?? "Conversa" }}>
               <div
                 ref={scrollRef}
-                className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-6 py-6 scrollbar-fancy"
+                className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-3 py-4 scrollbar-fancy md:px-6 md:py-6"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
                   {messagesError ? (
@@ -1513,7 +1527,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
 
-              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-5 py-4">
+              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-2 py-2 md:px-5 md:py-4">
                 {replyTo && (
                   <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
                     <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
