@@ -73,6 +73,25 @@ export function defaultPermissoes(): Permissoes {
   return p;
 }
 
+/** Default para SDRs e Closers: só enxergam High Ticket com o Analytics + o kanban da função. */
+export function htDefaultPermissoes(tipo: "sdr" | "closer"): Permissoes {
+  const p: Permissoes = {};
+  for (const n of MENU_TREE) {
+    if ("children" in n) {
+      const sub: Record<string, boolean> = {};
+      for (const c of n.children) sub[c.key] = false;
+      if (n.key === "high-ticket") {
+        sub["ht-analytics"] = true;
+        sub[tipo === "sdr" ? "ht-kanban-sdr" : "ht-kanban-closer"] = true;
+      }
+      p[n.key] = sub;
+    } else {
+      p[n.key] = n.key === "tasks";
+    }
+  }
+  return p;
+}
+
 /** Grupos/leaves que são exclusivos do admin — vendedor NUNCA vê, mesmo sem permissão setada. */
 const ADMIN_ONLY_GROUPS = new Set(["pv24h"]);
 const ADMIN_ONLY_LEAVES = new Set(["pv24h-analytics", "comissoes"]);
