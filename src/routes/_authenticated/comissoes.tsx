@@ -38,6 +38,16 @@ function ComissoesPage() {
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(today());
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const [selectedDays, setSelectedDays] = useState<Record<number, Record<string, boolean>>>({});
+
+  const toggleDay = (id: number, iso: string) =>
+    setSelectedDays((s) => {
+      const cur = { ...(s[id] ?? {}) };
+      if (cur[iso]) delete cur[iso]; else cur[iso] = true;
+      return { ...s, [id]: cur };
+    });
+  const setAllDays = (id: number, isos: string[], on: boolean) =>
+    setSelectedDays((s) => ({ ...s, [id]: on ? Object.fromEntries(isos.map((i) => [i, true])) : {} }));
 
   const fetchComissoes = useServerFn(getComissoes);
   const q = useQuery({
