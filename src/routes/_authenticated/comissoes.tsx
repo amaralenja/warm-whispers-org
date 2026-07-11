@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, DollarSign, Users, Trophy, ChevronDown, ChevronRight, Copy, CheckSquare, Square } from "lucide-react";
+import { Loader2, ShieldAlert, DollarSign, Users, Trophy, ChevronDown, ChevronRight, Copy, CheckSquare, Square, Save, KeyRound } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { getVendorSession } from "@/lib/vendor-session";
-import { getComissoes, TIERS } from "@/lib/comissoes.functions";
+import { getComissoes, setPixChave, TIERS } from "@/lib/comissoes.functions";
 
 export const Route = createFileRoute("/_authenticated/comissoes")({
   component: ComissoesPage,
@@ -39,6 +40,20 @@ function ComissoesPage() {
   const [to, setTo] = useState(today());
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [selectedDays, setSelectedDays] = useState<Record<number, Record<string, boolean>>>({});
+  const [pixDraft, setPixDraft] = useState<Record<number, string>>({});
+  const qc = useQueryClient();
+  const savePix = useServerFn(setPixChave);
+  const handleSavePix = async (id: number) => {
+    const pix = (pixDraft[id] ?? "").trim();
+    try {
+      await savePix({ data: { id, pix } });
+      toast.success("Chave PIX salva");
+      setPixDraft((s) => { const n = { ...s }; delete n[id]; return n; });
+      qc.invalidateQueries({ queryKey: ["comissoes"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar PIX");
+    }
+  };
 
   const toggleDay = (id: number, iso: string) =>
     setSelectedDays((s) => {
@@ -235,19 +250,49 @@ function ComissoesPage() {
                                 const selVendas = selDias.reduce((a, d) => a + d.vendas, 0);
                                 const copyReport = async () => {
                                   const base = selDias.length ? selDias : r.dias;
+                                  const totalFat = base.reduce((a, d) => a + d.faturamento, 0);
+                                  const totalCom = base.reduce((a, d) => a + d.comissao, 0);
+                                  const periodo = base.length === 1
+                                    ? fmtDate(base[0].data)
+                                    : `${fmtDate(base[0].data)} até ${fmtDate(base[base.length - 1].data)}`;
+                                  const pix = r.pixChave?.trim();
                                   const lines = [
-                                    `Comissões — ${r.nome} (${r.utm})`,
-                                    `Período: ${fmtDate(from)} até ${fmtDate(to)}`,
-                                    "",
-                                    ...base.map((d) => `${fmtDate(d.data)} — Fat ${fmtBRL(d.faturamento)} | ${d.milhares}k × ${fmtBRL(d.rate)} = ${fmtBRL(d.comissao)}`),
-                                    "",
-                                    `Total: ${base.reduce((a, d) => a + d.faturamento, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} → Comissão ${base.reduce((a, d) => a + d.comissao, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
-                                  ].join("\n");
+                                    `💰 *Relatório de Comissão*`,
+                                    ``,
+                                    `👤 *Vendedor:* ${r.nome}`,
+                                    r.expert ? `🏷️ *Expert:* ${r.expert}` : null,
+                                    `📅 *Período:* ${periodo}`,
+                                    ``,
+                                    `📊 *Detalhamento por dia:*`,
+                                    ...base.map((d) => `• ${fmtDate(d.data)} — ${fmtBRL(d.faturamento)}  →  ${d.milhares} × ${fmtBRL(d.rate)} = *${fmtBRL(d.comissao)}*`),
+                                    ``,
+                                    `🧾 *Faturamento total:* ${fmtBRL(totalFat)}`,
+                                    `✅ *Comissão a receber:* *${fmtBRL(totalCom)}*`,
+                                    ``,
+                                    pix ? `🔑 *Chave PIX:* ${pix}` : `⚠️ _Chave PIX não cadastrada_`,
+                                  ].filter(Boolean).join("\n");
                                   try { await navigator.clipboard.writeText(lines); toast.success("Relatório copiado"); }
                                   catch { toast.error("Falha ao copiar"); }
                                 };
+                                const pixValue = pixDraft[r.id] ?? (r.pixChave ?? "");
+                                const pixDirty = pixDraft[r.id] !== undefined && pixDraft[r.id] !== (r.pixChave ?? "");
                                 return (
-                                  <div className="space-y-2">
+                                  <div className="space-y-3">
+                                    <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border/50 bg-background/60 p-3">
+                                      <div className="flex-1 space-y-1 min-w-[220px]">
+                                        <Label className="flex items-center gap-1 text-xs"><KeyRound className="h-3 w-3" /> Chave PIX</Label>
+                                        <Input
+                                          placeholder="CPF, e-mail, telefone ou chave aleatória"
+                                          value={pixValue}
+                                          onChange={(e) => setPixDraft((s) => ({ ...s, [r.id]: e.target.value }))}
+                                          className="h-8 text-xs"
+                                          maxLength={200}
+                                        />
+                                      </div>
+                                      <Button size="sm" variant={pixDirty ? "default" : "outline"} disabled={!pixDirty} onClick={() => handleSavePix(r.id)}>
+                                        <Save className="mr-1 h-3.5 w-3.5" /> Salvar PIX
+                                      </Button>
+                                    </div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <Button size="sm" variant="outline" onClick={() => setAllDays(r.id, r.dias.map((d) => d.data), !allOn)}>
                                         {allOn ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>}
@@ -264,6 +309,7 @@ function ComissoesPage() {
                                         </div>
                                       )}
                                     </div>
+
                                     <table className="w-full text-xs">
                                       <thead className="text-muted-foreground">
                                         <tr>

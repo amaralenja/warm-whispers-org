@@ -1546,6 +1546,7 @@ export type Database = {
           meta: number | null
           nome: string
           permissoes: Json
+          pix_chave: string | null
           telefone: string | null
           utm: string
           wa_channel_ids: string[]
@@ -1564,6 +1565,7 @@ export type Database = {
           meta?: number | null
           nome: string
           permissoes?: Json
+          pix_chave?: string | null
           telefone?: string | null
           utm: string
           wa_channel_ids?: string[]
@@ -1582,6 +1584,7 @@ export type Database = {
           meta?: number | null
           nome?: string
           permissoes?: Json
+          pix_chave?: string | null
           telefone?: string | null
           utm?: string
           wa_channel_ids?: string[]

@@ -66,6 +66,7 @@ export type ComissaoRow = {
   nome: string;
   expert: string | null;
   fotoUrl: string | null;
+  pixChave: string | null;
   faturamento: number;
   vendas: number;
   comissao: number;
@@ -118,7 +119,7 @@ export const getComissoes = createServerFn({ method: "POST" })
     }
 
     const [vendedoresRes, vendasAll] = await Promise.all([
-      supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo"),
+      supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo, pix_chave"),
       fetchAll<any>((from, to) =>
         supabase
           .from("vendas")
@@ -184,6 +185,7 @@ export const getComissoes = createServerFn({ method: "POST" })
           nome: v.nome ?? key,
           expert: v.expert ?? null,
           fotoUrl: v.foto_url ?? null,
+          pixChave: v.pix_chave ?? null,
           faturamento,
           vendas,
           comissao,
@@ -198,4 +200,22 @@ export const getComissoes = createServerFn({ method: "POST" })
     const totalComissao = rows.reduce((a, r) => a + r.comissao, 0);
 
     return { rows, totalFaturamento, totalComissao };
+  });
+
+export const setPixChave = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: number; pix: string }) => ({
+    id: Number(input.id),
+    pix: String(input.pix ?? "").trim().slice(0, 200),
+  }))
+  .handler(async (opts) => {
+    const context = opts?.context;
+    assertAdmin(context);
+    const supabase = context.supabase as any;
+    const { error } = await supabase
+      .from("vendedores")
+      .update({ pix_chave: opts.data.pix || null })
+      .eq("id", opts.data.id);
+    if (error) throw error;
+    return { ok: true };
   });
