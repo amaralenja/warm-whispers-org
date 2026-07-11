@@ -101,7 +101,7 @@ function fmtDate(iso?: string | null) {
 }
 
 export function HtLeadDetailDialog({
-  lead, role, open, onOpenChange, scheduledAt, onSchedule,
+  lead, role, open, onOpenChange, scheduledAt, onSchedule, onSaleSaved,
 }: {
   lead: LeadLike | null;
   role: Role;
@@ -109,6 +109,7 @@ export function HtLeadDetailDialog({
   onOpenChange: (v: boolean) => void;
   scheduledAt?: string | null;
   onSchedule?: (iso: string | null) => void;
+  onSaleSaved?: () => void;
 }) {
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -116,6 +117,7 @@ export function HtLeadDetailDialog({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
+
   const [schedDraft, setSchedDraft] = useState<string>("");
 
   useEffect(() => {
