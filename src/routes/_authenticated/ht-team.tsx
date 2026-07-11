@@ -28,9 +28,11 @@ type Membro = {
   nome: string | null;
   tipo: "sdr" | "closer";
   telefone: string | null;
+  email: string | null;
   foto_url: string | null;
   codigo: string | null;
   ativo: boolean | null;
+  permissoes: Permissoes | null;
 };
 
 function initials(s: string | null) {
