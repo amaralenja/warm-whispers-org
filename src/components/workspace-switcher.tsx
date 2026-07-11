@@ -1,6 +1,7 @@
 import { Check, ChevronsUpDown, ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkspace, ACCENTS, type Workspace } from "@/lib/workspace-context";
+import { getVendorSession } from "@/lib/vendor-session";
 import {
   Popover,
   PopoverContent,
