@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar } from "lucide-react";
 import logoMultium from "@/assets/logo-multium.webp";
 import { getVendorStats } from "@/lib/vendor.functions";
+import { DesempenhoDiario } from "@/components/desempenho-diario";
+
 
 export const Route = createFileRoute("/_authenticated/vendor")({
   ssr: false,
