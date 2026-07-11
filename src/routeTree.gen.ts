@@ -38,6 +38,7 @@ import { Route as AuthenticatedComissoesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedFlowsIndexRouteImport } from './routes/_authenticated/flows.index'
+import { Route as ApiPublicTranscribeRouteImport } from './routes/api/public/transcribe'
 import { Route as ApiPublicIgImageRouteImport } from './routes/api/public/ig-image'
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
@@ -202,6 +203,11 @@ const AuthenticatedFlowsIndexRoute = AuthenticatedFlowsIndexRouteImport.update({
   path: '/flows/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicTranscribeRoute = ApiPublicTranscribeRouteImport.update({
+  id: '/api/public/transcribe',
+  path: '/api/public/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicIgImageRoute = ApiPublicIgImageRouteImport.update({
   id: '/api/public/ig-image',
   path: '/api/public/ig-image',
@@ -302,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/x1-analytics': typeof AuthenticatedX1AnalyticsRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
+  '/api/public/transcribe': typeof ApiPublicTranscribeRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/dispatch-worker': typeof ApiPublicHooksDispatchWorkerRoute
@@ -344,6 +351,7 @@ export interface FileRoutesByTo {
   '/x1-analytics': typeof AuthenticatedX1AnalyticsRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
+  '/api/public/transcribe': typeof ApiPublicTranscribeRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/dispatch-worker': typeof ApiPublicHooksDispatchWorkerRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/_authenticated/x1-analytics': typeof AuthenticatedX1AnalyticsRoute
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
+  '/api/public/transcribe': typeof ApiPublicTranscribeRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/dispatch-worker': typeof ApiPublicHooksDispatchWorkerRoute
@@ -432,6 +441,7 @@ export interface FileRouteTypes {
     | '/x1-analytics'
     | '/flows/$flowId'
     | '/api/public/ig-image'
+    | '/api/public/transcribe'
     | '/flows/'
     | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/dispatch-worker'
@@ -474,6 +484,7 @@ export interface FileRouteTypes {
     | '/x1-analytics'
     | '/flows/$flowId'
     | '/api/public/ig-image'
+    | '/api/public/transcribe'
     | '/flows'
     | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/dispatch-worker'
@@ -517,6 +528,7 @@ export interface FileRouteTypes {
     | '/_authenticated/x1-analytics'
     | '/_authenticated/flows/$flowId'
     | '/api/public/ig-image'
+    | '/api/public/transcribe'
     | '/_authenticated/flows/'
     | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/dispatch-worker'
@@ -536,6 +548,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   RankingTvRoute: typeof RankingTvRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
+  ApiPublicTranscribeRoute: typeof ApiPublicTranscribeRoute
   ApiPublicHooksCallsTickRoute: typeof ApiPublicHooksCallsTickRoute
   ApiPublicHooksDispatchWorkerRoute: typeof ApiPublicHooksDispatchWorkerRoute
   ApiPublicHooksNotifyTaskCreatedRoute: typeof ApiPublicHooksNotifyTaskCreatedRoute
@@ -753,6 +766,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFlowsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/transcribe': {
+      id: '/api/public/transcribe'
+      path: '/api/public/transcribe'
+      fullPath: '/api/public/transcribe'
+      preLoaderRoute: typeof ApiPublicTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ig-image': {
       id: '/api/public/ig-image'
       path: '/api/public/ig-image'
@@ -907,6 +927,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   RankingTvRoute: RankingTvRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
+  ApiPublicTranscribeRoute: ApiPublicTranscribeRoute,
   ApiPublicHooksCallsTickRoute: ApiPublicHooksCallsTickRoute,
   ApiPublicHooksDispatchWorkerRoute: ApiPublicHooksDispatchWorkerRoute,
   ApiPublicHooksNotifyTaskCreatedRoute: ApiPublicHooksNotifyTaskCreatedRoute,
