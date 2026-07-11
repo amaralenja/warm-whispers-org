@@ -2355,6 +2355,92 @@ export type Database = {
           },
         ]
       }
+      wa_remarketing_dispatches: {
+        Row: {
+          channel_id: string
+          contact_wa_id: string
+          conversation_id: string
+          fired_at: string
+          id: string
+          rule_id: string
+          run_id: string | null
+          window_key: string
+        }
+        Insert: {
+          channel_id: string
+          contact_wa_id: string
+          conversation_id: string
+          fired_at?: string
+          id?: string
+          rule_id: string
+          run_id?: string | null
+          window_key: string
+        }
+        Update: {
+          channel_id?: string
+          contact_wa_id?: string
+          conversation_id?: string
+          fired_at?: string
+          id?: string
+          rule_id?: string
+          run_id?: string | null
+          window_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_remarketing_dispatches_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "wa_remarketing_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_remarketing_rules: {
+        Row: {
+          ativo: boolean
+          channel_id: string | null
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          flow_id: string
+          id: string
+          last_run_at: string | null
+          minutes_before_close: number
+          nome: string
+          operacao: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          channel_id?: string | null
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          flow_id: string
+          id?: string
+          last_run_at?: string | null
+          minutes_before_close?: number
+          nome: string
+          operacao: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          channel_id?: string | null
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          flow_id?: string
+          id?: string
+          last_run_at?: string | null
+          minutes_before_close?: number
+          nome?: string
+          operacao?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wa_task_notifications: {
         Row: {
           channel_id: string | null
