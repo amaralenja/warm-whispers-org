@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, UserRound } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { Copy, KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Upload, UserRound } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
