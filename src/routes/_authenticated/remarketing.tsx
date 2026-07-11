@@ -280,7 +280,11 @@ function RuleDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Operação</Label>
-              <Select value={operacao} onValueChange={(v) => { setOperacao(v); setChannelId(""); setConditions([]); }}>
+              <Select
+                value={operacao}
+                onValueChange={(v) => { setOperacao(v); setChannelId(""); setConditions([]); }}
+                disabled={isVendor && !!vendorExpert}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {(expertsQ.data ?? []).map((e: any) => (
@@ -288,6 +292,9 @@ function RuleDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {isVendor && vendorExpert && (
+                <p className="mt-1 text-[11px] text-muted-foreground">Operação do seu login.</p>
+              )}
             </div>
             <div>
               <Label>Canal (opcional)</Label>
@@ -308,14 +315,43 @@ function RuleDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Fluxo a disparar</Label>
-              <Select value={flowId} onValueChange={setFlowId}>
-                <SelectTrigger><SelectValue placeholder="Selecione o fluxo" /></SelectTrigger>
-                <SelectContent>
-                  {(flowsQ.data ?? []).map((f: any) => (
-                    <SelectItem key={f.id} value={f.id}>{f.nome ?? f.name ?? f.id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={flowPickerOpen} onOpenChange={setFlowPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn("w-full justify-between font-normal", !flowId && "text-muted-foreground")}
+                  >
+                    <span className="truncate">
+                      {selectedFlow ? (selectedFlow.nome ?? selectedFlow.name ?? selectedFlow.id) : "Pesquisar fluxo…"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar fluxo por nome…" />
+                    <CommandList>
+                      <CommandEmpty>Nenhum fluxo encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {(flowsQ.data ?? []).map((f: any) => {
+                          const label = f.nome ?? f.name ?? f.id;
+                          return (
+                            <CommandItem
+                              key={f.id}
+                              value={String(label)}
+                              onSelect={() => { setFlowId(f.id); setFlowPickerOpen(false); }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", flowId === f.id ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{label}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Minutos antes da janela fechar</Label>
