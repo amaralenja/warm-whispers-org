@@ -23,8 +23,9 @@ import {
   listFlows, createFlow, deleteFlow, saveFlow,
   duplicateFlow, exportFlow, importFlow,
 } from "@/lib/flow-engine.functions";
-import { importZapVoiceBackup, uploadZapVoiceMedia } from "@/lib/zapvoice-import.functions";
+import { importZapVoiceBackup } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/flows/")({
   component: FlowsListPage,
@@ -42,7 +43,6 @@ function FlowsListPage() {
   const exportFn = useServerFn(exportFlow);
   const importFn = useServerFn(importFlow);
   const importZvFn = useServerFn(importZapVoiceBackup);
-  const uploadZvMediaFn = useServerFn(uploadZapVoiceMedia);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -62,6 +62,7 @@ function FlowsListPage() {
   const [zvReplace, setZvReplace] = useState(false);
   const [zvFile, setZvFile] = useState<File | null>(null);
   const [zvSummary, setZvSummary] = useState<any>(null);
+  const [zvLogs, setZvLogs] = useState<string[]>([]);
 
   useEffect(() => {
     const allowedOps = new Set(workspaces.filter((o) => o.id !== "all").map((o) => o.id));
@@ -182,27 +183,38 @@ function FlowsListPage() {
 
   const [zvProgress, setZvProgress] = useState<string>("");
 
+  const addZvLog = (message: string) => {
+    const time = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setZvLogs((logs) => [...logs.slice(-79), `[${time}] ${message}`]);
+  };
+
   async function runZvImport() {
     if (!zvFile) return toast.error("Selecione o arquivo .json");
     const t = toast.loading("Lendo arquivo…");
     setZvProgress("lendo");
+    setZvLogs([]);
+    addZvLog(`Lendo ${zvFile.name} (${(zvFile.size / 1024 / 1024).toFixed(2)} MB)`);
     let parsed: any;
     try {
       const raw = await zvFile.text();
       parsed = JSON.parse(raw);
+      addZvLog("JSON carregado com sucesso");
     } catch (e: any) {
       console.error("[zv-import] parse fail", e);
+      addZvLog(`Erro lendo JSON: ${e?.message ?? String(e)}`);
       setZvProgress("");
       return toast.error("JSON inválido: " + (e?.message ?? e), { id: t });
     }
     if (!Array.isArray(parsed?.funnels)) {
       setZvProgress("");
+      addZvLog("Erro: JSON sem funnels[]");
       return toast.error("JSON sem 'funnels[]'", { id: t });
     }
 
     setZvSummary(null);
     const allFunnels: any[] = parsed.funnels;
     const total = allFunnels.length;
+    addZvLog(`${total} funil(is) encontrados`);
     // Reduzido: 1 funil por request pra evitar "Request Entity Too Large".
     const CHUNK = 1;
     const acc: any = { funnels: 0, steps: 0, uploads: 0, errors: [] };
@@ -218,6 +230,52 @@ function FlowsListPage() {
     const mediasIdx = byId(parsed.medias);
     const docsIdx = byId(parsed.docs);
     const objectsIdx = byId(parsed.objectsList);
+    const sequenceIdx = new Map<string, any>();
+
+    const extOf = (mime?: string | null, filename?: string | null): string => {
+      if (filename && /\.[a-z0-9]{1,6}$/i.test(filename)) return filename.match(/\.[a-z0-9]{1,6}$/i)![0].toLowerCase();
+      const map: Record<string, string> = {
+        "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp",
+        "audio/mpeg": ".mp3", "audio/mp3": ".mp3", "audio/ogg": ".ogg", "audio/wav": ".wav",
+        "audio/webm": ".webm", "audio/m4a": ".m4a", "audio/mp4": ".m4a",
+        "video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov",
+        "application/pdf": ".pdf",
+      };
+      return mime ? (map[mime] ?? ".bin") : ".bin";
+    };
+
+    const safePathPart = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "item";
+
+    const base64ToBlob = (base64: string, mime?: string | null) => {
+      const clean = base64.replace(/\s+/g, "");
+      const chunkSize = 64 * 1024;
+      const chunks: BlobPart[] = [];
+      for (let offset = 0; offset < clean.length; offset += chunkSize) {
+        const slice = clean.slice(offset, offset + chunkSize);
+        const binary = atob(slice);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        chunks.push(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+      }
+      return new Blob(chunks, { type: mime ?? "application/octet-stream" });
+    };
+
+    const isBigInlineFile = (value: unknown) => {
+      if (typeof value !== "string" || value.length < 300) return false;
+      if (value.startsWith("data:") && value.includes(";base64,")) return true;
+      return value.length > 1500 && /^[A-Za-z0-9+/=\r\n]+$/.test(value);
+    };
+
+    const scrubPayload = (value: any): any => {
+      if (isBigInlineFile(value)) return "[arquivo enviado ao Storage]";
+      if (Array.isArray(value)) return value.map(scrubPayload);
+      if (!value || typeof value !== "object") return value;
+      const out: any = {};
+      for (const [key, child] of Object.entries(value)) {
+        out[key] = scrubPayload(child);
+      }
+      return out;
+    };
 
     // --- Pre-upload: sobe base64 pesado (áudios/mídias/docs) uma vez só,
     // pra evitar "Request Entity Too Large" nos chunks.
@@ -251,30 +309,48 @@ function FlowsListPage() {
     for (const f of allFunnels) {
       const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
       // Pre-upa TODO item que tiver base64, independente do tipo.
-      for (const s of seq) if (s?.itemId) allItemIds.add(String(s.itemId));
+      for (const s of seq) if (s?.itemId) {
+        const itemId = String(s.itemId);
+        allItemIds.add(itemId);
+        if (!sequenceIdx.has(itemId)) sequenceIdx.set(itemId, s);
+      }
     }
     let mediaDone = 0;
     const mediaTotal = allItemIds.size;
+    addZvLog(`${mediaTotal} item(ns) na fila de verificação de mídia`);
     if (mediaTotal > 0) toast.loading(`Enviando mídias 0 / ${mediaTotal}…`, { id: t });
 
     for (const itemId of allItemIds) {
-      const src = objectsIdx.get(itemId) ?? audiosIdx.get(itemId) ?? mediasIdx.get(itemId) ?? docsIdx.get(itemId) ?? messagesIdx.get(itemId);
+      const src = objectsIdx.get(itemId) ?? audiosIdx.get(itemId) ?? mediasIdx.get(itemId) ?? docsIdx.get(itemId) ?? messagesIdx.get(itemId) ?? sequenceIdx.get(itemId);
       if (!src) { mediaDone++; continue; }
       const ex = extractB64(src);
       if (!ex) { mediaDone++; continue; }
       try {
-        const up: any = await uploadZvMediaFn({
-          data: { itemId, base64: ex.base64, mime: ex.mime ?? null, filename: ex.filename ?? null },
+        const ext = extOf(ex.mime ?? null, ex.filename ?? null);
+        const path = `zapvoice-import/${Date.now()}-${safePathPart(itemId)}${ext}`;
+        const blob = base64ToBlob(ex.base64, ex.mime ?? null);
+        const { error: upErr } = await supabase.storage.from("wa-media").upload(path, blob, {
+          contentType: ex.mime ?? "application/octet-stream",
+          upsert: true,
         });
-        preuploaded.set(itemId, { url: up.url, mime: up.mime ?? null, filename: up.filename ?? null });
+        if (upErr) throw upErr;
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("wa-media")
+          .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+        if (signErr || !signed?.signedUrl) throw signErr ?? new Error("signed url ausente");
+        preuploaded.set(itemId, { url: signed.signedUrl, mime: ex.mime ?? null, filename: ex.filename ?? null });
+        addZvLog(`Mídia enviada: ${itemId} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
       } catch (upErr: any) {
         console.error("[zv-import] preupload fail", itemId, upErr);
+        addZvLog(`Falha ao enviar mídia ${itemId}: ${upErr?.message ?? String(upErr)}`);
       }
       mediaDone++;
       if (mediaDone % 3 === 0 || mediaDone === mediaTotal) {
         toast.loading(`Enviando mídias ${mediaDone} / ${mediaTotal}…`, { id: t });
+        addZvLog(`Mídias verificadas: ${mediaDone} / ${mediaTotal}`);
       }
     }
+    addZvLog(`${preuploaded.size} mídia(s) pré-enviadas para o Storage`);
 
     // Substitui itens no objectsList/etc por versão slim (sem base64)
     const slimItem = (itemId: string, orig: any) => {
@@ -290,36 +366,46 @@ function FlowsListPage() {
       };
     };
 
+    const pickSlimItem = (itemId: string, idx: Map<string, any>, fallback?: any) => {
+      const original = idx.get(itemId) ?? fallback;
+      if (!original) return null;
+      return scrubPayload(slimItem(itemId, original));
+    };
+
 
     toast.loading(`Importando 0 / ${total} funis…`, { id: t });
     try {
       for (let i = 0; i < allFunnels.length; i += CHUNK) {
-        const chunkFunnels = allFunnels.slice(i, i + CHUNK);
+        const chunkFunnelsRaw = allFunnels.slice(i, i + CHUNK);
+        const chunkFunnels = scrubPayload(chunkFunnelsRaw);
         const chunkIdx = Math.floor(i / CHUNK);
         setZvProgress(`${i} / ${total}`);
         toast.loading(`Importando ${i} / ${total} funis…`, { id: t });
+        addZvLog(`Importando funil ${i + 1} de ${total}`);
 
         const itemIds = new Set<string>();
-        for (const f of chunkFunnels) {
+        for (const f of chunkFunnelsRaw) {
           const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
           for (const s of seq) if (s?.itemId) itemIds.add(String(s.itemId));
         }
-        const pickSlim = (idx: Map<string, any>) => {
+        const pickSlim = (idx: Map<string, any>, type?: string) => {
           const out: any[] = [];
           for (const id of itemIds) {
-            const v = idx.get(id);
-            if (v) out.push(slimItem(id, v));
+            const fallback = type && sequenceIdx.get(id)?.type === type ? sequenceIdx.get(id) : undefined;
+            const v = pickSlimItem(id, idx, fallback);
+            if (v) out.push(v);
           }
           return out;
         };
         const slimBackup = {
           funnels: chunkFunnels,
           messages: pickSlim(messagesIdx),
-          audios: pickSlim(audiosIdx),
-          medias: pickSlim(mediasIdx),
-          docs: pickSlim(docsIdx),
+          audios: pickSlim(audiosIdx, "audio"),
+          medias: pickSlim(mediasIdx, "media"),
+          docs: pickSlim(docsIdx, "document"),
           objectsList: pickSlim(objectsIdx),
         };
+        addZvLog(`Payload do funil ${i + 1}: ${(JSON.stringify(slimBackup).length / 1024 / 1024).toFixed(2)} MB`);
 
         try {
           const r: any = await importZvFn({
@@ -334,14 +420,17 @@ function FlowsListPage() {
           acc.steps += r?.steps ?? 0;
           acc.uploads += r?.uploads ?? 0;
           if (Array.isArray(r?.errors)) acc.errors.push(...r.errors);
+          addZvLog(`Funil ${i + 1} importado: ${r?.funnels ?? 0} fluxo(s), ${r?.steps ?? 0} etapa(s)`);
         } catch (chunkErr: any) {
           console.error("[zv-import] chunk fail", { chunkIdx, error: chunkErr });
-          for (const f of chunkFunnels) {
+          addZvLog(`Erro no funil ${i + 1}: ${chunkErr?.message ?? String(chunkErr)}`);
+          for (const f of chunkFunnelsRaw) {
             acc.errors.push({ funnel: f?.name ?? f?.id, message: chunkErr?.message ?? String(chunkErr) });
           }
         }
       }
       setZvSummary(acc);
+      addZvLog(`Finalizado: ${acc.funnels} funil(is), ${acc.steps} etapa(s), ${acc.errors.length} erro(s)`);
       qc.invalidateQueries({ queryKey: ["wa-flows"] });
       if (acc.funnels === 0) {
         const firstErr = acc.errors[0]?.message ?? "Nenhum funil foi importado";
@@ -353,6 +442,7 @@ function FlowsListPage() {
       }
     } catch (e: any) {
       console.error("[zv-import] server fail", e);
+      addZvLog(`Erro geral: ${e?.message ?? String(e)}`);
       toast.error(e?.message ?? "Erro ao importar ZapVoice", { id: t });
     } finally {
       setZvProgress("");
@@ -697,7 +787,11 @@ function FlowsListPage() {
               <Input
                 type="file"
                 accept="application/json,.json"
-                onChange={(e) => setZvFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  setZvFile(e.target.files?.[0] ?? null);
+                  setZvSummary(null);
+                  setZvLogs([]);
+                }}
               />
               {zvFile && (
                 <p className="text-[11px] text-muted-foreground">
@@ -738,6 +832,14 @@ function FlowsListPage() {
                   </details>
                 )}
               </div>
+            )}
+            {zvLogs.length > 0 && (
+              <details open className="rounded-md border border-border bg-muted/30 p-3 text-xs">
+                <summary className="cursor-pointer font-medium text-foreground">Logs da importação</summary>
+                <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                  {zvLogs.join("\n")}
+                </pre>
+              </details>
             )}
           </div>
           <DialogFooter>

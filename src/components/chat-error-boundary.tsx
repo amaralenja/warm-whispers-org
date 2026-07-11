@@ -1,4 +1,4 @@
-import { Component, Fragment, isValidElement, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 
 type Props = { children?: ReactNode };
 type State = { error: unknown | null; errorText: string; stackText: string };
@@ -38,30 +38,6 @@ function forceText(value: unknown, fallback: string): string {
   return typeof text === "string" ? text : fallback;
 }
 
-function isRenderableChild(value: unknown): value is ReactNode {
-  if (value == null) return true;
-  const type = typeof value;
-  if (type === "string" || type === "number" || type === "boolean") return true;
-  if (isValidElement(value)) return true;
-  if (Array.isArray(value)) return value.every(isRenderableChild);
-  return false;
-}
-
-function SafeChildren({ children }: { children: ReactNode }) {
-  if (children == null) return null;
-  if (Array.isArray(children)) {
-    return (
-      <>
-        {children.map((child, index) => (
-          isRenderableChild(child) ? <Fragment key={index}>{child}</Fragment> : null
-        ))}
-      </>
-    );
-  }
-  if (isRenderableChild(children)) return <>{children}</>;
-  return null;
-}
-
 export class ChatErrorBoundary extends Component<Props, State> {
   state: State = { error: null, errorText: "", stackText: "" };
 
@@ -85,7 +61,7 @@ export class ChatErrorBoundary extends Component<Props, State> {
   reset = () => this.setState({ error: null, errorText: "", stackText: "" });
 
   render() {
-    if (!this.state.error) return <SafeChildren>{this.props?.children ?? null}</SafeChildren>;
+    if (!this.state.error) return this.props?.children ?? null;
     const errorText = forceText(this.state.errorText, "Erro desconhecido");
     const stackText = forceText(this.state.stackText, "Sem detalhes técnicos disponíveis.");
     return (
