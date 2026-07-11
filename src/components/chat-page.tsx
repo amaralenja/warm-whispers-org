@@ -2441,6 +2441,7 @@ function FlowInlineBar({
   function handleSaveOrder(newIds: string[]) {
     setOrderIds(newIds);
     saveFlowOrder(vendorKey, opKey, newIds);
+    setPref({ data: { key: remoteKey, valueJson: JSON.stringify(newIds) } }).catch(() => {});
     toast.success("Ordem dos fluxos salva");
   }
 
