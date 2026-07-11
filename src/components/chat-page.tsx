@@ -1344,7 +1344,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         )}
 
 
-        <main className="flex min-h-0 min-w-0 flex-col bg-chat-thread">
+        <main className={`min-h-0 min-w-0 flex-col bg-chat-thread ${!active && !searchParams.embed ? "hidden md:flex" : "flex"}`}>
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
               <div className="max-w-sm text-center">
