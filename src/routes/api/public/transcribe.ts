@@ -12,9 +12,9 @@ export const Route = createFileRoute("/api/public/transcribe")({
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
       POST: async ({ request }) => {
         try {
-          const apiKey = process.env.LOVABLE_API_KEY;
+          const apiKey = process.env.OPENAI_API_KEY;
           if (!apiKey) {
-            return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }), {
+            return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurado" }), {
               status: 500,
               headers: { "Content-Type": "application/json", ...CORS },
             });
@@ -35,10 +35,10 @@ export const Route = createFileRoute("/api/public/transcribe")({
           }
 
           const upstream = new FormData();
-          upstream.append("model", "openai/gpt-4o-transcribe");
+          upstream.append("model", "gpt-4o-transcribe");
           upstream.append("file", file, file.name || "call.webm");
 
-          const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+          const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}` },
             body: upstream,
