@@ -29,6 +29,7 @@ import {
   Kanban,
   Target,
   Zap,
+  Percent,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -72,6 +73,7 @@ const operacaoX1Items: Item[] = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },
+  { title: "Comissões", url: "/comissoes", icon: Percent },
 ];
 
 const highTicketItems: Item[] = [
@@ -109,6 +111,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",
   "/pv24h-analytics": "pv24h-analytics",
+  "/comissoes": "comissoes",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 

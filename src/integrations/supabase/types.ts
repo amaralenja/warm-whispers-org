@@ -1536,6 +1536,7 @@ export type Database = {
         Row: {
           ativo: boolean | null
           codigo: string | null
+          comissao_pct: number
           created_at: string | null
           expert: string
           foto_url: string | null
@@ -1553,6 +1554,7 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           codigo?: string | null
+          comissao_pct?: number
           created_at?: string | null
           expert: string
           foto_url?: string | null
@@ -1570,6 +1572,7 @@ export type Database = {
         Update: {
           ativo?: boolean | null
           codigo?: string | null
+          comissao_pct?: number
           created_at?: string | null
           expert?: string
           foto_url?: string | null

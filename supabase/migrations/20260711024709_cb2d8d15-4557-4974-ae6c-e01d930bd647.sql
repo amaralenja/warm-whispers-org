@@ -1,0 +1,1 @@
+ALTER TABLE public.vendedores ADD COLUMN IF NOT EXISTS comissao_pct numeric NOT NULL DEFAULT 0;
