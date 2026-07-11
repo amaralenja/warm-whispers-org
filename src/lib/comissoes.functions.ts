@@ -66,6 +66,7 @@ export type ComissaoRow = {
   nome: string;
   expert: string | null;
   fotoUrl: string | null;
+  pixChave: string | null;
   faturamento: number;
   vendas: number;
   comissao: number;
