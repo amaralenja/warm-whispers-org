@@ -74,6 +74,7 @@ import {
   type CalendarEvent,
 } from "@/lib/google-calendar.functions";
 import { sendMetaEvent } from "@/lib/meta-ads.functions";
+import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -181,7 +182,19 @@ export function CalendarPage() {
     refetchInterval: 60_000,
   });
 
-  const events = data?.items || [];
+  const rawEvents = data?.items || [];
+
+  // Se um closer/SDR do HT Team está logado, mostra só as calls onde ele
+  // aparece como participante (por email ou primeiro nome).
+  const htSession = useMemo(() => getHtTeamSession(), []);
+  const events = useMemo(() => {
+    if (!htSession || (htSession.tipo !== "closer" && htSession.tipo !== "sdr")) return rawEvents;
+    return rawEvents.filter((ev) => {
+      const atts = ev.attendees ?? [];
+      if (atts.some((a) => matchesHtCloser(htSession, { email: a.email, displayName: a.displayName }))) return true;
+      return matchesHtCloser(htSession, { nome: `${ev.summary ?? ""} ${ev.description ?? ""}` });
+    });
+  }, [rawEvents, htSession]);
 
   useEffect(() => {
     const refresh = () => refreshMarkers((n) => n + 1);

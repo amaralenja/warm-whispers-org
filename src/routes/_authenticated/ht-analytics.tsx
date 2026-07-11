@@ -19,6 +19,7 @@ import { CalendarPage } from "@/routes/_authenticated/calendar";
 import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
+import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
@@ -1704,8 +1705,14 @@ const CAIXA_VALOR: Record<string, number> = {
 };
 
 function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[]; loading: boolean }) {
+  const htSession = useMemo(() => getHtTeamSession(), []);
+  const isCloserSession = htSession?.tipo === "closer";
+  const vendasScoped = useMemo(
+    () => (isCloserSession ? (vendas || []).filter((v) => matchesHtCloser(htSession, { nome: v.closer })) : vendas),
+    [vendas, htSession, isCloserSession],
+  );
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
-  const [closerFilter, setCloserFilter] = useState<string>("all");
+  const [closerFilter, setCloserFilter] = useState<string>(isCloserSession ? (htSession?.nome ?? "all") : "all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
@@ -1782,7 +1789,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         lead: l,
       });
     }
-    for (const v of vendas || []) {
+    for (const v of vendasScoped || []) {
       list.push({
         id: `venda-${v.id}`,
         nome: v.cliente || "Sem nome",
@@ -1794,7 +1801,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
       });
     }
     return list;
-  }, [leads, vendas, fakeSet, schedMap, sdrStageMap, stageMap]);
+  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
