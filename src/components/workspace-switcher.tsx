@@ -129,6 +129,7 @@ export function WorkspaceSwitcher() {
           })}
         </div>
 
+        {!isVendor && (
         <div className="mt-1 border-t border-border p-1">
           {creating ? (
             <div className="flex items-center gap-1.5 p-1">
