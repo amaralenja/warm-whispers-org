@@ -30,42 +30,73 @@ const DOWNLOADS = {
   macArm: "#",
 };
 
-const downloadOptions = [
-  { label: "Baixar pra Windows", href: DOWNLOADS.windows, icon: Monitor },
-  { label: "Baixar pra Mac (Apple Silicon)", href: DOWNLOADS.macArm, icon: Laptop, variant: "outline" as const },
-  { label: "Mac (Intel)", href: DOWNLOADS.macIntel, icon: Laptop, variant: "outline" as const },
-];
+type DownloadButtonProps = {
+  label: string;
+  href: string;
+  icon: typeof Monitor;
+  variant?: "default" | "outline";
+};
 
-const featureCards = [
-  {
-    icon: Mic,
-    title: "Captura o áudio da call",
-    desc: "Pega tanto seu microfone quanto o áudio do sistema (a voz do lead). Zoom, Meet, WhatsApp Web, o que for.",
-  },
-  {
-    icon: Brain,
-    title: "Transcrição + resumo com IA",
-    desc: "Whisper local + LLM pra gerar transcrição, resumo, próximos passos e objeções levantadas.",
-  },
-  {
-    icon: Shield,
-    title: "Privado por padrão",
-    desc: "Tudo processa offline no seu computador. Nenhum áudio sai da sua máquina sem você mandar.",
-  },
-];
+function DownloadButton({ label, href, icon: Icon, variant = "default" }: DownloadButtonProps) {
+  const disabled = href === "#";
 
-const setupSteps = [
-  "Baixe o instalador pra sua plataforma (Windows ou Mac).",
-  "Abra o Multium Meet e deixe ele baixar o modelo de transcrição (uma vez só, ~2GB).",
-  "Antes da call, clique em Gravar. Ao terminar, o resumo aparece em segundos.",
-  "Cole o resumo direto no card do lead no Kanban Closer.",
-];
+  return (
+    <Button size="lg" variant={variant} asChild disabled={disabled}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        aria-disabled={disabled}
+        onClick={(event) => {
+          if (disabled) event.preventDefault();
+        }}
+      >
+        <Icon className="mr-2 h-5 w-5" />
+        {label}
+      </a>
+    </Button>
+  );
+}
 
-const statusItems = [
-  "Fork do repositório com nome, ícones e cores Multium",
-  "GitHub Actions gerando .exe (Win) e .dmg (Mac) por release",
-  "Integração opcional: transcrição vai direto pro card do lead",
-];
+type FeatureCardProps = {
+  icon: typeof Mic;
+  title: string;
+  desc: string;
+};
+
+function FeatureCard({ icon: Icon, title, desc }: FeatureCardProps) {
+  return (
+    <Card className="border-border/60">
+      <CardContent className="p-6">
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <h3 className="font-semibold">{title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SetupStep({ index, children }: { index: number; children: string }) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+        {index}
+      </div>
+      <p className="pt-1 text-sm text-foreground/90">{children}</p>
+    </div>
+  );
+}
+
+function StatusItem({ children }: { children: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <CheckCircle2 className="h-4 w-4 text-primary" />
+      <span>{children}</span>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/multium-meet")({
   component: MultiumMeetPage,
@@ -106,32 +137,9 @@ function MultiumMeetPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {(downloadOptions ?? []).map((option) => {
-              const Icon = option.icon;
-              const disabled = option.href === "#";
-              return (
-                <Button
-                  key={option.label}
-                  size="lg"
-                  variant={option.variant ?? "default"}
-                  asChild
-                  disabled={disabled}
-                >
-                  <a
-                    href={option.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-disabled={disabled}
-                    onClick={(event) => {
-                      if (disabled) event.preventDefault();
-                    }}
-                  >
-                    <Icon className="mr-2 h-5 w-5" />
-                    {option.label}
-                  </a>
-                </Button>
-              );
-            })}
+            <DownloadButton label="Baixar pra Windows" href={DOWNLOADS.windows} icon={Monitor} />
+            <DownloadButton label="Baixar pra Mac (Apple Silicon)" href={DOWNLOADS.macArm} icon={Laptop} variant="outline" />
+            <DownloadButton label="Mac (Intel)" href={DOWNLOADS.macIntel} icon={Laptop} variant="outline" />
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
             Precisa de ~4GB livres pra baixar o modelo Whisper na primeira vez.
@@ -140,31 +148,31 @@ function MultiumMeetPage() {
 
         {/* Features */}
         <div className="mt-16 grid gap-4 md:grid-cols-3">
-          {(featureCards ?? []).map((f) => (
-            <Card key={f.title} className="border-border/60">
-              <CardContent className="p-6">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <f.icon className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold">{f.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <FeatureCard
+            icon={Mic}
+            title="Captura o áudio da call"
+            desc="Pega tanto seu microfone quanto o áudio do sistema (a voz do lead). Zoom, Meet, WhatsApp Web, o que for."
+          />
+          <FeatureCard
+            icon={Brain}
+            title="Transcrição + resumo com IA"
+            desc="Whisper local + LLM pra gerar transcrição, resumo, próximos passos e objeções levantadas."
+          />
+          <FeatureCard
+            icon={Shield}
+            title="Privado por padrão"
+            desc="Tudo processa offline no seu computador. Nenhum áudio sai da sua máquina sem você mandar."
+          />
         </div>
 
         {/* Setup */}
         <div className="mt-16">
           <h2 className="text-2xl font-bold">Como começar</h2>
           <div className="mt-6 space-y-4">
-            {(setupSteps ?? []).map((step, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                  {i + 1}
-                </div>
-                <p className="pt-1 text-sm text-foreground/90">{step}</p>
-              </div>
-            ))}
+            <SetupStep index={1}>Baixe o instalador pra sua plataforma (Windows ou Mac).</SetupStep>
+            <SetupStep index={2}>Abra o Multium Meet e deixe ele baixar o modelo de transcrição (uma vez só, ~2GB).</SetupStep>
+            <SetupStep index={3}>Antes da call, clique em Gravar. Ao terminar, o resumo aparece em segundos.</SetupStep>
+            <SetupStep index={4}>Cole o resumo direto no card do lead no Kanban Closer.</SetupStep>
           </div>
         </div>
 
@@ -191,12 +199,9 @@ function MultiumMeetPage() {
                   (open-source, Apache 2.0), com fork rebrandeado pra Multium.
                 </p>
                 <div className="mt-4 space-y-2 text-sm">
-                  {(statusItems ?? []).map((item) => (
-                    <div key={item} className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
+                  <StatusItem>Fork do repositório com nome, ícones e cores Multium</StatusItem>
+                  <StatusItem>GitHub Actions gerando .exe (Win) e .dmg (Mac) por release</StatusItem>
+                  <StatusItem>Integração opcional: transcrição vai direto pro card do lead</StatusItem>
                 </div>
               </div>
             </div>
