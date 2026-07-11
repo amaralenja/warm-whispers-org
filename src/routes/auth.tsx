@@ -14,7 +14,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type Role = "admin" | "vendedor";
+type Role = "admin" | "vendedor" | "ht";
 
 function AuthPage() {
   const navigate = useNavigate();
