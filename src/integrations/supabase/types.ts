@@ -844,6 +844,45 @@ export type Database = {
           },
         ]
       }
+      ht_team: {
+        Row: {
+          ativo: boolean | null
+          codigo: string | null
+          created_at: string
+          foto_url: string | null
+          id: number
+          nome: string | null
+          permissoes: Json | null
+          telefone: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo?: string | null
+          created_at?: string
+          foto_url?: string | null
+          id?: never
+          nome?: string | null
+          permissoes?: Json | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo?: string | null
+          created_at?: string
+          foto_url?: string | null
+          id?: never
+          nome?: string | null
+          permissoes?: Json | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ht_vendas: {
         Row: {
           cliente: string | null
@@ -2479,6 +2518,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      generate_ht_team_codigo: { Args: never; Returns: string }
       generate_vendedor_codigo: { Args: never; Returns: string }
       get_hall_of_fame_mes: { Args: never; Returns: Json }
       get_metas_coletivas_mes: { Args: never; Returns: Json }
@@ -2522,6 +2562,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      login_ht_team_by_codigo: { Args: { _codigo: string }; Returns: Json }
       login_vendedor_by_codigo: { Args: { _codigo: string }; Returns: Json }
       submit_ht_quiz_submission: {
         Args: {
