@@ -1434,7 +1434,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                         if (!stage) return null;
                         return (
                           <span
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                            className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                             style={{ color: stage.cor, borderColor: `${stage.cor}66`, backgroundColor: `${stage.cor}1f` }}
                             title={`CRM: ${stage.nome}`}
                           >
