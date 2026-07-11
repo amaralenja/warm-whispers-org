@@ -15,7 +15,10 @@ import {
   ArrowLeft, Save, Power, PowerOff, Send, Trash2, Copy, Scissors,
   MessageSquare, Image as ImageIcon, Video, FileText, Mic,
   MousePointerClick, Clock, GitBranch, Square as StopIcon, Play, Plus, X, Shuffle, Tag as TagIcon,
+  Menu, SlidersHorizontal,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { useCrmTags, type CrmTag } from "@/components/tags-manager-dialog";
 import { Input } from "@/components/ui/input";
@@ -335,6 +338,15 @@ function Editor({ flowId }: { flowId: string }) {
   const [testOpen, setTestOpen] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testChannel, setTestChannel] = useState("");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Abre inspector automaticamente quando um nó é selecionado no mobile
+  useEffect(() => {
+    if (isMobile && selectedNode) setInspectorOpen(true);
+    if (!selectedNode) setInspectorOpen(false);
+  }, [selectedNode, isMobile]);
 
   const listChannelsFn = useServerFn(listWhatsappChannels);
   const { data: allChannels = [] } = useQuery({
@@ -451,37 +463,58 @@ function Editor({ flowId }: { flowId: string }) {
   return (
     <div className="h-[calc(100vh-1rem)] flex flex-col">
       {/* Topbar */}
-      <header className="px-4 py-2 border-b flex items-center gap-3 bg-card">
+      <header className="px-2 sm:px-4 py-2 border-b flex flex-wrap items-center gap-2 bg-card">
         <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/flows" })}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
+        {isMobile && (
+          <Button variant="outline" size="icon" onClick={() => setPaletteOpen(true)} title="Blocos & Gatilhos">
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
         <Input
           value={name} onChange={(e) => setName(e.target.value)}
-          className="max-w-xs font-semibold"
+          className="flex-1 min-w-[120px] sm:max-w-xs font-semibold"
         />
-        <Badge className={ativo ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}>
+        <Badge className={`hidden sm:inline-flex ${ativo ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
           {ativo ? "Ativo" : "Inativo"}
         </Badge>
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-1.5">
           <Switch checked={ativo} onCheckedChange={setAtivo} />
           <span className="text-xs">{ativo ? <Power className="h-3.5 w-3.5 inline" /> : <PowerOff className="h-3.5 w-3.5 inline" />}</span>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex gap-1.5">
           <Button variant="outline" size="sm" onClick={() => setTestOpen(true)}>
-            <Send className="h-4 w-4 mr-1.5" /> Testar
+            <Send className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Testar</span>
           </Button>
           <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-            <Save className="h-4 w-4 mr-1.5" /> Salvar
+            <Save className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Salvar</span>
           </Button>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Palette */}
-        <Palette onAdd={addNode} triggers={triggers} setTriggers={setTriggers} channels={channels} operacaoId={operacaoId} />
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Palette — sidebar no desktop, sheet no mobile */}
+        {!isMobile && (
+          <Palette onAdd={addNode} triggers={triggers} setTriggers={setTriggers} channels={channels} operacaoId={operacaoId} />
+        )}
+        {isMobile && (
+          <Sheet open={paletteOpen} onOpenChange={setPaletteOpen}>
+            <SheetContent side="left" className="p-0 w-[85vw] max-w-sm overflow-y-auto">
+              <SheetHeader className="px-3 pt-3">
+                <SheetTitle>Blocos & Gatilhos</SheetTitle>
+              </SheetHeader>
+              <Palette
+                onAdd={(t) => { addNode(t); setPaletteOpen(false); }}
+                triggers={triggers} setTriggers={setTriggers}
+                channels={channels} operacaoId={operacaoId}
+              />
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Canvas */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -496,10 +529,21 @@ function Editor({ flowId }: { flowId: string }) {
           >
             <Background gap={16} color="#374151" />
           </ReactFlow>
+
+          {/* FAB mobile para reabrir inspector */}
+          {isMobile && selectedNode && !inspectorOpen && (
+            <Button
+              size="icon"
+              className="absolute bottom-4 right-4 h-12 w-12 rounded-full shadow-lg z-20"
+              onClick={() => setInspectorOpen(true)}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+            </Button>
+          )}
         </div>
 
-        {/* Inspector */}
-        {selectedNode && (
+        {/* Inspector — sidebar no desktop, sheet no mobile */}
+        {!isMobile && selectedNode && (
           <Inspector
             key={selectedNode.id}
             node={selectedNode}
@@ -508,7 +552,23 @@ function Editor({ flowId }: { flowId: string }) {
             onUpload={uploadMedia}
           />
         )}
+        {isMobile && (
+          <Sheet open={inspectorOpen} onOpenChange={setInspectorOpen}>
+            <SheetContent side="right" className="p-0 w-[90vw] max-w-md overflow-y-auto">
+              {selectedNode && (
+                <Inspector
+                  key={selectedNode.id}
+                  node={selectedNode}
+                  onChange={updateSelectedData}
+                  onDelete={() => { deleteSelected(); setInspectorOpen(false); }}
+                  onUpload={uploadMedia}
+                />
+              )}
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
+
 
       {/* Test dialog */}
       <Dialog open={testOpen} onOpenChange={setTestOpen}>
