@@ -611,6 +611,151 @@ export function HtLeadDetailDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* Dialog aninhado: Registrar Venda */}
+      <Dialog open={saleOpen} onOpenChange={setSaleOpen}>
+        <DialogContent className="max-w-md border-border/60 bg-background">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-black tracking-tight">
+              <Handshake className="h-5 w-5 text-amber-400" />
+              Registrar Venda
+            </DialogTitle>
+            <div className="text-xs text-muted-foreground truncate">
+              {lead?.nome || "Lead"}
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Tipo — cards grandes */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSaleType("direta")}
+                className={`relative rounded-lg border p-3 text-left transition-all ${
+                  saleType === "direta"
+                    ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_25px_-8px_rgba(16,185,129,0.55)]"
+                    : "border-border/60 bg-card/40 hover:border-border"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-emerald-300 font-bold">
+                  <CheckCircle2 className="h-3 w-3" /> Venda Direta
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                  100% pago. Vai direto pro Dashboard.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaleType("sinal")}
+                className={`relative rounded-lg border p-3 text-left transition-all ${
+                  saleType === "sinal"
+                    ? "border-violet-500/60 bg-violet-500/10 shadow-[0_0_25px_-8px_rgba(139,92,246,0.55)]"
+                    : "border-border/60 bg-card/40 hover:border-border"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-violet-300 font-bold">
+                  <Wallet className="h-3 w-3" /> Sinal
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                  Pagamento parcial. Vai pra Contas a Receber.
+                </div>
+              </button>
+            </div>
+
+            {/* Valor total */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Valor total da venda (R$)
+              </Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                placeholder="Ex: 15000"
+                value={valorTotal}
+                onChange={(e) => setValorTotal(e.target.value)}
+                className="text-lg font-mono tabular-nums h-11"
+                autoFocus
+              />
+            </div>
+
+            {/* Se sinal: valor recebido + data restante */}
+            {saleType === "sinal" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase tracking-wider text-violet-300">
+                    Sinal recebido (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    placeholder="Ex: 800"
+                    value={valorRecebido}
+                    onChange={(e) => setValorRecebido(e.target.value)}
+                    className="text-sm font-mono tabular-nums h-10 border-violet-500/40 focus:border-violet-500/70"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Restante em
+                  </Label>
+                  <Input
+                    type="date"
+                    value={dataRestante}
+                    onChange={(e) => setDataRestante(e.target.value)}
+                    className="text-sm h-10"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Preview */}
+            {Number(valorTotal) > 0 && (
+              <div className="rounded-md border border-border/50 bg-card/30 px-3 py-2 text-[11px] font-mono tabular-nums text-muted-foreground space-y-0.5">
+                <div className="flex justify-between">
+                  <span>Total</span>
+                  <span className="text-foreground font-semibold">
+                    {Number(valorTotal).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </span>
+                </div>
+                {saleType === "sinal" && Number(valorRecebido) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Sinal</span>
+                      <span className="text-emerald-300">
+                        {Number(valorRecebido).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Falta</span>
+                      <span className="text-amber-300">
+                        {Math.max(0, Number(valorTotal) - Number(valorRecebido)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSaleOpen(false)} disabled={savingSale}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={saveSale}
+              disabled={savingSale || !valorTotal}
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:from-amber-400 hover:to-yellow-400 font-bold"
+            >
+              {savingSale ? "Salvando…" : saleType === "direta" ? "Confirmar venda" : "Registrar sinal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
+
