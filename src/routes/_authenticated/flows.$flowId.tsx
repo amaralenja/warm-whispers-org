@@ -431,6 +431,10 @@ function Editor({ flowId }: { flowId: string }) {
             match_mode: t.match_mode ?? "contains",
             channel_id: t.channel_id,
             ativo: t.ativo ?? true,
+            days_of_week: Array.isArray(t.days_of_week) && t.days_of_week.length ? t.days_of_week : null,
+            time_start: t.time_start || null,
+            time_end: t.time_end || null,
+            timezone: t.timezone || "America/Sao_Paulo",
           })),
         },
       });
