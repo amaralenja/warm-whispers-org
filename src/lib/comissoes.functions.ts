@@ -119,7 +119,7 @@ export const getComissoes = createServerFn({ method: "POST" })
     }
 
     const [vendedoresRes, vendasAll] = await Promise.all([
-      supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo"),
+      supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo, pix_chave"),
       fetchAll<any>((from, to) =>
         supabase
           .from("vendas")
