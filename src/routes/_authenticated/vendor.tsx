@@ -167,14 +167,14 @@ function VendorPortal() {
 
         {/* Meta */}
         {metaDiaria > 0 && (
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-400"><Target className="h-4 w-4" /></div>
-                <h3 className="text-sm font-semibold uppercase tracking-wider">{labelMeta}</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider md:text-sm">{labelMeta}</h3>
               </div>
               <div className="text-right">
-                <div className="font-display text-2xl font-bold tabular-nums">{metaPct.toFixed(0)}%</div>
+                <div className="font-display text-xl font-bold tabular-nums md:text-2xl">{metaPct.toFixed(0)}%</div>
                 <div className="text-[0.65rem] text-muted-foreground">
                   {BRL(stats?.faturamento ?? 0)} / {BRL(metaPeriodo)}
                 </div>
@@ -183,7 +183,7 @@ function VendorPortal() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-secondary/40">
+            <div className="mt-3 h-3 overflow-hidden rounded-full bg-secondary/40 md:mt-4">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all"
                 style={{ width: `${metaPct}%` }}
@@ -198,22 +198,22 @@ function VendorPortal() {
         )}
 
         {/* Série diária */}
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <h3 className="text-sm font-semibold uppercase tracking-wider mb-4">Seu desempenho diário</h3>
+        <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider md:mb-4 md:text-sm">Seu desempenho diário</h3>
           {isLoading ? (
             <div className="h-40 animate-pulse rounded-lg bg-secondary/30" />
           ) : (
-            <div className="flex h-40 items-end gap-1">
+            <div className="flex h-32 items-end gap-0.5 md:h-40 md:gap-1">
               {stats?.serieDiaria?.map((d) => {
                 const h = (d.total / maxSerie) * 100;
                 return (
-                  <div key={d.data} className="group relative flex-1 flex flex-col items-center gap-1">
+                  <div key={d.data} className="group relative flex flex-1 flex-col items-center gap-1">
                     <div
                       className="w-full rounded-t bg-gradient-to-t from-emerald-600 to-emerald-300 transition-all hover:from-emerald-500"
                       style={{ height: `${Math.max(2, h)}%` }}
                       title={`${d.data}: ${BRL(d.total)} (${d.vendas} vendas)`}
                     />
-                    <span className="text-[0.55rem] text-muted-foreground">{d.data.slice(8, 10)}</span>
+                    <span className="text-[0.5rem] text-muted-foreground md:text-[0.55rem]">{d.data.slice(8, 10)}</span>
                   </div>
                 );
               })}
@@ -222,8 +222,8 @@ function VendorPortal() {
         </div>
 
         {/* Últimas vendas */}
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <h3 className="text-sm font-semibold uppercase tracking-wider mb-4">Últimas vendas</h3>
+        <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider md:mb-4 md:text-sm">Últimas vendas</h3>
           {isLoading ? (
             <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-md bg-secondary/30" />)}</div>
           ) : !stats?.ultimasVendas?.length ? (
@@ -231,7 +231,7 @@ function VendorPortal() {
           ) : (
             <div className="space-y-1.5">
               {stats.ultimasVendas.map((s, i) => (
-                <div key={i} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-transparent px-3 py-2 hover:border-border hover:bg-secondary/20">
+                <div key={i} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-transparent px-2 py-2 hover:border-border hover:bg-secondary/20 md:gap-3 md:px-3">
                   <div className="text-[0.65rem] text-muted-foreground font-mono">
                     {s.data?.split("-").reverse().slice(0, 2).join("/")}
                   </div>
@@ -245,6 +245,7 @@ function VendorPortal() {
             </div>
           )}
         </div>
+
       </div>
     </main>
   );
