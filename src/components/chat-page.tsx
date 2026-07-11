@@ -1419,7 +1419,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                         const b = opBadgeFor((active as any).operacao_id);
                         return b ? (
                           <span
-                            className="inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                            className="hidden sm:inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                             style={{ color: b.hex, borderColor: `${b.hex}66`, backgroundColor: `${b.hex}1f` }}
                             title={`Operação: ${b.nome}`}
                           >
