@@ -1,0 +1,326 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, UserRound } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/_authenticated/ht-team")({
+  component: HtTeamPage,
+  head: () => ({ meta: [{ title: "SDRs & Closers · High Ticket" }] }),
+  errorComponent: ({ error }) => (
+    <div className="p-6 text-sm text-destructive">Erro: {error.message}</div>
+  ),
+  notFoundComponent: () => <div className="p-6">Não encontrado</div>,
+});
+
+type Membro = {
+  id: number;
+  nome: string | null;
+  tipo: "sdr" | "closer";
+  telefone: string | null;
+  foto_url: string | null;
+  codigo: string | null;
+  ativo: boolean | null;
+};
+
+function initials(s: string | null) {
+  if (!s) return "?";
+  const p = s.trim().split(/\s+/);
+  return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
+function HtTeamPage() {
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<"todos" | "sdr" | "closer">("todos");
+  const [editing, setEditing] = useState<Membro | null>(null);
+  const [creating, setCreating] = useState(false);
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["ht-team-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ht_team")
+        .select("id, nome, tipo, telefone, foto_url, codigo, ativo")
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Membro[];
+    },
+  });
+
+  async function regenerateCode(id: number) {
+    const { data: newCode, error: rpcErr } = await supabase.rpc("generate_ht_team_codigo");
+    if (rpcErr || !newCode) { toast.error("Falha ao gerar código"); return; }
+    const { error } = await supabase.from("ht_team").update({ codigo: newCode }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Novo código: ${newCode}`);
+    qc.invalidateQueries({ queryKey: ["ht-team-list"] });
+  }
+
+  async function copyCode(code: string) {
+    try { await navigator.clipboard.writeText(code); toast.success(`Código ${code} copiado`); }
+    catch { toast.error(`Código: ${code}`); }
+  }
+
+  async function toggleAtivo(m: Membro) {
+    const { error } = await supabase.from("ht_team").update({ ativo: !m.ativo }).eq("id", m.id);
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["ht-team-list"] });
+  }
+
+  async function remove(id: number) {
+    if (!confirm("Remover este membro?")) return;
+    const { error } = await supabase.from("ht_team").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Removido");
+    qc.invalidateQueries({ queryKey: ["ht-team-list"] });
+  }
+
+  const filtered = useMemo(() => {
+    const list = data ?? [];
+    return list.filter((v) => {
+      if (filter !== "todos" && v.tipo !== filter) return false;
+      if (!q.trim()) return true;
+      const n = q.toLowerCase();
+      return (v.nome ?? "").toLowerCase().includes(n) || (v.telefone ?? "").includes(q);
+    });
+  }, [data, q, filter]);
+
+  const totals = useMemo(() => {
+    const list = data ?? [];
+    return {
+      total: list.length,
+      sdr: list.filter((v) => v.tipo === "sdr").length,
+      closer: list.filter((v) => v.tipo === "closer").length,
+    };
+  }, [data]);
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-500/15 via-card to-card p-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/20 text-violet-400">
+            <UserRound className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-bold">SDRs & Closers</h1>
+            <p className="text-sm text-muted-foreground">Time da operação High Ticket</p>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          {[
+            { label: "Total", value: totals.total },
+            { label: "SDRs", value: totals.sdr },
+            { label: "Closers", value: totals.closer },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-border/60 bg-background/40 p-4">
+              <div className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">{s.label}</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou telefone..." className="pl-9" />
+        </div>
+        <div className="flex rounded-lg border border-border bg-card p-1">
+          {(["todos", "sdr", "closer"] as const).map((k) => (
+            <button
+              key={k}
+              onClick={() => setFilter(k)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium uppercase transition-colors ${
+                filter === k ? "bg-violet-500/15 text-violet-400" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+        <Button onClick={() => setCreating(true)} className="gap-1.5 bg-violet-500 text-white hover:bg-violet-600">
+          <Plus className="h-4 w-4" /> Novo membro
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 animate-pulse rounded-xl bg-secondary/30" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+          Nenhum membro encontrado.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((v) => (
+            <div key={v.id} className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-violet-500/40">
+              <div className="flex items-start gap-3">
+                {v.foto_url ? (
+                  <img src={v.foto_url} alt={v.nome ?? ""} className="h-12 w-12 rounded-full border border-border/60 object-cover" />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-sm font-bold text-white">
+                    {initials(v.nome)}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate font-semibold">{v.nome ?? "—"}</h3>
+                    {v.ativo ? (
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    ) : (
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[0.6rem] uppercase">{v.tipo}</Badge>
+                    {v.telefone && <span className="truncate">· {v.telefone}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-violet-500/20 bg-violet-500/5 px-2 py-1.5">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <KeyRound className="h-3.5 w-3.5 text-violet-400" />
+                  <span className="font-mono text-sm font-bold tracking-widest text-foreground">
+                    {v.codigo ?? "——————"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {v.codigo && (
+                    <button onClick={() => copyCode(v.codigo!)} title="Copiar" className="rounded p-1 hover:bg-violet-500/10 hover:text-violet-400">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => regenerateCode(v.id)} title="Novo código" className="rounded p-1 hover:bg-violet-500/10 hover:text-violet-400">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-1.5">
+                <button
+                  onClick={() => setEditing(v)}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </button>
+                <button
+                  onClick={() => toggleAtivo(v)}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
+                >
+                  {v.ativo ? "Desativar" : "Ativar"}
+                </button>
+                <button
+                  onClick={() => remove(v.id)}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <MembroDialog
+        open={!!editing || creating}
+        member={editing}
+        onClose={() => { setEditing(null); setCreating(false); }}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["ht-team-list"] })}
+      />
+    </div>
+  );
+}
+
+function MembroDialog({
+  open, member, onClose, onSaved,
+}: { open: boolean; member: Membro | null; onClose: () => void; onSaved: () => void }) {
+  const [nome, setNome] = useState("");
+  const [tipo, setTipo] = useState<"sdr" | "closer">("closer");
+  const [telefone, setTelefone] = useState("");
+  const [fotoUrl, setFotoUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useMemo(() => {
+    if (open) {
+      setNome(member?.nome ?? "");
+      setTipo(member?.tipo ?? "closer");
+      setTelefone(member?.telefone ?? "");
+      setFotoUrl(member?.foto_url ?? "");
+    }
+  }, [open, member]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { nome: nome.trim() || null, tipo, telefone: telefone.trim() || null, foto_url: fotoUrl.trim() || null };
+      if (member) {
+        const { error } = await supabase.from("ht_team").update(payload).eq("id", member.id);
+        if (error) throw error;
+        toast.success("Atualizado");
+      } else {
+        const { error } = await supabase.from("ht_team").insert(payload);
+        if (error) throw error;
+        toast.success("Criado");
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{member ? "Editar membro" : "Novo membro"}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Nome</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tipo</Label>
+            <Select value={tipo} onValueChange={(v) => setTipo(v as "sdr" | "closer")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sdr">SDR</SelectItem>
+                <SelectItem value="closer">Closer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Telefone</Label>
+            <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="opcional" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Foto (URL)</Label>
+            <Input value={fotoUrl} onChange={(e) => setFotoUrl(e.target.value)} placeholder="opcional" />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={saving} className="bg-violet-500 hover:bg-violet-600 text-white">
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
