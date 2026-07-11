@@ -1481,6 +1481,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_prefs: {
+        Row: {
+          owner_key: string
+          pref_key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          owner_key: string
+          pref_key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          owner_key?: string
+          pref_key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       vendas: {
         Row: {
           Campanha: string | null
