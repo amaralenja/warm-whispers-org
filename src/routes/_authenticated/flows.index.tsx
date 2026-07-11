@@ -23,7 +23,7 @@ import {
   listFlows, createFlow, deleteFlow, saveFlow,
   duplicateFlow, exportFlow, importFlow,
 } from "@/lib/flow-engine.functions";
-import { importZapVoiceBackup, uploadZapVoiceMedia } from "@/lib/zapvoice-import.functions";
+import { importZapVoiceBackup } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -43,7 +43,6 @@ function FlowsListPage() {
   const exportFn = useServerFn(exportFlow);
   const importFn = useServerFn(importFlow);
   const importZvFn = useServerFn(importZapVoiceBackup);
-  const uploadZvMediaFn = useServerFn(uploadZapVoiceMedia);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
