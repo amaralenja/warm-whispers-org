@@ -1711,11 +1711,6 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
     () => (isCloserSession ? (vendas || []).filter((v) => matchesHtCloser(htSession, { nome: v.closer })) : vendas),
     [vendas, htSession, isCloserSession],
   );
-  const leadsScoped = useMemo(() => {
-    if (!isCloserSession) return leads;
-    // Sem coluna de closer nos leads do quiz — só some se o vendedor está claramente identificado em outro
-    return (leads || []).filter((l) => !l.crm_status || matchesHtCloser(htSession, { nome: `${l.nome ?? ""}` }));
-  }, [leads, htSession, isCloserSession]);
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
   const [closerFilter, setCloserFilter] = useState<string>(isCloserSession ? (htSession?.nome ?? "all") : "all");
   const [search, setSearch] = useState("");
