@@ -787,7 +787,11 @@ function FlowsListPage() {
               <Input
                 type="file"
                 accept="application/json,.json"
-                onChange={(e) => setZvFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  setZvFile(e.target.files?.[0] ?? null);
+                  setZvSummary(null);
+                  setZvLogs([]);
+                }}
               />
               {zvFile && (
                 <p className="text-[11px] text-muted-foreground">
@@ -828,6 +832,14 @@ function FlowsListPage() {
                   </details>
                 )}
               </div>
+            )}
+            {zvLogs.length > 0 && (
+              <details open className="rounded-md border border-border bg-muted/30 p-3 text-xs">
+                <summary className="cursor-pointer font-medium text-foreground">Logs da importação</summary>
+                <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                  {zvLogs.join("\n")}
+                </pre>
+              </details>
             )}
           </div>
           <DialogFooter>
