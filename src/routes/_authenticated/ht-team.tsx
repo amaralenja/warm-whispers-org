@@ -1,14 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Upload, UserRound } from "lucide-react";
+import { Copy, KeyRound, Loader2, Mail, Pencil, Plus, RefreshCw, Search, Settings2, Trash2, Upload, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MENU_TREE, htDefaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/ht-team")({
@@ -25,9 +28,11 @@ type Membro = {
   nome: string | null;
   tipo: "sdr" | "closer";
   telefone: string | null;
+  email: string | null;
   foto_url: string | null;
   codigo: string | null;
   ativo: boolean | null;
+  permissoes: Permissoes | null;
 };
 
 function initials(s: string | null) {
@@ -41,6 +46,7 @@ function HtTeamPage() {
   const [filter, setFilter] = useState<"todos" | "sdr" | "closer">("todos");
   const [editing, setEditing] = useState<Membro | null>(null);
   const [creating, setCreating] = useState(false);
+  const [permMember, setPermMember] = useState<Membro | null>(null);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -48,7 +54,7 @@ function HtTeamPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ht_team")
-        .select("id, nome, tipo, telefone, foto_url, codigo, ativo")
+        .select("id, nome, tipo, telefone, email, foto_url, codigo, ativo, permissoes")
         .order("nome", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Membro[];
@@ -208,21 +214,31 @@ function HtTeamPage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
                 <button
                   onClick={() => setEditing(v)}
+                  title="Editar dados"
                   className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Editar
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setPermMember(v)}
+                  title="Permissões / menus"
+                  className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => toggleAtivo(v)}
+                  title={v.ativo ? "Desativar" : "Ativar"}
                   className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
                 >
-                  {v.ativo ? "Desativar" : "Ativar"}
+                  {v.ativo ? "Off" : "On"}
                 </button>
                 <button
                   onClick={() => remove(v.id)}
+                  title="Remover"
                   className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -239,6 +255,12 @@ function HtTeamPage() {
         onClose={() => { setEditing(null); setCreating(false); }}
         onSaved={() => qc.invalidateQueries({ queryKey: ["ht-team-list"] })}
       />
+      <PermissoesDialog
+        open={!!permMember}
+        member={permMember}
+        onClose={() => setPermMember(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["ht-team-list"] })}
+      />
     </div>
   );
 }
@@ -249,6 +271,7 @@ function MembroDialog({
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<"sdr" | "closer">("closer");
   const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -259,6 +282,7 @@ function MembroDialog({
       setNome(member?.nome ?? "");
       setTipo(member?.tipo ?? "closer");
       setTelefone(member?.telefone ?? "");
+      setEmail(member?.email ?? "");
       setFotoUrl(member?.foto_url ?? "");
     }
   }, [open, member]);
@@ -289,14 +313,30 @@ function MembroDialog({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const emailTrim = email.trim();
+    if (tipo === "closer" && !emailTrim) {
+      toast.error("Email é obrigatório para Closers (recebe os convites de reunião)");
+      return;
+    }
+    if (emailTrim && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+      toast.error("Email inválido");
+      return;
+    }
     setSaving(true);
     try {
-      const payload = { nome: nome.trim() || null, tipo, telefone: telefone.trim() || null, foto_url: fotoUrl.trim() || null };
+      const payload: any = {
+        nome: nome.trim() || null,
+        tipo,
+        telefone: telefone.trim() || null,
+        email: emailTrim || null,
+        foto_url: fotoUrl.trim() || null,
+      };
       if (member) {
         const { error } = await supabase.from("ht_team").update(payload).eq("id", member.id);
         if (error) throw error;
         toast.success("Atualizado");
       } else {
+        payload.permissoes = htDefaultPermissoes(tipo);
         const { error } = await supabase.from("ht_team").insert(payload);
         if (error) throw error;
         toast.success("Criado");
@@ -312,7 +352,7 @@ function MembroDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{member ? "Editar membro" : "Novo membro"}</DialogTitle>
         </DialogHeader>
@@ -363,6 +403,24 @@ function MembroDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 text-violet-400" />
+              Email {tipo === "closer" ? <span className="text-xs text-violet-400">*obrigatório</span> : <span className="text-xs text-muted-foreground">(opcional)</span>}
+            </Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="closer@empresa.com"
+              required={tipo === "closer"}
+            />
+            {tipo === "closer" && (
+              <p className="rounded-md border border-violet-500/20 bg-violet-500/5 px-2.5 py-2 text-[0.7rem] leading-relaxed text-muted-foreground">
+                O Closer <strong className="text-foreground">precisa</strong> de email pra receber os convites (Google Calendar / .ics) das reuniões agendadas pelo SDR.
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
             <Label>Telefone <span className="text-xs text-muted-foreground">(opcional)</span></Label>
             <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" />
           </div>
@@ -374,6 +432,120 @@ function MembroDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PermissoesDialog({
+  open, member, onClose, onSaved,
+}: { open: boolean; member: Membro | null; onClose: () => void; onSaved: () => void }) {
+  const [perm, setPerm] = useState<Permissoes>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && member) {
+      const base = htDefaultPermissoes(member.tipo);
+      const cur = (member.permissoes && typeof member.permissoes === "object") ? member.permissoes : base;
+      setPerm({ ...base, ...cur });
+    }
+  }, [open, member]);
+
+  function setLeaf(groupKey: string, leafKey: string, v: boolean) {
+    setPerm((prev) => {
+      const node = prev[groupKey];
+      const sub = typeof node === "object" && node !== null ? { ...node } : {};
+      sub[leafKey] = v;
+      return { ...prev, [groupKey]: sub };
+    });
+  }
+  function setTop(groupKey: string, v: boolean) {
+    setPerm((prev) => {
+      const node = prev[groupKey];
+      if (typeof node === "object" && node !== null) {
+        const sub: Record<string, boolean> = {};
+        for (const k of Object.keys(node)) sub[k] = v;
+        return { ...prev, [groupKey]: sub };
+      }
+      return { ...prev, [groupKey]: v };
+    });
+  }
+  function isTopOn(groupKey: string): boolean {
+    const node = perm[groupKey];
+    if (typeof node === "boolean") return node;
+    if (typeof node === "object" && node !== null) return Object.values(node).some((v) => v !== false);
+    return false;
+  }
+
+  async function resetDefaults() {
+    if (!member) return;
+    setPerm(htDefaultPermissoes(member.tipo));
+  }
+
+  async function save() {
+    if (!member) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("ht_team").update({ permissoes: perm as any }).eq("id", member.id);
+      if (error) throw error;
+      toast.success("Permissões salvas");
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-violet-400" />
+            Permissões — {member?.nome ?? ""}
+          </DialogTitle>
+          <DialogDescription>
+            Por padrão, {member?.tipo === "sdr" ? "SDRs" : "Closers"} veem só o <strong>Analytics de High Ticket</strong> e o <strong>Kanban {member?.tipo === "sdr" ? "SDR" : "Closer"}</strong>. Libere outras abas manualmente aqui.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          {MENU_TREE.map((node) => {
+            const isGroup = "children" in node;
+            return (
+              <div key={node.key} className="rounded-lg border border-border bg-card/40 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm">{node.title}</div>
+                  <Switch checked={isTopOn(node.key)} onCheckedChange={(v) => setTop(node.key, v)} />
+                </div>
+                {isGroup && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/40 pt-3">
+                    {node.children.map((c) => {
+                      const sub = perm[node.key];
+                      const checked = typeof sub === "object" && sub !== null ? sub[c.key] === true : !!sub;
+                      return (
+                        <label key={c.key} className="flex cursor-pointer items-center gap-2 text-sm">
+                          <Checkbox checked={checked} onCheckedChange={(v) => setLeaf(node.key, c.key, !!v)} />
+                          <span>{c.title}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="ghost" onClick={resetDefaults}>Restaurar padrão</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={save} disabled={saving} className="bg-violet-500 hover:bg-violet-600 text-white">
+            {saving ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

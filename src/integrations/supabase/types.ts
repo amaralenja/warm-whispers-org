@@ -849,6 +849,7 @@ export type Database = {
           ativo: boolean | null
           codigo: string | null
           created_at: string
+          email: string | null
           foto_url: string | null
           id: number
           nome: string | null
@@ -861,6 +862,7 @@ export type Database = {
           ativo?: boolean | null
           codigo?: string | null
           created_at?: string
+          email?: string | null
           foto_url?: string | null
           id?: never
           nome?: string | null
@@ -873,6 +875,7 @@ export type Database = {
           ativo?: boolean | null
           codigo?: string | null
           created_at?: string
+          email?: string | null
           foto_url?: string | null
           id?: never
           nome?: string | null
