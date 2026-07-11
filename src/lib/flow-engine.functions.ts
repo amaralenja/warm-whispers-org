@@ -750,7 +750,7 @@ export const importFlow = createServerFn({ method: "POST" })
 
 export const saveTriggers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { flow_id: string; triggers: Array<{ tipo: string; valor?: string; match_mode?: string; channel_id?: string | null; ativo?: boolean }> }) => d)
+  .inputValidator((d: { flow_id: string; triggers: Array<{ tipo: string; valor?: string; match_mode?: string; channel_id?: string | null; ativo?: boolean; days_of_week?: number[] | null; time_start?: string | null; time_end?: string | null; timezone?: string | null }> }) => d)
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     await assertVendorFlowAccess(context, db, data.flow_id);
@@ -764,6 +764,10 @@ export const saveTriggers = createServerFn({ method: "POST" })
       match_mode: t.match_mode ?? "contains",
       channel_id: t.channel_id ?? null,
       ativo: t.ativo ?? true,
+      days_of_week: Array.isArray(t.days_of_week) && t.days_of_week.length ? t.days_of_week : null,
+      time_start: t.time_start || null,
+      time_end: t.time_end || null,
+      timezone: t.timezone || "America/Sao_Paulo",
     }));
     const { error } = await db.from("wa_flow_triggers" as any).insert(rows);
     if (error) throw new Error(error.message);
