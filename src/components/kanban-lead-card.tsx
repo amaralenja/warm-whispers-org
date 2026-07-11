@@ -196,15 +196,12 @@ export function KanbanLeadCard({
             {name}
           </div>
           {handle && (
-            <a
-              href={`https://instagram.com/${handle}`}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-[10px] text-pink-300/80 hover:text-pink-300 flex items-center gap-0.5 truncate"
+            <span
+              className="text-[10px] text-pink-300/80 flex items-center gap-0.5 truncate select-none"
+              title="Abra o card para acessar o Instagram"
             >
               <InstagramIcon className="h-2.5 w-2.5" />@{handle}
-            </a>
+            </span>
           )}
           <div className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
             {timeAgo(lead.data_criacao)}
