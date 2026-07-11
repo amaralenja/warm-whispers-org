@@ -171,6 +171,7 @@ export function WorkspaceSwitcher() {
             </button>
           )}
         </div>
+        )}
       </PopoverContent>
     </Popover>
   );
