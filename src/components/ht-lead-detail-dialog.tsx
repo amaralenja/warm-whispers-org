@@ -44,8 +44,11 @@ export type LeadLike = {
   data_criacao?: string | null;
   crm_status?: string | null;
   crm_valor?: number | null;
+  crm_valor_recebido?: number | null;
+  crm_data_pagamento_restante?: string | null;
   crm_data_agendamento?: string | null;
 };
+
 
 type Note = {
   id: string;
