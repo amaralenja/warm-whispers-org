@@ -201,3 +201,21 @@ export const getComissoes = createServerFn({ method: "POST" })
 
     return { rows, totalFaturamento, totalComissao };
   });
+
+export const setPixChave = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: number; pix: string }) => ({
+    id: Number(input.id),
+    pix: String(input.pix ?? "").trim().slice(0, 200),
+  }))
+  .handler(async (opts) => {
+    const context = opts?.context;
+    assertAdmin(context);
+    const supabase = context.supabase as any;
+    const { error } = await supabase
+      .from("vendedores")
+      .update({ pix_chave: opts.data.pix || null })
+      .eq("id", opts.data.id);
+    if (error) throw error;
+    return { ok: true };
+  });
