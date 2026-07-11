@@ -521,7 +521,7 @@ function X1AnalyticsPage() {
                   return (
                     <div
                       key={`${v.vendedorId}-${v.utm}-${idx}`}
-                      className={`group grid grid-cols-[2rem_2.5rem_1fr_auto] items-center gap-3 rounded-xl border px-3 py-2.5 transition-all ${
+                      className={`group grid grid-cols-[1.5rem_2.25rem_1fr_auto] items-center gap-2 rounded-xl border px-2 py-2 transition-all md:grid-cols-[2rem_2.5rem_1fr_auto] md:gap-3 md:px-3 md:py-2.5 ${
                         isTop
                           ? "border-amber-500/40 bg-amber-500/5"
                           : "border-transparent hover:border-border hover:bg-muted/30"
@@ -540,32 +540,30 @@ function X1AnalyticsPage() {
                         <img
                           src={v.fotoUrl}
                           alt=""
-                          className="h-10 w-10 rounded-full object-cover ring-2 ring-border"
+                          className="h-9 w-9 rounded-full object-cover ring-2 ring-border md:h-10 md:w-10"
                         />
                       ) : (
-                        <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-2 ring-border">
+                        <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-2 ring-border md:h-10 md:w-10">
                           {v.nome.slice(0, 2).toUpperCase()}
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{v.nome}</p>
-                            <p className="truncate text-[10px] font-mono uppercase text-muted-foreground">
-                              {v.utm || "sem UTM"}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-baseline gap-3 text-xs text-muted-foreground">
-                            <span>
-                              <span className="font-semibold text-foreground">{fmtInt(v.vendas)}</span> vendas
-                            </span>
-                            <span>
-                              <span className="font-semibold text-foreground">{fmtPct(v.conversao)}</span> conv.
-                            </span>
-                            <span>
-                              TM <span className="font-semibold text-foreground">{fmtBRL(v.ticketMedio)}</span>
-                            </span>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{v.nome}</p>
+                          <p className="truncate text-[10px] font-mono uppercase text-muted-foreground">
+                            {v.utm || "sem UTM"}
+                          </p>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground md:text-xs">
+                          <span>
+                            <span className="font-semibold text-foreground">{fmtInt(v.vendas)}</span> vendas
+                          </span>
+                          <span>
+                            <span className="font-semibold text-foreground">{fmtPct(v.conversao)}</span> conv.
+                          </span>
+                          <span className="hidden sm:inline">
+                            TM <span className="font-semibold text-foreground">{fmtBRL(v.ticketMedio)}</span>
+                          </span>
                         </div>
                         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                           <div
@@ -575,14 +573,15 @@ function X1AnalyticsPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono text-sm font-bold tabular-nums">
+                        <p className="font-mono text-xs font-bold tabular-nums md:text-sm">
                           {fmtBRL(v.faturamento)}
                         </p>
                         <p className="text-[10px] text-muted-foreground">
-                          {share.toFixed(1)}% do total
+                          {share.toFixed(1)}%
                         </p>
                       </div>
                     </div>
+
                   );
                 })}
               </div>
