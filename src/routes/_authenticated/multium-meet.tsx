@@ -191,7 +191,7 @@ function MultiumMeetPage() {
                   (open-source, Apache 2.0), com fork rebrandeado pra Multium.
                 </p>
                 <div className="mt-4 space-y-2 text-sm">
-                  {statusItems.map((item) => (
+                  {(statusItems ?? []).map((item) => (
                     <div key={item} className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-primary" />
                       <span>{item}</span>
