@@ -33,24 +33,24 @@ function AuthPage() {
     setInfo(null);
     setLoading(true);
     try {
-      if (role === "vendedor") {
+      if (role === "vendedor" || role === "ht") {
         const code = codigo.trim();
         if (!/^\d{6}$/.test(code)) throw new Error("Código deve ter 6 dígitos");
-        // Tenta vendedor primeiro; se não achar, tenta SDR/Closer (HT)
-        const { data: vData, error: vErr } = await supabase.rpc("login_vendedor_by_codigo", { _codigo: code });
-        if (vErr) throw vErr;
-        if (vData) {
-          localStorage.setItem("vendor_session", JSON.stringify(vData));
+        if (role === "ht") {
+          const { data: htData, error: htErr } = await supabase.rpc("login_ht_team_by_codigo", { _codigo: code });
+          if (htErr) throw htErr;
+          if (!htData) throw new Error("Código inválido ou inativo");
+          localStorage.setItem("ht_team_session", JSON.stringify(htData));
           window.dispatchEvent(new Event("vendor-session-updated"));
-          navigate({ to: "/vendor" });
+          navigate({ to: "/ht-analytics" });
           return;
         }
-        const { data: htData, error: htErr } = await supabase.rpc("login_ht_team_by_codigo", { _codigo: code });
-        if (htErr) throw htErr;
-        if (!htData) throw new Error("Código inválido ou inativo");
-        localStorage.setItem("ht_team_session", JSON.stringify(htData));
+        const { data: vData, error: vErr } = await supabase.rpc("login_vendedor_by_codigo", { _codigo: code });
+        if (vErr) throw vErr;
+        if (!vData) throw new Error("Código inválido ou inativo");
+        localStorage.setItem("vendor_session", JSON.stringify(vData));
         window.dispatchEvent(new Event("vendor-session-updated"));
-        navigate({ to: "/ht-analytics" });
+        navigate({ to: "/vendor" });
         return;
       }
       if (mode === "signin") {
