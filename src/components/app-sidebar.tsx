@@ -115,6 +115,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/x1-analytics": "x1-analytics",
   "/pv24h-analytics": "pv24h-analytics",
   "/comissoes": "comissoes",
+  "/remarketing": "remarketing",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 
