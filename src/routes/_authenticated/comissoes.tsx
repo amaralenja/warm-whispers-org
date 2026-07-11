@@ -81,23 +81,70 @@ function ComissoesPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto]">
-          <div className="space-y-1">
-            <Label>De</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const now = new Date();
+              const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              const yest = new Date(now); yest.setDate(now.getDate() - 1);
+              const w0 = new Date(now); w0.setDate(now.getDate() - now.getDay());
+              const m0 = new Date(now.getFullYear(), now.getMonth(), 1);
+              const lm0 = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              const lm1 = new Date(now.getFullYear(), now.getMonth(), 0);
+              const d7 = new Date(now); d7.setDate(now.getDate() - 6);
+              const d30 = new Date(now); d30.setDate(now.getDate() - 29);
+              const presets: Array<{ label: string; f: string; t: string }> = [
+                { label: "Hoje", f: iso(now), t: iso(now) },
+                { label: "Ontem", f: iso(yest), t: iso(yest) },
+                { label: "7 dias", f: iso(d7), t: iso(now) },
+                { label: "Esta semana", f: iso(w0), t: iso(now) },
+                { label: "Este mês", f: iso(m0), t: iso(now) },
+                { label: "Mês passado", f: iso(lm0), t: iso(lm1) },
+                { label: "30 dias", f: iso(d30), t: iso(now) },
+              ];
+              return presets.map((p) => {
+                const active = from === p.f && to === p.t;
+                return (
+                  <Button
+                    key={p.label}
+                    size="sm"
+                    variant={active ? "default" : "outline"}
+                    onClick={() => { setFrom(p.f); setTo(p.t); }}
+                  >
+                    {p.label}
+                  </Button>
+                );
+              });
+            })()}
           </div>
-          <div className="space-y-1">
-            <Label>Até</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <div className="space-y-1">
+              <Label>De</Label>
+              <Input type="date" max={to} value={from} onChange={(e) => setFrom(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Até</Label>
+              <Input type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            <div className="flex items-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { const d = today(); setFrom(d); setTo(d); }}
+              >
+                Só hoje
+              </Button>
+              <Button variant="outline" onClick={() => q.refetch()} disabled={q.isFetching}>
+                {q.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Atualizar
+              </Button>
+            </div>
           </div>
-          <div className="flex items-end">
-            <Button variant="outline" onClick={() => q.refetch()} disabled={q.isFetching}>
-              {q.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Atualizar
-            </Button>
+          <div className="text-xs text-muted-foreground">
+            Período selecionado: <span className="font-medium text-foreground">{fmtDate(from)}</span> até <span className="font-medium text-foreground">{fmtDate(to)}</span>
           </div>
         </CardContent>
       </Card>
+
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Faixas de comissão (por R$ 1.000 no dia)</CardTitle></CardHeader>
