@@ -14,7 +14,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type Role = "admin" | "vendedor";
+type Role = "admin" | "vendedor" | "ht";
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -33,24 +33,24 @@ function AuthPage() {
     setInfo(null);
     setLoading(true);
     try {
-      if (role === "vendedor") {
+      if (role === "vendedor" || role === "ht") {
         const code = codigo.trim();
         if (!/^\d{6}$/.test(code)) throw new Error("Código deve ter 6 dígitos");
-        // Tenta vendedor primeiro; se não achar, tenta SDR/Closer (HT)
-        const { data: vData, error: vErr } = await supabase.rpc("login_vendedor_by_codigo", { _codigo: code });
-        if (vErr) throw vErr;
-        if (vData) {
-          localStorage.setItem("vendor_session", JSON.stringify(vData));
+        if (role === "ht") {
+          const { data: htData, error: htErr } = await supabase.rpc("login_ht_team_by_codigo", { _codigo: code });
+          if (htErr) throw htErr;
+          if (!htData) throw new Error("Código inválido ou inativo");
+          localStorage.setItem("ht_team_session", JSON.stringify(htData));
           window.dispatchEvent(new Event("vendor-session-updated"));
-          navigate({ to: "/vendor" });
+          navigate({ to: "/ht-analytics" });
           return;
         }
-        const { data: htData, error: htErr } = await supabase.rpc("login_ht_team_by_codigo", { _codigo: code });
-        if (htErr) throw htErr;
-        if (!htData) throw new Error("Código inválido ou inativo");
-        localStorage.setItem("ht_team_session", JSON.stringify(htData));
+        const { data: vData, error: vErr } = await supabase.rpc("login_vendedor_by_codigo", { _codigo: code });
+        if (vErr) throw vErr;
+        if (!vData) throw new Error("Código inválido ou inativo");
+        localStorage.setItem("vendor_session", JSON.stringify(vData));
         window.dispatchEvent(new Event("vendor-session-updated"));
-        navigate({ to: "/ht-analytics" });
+        navigate({ to: "/vendor" });
         return;
       }
       if (mode === "signin") {
@@ -82,7 +82,7 @@ function AuthPage() {
 
       <header className="relative z-10 flex items-center justify-end px-8 py-7">
         <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          {role === "admin" ? (mode === "signin" ? "Acesso" : "Cadastro") : "Vendedor"}
+          {role === "admin" ? (mode === "signin" ? "Acesso" : "Cadastro") : role === "ht" ? "SDR / Closer" : "Vendedor"}
         </div>
       </header>
 
@@ -106,9 +106,9 @@ function AuthPage() {
               <img src={logoMultium} alt="MULTIUM" className="h-12 w-auto object-contain" />
             </div>
 
-            {/* Toggle Admin / Vendedor */}
-            <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-border bg-background/40 p-1">
-              {(["admin", "vendedor"] as const).map((r) => (
+            {/* Toggle Admin / Vendedor / SDR•Closer */}
+            <div className="mb-6 grid grid-cols-3 gap-1 rounded-full border border-border bg-background/40 p-1">
+              {(["admin", "vendedor", "ht"] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -117,13 +117,13 @@ function AuthPage() {
                     setError(null);
                     setInfo(null);
                   }}
-                  className={`rounded-full py-2 text-xs font-semibold uppercase tracking-wider transition-all ${
+                  className={`rounded-full py-2 text-[0.65rem] font-semibold uppercase tracking-wider transition-all ${
                     role === r
                       ? "bg-foreground text-background shadow"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {r === "admin" ? "Admin" : "Vendedor"}
+                  {r === "admin" ? "Admin" : r === "vendedor" ? "Vendedor" : "SDR/Closer"}
                 </button>
               ))}
             </div>
@@ -131,12 +131,14 @@ function AuthPage() {
             <h2 className="font-display text-3xl text-foreground">
               {role === "vendedor"
                 ? "Acesso do vendedor"
+                : role === "ht"
+                ? "Acesso SDR / Closer"
                 : mode === "signin"
                 ? "Bem-vindo de volta"
                 : "Criar conta"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {role === "vendedor"
+              {role === "vendedor" || role === "ht"
                 ? "Digite seu código de 6 dígitos para entrar."
                 : mode === "signin"
                 ? "Entre com suas credenciais para continuar."
@@ -144,7 +146,7 @@ function AuthPage() {
             </p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-              {role === "vendedor" ? (
+              {role === "vendedor" || role === "ht" ? (
                 <div>
                   <label className="block text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Código de acesso
@@ -214,6 +216,8 @@ function AuthPage() {
                   ? "Aguarde…"
                   : role === "vendedor"
                   ? "Entrar como vendedor"
+                  : role === "ht"
+                  ? "Entrar SDR / Closer"
                   : mode === "signin"
                   ? "Entrar"
                   : "Criar conta"}
