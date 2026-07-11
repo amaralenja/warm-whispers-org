@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { canSee, type Permissoes } from "@/lib/menu-permissions";
+import { canSee, htDefaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getVendorSession } from "@/lib/vendor-session";
