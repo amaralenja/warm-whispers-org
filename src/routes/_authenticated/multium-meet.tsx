@@ -13,16 +13,11 @@ import {
   CheckCircle2,
   Github,
 } from "lucide-react";
-import logo from "@/assets/multium-logo.png.asset.json";
-
 const PAGE_TITLE = "Multium Meet — Transcrição de calls com IA";
 const PAGE_DESCRIPTION =
   "App desktop da Multium para gravar, transcrever e resumir calls de vendas localmente na máquina do closer.";
 
-const logoUrl =
-  typeof logo === "object" && logo !== null && "url" in logo
-    ? String((logo as { url?: string }).url ?? "/favicon.webp")
-    : "/favicon.webp";
+const logoUrl = "/favicon.webp";
 
 const DOWNLOADS = {
   windows: "#", // TODO: link do release do GitHub após primeiro build
