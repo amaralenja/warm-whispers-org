@@ -130,31 +130,60 @@ export function AppSidebar() {
     let cancelled = false;
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem("vendor_session") : null;
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s?.permissoes && typeof s.permissoes === "object") setPerm(s.permissoes);
-      else setPerm({});
-      // Re-sincroniza com o banco pra refletir mudanças do admin sem precisar deslogar
-      if (s?.id) {
-        supabase
-          .rpc("login_vendedor_by_codigo" as any, { _codigo: s.codigo })
-          .then(({ data }) => {
-            if (cancelled || !data) return;
-            const row = data as any;
-            if (Number(row.id) !== Number(s.id)) return;
-            const next = (row.permissoes ?? {}) as Permissoes;
-            setPerm(next);
-            try {
-              saveVendorSession({
-                ...s,
-                ...row,
-                permissoes: next,
-                wa_channel_ids: Array.isArray(row.wa_channel_ids) ? row.wa_channel_ids : s.wa_channel_ids,
-                workspace_ids: Array.isArray(row.workspace_ids) ? row.workspace_ids : s.workspace_ids,
-              } as any);
-              window.dispatchEvent(new Event("vendor-session-updated"));
-            } catch { /* noop */ }
-          });
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s?.permissoes && typeof s.permissoes === "object") setPerm(s.permissoes);
+        else setPerm({});
+        if (s?.id) {
+          supabase
+            .rpc("login_vendedor_by_codigo" as any, { _codigo: s.codigo })
+            .then(({ data }) => {
+              if (cancelled || !data) return;
+              const row = data as any;
+              if (Number(row.id) !== Number(s.id)) return;
+              const next = (row.permissoes ?? {}) as Permissoes;
+              setPerm(next);
+              try {
+                saveVendorSession({
+                  ...s,
+                  ...row,
+                  permissoes: next,
+                  wa_channel_ids: Array.isArray(row.wa_channel_ids) ? row.wa_channel_ids : s.wa_channel_ids,
+                  workspace_ids: Array.isArray(row.workspace_ids) ? row.workspace_ids : s.workspace_ids,
+                } as any);
+                window.dispatchEvent(new Event("vendor-session-updated"));
+              } catch { /* noop */ }
+            });
+        }
+        return;
+      }
+      // Sessão SDR/Closer (High Ticket)
+      const rawHt = typeof window !== "undefined" ? localStorage.getItem("ht_team_session") : null;
+      if (rawHt) {
+        const s = JSON.parse(rawHt);
+        const initial = (s?.permissoes && typeof s.permissoes === "object")
+          ? s.permissoes
+          : (s?.tipo === "sdr" || s?.tipo === "closer"
+              ? (require("@/lib/menu-permissions") as typeof import("@/lib/menu-permissions")).htDefaultPermissoes(s.tipo)
+              : {});
+        setPerm(initial);
+        if (s?.codigo) {
+          supabase
+            .rpc("login_ht_team_by_codigo" as any, { _codigo: s.codigo })
+            .then(({ data }) => {
+              if (cancelled || !data) return;
+              const row = data as any;
+              if (Number(row.id) !== Number(s.id)) return;
+              const next = (row.permissoes && typeof row.permissoes === "object")
+                ? (row.permissoes as Permissoes)
+                : ((require("@/lib/menu-permissions") as typeof import("@/lib/menu-permissions")).htDefaultPermissoes(row.tipo ?? "closer"));
+              setPerm(next);
+              try {
+                localStorage.setItem("ht_team_session", JSON.stringify({ ...s, ...row, permissoes: next }));
+                window.dispatchEvent(new Event("vendor-session-updated"));
+              } catch { /* noop */ }
+            });
+        }
       }
     } catch {
       /* noop */
