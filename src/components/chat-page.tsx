@@ -1495,7 +1495,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               <CurrentConversationProvider value={{ conversationId: String(active.id), phone: (active as any).contact_wa_id ?? null, title: (active as any).contact_name ?? (active as any).contact_wa_id ?? "Conversa" }}>
               <div
                 ref={scrollRef}
-                className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-6 py-6 scrollbar-fancy"
+                className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-3 py-4 scrollbar-fancy md:px-6 md:py-6"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
                   {messagesError ? (
