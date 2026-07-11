@@ -3047,12 +3047,13 @@ function ConversationMetaControls({
     <div className="flex shrink-0 items-center gap-2">
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-3 text-xs">
-            <Tag className="h-4 w-4" /> Etiquetas
+          <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-chat-line px-2 text-xs md:px-3">
+            <Tag className="h-4 w-4" /> <span className="hidden md:inline">Etiquetas</span>
             {tags.length > 0 ? (
               <span className="rounded-full bg-chat-accent/20 px-1.5 text-[10px] font-semibold text-chat-accent">{tags.length}</span>
             ) : null}
           </Button>
+
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80 border-chat-line bg-chat-panel p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas do contato</div>
