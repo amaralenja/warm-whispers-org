@@ -19,6 +19,7 @@ import { Route as AuthenticatedVendorRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedVendedoresRouteImport } from './routes/_authenticated/vendedores'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedSopsRouteImport } from './routes/_authenticated/sops'
+import { Route as AuthenticatedRemarketingRouteImport } from './routes/_authenticated/remarketing'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRankingRouteImport } from './routes/_authenticated/ranking'
 import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
@@ -99,6 +100,12 @@ const AuthenticatedSopsRoute = AuthenticatedSopsRouteImport.update({
   path: '/sops',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRemarketingRoute =
+  AuthenticatedRemarketingRouteImport.update({
+    id: '/remarketing',
+    path: '/remarketing',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
@@ -278,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/remarketing': typeof AuthenticatedRemarketingRoute
   '/sops': typeof AuthenticatedSopsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/vendedores': typeof AuthenticatedVendedoresRoute
@@ -318,6 +326,7 @@ export interface FileRoutesByTo {
   '/quiz': typeof AuthenticatedQuizRoute
   '/ranking': typeof AuthenticatedRankingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/remarketing': typeof AuthenticatedRemarketingRoute
   '/sops': typeof AuthenticatedSopsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/vendedores': typeof AuthenticatedVendedoresRoute
@@ -360,6 +369,7 @@ export interface FileRoutesById {
   '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/ranking': typeof AuthenticatedRankingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/_authenticated/remarketing': typeof AuthenticatedRemarketingRoute
   '/_authenticated/sops': typeof AuthenticatedSopsRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/vendedores': typeof AuthenticatedVendedoresRoute
@@ -402,6 +412,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/ranking'
     | '/relatorios'
+    | '/remarketing'
     | '/sops'
     | '/tasks'
     | '/vendedores'
@@ -442,6 +453,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/ranking'
     | '/relatorios'
+    | '/remarketing'
     | '/sops'
     | '/tasks'
     | '/vendedores'
@@ -483,6 +495,7 @@ export interface FileRouteTypes {
     | '/_authenticated/quiz'
     | '/_authenticated/ranking'
     | '/_authenticated/relatorios'
+    | '/_authenticated/remarketing'
     | '/_authenticated/sops'
     | '/_authenticated/tasks'
     | '/_authenticated/vendedores'
@@ -592,6 +605,13 @@ declare module '@tanstack/react-router' {
       path: '/sops'
       fullPath: '/sops'
       preLoaderRoute: typeof AuthenticatedSopsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/remarketing': {
+      id: '/_authenticated/remarketing'
+      path: '/remarketing'
+      fullPath: '/remarketing'
+      preLoaderRoute: typeof AuthenticatedRemarketingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/relatorios': {
@@ -817,6 +837,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedRankingRoute: typeof AuthenticatedRankingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
+  AuthenticatedRemarketingRoute: typeof AuthenticatedRemarketingRoute
   AuthenticatedSopsRoute: typeof AuthenticatedSopsRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedVendedoresRoute: typeof AuthenticatedVendedoresRoute
@@ -844,6 +865,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedRankingRoute: AuthenticatedRankingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
+  AuthenticatedRemarketingRoute: AuthenticatedRemarketingRoute,
   AuthenticatedSopsRoute: AuthenticatedSopsRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedVendedoresRoute: AuthenticatedVendedoresRoute,
