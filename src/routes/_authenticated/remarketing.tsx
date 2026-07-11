@@ -2,8 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Pencil, Trash2, Zap, Tag as TagIcon, Columns3, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, Tag as TagIcon, Columns3, X, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { getVendorSession } from "@/lib/vendor-session";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,13 +178,20 @@ function RuleDialog({
   const listStagesFn = useServerFn(listCrmStages);
   const listTagsFn = useServerFn(listCrmTags);
 
+  // Prefill do vendedor (operação + canal) — só quando é criação nova
+  const vendorSession = typeof window !== "undefined" ? getVendorSession() : null;
+  const isVendor = !!vendorSession;
+  const vendorExpert = vendorSession?.expert ?? null;
+  const vendorFirstChannel = vendorSession?.wa_channel_ids?.[0] ?? null;
+
   const [nome, setNome] = useState(rule?.nome ?? "");
   const [ativo, setAtivo] = useState(rule?.ativo ?? true);
-  const [operacao, setOperacao] = useState(rule?.operacao ?? "");
-  const [channelId, setChannelId] = useState<string>(rule?.channel_id ?? "");
+  const [operacao, setOperacao] = useState(rule?.operacao ?? vendorExpert ?? "");
+  const [channelId, setChannelId] = useState<string>(rule?.channel_id ?? vendorFirstChannel ?? "");
   const [flowId, setFlowId] = useState<string>(rule?.flow_id ?? "");
   const [minutesBefore, setMinutesBefore] = useState<number>(rule?.minutes_before_close ?? 30);
   const [conditions, setConditions] = useState<RemarketingCondition[]>(rule?.conditions ?? []);
+  const [flowPickerOpen, setFlowPickerOpen] = useState(false);
 
   const expertsQ = useQuery({ queryKey: ["crm-experts-all"], queryFn: () => listExpertsFn({}) });
   const flowsQ = useQuery({ queryKey: ["flows-all"], queryFn: () => listFlowsFn({}) });
@@ -197,8 +208,19 @@ function RuleDialog({
   });
 
   const availableChannels = useMemo(() => {
-    return (channelsQ.data ?? []).filter((c: any) => !operacao || c.operacao_id === operacao || !c.operacao_id);
-  }, [channelsQ.data, operacao]);
+    const list = (channelsQ.data ?? []) as any[];
+    // Vendedor: só os canais dele
+    if (isVendor && Array.isArray(vendorSession?.wa_channel_ids) && vendorSession!.wa_channel_ids!.length > 0) {
+      const allowed = new Set(vendorSession!.wa_channel_ids!.map(String));
+      return list.filter((c) => allowed.has(String(c.id)));
+    }
+    return list.filter((c) => !operacao || c.operacao_id === operacao || !c.operacao_id);
+  }, [channelsQ.data, operacao, isVendor, vendorSession]);
+
+  const selectedFlow = useMemo(
+    () => (flowsQ.data ?? []).find((f: any) => f.id === flowId),
+    [flowsQ.data, flowId],
+  );
 
   const upsertMut = useMutation({
     mutationFn: async () => upsertFn({
@@ -258,7 +280,11 @@ function RuleDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Operação</Label>
-              <Select value={operacao} onValueChange={(v) => { setOperacao(v); setChannelId(""); setConditions([]); }}>
+              <Select
+                value={operacao}
+                onValueChange={(v) => { setOperacao(v); setChannelId(""); setConditions([]); }}
+                disabled={isVendor && !!vendorExpert}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {(expertsQ.data ?? []).map((e: any) => (
@@ -266,6 +292,9 @@ function RuleDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {isVendor && vendorExpert && (
+                <p className="mt-1 text-[11px] text-muted-foreground">Operação do seu login.</p>
+              )}
             </div>
             <div>
               <Label>Canal (opcional)</Label>
@@ -286,14 +315,43 @@ function RuleDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Fluxo a disparar</Label>
-              <Select value={flowId} onValueChange={setFlowId}>
-                <SelectTrigger><SelectValue placeholder="Selecione o fluxo" /></SelectTrigger>
-                <SelectContent>
-                  {(flowsQ.data ?? []).map((f: any) => (
-                    <SelectItem key={f.id} value={f.id}>{f.nome ?? f.name ?? f.id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={flowPickerOpen} onOpenChange={setFlowPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn("w-full justify-between font-normal", !flowId && "text-muted-foreground")}
+                  >
+                    <span className="truncate">
+                      {selectedFlow ? (selectedFlow.nome ?? selectedFlow.name ?? selectedFlow.id) : "Pesquisar fluxo…"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar fluxo por nome…" />
+                    <CommandList>
+                      <CommandEmpty>Nenhum fluxo encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {(flowsQ.data ?? []).map((f: any) => {
+                          const label = f.nome ?? f.name ?? f.id;
+                          return (
+                            <CommandItem
+                              key={f.id}
+                              value={String(label)}
+                              onSelect={() => { setFlowId(f.id); setFlowPickerOpen(false); }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", flowId === f.id ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{label}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Minutos antes da janela fechar</Label>
