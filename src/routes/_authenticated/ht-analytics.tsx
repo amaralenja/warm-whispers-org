@@ -246,11 +246,27 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
     return Array.from(map.values()).sort((a, b) => b.receita - a.receita).slice(0, 8);
   }, [vendas]);
 
+  const STEP_LABELS: Record<string, string> = {
+    nome: "Nome", email: "E-mail", whatsapp: "WhatsApp", instagram: "Instagram",
+    momento: "Momento atual", gargalo: "Gargalo", situacao: "Situação",
+    caixa: "Caixa disponível", caixa_letra: "Caixa (letra)",
+    faturamento: "Faturamento", lucro: "Lucro desejado", meta: "Meta / objetivo",
+    objetivo: "Objetivo", investir: "Já investiu?", socio: "Sócio/Cônjuge",
+    comprometimento: "Comprometimento", minicurso: "Ideia de SaaS",
+    inicio: "Início", start: "Início", finish: "Finalizado",
+  };
+  const prettyStep = (s: string): string => {
+    const k = s.toLowerCase().trim();
+    if (STEP_LABELS[k]) return STEP_LABELS[k];
+    const m = k.match(/^step[_-]?(\d+)$/);
+    if (m) return `Etapa ${m[1]}`;
+    return k.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
   const funilAbandono = useMemo(() => {
     const map = new Map<string, number>();
     for (const l of leads) {
       if (isFinalizado(l)) continue;
-      const k = (l.last_step ?? l.funil ?? "").trim() || "início";
+      const k = prettyStep((l.last_step ?? l.funil ?? "").trim() || "inicio");
       map.set(k, (map.get(k) ?? 0) + 1);
     }
     return Array.from(map.entries()).map(([label, value]) => ({ label, value }))
