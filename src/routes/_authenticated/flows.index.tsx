@@ -78,6 +78,8 @@ function FlowsListPage() {
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [dupConfirmOpen, setDupConfirmOpen] = useState(false);
+  const [dupPreview, setDupPreview] = useState<{ keep: any; remove: any[] }[]>([]);
   const toggleSel = (id: string) =>
     setSelected((s) => {
       const n = new Set(s);
