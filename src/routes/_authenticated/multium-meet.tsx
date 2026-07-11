@@ -106,7 +106,7 @@ function MultiumMeetPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {downloadOptions.map((option) => {
+            {(downloadOptions ?? []).map((option) => {
               const Icon = option.icon;
               const disabled = option.href === "#";
               return (
