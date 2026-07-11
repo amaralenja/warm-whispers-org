@@ -84,6 +84,7 @@ const highTicketItems: Item[] = [
   { title: "SDRs & Closers", url: "/ht-team", icon: Briefcase },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
+  { title: "Multium Meet", url: "/multium-meet", icon: Mic },
   { title: "API", url: "/ht-api", icon: KeyRound },
 ];
 
