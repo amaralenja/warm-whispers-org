@@ -13,36 +13,14 @@ function signParams(paramsJson: string, secret: string) {
   return createHmac("sha384", secret).update(paramsJson).digest("hex");
 }
 
-/**
- * Converts a remote audio file to OGG/Opus mono (WhatsApp voice format)
- * and returns the resulting public URL.
- */
-export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<string> {
+async function runAssembly(steps: Record<string, any>, timeoutMs = 240_000) {
   const { key, secret } = getCreds();
 
   const expires = new Date(Date.now() + 1000 * 60 * 10).toISOString();
 
   const params = {
     auth: { key, expires, nonce: randomUUID() },
-    steps: {
-      imported: {
-        robot: "/http/import",
-        url: sourceUrl,
-      },
-      encoded: {
-        use: "imported",
-        robot: "/audio/encode",
-        preset: "ogg",
-        ffmpeg_stack: "v6.0.0",
-        ffmpeg: {
-          c: "libopus",
-          ac: 1,
-          ar: 48000,
-          "b:a": "32k",
-          application: "voip",
-        },
-      },
-    },
+    steps,
   };
 
   const paramsJson = JSON.stringify(params);
@@ -62,9 +40,7 @@ export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<st
   }
 
   const assemblyUrl: string = created.assembly_ssl_url;
-
-  // Poll until completed — áudios grandes podem levar bem mais que 90s.
-  const deadline = Date.now() + 240_000;
+  const deadline = Date.now() + timeoutMs;
   let assembly: any = created;
   while (Date.now() < deadline) {
     if (assembly?.ok === "ASSEMBLY_COMPLETED") break;
@@ -81,9 +57,64 @@ export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<st
   if (assembly?.ok !== "ASSEMBLY_COMPLETED") {
     throw new Error(`Transloadit timeout (status=${assembly?.ok ?? "unknown"})`);
   }
+  return assembly;
+}
+
+/**
+ * Converts a remote audio file to OGG/Opus mono (WhatsApp voice format)
+ * and returns the resulting public URL.
+ */
+export async function convertAudioToWhatsappVoice(sourceUrl: string): Promise<string> {
+  const assembly = await runAssembly({
+    imported: {
+      robot: "/http/import",
+      url: sourceUrl,
+    },
+    encoded: {
+      use: "imported",
+      robot: "/audio/encode",
+      preset: "ogg",
+      ffmpeg_stack: "v6.0.0",
+      ffmpeg: {
+        c: "libopus",
+        ac: 1,
+        ar: 48000,
+        "b:a": "32k",
+        application: "voip",
+      },
+    },
+  });
 
   const encoded = assembly?.results?.encoded?.[0];
   const url: string | undefined = encoded?.ssl_url || encoded?.url;
   if (!url) throw new Error("Transloadit não retornou URL do áudio convertido");
+  return url;
+}
+
+/**
+ * Normalizes screenshots/PNGs to a WhatsApp-friendly JPEG. Meta sometimes
+ * accepts big PNG sends synchronously and later reports status=failed.
+ */
+export async function convertImageToWhatsappJpeg(sourceUrl: string): Promise<string> {
+  const assembly = await runAssembly({
+    imported: {
+      robot: "/http/import",
+      url: sourceUrl,
+    },
+    optimized: {
+      use: "imported",
+      robot: "/image/resize",
+      format: "jpg",
+      quality: 86,
+      resize_strategy: "fit",
+      width: 1600,
+      height: 1600,
+      imagemagick_stack: "v3.0.1",
+    },
+  }, 180_000);
+
+  const optimized = assembly?.results?.optimized?.[0];
+  const url: string | undefined = optimized?.ssl_url || optimized?.url;
+  if (!url) throw new Error("Transloadit não retornou URL da imagem convertida");
   return url;
 }
