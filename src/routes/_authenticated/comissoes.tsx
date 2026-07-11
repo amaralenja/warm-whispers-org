@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, DollarSign, Users, Trophy, ChevronDown, ChevronRight, Copy, CheckSquare, Square } from "lucide-react";
+import { Loader2, ShieldAlert, DollarSign, Users, Trophy, ChevronDown, ChevronRight, Copy, CheckSquare, Square, Save, KeyRound } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { getVendorSession } from "@/lib/vendor-session";
-import { getComissoes, TIERS } from "@/lib/comissoes.functions";
+import { getComissoes, setPixChave, TIERS } from "@/lib/comissoes.functions";
 
 export const Route = createFileRoute("/_authenticated/comissoes")({
   component: ComissoesPage,
