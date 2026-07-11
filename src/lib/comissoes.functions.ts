@@ -185,6 +185,7 @@ export const getComissoes = createServerFn({ method: "POST" })
           nome: v.nome ?? key,
           expert: v.expert ?? null,
           fotoUrl: v.foto_url ?? null,
+          pixChave: v.pix_chave ?? null,
           faturamento,
           vendas,
           comissao,
