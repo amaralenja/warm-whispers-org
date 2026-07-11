@@ -36,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DragScroll } from "@/components/drag-scroll";
 import { ChatEmbed } from "@/components/chat-page";
+import { BulkDispatchButton } from "@/components/crm-bulk-dispatch-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
