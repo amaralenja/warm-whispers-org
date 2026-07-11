@@ -83,6 +83,7 @@ export function htDefaultPermissoes(tipo: "sdr" | "closer"): Permissoes {
       if (n.key === "high-ticket") {
         sub["ht-analytics"] = true;
         sub[tipo === "sdr" ? "ht-kanban-sdr" : "ht-kanban-closer"] = true;
+        if (tipo === "sdr") sub["quiz"] = true;
       }
       p[n.key] = sub;
     } else {
