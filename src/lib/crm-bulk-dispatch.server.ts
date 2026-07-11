@@ -1,6 +1,6 @@
 // Background worker: processes due items from crm_bulk_dispatches, calling
-// runFlowAdmin for each and updating counters. Idempotent per-item via row lock
-// pattern (claim by scheduled_at + status='pending').
+// runFlowAdmin for each and updating counters. Uses optimistic CAS on the
+// item status to avoid double-send when multiple workers run in parallel.
 
 import { runFlowAdmin } from "@/lib/flow-engine.server";
 
@@ -9,13 +9,20 @@ async function getAdminDb() {
   return supabaseAdmin as any;
 }
 
+async function bumpCounter(db: any, dispatchId: string, field: "sent_count" | "failed_count") {
+  const { data: cur } = await db
+    .from("crm_bulk_dispatches" as any)
+    .select(field)
+    .eq("id", dispatchId)
+    .maybeSingle();
+  const next = ((cur as any)?.[field] ?? 0) + 1;
+  await db.from("crm_bulk_dispatches" as any).update({ [field]: next }).eq("id", dispatchId);
+}
+
 export async function processDueBulkDispatchItems(limit = 10) {
   const db = await getAdminDb();
   const nowIso = new Date().toISOString();
 
-  // Claim items: fetch a small batch of due pending items and flip them to
-  // 'processing' one-by-one to avoid double-send. Postgres doesn't give us a
-  // SKIP LOCKED via PostgREST, so we do compare-and-swap on status.
   const { data: candidates, error } = await db
     .from("crm_bulk_dispatch_items" as any)
     .select("id,dispatch_id,lead_id,contact_wa_id,conversation_id")
@@ -25,9 +32,8 @@ export async function processDueBulkDispatchItems(limit = 10) {
     .limit(limit);
   if (error) throw new Error(error.message);
   const list = (candidates ?? []) as Array<any>;
-  if (list.length === 0) return { picked: 0 };
+  if (list.length === 0) return { picked: 0, sent: 0, failed: 0 };
 
-  // Load dispatch metadata in bulk
   const dispatchIds = Array.from(new Set(list.map((i) => i.dispatch_id)));
   const { data: dispatches } = await db
     .from("crm_bulk_dispatches" as any)
@@ -47,15 +53,16 @@ export async function processDueBulkDispatchItems(limit = 10) {
       continue;
     }
 
-    // Compare-and-swap: only take it if still pending.
-    const { data: claimed, error: claimErr } = await db
+    // Optimistic claim: flip pending→sent atomically. Only the winning update
+    // returns a row; concurrent workers get no rows and skip.
+    const { data: claimed } = await db
       .from("crm_bulk_dispatch_items" as any)
-      .update({ status: "processing" })
+      .update({ status: "sent", processed_at: new Date().toISOString() })
       .eq("id", item.id)
       .eq("status", "pending")
       .select("id")
       .maybeSingle();
-    if (claimErr || !claimed) continue;
+    if (!claimed) continue;
 
     try {
       const res = await runFlowAdmin({
@@ -67,18 +74,10 @@ export async function processDueBulkDispatchItems(limit = 10) {
         triggerContext: { manual: true, bulk_dispatch_id: item.dispatch_id },
         queueOnly: true,
       });
-      await db.from("crm_bulk_dispatch_items" as any).update({
-        status: "sent",
-        run_id: (res as any)?.runId ?? null,
-        processed_at: new Date().toISOString(),
-      }).eq("id", item.id);
-      await db.rpc("increment_crm_bulk_dispatch_counter" as any, {
-        _id: item.dispatch_id, _field: "sent_count",
-      }).then(() => {}, async () => {
-        // Fallback if RPC missing: manual update
-        const { data: cur } = await db.from("crm_bulk_dispatches" as any).select("sent_count").eq("id", item.dispatch_id).maybeSingle();
-        await db.from("crm_bulk_dispatches" as any).update({ sent_count: ((cur as any)?.sent_count ?? 0) + 1 }).eq("id", item.dispatch_id);
-      });
+      await db.from("crm_bulk_dispatch_items" as any)
+        .update({ run_id: (res as any)?.runId ?? null })
+        .eq("id", item.id);
+      await bumpCounter(db, item.dispatch_id, "sent_count");
       sent++;
     } catch (err: any) {
       await db.from("crm_bulk_dispatch_items" as any).update({
@@ -86,19 +85,18 @@ export async function processDueBulkDispatchItems(limit = 10) {
         error: String(err?.message ?? err).slice(0, 500),
         processed_at: new Date().toISOString(),
       }).eq("id", item.id);
-      const { data: cur } = await db.from("crm_bulk_dispatches" as any).select("failed_count").eq("id", item.dispatch_id).maybeSingle();
-      await db.from("crm_bulk_dispatches" as any).update({ failed_count: ((cur as any)?.failed_count ?? 0) + 1 }).eq("id", item.dispatch_id);
+      await bumpCounter(db, item.dispatch_id, "failed_count");
       failed++;
     }
   }
 
-  // Complete dispatches that have no pending/processing items left.
+  // Complete dispatches with no pending items remaining.
   for (const dispatchId of dispatchIds) {
     const { count } = await db
       .from("crm_bulk_dispatch_items" as any)
       .select("id", { count: "exact", head: true })
       .eq("dispatch_id", dispatchId)
-      .in("status", ["pending", "processing"]);
+      .eq("status", "pending");
     if ((count ?? 0) === 0) {
       await db.from("crm_bulk_dispatches" as any)
         .update({ status: "completed", finished_at: new Date().toISOString() })
