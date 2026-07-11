@@ -214,21 +214,31 @@ function HtTeamPage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
                 <button
                   onClick={() => setEditing(v)}
+                  title="Editar dados"
                   className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Editar
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setPermMember(v)}
+                  title="Permissões / menus"
+                  className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => toggleAtivo(v)}
+                  title={v.ativo ? "Desativar" : "Ativar"}
                   className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-violet-500/40 hover:text-violet-400"
                 >
-                  {v.ativo ? "Desativar" : "Ativar"}
+                  {v.ativo ? "Off" : "On"}
                 </button>
                 <button
                   onClick={() => remove(v.id)}
+                  title="Remover"
                   className="flex items-center justify-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1.5 text-[0.7rem] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -243,6 +253,12 @@ function HtTeamPage() {
         open={!!editing || creating}
         member={editing}
         onClose={() => { setEditing(null); setCreating(false); }}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["ht-team-list"] })}
+      />
+      <PermissoesDialog
+        open={!!permMember}
+        member={permMember}
+        onClose={() => setPermMember(null)}
         onSaved={() => qc.invalidateQueries({ queryKey: ["ht-team-list"] })}
       />
     </div>
