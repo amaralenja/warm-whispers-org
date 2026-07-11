@@ -2361,12 +2361,29 @@ function FlowInlineBar({
   const vendorSession = useMemo(() => getVendorSession(), []);
   const vendorKey = vendorSession?.id ?? "admin";
   const opKey = conversation.operacao_id ?? "all";
+  const remoteKey = `chat:flow-order:${opKey}`;
+  const getPref = useServerFn(getUserPref);
+  const setPref = useServerFn(setUserPref);
 
   const [orderIds, setOrderIds] = useState<string[]>(() => loadFlowOrder(vendorKey, opKey));
 
   useEffect(() => {
     setOrderIds(loadFlowOrder(vendorKey, opKey));
-  }, [vendorKey, opKey]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getPref({ data: { key: remoteKey } });
+        if (cancelled || !res?.value) return;
+        const parsed = JSON.parse(res.value);
+        if (Array.isArray(parsed)) {
+          const ids = parsed.map(String);
+          setOrderIds(ids);
+          saveFlowOrder(vendorKey, opKey, ids);
+        }
+      } catch { /* noop */ }
+    })();
+    return () => { cancelled = true; };
+  }, [vendorKey, opKey, remoteKey, getPref]);
 
   const { data: flows = [] } = useQuery({
     queryKey: ["flows-for-dispatch"],
