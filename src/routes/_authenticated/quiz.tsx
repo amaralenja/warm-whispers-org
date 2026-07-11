@@ -394,7 +394,7 @@ function QuizPage() {
 
   const { from: fromIso, to: toIso } = periodToRange(period, customFrom, customTo);
 
-  const { data: leads = [], isLoading, error } = useQuery({
+  const { data: extLeads = [], isLoading, error } = useQuery({
     queryKey: ["quiz-leads", period, fromIso, toIso],
     queryFn: async () => {
       let q = quizSb
@@ -410,6 +410,32 @@ function QuizPage() {
     },
     refetchInterval: 30000,
   });
+
+  // Também puxa submissões vindas via API (/api/public/ht-quiz/submit)
+  const listSubsFn = useServerFn(listHtQuizSubmissions);
+  const { data: apiSubsRes } = useQuery({
+    queryKey: ["quiz-api-subs"],
+    queryFn: () => listSubsFn() as Promise<{ submissions: any[] }>,
+    refetchInterval: 20000,
+  });
+
+  const leads: Lead[] = useMemo(() => {
+    const api = (apiSubsRes?.submissions ?? []).map(apiSubToLead).filter((l) => {
+      if (!fromIso && !toIso) return true;
+      const t = l.data_criacao;
+      if (fromIso && t < fromIso) return false;
+      if (toIso && t >= toIso) return false;
+      return true;
+    });
+    // dedupe por email/whatsapp (API tem prioridade — é o novo canal)
+    const seen = new Set<string>();
+    const keyOf = (l: Lead) => `${(l.email ?? "").toLowerCase()}|${(l.whatsapp ?? "").replace(/\D/g, "")}`;
+    const out: Lead[] = [];
+    for (const l of api) { const k = keyOf(l); if (k !== "|") seen.add(k); out.push(l); }
+    for (const l of extLeads) { const k = keyOf(l); if (k === "|" || !seen.has(k)) out.push(l); }
+    return out.sort((a, b) => (b.data_criacao || "").localeCompare(a.data_criacao || ""));
+  }, [extLeads, apiSubsRes, fromIso, toIso]);
+
 
   useEffect(() => {
     const ch = quizSb
