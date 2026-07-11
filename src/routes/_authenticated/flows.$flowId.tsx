@@ -338,6 +338,15 @@ function Editor({ flowId }: { flowId: string }) {
   const [testOpen, setTestOpen] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testChannel, setTestChannel] = useState("");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Abre inspector automaticamente quando um nó é selecionado no mobile
+  useEffect(() => {
+    if (isMobile && selectedNode) setInspectorOpen(true);
+    if (!selectedNode) setInspectorOpen(false);
+  }, [selectedNode, isMobile]);
 
   const listChannelsFn = useServerFn(listWhatsappChannels);
   const { data: allChannels = [] } = useQuery({
