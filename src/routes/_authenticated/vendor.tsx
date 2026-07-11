@@ -95,57 +95,57 @@ function VendorPortal() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-card/40 px-6 py-4 backdrop-blur sticky top-0 z-10">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <img src={logoMultium} alt="MULTIUM" className="h-8 w-auto object-contain" />
+      <header className="border-b border-border bg-card/40 px-4 py-3 backdrop-blur sticky top-0 z-10 md:px-6 md:py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <img src={logoMultium} alt="MULTIUM" className="h-7 w-auto object-contain md:h-8" />
           <button
             onClick={logout}
-            className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
+            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition hover:border-destructive/50 hover:text-destructive md:px-4 md:py-2"
           >
             <LogOut className="h-3.5 w-3.5" /> Sair
           </button>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl space-y-6 p-6">
+      <div className="mx-auto max-w-6xl space-y-4 p-4 md:space-y-6 md:p-6">
         {/* Hero */}
-        <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-emerald-500/15 via-card to-card p-8">
-          <div className="flex flex-wrap items-center gap-5">
+        <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-emerald-500/15 via-card to-card p-4 md:p-8">
+          <div className="flex flex-wrap items-center gap-4 md:gap-5">
             {v.foto_url ? (
-              <img src={v.foto_url} alt={v.nome ?? ""} className="h-20 w-20 rounded-full border-2 border-emerald-500/40 object-cover" />
+              <img src={v.foto_url} alt={v.nome ?? ""} className="h-14 w-14 shrink-0 rounded-full border-2 border-emerald-500/40 object-cover md:h-20 md:w-20" />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 text-2xl font-bold text-white">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 text-lg font-bold text-white md:h-20 md:w-20 md:text-2xl">
                 {initials}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">Bem-vindo</div>
-              <h1 className="mt-1 font-display text-3xl font-bold truncate">{v.nome ?? "Vendedor"}</h1>
-              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="text-[0.6rem] uppercase tracking-[0.2em] text-emerald-400 md:text-xs">Bem-vindo</div>
+              <h1 className="mt-0.5 font-display text-xl font-bold truncate md:mt-1 md:text-3xl">{v.nome ?? "Vendedor"}</h1>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground md:mt-1 md:text-sm">
                 {v.utm && <span className="font-mono">{v.utm}</span>}
                 {v.expert && <span>· {v.expert}</span>}
               </div>
             </div>
             {stats?.posicao && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 text-center">
-                <div className="flex items-center justify-center gap-1.5 text-[0.6rem] uppercase tracking-[0.2em] text-amber-400">
-                  <Trophy className="h-3 w-3" /> Sua posição
+              <div className="ml-auto rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center md:px-5 md:py-3">
+                <div className="flex items-center justify-center gap-1 text-[0.55rem] uppercase tracking-[0.2em] text-amber-400 md:text-[0.6rem]">
+                  <Trophy className="h-3 w-3" /> Posição
                 </div>
-                <div className="font-display text-3xl font-bold text-amber-300">#{stats.posicao}</div>
-                <div className="text-[0.65rem] text-muted-foreground">de {stats.totalVendedores}</div>
+                <div className="font-display text-2xl font-bold text-amber-300 md:text-3xl">#{stats.posicao}</div>
+                <div className="text-[0.6rem] text-muted-foreground md:text-[0.65rem]">de {stats.totalVendedores}</div>
               </div>
             )}
           </div>
         </div>
 
         {/* Filtro período */}
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
+        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0 md:pb-0 scrollbar-none">
+          <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
           {(["hoje", "7d", "30d", "mes"] as RangePreset[]).map((p) => (
             <button
               key={p}
               onClick={() => setPreset(p)}
-              className={`rounded-full border px-3 py-1 text-[0.7rem] uppercase tracking-wider transition ${
+              className={`shrink-0 rounded-full border px-3 py-1 text-[0.7rem] uppercase tracking-wider transition ${
                 preset === p
                   ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
                   : "border-border text-muted-foreground hover:border-emerald-500/40"
@@ -155,6 +155,7 @@ function VendorPortal() {
             </button>
           ))}
         </div>
+
 
         {/* KPIs */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
