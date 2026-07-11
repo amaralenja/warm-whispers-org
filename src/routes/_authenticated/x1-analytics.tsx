@@ -190,18 +190,20 @@ function X1AnalyticsPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
-            <DateRangeFilter
-              value={dateRange}
-              onChange={setDateRange}
-              presets={["hoje", "ontem", "7d", "15d", "30d", "mes"]}
-            />
-            <div>
+          <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+            <div className="col-span-2">
+              <DateRangeFilter
+                value={dateRange}
+                onChange={setDateRange}
+                presets={["hoje", "ontem", "7d", "15d", "30d", "mes"]}
+              />
+            </div>
+            <div className="min-w-0">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Operação
               </Label>
               <Select value={operacao} onValueChange={(v) => { setOperacao(v); setChannelId("all"); }}>
-                <SelectTrigger className="h-9 w-40 bg-card">
+                <SelectTrigger className="h-9 w-full bg-card sm:w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -214,12 +216,12 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="min-w-0">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Canal
               </Label>
               <Select value={channelId} onValueChange={setChannelId}>
-                <SelectTrigger className="h-9 w-52 bg-card">
+                <SelectTrigger className="h-9 w-full bg-card sm:w-52">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -236,12 +238,12 @@ function X1AnalyticsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="col-span-2 min-w-0">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Vendedor
               </Label>
               <Select value={vendedorId} onValueChange={setVendedorId}>
-                <SelectTrigger className="h-9 w-48 bg-card">
+                <SelectTrigger className="h-9 w-full bg-card sm:w-48">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,6 +278,7 @@ function X1AnalyticsPage() {
               PDF
             </Button>
           </div>
+
         </div>
 
         {dataUpdatedAt ? (
