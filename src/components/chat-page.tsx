@@ -1508,7 +1508,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   ) : messageList.map((m, i, arr) => {
                     const prev = arr[i - 1];
                     const showDate = !prev || toSafeDate(prev.created_at).toDateString() !== toSafeDate(m.created_at).toDateString();
-                    const ctxId = (m.raw as any)?.context?.message_id ?? null;
+                    const ctxId =
+                      (m as any).reply_to ??
+                      (m.raw as any)?.context?.message_id ??
+                      (m.raw as any)?.context?.id ??
+                      (m.raw as any)?.contextInfo?.stanzaId ??
+                      (m.raw as any)?.quoted?.id ??
+                      null;
                     const quoted = ctxId ? messageList.find((x) => x.wa_message_id === ctxId) ?? null : null;
                     return (
                       <div key={String(m.id)}>
