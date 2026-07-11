@@ -749,25 +749,26 @@ function HeroMetric({
 }) {
   const t = TONES[tone];
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br ${t.bg} p-5`}>
-      <div className="flex items-start justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+    <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br ${t.bg} p-3 md:p-5`}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground md:text-[10px] md:tracking-[0.2em]">
           {title}
         </p>
-        <div className={`grid h-8 w-8 place-items-center rounded-lg bg-background/60 ring-1 ${t.ring} ${t.text}`}>
+        <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-background/60 ring-1 md:h-8 md:w-8 ${t.ring} ${t.text}`}>
           {icon}
         </div>
       </div>
-      <div className="mt-3">
+      <div className="mt-2 md:mt-3">
         {loading ? (
-          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-8 w-24 md:h-9 md:w-32" />
         ) : (
-          <p className="font-mono text-3xl font-black tracking-tight tabular-nums">{value}</p>
+          <p className="font-mono text-xl font-black tracking-tight tabular-nums md:text-3xl">{value}</p>
         )}
-        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground md:mt-1 md:text-xs">{subtitle}</p>
         {action}
       </div>
     </div>
+
   );
 }
 
