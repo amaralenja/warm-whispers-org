@@ -1794,7 +1794,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
         lead: l,
       });
     }
-    for (const v of vendas || []) {
+    for (const v of vendasScoped || []) {
       list.push({
         id: `venda-${v.id}`,
         nome: v.cliente || "Sem nome",
@@ -1806,7 +1806,7 @@ function KanbanCloser({ leads, vendas, loading }: { leads: QLead[]; vendas: any[
       });
     }
     return list;
-  }, [leads, vendas, fakeSet, schedMap, sdrStageMap, stageMap]);
+  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
