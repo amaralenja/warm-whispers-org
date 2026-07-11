@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar } from "lucide-react";
 import logoMultium from "@/assets/logo-multium.webp";
 import { getVendorStats } from "@/lib/vendor.functions";
+import { DesempenhoDiario } from "@/components/desempenho-diario";
+
 
 export const Route = createFileRoute("/_authenticated/vendor")({
   ssr: false,
@@ -75,7 +77,7 @@ function VendorPortal() {
     (v.nome ?? "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?";
 
   const stats = data;
-  const maxSerie = Math.max(1, ...(stats?.serieDiaria?.map((d) => d.total) ?? [0]));
+
 
   // meta no banco = meta DIÁRIA. Multiplica pelos dias do período.
   const diasPeriodo = Math.max(
@@ -198,28 +200,8 @@ function VendorPortal() {
         )}
 
         {/* Série diária */}
-        <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider md:mb-4 md:text-sm">Seu desempenho diário</h3>
-          {isLoading ? (
-            <div className="h-40 animate-pulse rounded-lg bg-secondary/30" />
-          ) : (
-            <div className="flex h-32 items-end gap-0.5 md:h-40 md:gap-1">
-              {stats?.serieDiaria?.map((d) => {
-                const h = (d.total / maxSerie) * 100;
-                return (
-                  <div key={d.data} className="group relative flex flex-1 flex-col items-center gap-1">
-                    <div
-                      className="w-full rounded-t bg-gradient-to-t from-emerald-600 to-emerald-300 transition-all hover:from-emerald-500"
-                      style={{ height: `${Math.max(2, h)}%` }}
-                      title={`${d.data}: ${BRL(d.total)} (${d.vendas} vendas)`}
-                    />
-                    <span className="text-[0.5rem] text-muted-foreground md:text-[0.55rem]">{d.data.slice(8, 10)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <DesempenhoDiario serie={stats?.serieDiaria ?? []} loading={isLoading} />
+
 
         {/* Últimas vendas */}
         <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
