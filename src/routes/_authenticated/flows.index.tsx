@@ -487,6 +487,43 @@ function FlowsListPage() {
           )}
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => {
+              const groups = new Map<string, any[]>();
+              for (const f of filtered as any[]) {
+                const key = `${String(f?.operacao_id ?? "")}::${String(f?.nome ?? "").trim().toLowerCase()}`;
+                if (!key.endsWith("::")) {
+                  if (!groups.has(key)) groups.set(key, []);
+                  groups.get(key)!.push(f);
+                }
+              }
+              const dups: { keep: any; remove: any[] }[] = [];
+              for (const arr of groups.values()) {
+                if (arr.length < 2) continue;
+                // Mantém o mais completo (mais nós) e, em empate, o mais recente.
+                const sorted = [...arr].sort((a, b) => {
+                  const na = (a?.nodes?.length ?? 0);
+                  const nb = (b?.nodes?.length ?? 0);
+                  if (nb !== na) return nb - na;
+                  const ua = String(a?.updated_at ?? a?.created_at ?? "");
+                  const ub = String(b?.updated_at ?? b?.created_at ?? "");
+                  return ub.localeCompare(ua);
+                });
+                dups.push({ keep: sorted[0], remove: sorted.slice(1) });
+              }
+              if (dups.length === 0) {
+                toast.info("Nenhum fluxo duplicado encontrado.");
+                return;
+              }
+              setDupPreview(dups);
+              setDupConfirmOpen(true);
+            }}
+          >
+            <Copy className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Apagar duplicados</span>
+          </Button>
+          <Button
+            size="sm"
             variant="destructive"
             disabled={selected.size === 0 || bulkDelMut.isPending}
             onClick={() => setBulkConfirmOpen(true)}
