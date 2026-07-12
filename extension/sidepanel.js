@@ -54,14 +54,16 @@ async function refreshUi() {
   if (lastTranscript) transcript.textContent = lastTranscript;
 }
 
-// Pré-aquece permissão de microfone dentro da página do side panel (contexto de extensão)
+// Side panels não mostram prompt de mic — abre página dedicada em aba normal.
 async function warmupMicPermission() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach((t) => t.stop());
     return true;
   } catch (e) {
-    throw new Error("Permissão do microfone negada. Clica no cadeado ao lado da URL da extensão e libera o mic.");
+    const url = chrome.runtime.getURL("permission.html");
+    await chrome.tabs.create({ url });
+    throw new Error("Abri uma aba pra você autorizar o mic. Aceita o pop-up e volta aqui.");
   }
 }
 
