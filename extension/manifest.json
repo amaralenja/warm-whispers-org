@@ -1,10 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Multium Meet",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Painel lateral que grava mic + áudio da aba (Meet/Zoom Web) e transcreve com IA.",
   "permissions": ["activeTab", "tabCapture", "storage", "offscreen", "sidePanel", "tabs", "scripting"],
   "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["permission.html", "permission.js", "icon.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_title": "Abrir Multium Meet",
     "default_icon": { "128": "icon.png" }

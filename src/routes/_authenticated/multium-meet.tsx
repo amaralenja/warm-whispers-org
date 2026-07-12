@@ -18,7 +18,8 @@ const PAGE_TITLE = "Multium Meet — Extensão de transcrição de calls";
 const PAGE_DESCRIPTION =
   "Extensão Chrome da Multium: grava mic + áudio da aba (Meet/Zoom) e transcreve com IA.";
 
-const EXTENSION_ZIP_URL = "/downloads/multium-meet-extension.zip";
+const EXTENSION_VERSION = "0.3.0";
+const EXTENSION_ZIP_URL = `/downloads/multium-meet-extension-v${EXTENSION_VERSION}.zip`;
 
 export const Route = createFileRoute("/_authenticated/multium-meet")({
   component: MultiumMeetPage,
@@ -41,7 +42,7 @@ function MultiumMeetPage() {
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "multium-meet-extension.zip";
+      a.download = `multium-meet-extension-v${EXTENSION_VERSION}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -62,7 +63,7 @@ function MultiumMeetPage() {
             <Chrome className="h-12 w-12" />
           </div>
           <Badge variant="secondary" className="mb-4">
-            Beta interno · Extensão Chrome
+            Beta interno · Extensão Chrome v{EXTENSION_VERSION}
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">Multium Meet</h1>
           <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
@@ -77,7 +78,7 @@ function MultiumMeetPage() {
             </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            ~13KB · funciona em Chrome, Edge, Brave, Arc, Opera
+            Baixe a v{EXTENSION_VERSION}; remova a v0.2.0 antes de carregar de novo.
           </p>
         </div>
 
@@ -90,12 +91,12 @@ function MultiumMeetPage() {
           <FeatureCard
             icon={<Brain className="h-5 w-5" />}
             title="Transcrição por IA"
-            desc="Áudio vai pro Multium AI Gateway e volta transcrito em segundos, direto no popup."
+            desc="Áudio vai pro endpoint da Multium e é transcrito com a OpenAI configurada no app."
           />
           <FeatureCard
             icon={<Shield className="h-5 w-5" />}
             title="Só a Multium vê"
-            desc="Endpoint próprio da Multium — nada vaza pra OpenAI/Google direto do seu navegador."
+            desc="Sua chave da OpenAI fica no servidor do app; a extensão só chama o endpoint da Multium."
           />
         </div>
 
@@ -118,8 +119,8 @@ function MultiumMeetPage() {
               descompactada.
             </SetupStep>
             <SetupStep index={5}>
-              Fixe a extensão Multium Meet na barra. Abra sua call, clique no ícone,
-              e aperte <strong>Iniciar gravação</strong>.
+              Remova a versão antiga, fixe a Multium Meet v{EXTENSION_VERSION}, abra sua call, clique no ícone
+              e aperte <strong>Iniciar gravação</strong>. Se pedir, a aba de autorização do microfone vai abrir.
             </SetupStep>
           </div>
         </div>
@@ -135,13 +136,13 @@ function MultiumMeetPage() {
                   <code>getUserMedia</code> pro mic, mistura os dois via Web Audio API,
                   grava em <code>audio/webm;opus</code>, e envia pro endpoint{" "}
                   <code>/api/public/transcribe</code> deste app, que fala com o
-                  Lovable AI Gateway (<code>openai/gpt-4o-transcribe</code>).
+                  OpenAI (<code>gpt-4o-transcribe</code>).
                 </p>
                 <div className="mt-4 space-y-2 text-sm">
                   <StatusItem>✅ Áudio da aba (voz do lead)</StatusItem>
                   <StatusItem>✅ Microfone (sua voz)</StatusItem>
                   <StatusItem>✅ Mixdown num único arquivo</StatusItem>
-                  <StatusItem>✅ Transcrição volta pro popup + botão copiar</StatusItem>
+                  <StatusItem>✅ Transcrição volta pro painel lateral + botão copiar</StatusItem>
                   <StatusItem>⚠️ Precisa estar tocando áudio na aba pra captura começar (ex: já no Meet)</StatusItem>
                 </div>
               </div>
