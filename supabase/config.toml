@@ -9,3 +9,7 @@ verify_jwt = false
 [functions.uaz-webhook]
 verify_jwt = false
 
+[functions.cakto-webhook]
+verify_jwt = false
+
+
