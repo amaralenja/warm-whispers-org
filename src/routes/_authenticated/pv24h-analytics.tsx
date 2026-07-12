@@ -5,8 +5,9 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   BarChart3, Loader2, RefreshCw, Save, KeyRound, Check, Settings,
   ChevronRight, TrendingUp, DollarSign, ShoppingCart, Percent, Wallet, Layers, Megaphone, ImageIcon,
-  ShieldAlert, Webhook, Copy,
+  ShieldAlert,
 } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
