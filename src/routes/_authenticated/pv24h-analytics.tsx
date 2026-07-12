@@ -481,7 +481,110 @@ function PV24HAnalyticsPage() {
           </CardContent>
         </Card>
       )}
+
+      {isConfigured && <CaktoTracking />}
     </div>
+  );
+}
+
+function CaktoTracking() {
+  const webhookUrl = "https://project--4860a253-8e14-4836-a639-c7fb96d53545.lovable.app/api/public/hooks/cakto";
+
+  const eventsQ = useQuery({
+    queryKey: ["cakto", "events"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cakto_events" as any)
+        .select("id, event_type, order_id, customer_email, customer_name, amount, status, product_name, utm_source, utm_campaign, received_at")
+        .order("received_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    refetchInterval: 15000,
+  });
+
+  const copy = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    toast.success("URL copiada!");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Webhook className="h-5 w-5" /> Trackeamento Cakto
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label className="text-xs text-muted-foreground">URL do Webhook (cole no painel da Cakto → Notificações / Webhooks)</Label>
+          <div className="mt-1 flex gap-2">
+            <Input readOnly value={webhookUrl} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <Button variant="outline" onClick={copy}><Copy className="h-4 w-4" /> Copiar</Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Método: <code>POST</code> · Content-Type: <code>application/json</code>. Aceita qualquer payload da Cakto (compra aprovada, reembolso, etc). Os UTMs são extraídos automaticamente.
+          </p>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Últimos eventos recebidos</h3>
+            <Button variant="ghost" size="sm" onClick={() => eventsQ.refetch()}>
+              <RefreshCw className="h-3 w-3" /> Atualizar
+            </Button>
+          </div>
+          {eventsQ.isLoading ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando...</div>
+          ) : !eventsQ.data?.length ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum evento recebido ainda. Configure o webhook na Cakto e faça uma venda de teste.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border/50">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/30 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Quando</th>
+                    <th className="px-3 py-2 text-left">Evento</th>
+                    <th className="px-3 py-2 text-left">Pedido</th>
+                    <th className="px-3 py-2 text-left">Cliente</th>
+                    <th className="px-3 py-2 text-left">Produto</th>
+                    <th className="px-3 py-2 text-left">UTM</th>
+                    <th className="px-3 py-2 text-right">Valor</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eventsQ.data.map((e) => (
+                    <tr key={e.id} className="border-t border-border/50 hover:bg-muted/20">
+                      <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(e.received_at).toLocaleString("pt-BR")}
+                      </td>
+                      <td className="px-3 py-2 text-xs"><code>{e.event_type ?? "—"}</code></td>
+                      <td className="px-3 py-2 text-xs font-mono">{e.order_id ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        <div className="text-sm">{e.customer_name ?? "—"}</div>
+                        <div className="text-xs text-muted-foreground">{e.customer_email ?? ""}</div>
+                      </td>
+                      <td className="px-3 py-2 text-xs">{e.product_name ?? "—"}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {e.utm_source || e.utm_campaign ? `${e.utm_source ?? "—"} / ${e.utm_campaign ?? "—"}` : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-sm text-emerald-400">
+                        {e.amount != null ? brl(Number(e.amount)) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-xs">{e.status ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
