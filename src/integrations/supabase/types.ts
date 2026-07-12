@@ -80,6 +80,69 @@ export type Database = {
         }
         Relationships: []
       }
+      cakto_events: {
+        Row: {
+          amount: number | null
+          currency: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          event_type: string | null
+          id: string
+          order_id: string | null
+          payload: Json
+          product_name: string | null
+          raw_headers: Json | null
+          received_at: string
+          status: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          amount?: number | null
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          event_type?: string | null
+          id?: string
+          order_id?: string | null
+          payload: Json
+          product_name?: string | null
+          raw_headers?: Json | null
+          received_at?: string
+          status?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          amount?: number | null
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          event_type?: string | null
+          id?: string
+          order_id?: string | null
+          payload?: Json
+          product_name?: string | null
+          raw_headers?: Json | null
+          received_at?: string
+          status?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: []
+      }
       checklist_completions: {
         Row: {
           completed_at: string | null
