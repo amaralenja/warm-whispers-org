@@ -1,8 +1,42 @@
 // Service worker MV3
-// Abre side panel ao clicar no ícone
+// IMPORTANTE: não use openPanelOnActionClick=true aqui.
+// Quando o Chrome abre o side panel automaticamente, chrome.action.onClicked não dispara,
+// então a permissão activeTab não é concedida e tabCapture falha com
+// "Extension has not been invoked for the current page".
+async function configureSidePanel() {
+  try { await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }); } catch {}
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  try { chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }); } catch {}
+  configureSidePanel();
   try { chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") }); } catch {}
+});
+
+chrome.runtime.onStartup?.addListener(() => {
+  configureSidePanel();
+});
+
+function isCapturableTab(tab) {
+  const url = tab?.url || "";
+  return Boolean(tab?.id && url && !url.startsWith("chrome://") && !url.startsWith("chrome-extension://") && !url.startsWith("edge://") && !url.startsWith("about:"));
+}
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!isCapturableTab(tab)) {
+    await chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") });
+    return;
+  }
+
+  await chrome.storage.local.set({
+    lastInvokedTabId: tab.id,
+    lastInvokedTabUrl: tab.url || "",
+    lastInvokedAt: Date.now(),
+  });
+
+  try {
+    await chrome.sidePanel.setOptions({ tabId: tab.id, path: "sidepanel.html", enabled: true });
+  } catch {}
+  await chrome.sidePanel.open({ tabId: tab.id });
 });
 
 const OFFSCREEN_URL = "offscreen.html";
@@ -26,13 +60,6 @@ async function closeOffscreen() {
   if (await hasOffscreen()) {
     try { await chrome.offscreen.closeDocument(); } catch {}
   }
-}
-
-// Pega a aba ativa que NÃO é a do próprio side panel
-async function findTargetTab() {
-  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  const t = tabs.find((x) => x.url && !x.url.startsWith("chrome://") && !x.url.startsWith("chrome-extension://"));
-  return t || tabs[0];
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

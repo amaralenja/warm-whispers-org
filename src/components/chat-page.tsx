@@ -454,7 +454,23 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return m;
   }, [allCrmTags]);
   const tagColorFor = (name: string) => tagColorMap.get(String(name || "").trim().toLowerCase()) || "";
-  const activeFlowConvIds = useActiveFlowConversationIds();
+  const listActiveFlowIdsFn = useServerFn(listActiveFlowConversationIds);
+  const { data: activeFlowConversationIds = [] } = useQuery<string[]>({
+    queryKey: ["chat-list-active-flow-ids"],
+    queryFn: async () => {
+      try {
+        const data = await listActiveFlowIdsFn({ data: undefined });
+        return asArray<string>(data).map(String).filter(Boolean);
+      } catch (e) {
+        console.warn("[chat] active flow ids falhou", e);
+        return [];
+      }
+    },
+    refetchInterval: 8000,
+    staleTime: 2000,
+    retry: false,
+  });
+  const activeFlowConvIds = useMemo(() => new Set(activeFlowConversationIds), [activeFlowConversationIds]);
 
   const handleReact = async (m: Msg, emoji: string) => {
     if (!active) return;
@@ -2285,45 +2301,6 @@ function ActiveFlowRuns({ conversationId }: { conversationId: string }) {
       </AlertDialog>
     </div>
   );
-}
-
-function useActiveFlowConversationIds(): Set<string> {
-  const listActiveFlowIdsFn = useServerFn(listActiveFlowConversationIds);
-  const [ids, setIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    let cancelled = false;
-    async function refresh() {
-      try {
-        const data = await listActiveFlowIdsFn({ data: undefined });
-        if (cancelled) return;
-        setIds(new Set(asArray<string>(data).map(String).filter(Boolean)));
-      } catch (e) {
-        if (!cancelled) {
-          console.warn("[chat] active flow ids falhou", e);
-          setIds(new Set());
-        }
-      }
-    }
-    refresh();
-    const ch = supabase
-      .channel("chat-list-active-flows")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "wa_flow_runs" },
-        () => refresh(),
-      )
-      .subscribe();
-    const iv = setInterval(refresh, 8000);
-    return () => {
-      cancelled = true;
-      clearInterval(iv);
-      supabase.removeChannel(ch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return ids;
 }
 
 function flowOrderStorageKey(vendorId: number | string | null | undefined, op: string | null | undefined) {

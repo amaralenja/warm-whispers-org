@@ -13,6 +13,7 @@ const errorBox = $("errorBox");
 let timerInterval = null;
 let startedAt = null;
 let micPermissionState = "unknown";
+let lastTargetTab = null;
 
 function fmt(ms) {
   const s = Math.floor(ms / 1000);
@@ -24,6 +25,31 @@ function showError(msg) {
   if (!msg) { errorBox.style.display = "none"; errorBox.textContent = ""; return; }
   errorBox.style.display = "block";
   errorBox.textContent = msg;
+}
+
+function isCapturableUrl(url) {
+  return Boolean(
+    url &&
+    !url.startsWith("chrome://") &&
+    !url.startsWith("chrome-extension://") &&
+    !url.startsWith("edge://") &&
+    !url.startsWith("about:"),
+  );
+}
+
+async function getInvokedTargetTab() {
+  const stored = await chrome.storage.local.get(["lastInvokedTabId", "lastInvokedTabUrl", "lastInvokedAt"]);
+  const lastInvokedAt = Number(stored.lastInvokedAt || 0);
+  const isFresh = Date.now() - lastInvokedAt < 10 * 60 * 1000;
+  if (stored.lastInvokedTabId && isFresh) {
+    try {
+      const tab = await chrome.tabs.get(Number(stored.lastInvokedTabId));
+      if (tab?.id && isCapturableUrl(tab.url || stored.lastInvokedTabUrl || "")) return tab;
+    } catch {}
+  }
+
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tabs.find((t) => t?.id && isCapturableUrl(t.url || "")) || null;
 }
 
 async function getMicPermissionState() {
@@ -51,6 +77,7 @@ async function refreshUi() {
     "recording", "lastTranscript", "endpoint", "recordingStartedAt",
   ]);
   endpointInput.value = endpoint || DEFAULT_ENDPOINT;
+  getInvokedTargetTab().then((tab) => { lastTargetTab = tab; }).catch(() => {});
   if (recording) {
     ring.className = "pulse-ring rec";
     statusText.innerHTML = "<strong>Gravando.</strong> Deixa a call rolando.";
@@ -66,7 +93,9 @@ async function refreshUi() {
     ring.className = "pulse-ring";
     if (statusText.textContent.indexOf("Transcrevendo") === -1) {
       if (micState === "granted") {
-        statusText.innerHTML = "<strong>Mic autorizado.</strong> Abre a call e clica em iniciar.";
+        statusText.innerHTML = lastTargetTab?.url
+          ? "<strong>Mic autorizado.</strong> Clique em iniciar nesta barra lateral."
+          : "<strong>Mic autorizado.</strong> Volte na aba do Meet/Zoom e clique no ícone da extensão.";
       } else if (micState === "denied") {
         statusText.innerHTML = "<strong>Mic bloqueado.</strong> Clique em iniciar para abrir a página de permissão.";
       } else {
@@ -98,10 +127,10 @@ startBtn.addEventListener("click", async () => {
   try {
     await warmupMicPermission();
 
-    // Descobre a aba alvo (Meet/Zoom) — precisa estar ativa na janela
-    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    const targetTab = tabs.find((t) => t.url && !t.url.startsWith("chrome://") && !t.url.startsWith("chrome-extension://"));
-    if (!targetTab?.id) throw new Error("Abre a aba do Meet/Zoom e clique no ícone da extensão nela pra abrir o painel.");
+    const targetTab = await getInvokedTargetTab();
+    if (!targetTab?.id) {
+      throw new Error("Abre a aba do Meet/Zoom/WhatsApp Web, clique no ícone da Multium Meet nessa mesma aba e só então aperte Iniciar.");
+    }
 
     // getMediaStreamId PRECISA rodar aqui (gesto do usuário no sidepanel)
     // Chamar do background perde o gesto e Chrome bloqueia com "Extension has not been invoked"
@@ -110,7 +139,7 @@ startBtn.addEventListener("click", async () => {
         if (chrome.runtime.lastError || !id) {
           reject(new Error(
             (chrome.runtime.lastError?.message || "Falha ao capturar áudio da aba.") +
-            " Dica: clique no ícone da extensão ESTANDO na aba do Meet/Zoom (aba precisa estar tocando som).",
+            " Dica: remova a versão antiga, carregue a v0.5.0, vá pra aba do Meet/Zoom/WhatsApp Web e clique no ícone da extensão nessa aba. Não abra o painel por atalho nem por página chrome://.",
           ));
         } else resolve(id);
       });
