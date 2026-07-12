@@ -18,7 +18,7 @@ const PAGE_TITLE = "Multium Meet — Extensão de transcrição de calls";
 const PAGE_DESCRIPTION =
   "Extensão Chrome da Multium: grava mic + áudio da aba (Meet/Zoom) e transcreve com IA.";
 
-const EXTENSION_VERSION = "0.3.0";
+const EXTENSION_VERSION = "0.4.0";
 const EXTENSION_ZIP_URL = `/downloads/multium-meet-extension-v${EXTENSION_VERSION}.zip`;
 
 export const Route = createFileRoute("/_authenticated/multium-meet")({
