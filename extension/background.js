@@ -2,6 +2,7 @@
 // Abre side panel ao clicar no ícone
 chrome.runtime.onInstalled.addListener(() => {
   try { chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }); } catch {}
+  try { chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") }); } catch {}
 });
 
 const OFFSCREEN_URL = "offscreen.html";

@@ -96,7 +96,7 @@ function MultiumMeetPage() {
           <FeatureCard
             icon={<Shield className="h-5 w-5" />}
             title="Só a Multium vê"
-              desc="Sua chave da OpenAI fica no servidor do app; a extensão só chama o endpoint da Multium."
+            desc="Sua chave da OpenAI fica no servidor do app; a extensão só chama o endpoint da Multium."
           />
         </div>
 
