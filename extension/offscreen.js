@@ -10,29 +10,44 @@ async function startCapture(streamId, endpoint) {
   currentEndpoint = endpoint;
   chunks = [];
 
-  // Audio da aba
-  tabStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-    },
-    video: false,
-  });
-
-  // Mic
+  // 1) Áudio da aba (constraints legadas exigidas pelo tabCapture)
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    tabStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
+      },
+      video: false,
+    });
   } catch (e) {
-    micStream = null; // segue só com áudio da aba
+    throw new Error("Não peguei o áudio da aba: " + (e.message || e));
   }
 
-  // Reproduz o audio da aba de volta pro usuário (senão MediaStreamAudioSourceNode silencia a aba)
+  // 2) Microfone (opcional — segue mesmo se falhar)
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: false,
+    });
+  } catch (e) {
+    micStream = null;
+  }
+
+  if (!tabStream && !micStream) throw new Error("Sem fonte de áudio disponível");
+
+  // 3) Mixdown mic + aba
   audioCtx = new AudioContext();
   const dest = audioCtx.createMediaStreamDestination();
 
-  const tabSrc = audioCtx.createMediaStreamSource(tabStream);
-  tabSrc.connect(dest);
-  tabSrc.connect(audioCtx.destination); // devolve pro speaker
-
+  if (tabStream) {
+    const tabSrc = audioCtx.createMediaStreamSource(tabStream);
+    tabSrc.connect(dest);
+    // IMPORTANTE: devolve pro speaker senão a aba fica muda
+    tabSrc.connect(audioCtx.destination);
+  }
   if (micStream) {
     const micSrc = audioCtx.createMediaStreamSource(micStream);
     micSrc.connect(dest);
@@ -54,7 +69,7 @@ async function startCapture(streamId, endpoint) {
       cleanup();
     }
   };
-  recorder.start(); // sem timeslice = 1 blob final decodificável
+  recorder.start();
 }
 
 function cleanup() {
@@ -69,15 +84,16 @@ function cleanup() {
 }
 
 async function uploadForTranscription(blob, endpoint) {
-  if (!blob || blob.size < 2048) throw new Error("Gravação vazia");
+  if (!blob || blob.size < 2048) throw new Error("Gravação vazia (menos de 2KB)");
   const fd = new FormData();
   fd.append("file", blob, "call.webm");
   const res = await fetch(endpoint, { method: "POST", body: fd });
+  const bodyText = await res.text();
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Servidor ${res.status}: ${t.slice(0, 200)}`);
+    throw new Error(`Servidor ${res.status}: ${bodyText.slice(0, 200)}`);
   }
-  const json = await res.json();
+  let json;
+  try { json = JSON.parse(bodyText); } catch { throw new Error("Resposta inválida do servidor"); }
   return json.text || "";
 }
 

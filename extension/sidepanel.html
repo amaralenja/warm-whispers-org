@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Multium Meet</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0b0d;
+        --bg-elev: #14171c;
+        --border: #23272f;
+        --border-strong: #313742;
+        --text: #f5f6f8;
+        --muted: #8a94a3;
+        --primary: #ff5b1f;
+        --primary-hover: #ff7a44;
+        --primary-soft: rgba(255, 91, 31, 0.12);
+        --danger: #ef4444;
+        --success: #22c55e;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      header {
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: linear-gradient(180deg, rgba(255,91,31,0.08), transparent);
+      }
+      header .logo {
+        width: 36px; height: 36px; border-radius: 10px;
+        background: #fff; display: grid; place-items: center;
+        overflow: hidden; padding: 4px;
+      }
+      header img { width: 100%; height: 100%; object-fit: contain; }
+      header h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+      header p { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+      main {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .status-card {
+        border: 1px solid var(--border);
+        background: var(--bg-elev);
+        border-radius: 14px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .pulse-ring {
+        width: 92px; height: 92px;
+        border-radius: 50%;
+        display: grid; place-items: center;
+        background: var(--primary-soft);
+        border: 2px solid var(--border-strong);
+        transition: all .3s;
+      }
+      .pulse-ring.rec {
+        border-color: var(--danger);
+        animation: pulse-ring 1.4s ease-in-out infinite;
+      }
+      .pulse-ring.working { border-color: var(--primary); }
+      @keyframes pulse-ring {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.4); }
+        50% { box-shadow: 0 0 0 14px rgba(239,68,68,0); }
+      }
+      .mic-icon {
+        width: 40px; height: 40px;
+        color: var(--primary);
+      }
+      .status-text { font-size: 13px; color: var(--muted); text-align: center; }
+      .status-text strong { color: var(--text); }
+      .timer { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; letter-spacing: 0.02em; }
+      button {
+        width: 100%;
+        padding: 13px 16px;
+        border: 0;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        transition: background .15s, transform .1s;
+      }
+      button:active:not(:disabled) { transform: scale(0.98); }
+      button.primary { background: var(--primary); color: #fff; }
+      button.primary:hover { background: var(--primary-hover); }
+      button.danger { background: var(--danger); color: #fff; }
+      button.danger:hover { background: #dc2626; }
+      button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+      button.ghost:hover { color: var(--text); border-color: var(--border-strong); }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      .row { display: flex; gap: 8px; }
+      .row button { flex: 1; }
+      .section-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .transcript-box {
+        flex: 1;
+        min-height: 160px;
+        padding: 14px 16px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 13px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        color: var(--text);
+        overflow-y: auto;
+      }
+      .transcript-box:empty::before {
+        content: "A transcrição aparece aqui depois que você parar a gravação.";
+        color: var(--muted);
+      }
+      .error-box {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      details { font-size: 11px; color: var(--muted); }
+      details summary {
+        cursor: pointer;
+        user-select: none;
+        padding: 6px 0;
+        font-weight: 500;
+      }
+      details > div { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+      label { font-size: 11px; color: var(--muted); font-weight: 500; }
+      input[type="text"] {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg-elev);
+        color: var(--text);
+        font-size: 12px;
+      }
+      input[type="text"]:focus { outline: none; border-color: var(--primary); }
+      .footer {
+        padding: 10px 18px 14px;
+        font-size: 10px;
+        color: var(--muted);
+        text-align: center;
+        border-top: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo"><img src="icon.png" alt="Multium" /></div>
+      <div>
+        <h1>Multium Meet</h1>
+        <p>Grava sua call + transcreve com IA</p>
+      </div>
+    </header>
+
+    <main>
+      <div class="status-card">
+        <div class="pulse-ring" id="ring">
+          <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <div class="timer" id="timer">00:00</div>
+        <div class="status-text" id="statusText"><strong>Pronto pra gravar.</strong> Abre a call e clica abaixo.</div>
+      </div>
+
+      <div id="errorBox" class="error-box" style="display:none"></div>
+
+      <button id="startBtn" class="primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+        Iniciar gravação
+      </button>
+      <button id="stopBtn" class="danger" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        Parar e transcrever
+      </button>
+
+      <div style="display:flex; flex-direction:column;">
+        <div class="section-label">Transcrição</div>
+        <div class="transcript-box" id="transcript"></div>
+      </div>
+
+      <div class="row">
+        <button id="copyBtn" class="ghost">Copiar</button>
+        <button id="clearBtn" class="ghost">Limpar</button>
+      </div>
+
+      <details>
+        <summary>Configuração avançada</summary>
+        <div>
+          <label>Endpoint de transcrição</label>
+          <input type="text" id="endpoint" placeholder="https://.../api/public/transcribe" />
+          <button id="saveEndpoint" class="ghost" style="padding:8px">Salvar endpoint</button>
+        </div>
+      </details>
+    </main>
+
+    <div class="footer">Multium · fica aberto durante toda a call</div>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
