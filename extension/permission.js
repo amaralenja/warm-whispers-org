@@ -35,7 +35,7 @@ async function requestMicrophone() {
   } catch (error) {
     const message = String(error?.message || error);
     setStatus(
-      `Não consegui liberar o microfone.\n\n${message}\n\nSe apareceu Bloqueado/Denied, remova a extensão e carregue a pasta nova da versão 0.3.0, ou mude a permissão de microfone nas configurações do site da extensão.`,
+      `Não consegui liberar o microfone.\n\n${message}\n\nSe apareceu Bloqueado/Denied, remova a extensão antiga e carregue a pasta nova da versão 0.5.0, ou mude a permissão de microfone nas configurações do site da extensão.`,
       "err",
     );
     askButton.disabled = false;

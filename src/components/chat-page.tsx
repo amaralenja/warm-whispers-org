@@ -454,7 +454,23 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return m;
   }, [allCrmTags]);
   const tagColorFor = (name: string) => tagColorMap.get(String(name || "").trim().toLowerCase()) || "";
-  const activeFlowConvIds = useActiveFlowConversationIds();
+  const listActiveFlowIdsFn = useServerFn(listActiveFlowConversationIds);
+  const { data: activeFlowConversationIds = [] } = useQuery<string[]>({
+    queryKey: ["chat-list-active-flow-ids"],
+    queryFn: async () => {
+      try {
+        const data = await listActiveFlowIdsFn({ data: undefined });
+        return asArray<string>(data).map(String).filter(Boolean);
+      } catch (e) {
+        console.warn("[chat] active flow ids falhou", e);
+        return [];
+      }
+    },
+    refetchInterval: 8000,
+    staleTime: 2000,
+    retry: false,
+  });
+  const activeFlowConvIds = useMemo(() => new Set(activeFlowConversationIds), [activeFlowConversationIds]);
 
   const handleReact = async (m: Msg, emoji: string) => {
     if (!active) return;

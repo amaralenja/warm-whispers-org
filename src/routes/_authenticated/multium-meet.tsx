@@ -18,7 +18,7 @@ const PAGE_TITLE = "Multium Meet — Extensão de transcrição de calls";
 const PAGE_DESCRIPTION =
   "Extensão Chrome da Multium: grava mic + áudio da aba (Meet/Zoom) e transcreve com IA.";
 
-const EXTENSION_VERSION = "0.4.0";
+const EXTENSION_VERSION = "0.5.0";
 const EXTENSION_ZIP_URL = `/downloads/multium-meet-extension-v${EXTENSION_VERSION}.zip`;
 
 export const Route = createFileRoute("/_authenticated/multium-meet")({
@@ -78,7 +78,7 @@ function MultiumMeetPage() {
             </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            Baixe a v{EXTENSION_VERSION}; remova a v0.2.0 antes de carregar de novo.
+            Baixe a v{EXTENSION_VERSION}; remova qualquer versão antiga antes de carregar de novo.
           </p>
         </div>
 
@@ -119,8 +119,8 @@ function MultiumMeetPage() {
               descompactada.
             </SetupStep>
             <SetupStep index={5}>
-              Remova a versão antiga, fixe a Multium Meet v{EXTENSION_VERSION}, abra sua call, clique no ícone
-              e aperte <strong>Iniciar gravação</strong>. Se pedir, a aba de autorização do microfone vai abrir.
+              Remova a versão antiga, fixe a Multium Meet v{EXTENSION_VERSION}, abra sua call e clique no ícone
+              da extensão <strong>estando na aba do Meet/Zoom/WhatsApp Web</strong>. Depois aperte <strong>Iniciar gravação</strong> no painel.
             </SetupStep>
           </div>
         </div>
