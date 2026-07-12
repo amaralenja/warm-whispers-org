@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Multium Meet",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Painel lateral que grava mic + áudio da aba (Meet/Zoom Web) e transcreve com IA.",
   "permissions": ["activeTab", "tabCapture", "storage", "offscreen", "sidePanel", "tabs", "scripting"],
   "host_permissions": ["<all_urls>"],

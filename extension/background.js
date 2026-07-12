@@ -39,24 +39,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
       if (msg.type === "start-recording") {
-        const tab = await findTargetTab();
-        if (!tab?.id) throw new Error("Sem aba de call ativa. Abre o Meet/Zoom e tenta de novo.");
-
-        // getMediaStreamId requer user gesture — o clique no botão da side panel conta
-        const streamId = await new Promise((resolve, reject) => {
-          chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {
-            if (chrome.runtime.lastError || !id) {
-              reject(new Error(
-                chrome.runtime.lastError?.message ||
-                "Não consegui capturar áudio da aba. A aba precisa estar tocando som (call ativa).",
-              ));
-            } else resolve(id);
-          });
-        });
+        const streamId = msg.streamId;
+        if (!streamId) throw new Error("streamId ausente. Reabra o painel na aba do Meet/Zoom.");
 
         await ensureOffscreen();
         const { endpoint } = await chrome.storage.local.get("endpoint");
-        // pequena espera pro offscreen carregar
         await new Promise((r) => setTimeout(r, 200));
         const resp = await chrome.runtime.sendMessage({
           type: "offscreen-start",
