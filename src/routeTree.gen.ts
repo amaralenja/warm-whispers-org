@@ -51,6 +51,7 @@ import { Route as ApiPublicHooksSendAdsAnalyticsRouteImport } from './routes/api
 import { Route as ApiPublicHooksNotifyTaskCreatedRouteImport } from './routes/api/public/hooks/notify-task-created'
 import { Route as ApiPublicHooksDispatchWorkerRouteImport } from './routes/api/public/hooks/dispatch-worker'
 import { Route as ApiPublicHooksCallsTickRouteImport } from './routes/api/public/hooks/calls-tick'
+import { Route as ApiPublicHooksCaktoRouteImport } from './routes/api/public/hooks/cakto'
 
 const RankingTvRoute = RankingTvRouteImport.update({
   id: '/ranking-tv',
@@ -277,6 +278,11 @@ const ApiPublicHooksCallsTickRoute = ApiPublicHooksCallsTickRouteImport.update({
   path: '/api/public/hooks/calls-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksCaktoRoute = ApiPublicHooksCaktoRouteImport.update({
+  id: '/api/public/hooks/cakto',
+  path: '/api/public/hooks/cakto',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -310,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/api/public/transcribe': typeof ApiPublicTranscribeRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/cakto': typeof ApiPublicHooksCaktoRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/dispatch-worker': typeof ApiPublicHooksDispatchWorkerRoute
   '/api/public/hooks/notify-task-created': typeof ApiPublicHooksNotifyTaskCreatedRoute
@@ -353,6 +360,7 @@ export interface FileRoutesByTo {
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/api/public/transcribe': typeof ApiPublicTranscribeRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/cakto': typeof ApiPublicHooksCaktoRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/dispatch-worker': typeof ApiPublicHooksDispatchWorkerRoute
   '/api/public/hooks/notify-task-created': typeof ApiPublicHooksNotifyTaskCreatedRoute
@@ -398,6 +406,7 @@ export interface FileRoutesById {
   '/api/public/ig-image': typeof ApiPublicIgImageRoute
   '/api/public/transcribe': typeof ApiPublicTranscribeRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/api/public/hooks/cakto': typeof ApiPublicHooksCaktoRoute
   '/api/public/hooks/calls-tick': typeof ApiPublicHooksCallsTickRoute
   '/api/public/hooks/dispatch-worker': typeof ApiPublicHooksDispatchWorkerRoute
   '/api/public/hooks/notify-task-created': typeof ApiPublicHooksNotifyTaskCreatedRoute
@@ -443,6 +452,7 @@ export interface FileRouteTypes {
     | '/api/public/ig-image'
     | '/api/public/transcribe'
     | '/flows/'
+    | '/api/public/hooks/cakto'
     | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/dispatch-worker'
     | '/api/public/hooks/notify-task-created'
@@ -486,6 +496,7 @@ export interface FileRouteTypes {
     | '/api/public/ig-image'
     | '/api/public/transcribe'
     | '/flows'
+    | '/api/public/hooks/cakto'
     | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/dispatch-worker'
     | '/api/public/hooks/notify-task-created'
@@ -530,6 +541,7 @@ export interface FileRouteTypes {
     | '/api/public/ig-image'
     | '/api/public/transcribe'
     | '/_authenticated/flows/'
+    | '/api/public/hooks/cakto'
     | '/api/public/hooks/calls-tick'
     | '/api/public/hooks/dispatch-worker'
     | '/api/public/hooks/notify-task-created'
@@ -549,6 +561,7 @@ export interface RootRouteChildren {
   RankingTvRoute: typeof RankingTvRoute
   ApiPublicIgImageRoute: typeof ApiPublicIgImageRoute
   ApiPublicTranscribeRoute: typeof ApiPublicTranscribeRoute
+  ApiPublicHooksCaktoRoute: typeof ApiPublicHooksCaktoRoute
   ApiPublicHooksCallsTickRoute: typeof ApiPublicHooksCallsTickRoute
   ApiPublicHooksDispatchWorkerRoute: typeof ApiPublicHooksDispatchWorkerRoute
   ApiPublicHooksNotifyTaskCreatedRoute: typeof ApiPublicHooksNotifyTaskCreatedRoute
@@ -857,6 +870,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCallsTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/cakto': {
+      id: '/api/public/hooks/cakto'
+      path: '/api/public/hooks/cakto'
+      fullPath: '/api/public/hooks/cakto'
+      preLoaderRoute: typeof ApiPublicHooksCaktoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -928,6 +948,7 @@ const rootRouteChildren: RootRouteChildren = {
   RankingTvRoute: RankingTvRoute,
   ApiPublicIgImageRoute: ApiPublicIgImageRoute,
   ApiPublicTranscribeRoute: ApiPublicTranscribeRoute,
+  ApiPublicHooksCaktoRoute: ApiPublicHooksCaktoRoute,
   ApiPublicHooksCallsTickRoute: ApiPublicHooksCallsTickRoute,
   ApiPublicHooksDispatchWorkerRoute: ApiPublicHooksDispatchWorkerRoute,
   ApiPublicHooksNotifyTaskCreatedRoute: ApiPublicHooksNotifyTaskCreatedRoute,
