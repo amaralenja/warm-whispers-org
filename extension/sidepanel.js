@@ -97,7 +97,26 @@ startBtn.addEventListener("click", async () => {
   statusText.innerHTML = "<strong>Iniciando...</strong>";
   try {
     await warmupMicPermission();
-    const resp = await chrome.runtime.sendMessage({ type: "start-recording" });
+
+    // Descobre a aba alvo (Meet/Zoom) — precisa estar ativa na janela
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const targetTab = tabs.find((t) => t.url && !t.url.startsWith("chrome://") && !t.url.startsWith("chrome-extension://"));
+    if (!targetTab?.id) throw new Error("Abre a aba do Meet/Zoom e clique no ícone da extensão nela pra abrir o painel.");
+
+    // getMediaStreamId PRECISA rodar aqui (gesto do usuário no sidepanel)
+    // Chamar do background perde o gesto e Chrome bloqueia com "Extension has not been invoked"
+    const streamId = await new Promise((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: targetTab.id }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(new Error(
+            (chrome.runtime.lastError?.message || "Falha ao capturar áudio da aba.") +
+            " Dica: clique no ícone da extensão ESTANDO na aba do Meet/Zoom (aba precisa estar tocando som).",
+          ));
+        } else resolve(id);
+      });
+    });
+
+    const resp = await chrome.runtime.sendMessage({ type: "start-recording", streamId });
     if (!resp?.ok) throw new Error(resp?.error || "Falha ao iniciar");
     await chrome.storage.local.set({ recordingStartedAt: Date.now() });
   } catch (e) {
