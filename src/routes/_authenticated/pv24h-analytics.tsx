@@ -488,7 +488,7 @@ function PV24HAnalyticsPage() {
 }
 
 function CaktoTracking() {
-  const webhookUrl = "https://project--4860a253-8e14-4836-a639-c7fb96d53545.lovable.app/api/public/hooks/cakto";
+  const webhookUrl = "https://wvcwrozwnwdlpandwubp.supabase.co/functions/v1/cakto-webhook";
 
   const eventsQ = useQuery({
     queryKey: ["cakto", "events"],
