@@ -18,7 +18,7 @@ const PAGE_TITLE = "Multium Meet — Extensão de transcrição de calls";
 const PAGE_DESCRIPTION =
   "Extensão Chrome da Multium: grava mic + áudio da aba (Meet/Zoom) e transcreve com IA.";
 
-const EXTENSION_VERSION = "0.3.0";
+const EXTENSION_VERSION = "0.4.0";
 const EXTENSION_ZIP_URL = `/downloads/multium-meet-extension-v${EXTENSION_VERSION}.zip`;
 
 export const Route = createFileRoute("/_authenticated/multium-meet")({
@@ -74,7 +74,7 @@ function MultiumMeetPage() {
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button size="lg" onClick={handleDownload} disabled={downloading}>
               <Download className="mr-2 h-5 w-5" />
-              {downloading ? "Baixando..." : "Baixar extensão (.zip)"}
+              {downloading ? "Baixando..." : `Baixar extensão v${EXTENSION_VERSION} (.zip)`}
             </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
