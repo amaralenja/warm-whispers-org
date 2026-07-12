@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Permitir Microfone — Multium Meet</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0b0f; color:#f5f5f7; margin:0; padding:40px; max-width:640px; }
+  h1 { font-size:22px; margin:0 0 12px; }
+  p { color:#a1a1aa; line-height:1.5; }
+  button { background:#7c5cff; color:#fff; border:0; padding:14px 20px; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; margin-top:16px; }
+  button:disabled { opacity:.6; cursor:not-allowed; }
+  .ok { color:#22c55e; font-weight:600; }
+  .err { color:#ef4444; font-weight:600; white-space:pre-wrap; }
+  .box { background:#14141b; border:1px solid #26262f; border-radius:14px; padding:20px; margin-top:20px; }
+</style>
+</head>
+<body>
+  <h1>🎙️ Autorizar microfone</h1>
+  <p>O Chrome só mostra o pedido de permissão em uma aba normal. Clica no botão abaixo, aceita o pop-up do navegador e pode fechar essa aba.</p>
+  <button id="ask">Autorizar microfone</button>
+  <div class="box"><div id="status">Aguardando...</div></div>
+
+<script>
+  const btn = document.getElementById("ask");
+  const status = document.getElementById("status");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    status.textContent = "Solicitando permissão...";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      status.innerHTML = '<span class="ok">✓ Microfone autorizado!</span><br><br>Pode fechar essa aba e voltar ao painel lateral.';
+    } catch (e) {
+      status.innerHTML = '<span class="err">Erro: ' + (e.message || e) + '\n\nSe negou por engano: clica no cadeado 🔒 na barra de endereço → Permissões do site → Microfone → Permitir.</span>';
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
