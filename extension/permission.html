@@ -1,40 +1,40 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-<meta charset="utf-8" />
-<title>Permitir Microfone — Multium Meet</title>
-<style>
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0b0f; color:#f5f5f7; margin:0; padding:40px; max-width:640px; }
-  h1 { font-size:22px; margin:0 0 12px; }
-  p { color:#a1a1aa; line-height:1.5; }
-  button { background:#7c5cff; color:#fff; border:0; padding:14px 20px; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; margin-top:16px; }
-  button:disabled { opacity:.6; cursor:not-allowed; }
-  .ok { color:#22c55e; font-weight:600; }
-  .err { color:#ef4444; font-weight:600; white-space:pre-wrap; }
-  .box { background:#14141b; border:1px solid #26262f; border-radius:14px; padding:20px; margin-top:20px; }
-</style>
-</head>
-<body>
-  <h1>🎙️ Autorizar microfone</h1>
-  <p>O Chrome só mostra o pedido de permissão em uma aba normal. Clica no botão abaixo, aceita o pop-up do navegador e pode fechar essa aba.</p>
-  <button id="ask">Autorizar microfone</button>
-  <div class="box"><div id="status">Aguardando...</div></div>
-
-<script>
-  const btn = document.getElementById("ask");
-  const status = document.getElementById("status");
-  btn.addEventListener("click", async () => {
-    btn.disabled = true;
-    status.textContent = "Solicitando permissão...";
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-      status.innerHTML = '<span class="ok">✓ Microfone autorizado!</span><br><br>Pode fechar essa aba e voltar ao painel lateral.';
-    } catch (e) {
-      status.innerHTML = '<span class="err">Erro: ' + (e.message || e) + '\n\nSe negou por engano: clica no cadeado 🔒 na barra de endereço → Permissões do site → Microfone → Permitir.</span>';
-      btn.disabled = false;
-    }
-  });
-</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>Permitir Microfone — Multium Meet</title>
+    <style>
+      :root { color-scheme: dark; --bg:#0a0b0d; --card:#14171c; --border:#23272f; --text:#f5f6f8; --muted:#8a94a3; --primary:#ff5b1f; --success:#22c55e; --danger:#ef4444; }
+      * { box-sizing: border-box; }
+      body { min-height:100vh; margin:0; display:grid; place-items:center; padding:28px; font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+      main { width:min(680px,100%); border:1px solid var(--border); border-radius:18px; background:var(--card); padding:28px; box-shadow:0 24px 80px rgba(0,0,0,.35); }
+      .brand { display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+      .brand img { width:38px; height:38px; border-radius:10px; background:#fff; padding:4px; }
+      h1 { margin:0; font-size:24px; line-height:1.15; }
+      p { color:var(--muted); line-height:1.55; margin:12px 0 0; }
+      button { width:100%; margin-top:22px; background:var(--primary); color:#fff; border:0; padding:15px 20px; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; }
+      button:disabled { opacity:.65; cursor:not-allowed; }
+      .box { background:#0f1115; border:1px solid var(--border); border-radius:12px; padding:16px; margin-top:18px; color:var(--muted); line-height:1.5; white-space:pre-wrap; }
+      .ok { color:var(--success); font-weight:700; }
+      .err { color:#fca5a5; font-weight:650; }
+      .hint { margin-top:18px; font-size:13px; }
+      code { color:var(--text); background:#0b0d11; border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <img src="icon.png" alt="Multium" />
+        <div>
+          <h1>Autorizar microfone</h1>
+          <p>Versão 0.3.0 · permissão em aba normal do Chrome</p>
+        </div>
+      </div>
+      <p>O painel lateral do Chrome pode esconder o pop-up de microfone. Por isso a autorização acontece aqui, numa aba normal da própria extensão.</p>
+      <button id="ask">Autorizar microfone agora</button>
+      <div class="box" id="status">Clique no botão acima e aceite o pop-up do Chrome.</div>
+      <p class="hint">Se você já negou antes: clique no ícone de ajustes ao lado da barra de endereço → <code>Microfone</code> → <code>Permitir</code>, ou remova e carregue a extensão de novo.</p>
+    </main>
+    <script src="permission.js"></script>
+  </body>
 </html>

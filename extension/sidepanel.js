@@ -12,6 +12,7 @@ const errorBox = $("errorBox");
 
 let timerInterval = null;
 let startedAt = null;
+let micPermissionState = "unknown";
 
 function fmt(ms) {
   const s = Math.floor(ms / 1000);
@@ -25,7 +26,27 @@ function showError(msg) {
   errorBox.textContent = msg;
 }
 
+async function getMicPermissionState() {
+  try {
+    if (!navigator.permissions?.query) return "unknown";
+    const permission = await navigator.permissions.query({ name: "microphone" });
+    micPermissionState = permission.state;
+    permission.onchange = () => {
+      micPermissionState = permission.state;
+      refreshUi();
+    };
+    return permission.state;
+  } catch {
+    return "unknown";
+  }
+}
+
+async function openMicPermissionPage() {
+  await chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") });
+}
+
 async function refreshUi() {
+  const micState = await getMicPermissionState();
   const { recording, lastTranscript, endpoint, recordingStartedAt } = await chrome.storage.local.get([
     "recording", "lastTranscript", "endpoint", "recordingStartedAt",
   ]);
@@ -44,7 +65,13 @@ async function refreshUi() {
   } else {
     ring.className = "pulse-ring";
     if (statusText.textContent.indexOf("Transcrevendo") === -1) {
-      statusText.innerHTML = "<strong>Pronto pra gravar.</strong> Abre a call e clica abaixo.";
+      if (micState === "granted") {
+        statusText.innerHTML = "<strong>Mic autorizado.</strong> Abre a call e clica em iniciar.";
+      } else if (micState === "denied") {
+        statusText.innerHTML = "<strong>Mic bloqueado.</strong> Clique em iniciar para abrir a página de permissão.";
+      } else {
+        statusText.innerHTML = "<strong>Autorize o mic primeiro.</strong> Clique em iniciar e aceite o pop-up.";
+      }
     }
     startBtn.style.display = "flex";
     stopBtn.style.display = "none";
@@ -54,17 +81,14 @@ async function refreshUi() {
   if (lastTranscript) transcript.textContent = lastTranscript;
 }
 
-// Side panels não mostram prompt de mic — abre página dedicada em aba normal.
+// Side panels podem suprimir o prompt. A permissão precisa acontecer numa aba de extensão.
 async function warmupMicPermission() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((t) => t.stop());
-    return true;
-  } catch (e) {
-    const url = chrome.runtime.getURL("permission.html");
-    await chrome.tabs.create({ url });
-    throw new Error("Abri uma aba pra você autorizar o mic. Aceita o pop-up e volta aqui.");
+  const state = await getMicPermissionState();
+  if (state !== "granted") {
+    await openMicPermissionPage();
+    throw new Error("Abri a aba de autorização do microfone. Clique em Autorizar, aceite o pop-up do Chrome e volte aqui.");
   }
+  return true;
 }
 
 startBtn.addEventListener("click", async () => {
