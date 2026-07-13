@@ -218,6 +218,35 @@ function VendorPortal() {
         {/* Série diária */}
         <DesempenhoDiario serie={stats?.serieDiaria ?? []} loading={isLoading} />
 
+        {/* Meus links de pagamento */}
+        {paymentLinks.length > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+            <div className="mb-3 flex items-center gap-2 md:mb-4">
+              <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-400"><Link2 className="h-4 w-4" /></div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider md:text-sm">Meus links de pagamento</h3>
+            </div>
+            <ul className="space-y-2">
+              {paymentLinks.map((l) => (
+                <li key={l.id} className="flex items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{l.title}</div>
+                    <div className="truncate text-xs text-muted-foreground">{l.url}</div>
+                  </div>
+                  <button
+                    onClick={() => copyLink(l.url)}
+                    title="Copiar link"
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-400"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copiar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+
+
 
         {/* Últimas vendas */}
         <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
