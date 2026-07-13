@@ -1821,8 +1821,130 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
           setCloserEmail(selectedLead.id, email ?? null);
         }}
       />
+      <AddSDRLeadDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => { setAddOpen(false); onReload?.(); }} />
 
     </div>
+  );
+}
+
+function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [caixa, setCaixa] = useState<string>("B");
+  const [faturamento, setFaturamento] = useState("");
+  const [objetivo, setObjetivo] = useState("");
+  const [utmSource, setUtmSource] = useState("manual");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setNome(""); setEmail(""); setWhatsapp(""); setInstagram("");
+      setCaixa("B"); setFaturamento(""); setObjetivo(""); setUtmSource("manual");
+    }
+  }, [open]);
+
+  const caixaLabelMap: Record<string, string> = {
+    B: "R$ 1k–5k", C: "R$ 5k–10k", D: "R$ 10k–30k",
+    E: "R$ 30k–50k", F: "R$ 50k–100k", G: "R$ 100k+",
+  };
+
+  async function handleSave() {
+    if (!nome.trim() && !whatsapp.trim() && !email.trim()) {
+      toast.error("Preencha ao menos nome, whatsapp ou email");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        nome: nome.trim() || null,
+        email: email.trim() || null,
+        whatsapp: whatsapp.trim() || null,
+        instagram: instagram.trim() || null,
+        utm_source: utmSource.trim() || "manual",
+        utm_medium: "sdr-manual",
+        utm_campaign: null,
+        status: "finalizado",
+        respostas: {
+          caixa_letra: caixa,
+          caixa_label: caixaLabelMap[caixa] ?? null,
+          faturamento: faturamento.trim() || null,
+          objetivo: objetivo.trim() || null,
+          origem: "sdr_manual",
+        },
+        raw: { source: "sdr_manual" },
+      };
+      const { error } = await supabase.from("ht_quiz_submissions" as any).insert(payload as any);
+      if (error) throw error;
+      toast.success("Lead adicionado ao Kanban SDR");
+      onCreated();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar lead");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Adicionar Lead Manualmente</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>WhatsApp</Label>
+              <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="5511999999999" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Instagram</Label>
+              <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@usuario" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Caixa disponível</Label>
+              <Select value={caixa} onValueChange={setCaixa}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(caixaLabelMap).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>UTM Source</Label>
+              <Input value={utmSource} onChange={(e) => setUtmSource(e.target.value)} placeholder="manual" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Faturamento atual</Label>
+            <Input value={faturamento} onChange={(e) => setFaturamento(e.target.value)} placeholder="Ex: R$ 10k/mês" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Meta / Objetivo</Label>
+            <Input value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex: R$ 50k/mês em 6 meses" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Salvando…" : "Adicionar Lead"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
