@@ -1557,7 +1557,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       null;
                     const quoted = ctxId ? messageList.find((x) => x.wa_message_id === ctxId) ?? null : null;
                     return (
-                      <div key={String(m.id)}>
+                      <div key={String(m.id)} id={`msg-${m.id}`} className="scroll-mt-20 rounded-xl transition-colors duration-500">
                         {showDate && (
                           <div className="my-5 flex justify-center">
                             <span className="rounded-full border border-chat-line bg-chat-panel px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
@@ -1565,7 +1565,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} onQuotedClick={(target) => {
+                          const el = document.getElementById(`msg-${target.id}`);
+                          if (!el) return;
+                          el.scrollIntoView({ behavior: "smooth", block: "center" });
+                          el.classList.add("ring-2", "ring-chat-accent", "bg-chat-accent/10");
+                          window.setTimeout(() => {
+                            el.classList.remove("ring-2", "ring-chat-accent", "bg-chat-accent/10");
+                          }, 1600);
+                        }} />
                       </div>
                     );
                   })}
@@ -1787,7 +1795,7 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom, onQuotedClick }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null; onQuotedClick?: (m: Msg) => void }) {
   const isOut = msg.direction === "out";
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
@@ -1862,14 +1870,19 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             }`}
           >
             {(quotedPreview || quotedFrom) && (
-              <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); if (quotedFrom && onQuotedClick) onQuotedClick(quotedFrom); }}
+                disabled={!quotedFrom || !onQuotedClick}
+                className={`mb-2 block w-full text-left rounded-lg border-l-4 px-3 py-2 text-xs transition-colors ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"} ${quotedFrom && onQuotedClick ? "hover:bg-black/30 cursor-pointer" : "cursor-default"}`}
+              >
                 <div className="font-semibold opacity-80">
                   {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
                 </div>
                 <div className="mt-0.5 truncate opacity-90">
                   {quotedPreview || (quotedFrom ? (toText(quotedFrom.text_body) || toText(quotedFrom.caption) || toText(quotedFrom.msg_type)) : "")}
                 </div>
-              </div>
+              </button>
             )}
             <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
             {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
