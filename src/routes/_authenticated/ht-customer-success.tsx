@@ -251,9 +251,9 @@ function HTCustomerSuccessPage() {
             );
           })}
         </div>
-        <EditDialog
+        <StudentDetailDialog
           open={creating}
-          row={null}
+          student={null}
           defaultCategoria="x1"
           onClose={() => setCreating(false)}
         />
