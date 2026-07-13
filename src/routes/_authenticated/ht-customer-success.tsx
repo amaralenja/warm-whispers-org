@@ -312,9 +312,9 @@ function HTCustomerSuccessPage() {
         </DndContext>
       )}
 
-      <EditDialog
+      <StudentDetailDialog
         open={creating || !!editing}
-        row={editing}
+        student={editing}
         defaultCategoria={categoria}
         onClose={() => {
           setCreating(false);
