@@ -2987,6 +2987,10 @@ export type Database = {
         Args: { _codigo: string; _id: string; _vendor_id: number }
         Returns: boolean
       }
+      vendor_delete_remarketing_rule: {
+        Args: { _codigo: string; _rule_id: string; _vendor_id: number }
+        Returns: boolean
+      }
       vendor_delete_wa_flow: {
         Args: { _codigo: string; _flow_id: string; _vendor_id: number }
         Returns: boolean
@@ -3036,6 +3040,29 @@ export type Database = {
           to: "wa_flows"
           isOneToOne: false
           isSetofReturn: true
+        }
+      }
+      vendor_get_remarketing_rule: {
+        Args: { _codigo: string; _rule_id: string; _vendor_id: number }
+        Returns: {
+          ativo: boolean
+          channel_id: string | null
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          flow_id: string
+          id: string
+          last_run_at: string | null
+          minutes_before_close: number
+          nome: string
+          operacao: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "wa_remarketing_rules"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       vendor_get_wa_message_for_react: {
@@ -3222,6 +3249,29 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "wa_flows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      vendor_list_remarketing_rules: {
+        Args: { _codigo: string; _vendor_id: number }
+        Returns: {
+          ativo: boolean
+          channel_id: string | null
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          flow_id: string
+          id: string
+          last_run_at: string | null
+          minutes_before_close: number
+          nome: string
+          operacao: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_remarketing_rules"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -3476,6 +3526,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vendor_toggle_remarketing_rule: {
+        Args: {
+          _ativo: boolean
+          _codigo: string
+          _rule_id: string
+          _vendor_id: number
+        }
+        Returns: boolean
+      }
       vendor_touch_wa_conversation: {
         Args: {
           _codigo: string
@@ -3590,6 +3649,40 @@ export type Database = {
           _vendor_id: number
         }
         Returns: string
+      }
+      vendor_upsert_remarketing_rule: {
+        Args: {
+          _ativo: boolean
+          _channel_id: string
+          _codigo: string
+          _conditions: Json
+          _flow_id: string
+          _minutes_before_close: number
+          _nome: string
+          _operacao: string
+          _rule_id: string
+          _vendor_id: number
+        }
+        Returns: {
+          ativo: boolean
+          channel_id: string | null
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          flow_id: string
+          id: string
+          last_run_at: string | null
+          minutes_before_close: number
+          nome: string
+          operacao: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "wa_remarketing_rules"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
