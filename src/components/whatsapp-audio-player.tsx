@@ -136,7 +136,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
           </span>
           <span>{formatTime(duration)}</span>
         </div>
-        {error ? <p className="mt-0.5 text-[10px] text-destructive">{error}</p> : null}
+        {safeText(error) ? <p className="mt-0.5 text-[10px] text-destructive">{safeText(error)}</p> : null}
       </div>
 
       <button
