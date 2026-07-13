@@ -1795,7 +1795,7 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom, onQuotedClick }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null; onQuotedClick?: (m: Msg) => void }) {
   const isOut = msg.direction === "out";
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
