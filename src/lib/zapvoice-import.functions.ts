@@ -190,7 +190,9 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
     replace: !!d?.replace,
     funnelIds: Array.isArray(d?.funnelIds) ? d.funnelIds.map(String) : null,
   }))
-  .handler(async ({ context, data }) => {
+  .handler(async (args) => {
+    const { context, data } = args ?? ({} as any);
+    if (!data) throw new Error("Payload ausente no importador ZapVoice");
     const b = data.backup;
     if (!b || typeof b !== "object") throw new Error("Backup inválido.");
     if (!Array.isArray(b.funnels)) throw new Error("Backup inválido: 'funnels' precisa ser array.");
@@ -611,7 +613,9 @@ export const uploadZapVoiceMedia = createServerFn({ method: "POST" })
     mime: d?.mime ?? null,
     filename: d?.filename ?? null,
   }))
-  .handler(async ({ context, data }) => {
+  .handler(async (args) => {
+    const { context, data } = args ?? ({} as any);
+    if (!data) throw new Error("Payload ausente no upload de mídia ZapVoice");
     if (!data.itemId) throw new Error("itemId obrigatório");
     if (!data.base64) throw new Error("base64 obrigatório");
 
