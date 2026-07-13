@@ -1610,6 +1610,9 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
   const [schedMap, setSched] = useSchedMap();
+  const [closerEmailMap, setCloserEmail] = useCloserEmailMap();
+  const closersList = useClosersList();
+
 
 
 
