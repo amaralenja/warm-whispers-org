@@ -839,6 +839,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ht_customer_success: {
+        Row: {
+          aluno_nome: string
+          created_at: string
+          entrada_mentoria: string | null
+          fase: string
+          grupo_whatsapp_link: string | null
+          id: string
+          observacoes: string | null
+          sort_order: number
+          ultima_call: string | null
+          updated_at: string
+          whatsapp_privado: string | null
+        }
+        Insert: {
+          aluno_nome: string
+          created_at?: string
+          entrada_mentoria?: string | null
+          fase?: string
+          grupo_whatsapp_link?: string | null
+          id?: string
+          observacoes?: string | null
+          sort_order?: number
+          ultima_call?: string | null
+          updated_at?: string
+          whatsapp_privado?: string | null
+        }
+        Update: {
+          aluno_nome?: string
+          created_at?: string
+          entrada_mentoria?: string | null
+          fase?: string
+          grupo_whatsapp_link?: string | null
+          id?: string
+          observacoes?: string | null
+          sort_order?: number
+          ultima_call?: string | null
+          updated_at?: string
+          whatsapp_privado?: string | null
+        }
+        Relationships: []
+      }
       ht_lead_notes: {
         Row: {
           author: string | null
