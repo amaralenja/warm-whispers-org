@@ -836,6 +836,16 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     });
   }
 
+  // Só rola pro rodapé se o vendedor JÁ estava colado no rodapé.
+  // Usado por mídias que terminam de carregar — se ele scrollou pra cima,
+  // NÃO puxa ele de volta.
+  function scrollToBottomIfPinned() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distance <= 120) scrollToBottom();
+  }
+
   // Auto-scroll SÓ ao abrir a conversa. Depois é o vendedor que decide.
   useEffect(() => {
     scrollToBottom();
