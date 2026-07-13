@@ -31,6 +31,7 @@ import {
   Zap,
   Percent,
   Mic,
+  HeartHandshake,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
@@ -83,6 +84,7 @@ const highTicketItems: Item[] = [
   { title: "Kanban SDR", url: "/ht-kanban-sdr", icon: Kanban },
   { title: "Kanban Closer", url: "/ht-kanban-closer", icon: Target },
   { title: "SDRs & Closers", url: "/ht-team", icon: Briefcase },
+  { title: "Sucesso do Cliente", url: "/ht-customer-success", icon: HeartHandshake },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
   
@@ -112,6 +114,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/ht-kanban-closer": "ht-kanban-closer",
   "/ht-api": "ht-api",
   "/ht-team": "ht-team",
+  "/ht-customer-success": "ht-customer-success",
   "/sops": "sops",
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",
