@@ -271,6 +271,13 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         .map((item: any) => describeSource(`${bucket}[itemId]`, item));
     };
 
+    const findRawByItemId = (arr: any, itemId: string) => {
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter((item: any) => item && typeof item === "object" && String(item?.itemId ?? item?.data?.itemId ?? "") === itemId)
+        .slice(0, 5);
+    };
+
     const mediaDiagnostics = (itemId: string, kind: string, sequence?: any, reason?: string) => {
       const direct = [
         describeSource("objectsList[id]", objectsById.get(itemId)),
@@ -319,6 +326,10 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         audiosById.get(itemId),
         mediasById.get(itemId),
         docsById.get(itemId),
+        ...findRawByItemId(b.objectsList, itemId),
+        ...findRawByItemId(b.audios, itemId),
+        ...findRawByItemId(b.medias, itemId),
+        ...findRawByItemId(b.docs, itemId),
       ].filter(Boolean) as any[];
 
       if (sources.length === 0) {
