@@ -25,7 +25,6 @@ import {
 } from "@/lib/flow-engine.functions";
 import { importZapVoiceBackup, uploadZapVoiceMedia } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/flows/")({
   component: FlowsListPage,
