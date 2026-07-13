@@ -141,7 +141,9 @@ export function HtLeadDetailDialog({
     } else {
       setSchedDraft("");
     }
-  }, [scheduledAt, open]);
+    setCloserDraft(closerEmail ?? "");
+  }, [scheduledAt, closerEmail, open]);
+
 
   // Preenche o dialog de venda com o que já existe no lead
   useEffect(() => {
