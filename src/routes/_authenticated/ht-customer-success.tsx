@@ -45,6 +45,7 @@ import {
   updateCustomerSuccessFase,
   upsertCustomerSuccess,
 } from "@/lib/ht-customer-success.functions";
+import { StudentDetailDialog } from "@/components/ht-student-detail-dialog";
 
 export const Route = createFileRoute("/_authenticated/ht-customer-success")({
   component: HTCustomerSuccessPage,
