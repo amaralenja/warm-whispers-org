@@ -5,9 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   RefreshCw, DollarSign, TrendingUp, Target, ShoppingBag,
-  Users, CheckCircle2, XCircle, Flame, Activity,
+  Users, CheckCircle2, XCircle, Flame, Activity, Plus,
   Search, SlidersHorizontal, X, Mail, Phone, Calendar, TrendingDown, ArrowUpRight,
 } from "lucide-react";
 import {
