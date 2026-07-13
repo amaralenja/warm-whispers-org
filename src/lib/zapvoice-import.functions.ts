@@ -408,7 +408,6 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       const { error: upErr } = await db.storage
         .from("wa-media")
         .upload(path, bytes, {
-          contentType: extracted.mime ?? "application/octet-stream",
           contentType: uploadMime ?? "application/octet-stream",
           upsert: true,
         });
