@@ -35,6 +35,7 @@ type Rule = {
   flow_id: string;
   minutes_before_close: number;
   conditions: Array<{ type: "tag" | "stage"; value: string }>;
+  owner_vendor_id: number | null;
 };
 
 // Tick window: consider conversations whose last inbound was between
