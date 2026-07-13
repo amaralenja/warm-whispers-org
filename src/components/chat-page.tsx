@@ -836,9 +836,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     });
   }
 
-  // Auto-scroll: sempre ao abrir uma conversa; ao chegar msg nova só se o
-  // vendedor já estiver perto do rodapé (senão atrapalha ele lendo msgs antigas).
-  const messagesLen = messageList.length;
+  // Auto-scroll SÓ ao abrir a conversa. Depois é o vendedor que decide.
   useEffect(() => {
     scrollToBottom();
     const timer = window.setTimeout(scrollToBottom, 120);
@@ -849,13 +847,20 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
+  // Mostra a setinha "voltar pro rodapé" quando o vendedor rolou pra cima.
+  const [showScrollDown, setShowScrollDown] = useState(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceFromBottom < 150) scrollToBottom();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messagesLen]);
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollDown(distance > 300);
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [activeId]);
+
 
   // Mark read when opening a conv (depend só em activeId + unread_count pra não loopar com a referência recalculada de `active`)
   const unreadForActive = active?.unread_count ?? 0;
