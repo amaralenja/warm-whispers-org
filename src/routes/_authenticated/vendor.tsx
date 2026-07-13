@@ -2,9 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar } from "lucide-react";
+import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar, Copy, Link2 } from "lucide-react";
+import { toast } from "sonner";
 import logoMultium from "@/assets/logo-multium.webp";
 import { getVendorStats } from "@/lib/vendor.functions";
+import { listVendorLinksPublic } from "@/lib/vendor-links.functions";
 import { DesempenhoDiario } from "@/components/desempenho-diario";
 
 
@@ -49,6 +51,7 @@ function VendorPortal() {
   const [v, setV] = useState<VendorSession | null>(null);
   const [preset, setPreset] = useState<RangePreset>("mes");
   const fetchStats = useServerFn(getVendorStats);
+  const fetchLinks = useServerFn(listVendorLinksPublic);
 
   useEffect(() => {
     const raw = localStorage.getItem("vendor_session");
@@ -65,6 +68,19 @@ function VendorPortal() {
     enabled: !!v?.utm,
     refetchInterval: 60_000,
   });
+
+  const { data: paymentLinks = [] } = useQuery({
+    queryKey: ["vendor-payment-links", v?.id],
+    queryFn: () => fetchLinks({ data: { vendorId: v!.id } }),
+    enabled: !!v?.id,
+  });
+
+  function copyLink(url: string) {
+    navigator.clipboard.writeText(url).then(
+      () => toast.success("Link copiado"),
+      () => toast.error("Não consegui copiar"),
+    );
+  }
 
   function logout() {
     localStorage.removeItem("vendor_session");
@@ -201,6 +217,35 @@ function VendorPortal() {
 
         {/* Série diária */}
         <DesempenhoDiario serie={stats?.serieDiaria ?? []} loading={isLoading} />
+
+        {/* Meus links de pagamento */}
+        {paymentLinks.length > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+            <div className="mb-3 flex items-center gap-2 md:mb-4">
+              <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-400"><Link2 className="h-4 w-4" /></div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider md:text-sm">Meus links de pagamento</h3>
+            </div>
+            <ul className="space-y-2">
+              {paymentLinks.map((l) => (
+                <li key={l.id} className="flex items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{l.title}</div>
+                    <div className="truncate text-xs text-muted-foreground">{l.url}</div>
+                  </div>
+                  <button
+                    onClick={() => copyLink(l.url)}
+                    title="Copiar link"
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-400"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copiar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+
 
 
         {/* Últimas vendas */}
