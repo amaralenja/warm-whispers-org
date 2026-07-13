@@ -77,6 +77,29 @@ const FASE_META: Record<Fase, { label: string; accent: string; dot: string }> = 
     dot: "bg-emerald-400",
   },
 };
+const CATEGORIA_META: Record<Categoria, { label: string; short: string; description: string; accent: string; icon: typeof User }> = {
+  x1: {
+    label: "Alunos X1",
+    short: "X1",
+    description: "Alunos da mentoria X1",
+    accent: "from-sky-500/20 to-sky-500/5 border-sky-500/30 text-sky-300",
+    icon: User,
+  },
+  grupo: {
+    label: "Alunos Mentoria em Grupo",
+    short: "Grupo",
+    description: "Alunos das turmas em grupo",
+    accent: "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30 text-emerald-300",
+    icon: UsersRound,
+  },
+  individual: {
+    label: "Alunos Mentoria Individual",
+    short: "Individual",
+    description: "Alunos da mentoria individual",
+    accent: "from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/30 text-fuchsia-300",
+    icon: Users,
+  },
+};
 
 function fmtDate(v: string | null | undefined) {
   if (!v) return "—";
