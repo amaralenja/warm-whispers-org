@@ -95,18 +95,39 @@ export const listCrmLeads = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const db = await dbFor(context);
     const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+    let rows: any[] = [];
     if (rpcArgs) {
       const { data, error } = await db.rpc("vendor_list_crm_leads" as any, rpcArgs);
       if (error) throw new Error(error.message);
-      return data ?? [];
+      rows = (data ?? []) as any[];
+    } else {
+      let q: any = db.from("crm_leads" as any).select("*").order("ordem", { ascending: true }).order("created_at", { ascending: false });
+      q = applyVendorWorkspaceFilter(context, q);
+      if (!q) return [];
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      rows = (data ?? []) as any[];
     }
-    let q: any = db.from("crm_leads" as any).select("*").order("ordem", { ascending: true }).order("created_at", { ascending: false });
-    q = applyVendorWorkspaceFilter(context, q);
-    if (!q) return [];
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    // Escopo por vendedor: só mostra leads cujo responsável bate com o vendedor
+    // logado (utm ou nome). Leads sem responsável ficam visíveis (backlog).
+    if (context?.vendor) {
+      const vUtm = normalizeText(context.vendor.utm);
+      const vNome = normalizeText(context.vendor.nome);
+      const vCodigo = normalizeText(context.vendor.codigo);
+      const mine = new Set([vUtm, vNome, vCodigo].filter(Boolean));
+      if (mine.size > 0) {
+        rows = rows.filter((l: any) => {
+          const ru = normalizeText(l?.responsavel_utm);
+          const rn = normalizeText(l?.responsavel_nome);
+          if (!ru && !rn) return true; // sem responsável → backlog compartilhado
+          return (ru && mine.has(ru)) || (rn && mine.has(rn));
+        });
+      }
+    }
+    return rows;
   });
+
+
 
 export const syncInsertCrmLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
