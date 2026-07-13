@@ -12,7 +12,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { getVendorSession } from "@/lib/vendor-session";
-import { getComissoes, setPixChave, TIERS } from "@/lib/comissoes.functions";
+import { getComissoes, setPixChave } from "@/lib/comissoes.functions";
+const TIERS: { min: number; rate: number }[] = [
+  { min: 25000, rate: 250 },
+  { min: 20000, rate: 200 },
+  { min: 15000, rate: 120 },
+  { min: 10000, rate: 80 },
+  { min: 0, rate: 60 },
+];
 
 export const Route = createFileRoute("/_authenticated/comissoes")({
   component: ComissoesPage,

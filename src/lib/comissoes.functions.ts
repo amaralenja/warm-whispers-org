@@ -1,55 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-function parseTicket(raw: unknown): number {
-  if (raw == null) return 0;
-  let s = String(raw).replace(/R\$\s?/g, "").replace(/\s/g, "").trim();
-  const hasDot = s.includes(".");
-  const hasComma = s.includes(",");
-  if (hasDot && hasComma) {
-    s = s.lastIndexOf(",") > s.lastIndexOf(".")
-      ? s.replace(/\./g, "").replace(",", ".")
-      : s.replace(/,/g, "");
-  } else if (hasComma) {
-    const after = s.split(",")[1] || "";
-    s = after.length <= 2 ? s.replace(",", ".") : s.replace(/,/g, "");
-  } else if (hasDot) {
-    const after = s.split(".").pop() || "";
-    if (after.length === 3) s = s.replace(/\./g, "");
-  }
-  const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function parseDataField(raw: unknown): number | null {
-  if (!raw) return null;
-  const s = String(raw).trim();
-  let y = 0, m = 0, d = 0;
-  let match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) { y = +match[1]; m = +match[2]; d = +match[3]; }
-  else {
-    match = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
-    if (match) { d = +match[1]; m = +match[2]; y = +match[3]; }
-    else return null;
-  }
-  const t = Date.UTC(y, m - 1, d);
-  return Number.isFinite(t) ? t : null;
-}
-
-// Regras: R$ por R$1.000 vendidos no dia, tier definido pelo acumulado no mês.
-export const TIERS: { min: number; rate: number }[] = [
-  { min: 25000, rate: 250 },
-  { min: 20000, rate: 200 },
-  { min: 15000, rate: 120 },
-  { min: 10000, rate: 80 },
-  { min: 0, rate: 60 },
-];
-
-function tierRate(cumulativo: number): number {
-  for (const t of TIERS) if (cumulativo >= t.min) return t.rate;
-  return 0;
-}
-
 export type DiaComissao = {
   data: string;
   vendas: number;
@@ -90,6 +41,7 @@ export const getComissoes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: ComissoesRange | undefined) => input ?? {})
   .handler(async (opts): Promise<ComissoesPayload> => {
+    const { parseTicket, parseDataField, tierRate } = await import("@/lib/comissoes.server");
     const context = opts?.context;
     assertAdmin(context);
     const supabase = context.supabase as any;
