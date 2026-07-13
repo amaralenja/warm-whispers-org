@@ -1652,8 +1652,15 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
             <SelectTrigger className="h-9 w-48 bg-card/60"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Caixas (&gt; 1k)</SelectItem>
-              {["B","C","D","E","F","G"].map((c) => (
-                <SelectItem key={c} value={c}>Caixa {c}</SelectItem>
+              {([
+                ["B","R$ 1k–5k"],
+                ["C","R$ 5k–10k"],
+                ["D","R$ 10k–30k"],
+                ["E","R$ 30k–50k"],
+                ["F","R$ 50k–100k"],
+                ["G","R$ 100k+"],
+              ] as const).map(([c, label]) => (
+                <SelectItem key={c} value={c}>{label}</SelectItem>
               ))}
             </SelectContent>
           </Select>

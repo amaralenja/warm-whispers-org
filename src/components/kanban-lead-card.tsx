@@ -48,8 +48,9 @@ export function useIgProfileMap(usernames: string[]): Map<string, IgLite> {
   const [map, setMap] = useState<Map<string, IgLite>>(new Map());
 
   const key = useMemo(() => {
+    const list = Array.isArray(usernames) ? usernames : [];
     const uniq = Array.from(
-      new Set(usernames.map(cleanHandle).filter((u) => /^[a-z0-9._]+$/.test(u))),
+      new Set(list.map(cleanHandle).filter((u) => /^[a-z0-9._]+$/.test(u))),
     );
     uniq.sort();
     return uniq.join(",");
