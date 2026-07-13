@@ -1896,6 +1896,44 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_payment_links: {
+        Row: {
+          created_at: string
+          id: string
+          sort_order: number
+          title: string
+          updated_at: string
+          url: string
+          vendor_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          url: string
+          vendor_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          url?: string
+          vendor_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_payment_links_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wa_ai_sessions: {
         Row: {
           calendar_event_id: string | null
