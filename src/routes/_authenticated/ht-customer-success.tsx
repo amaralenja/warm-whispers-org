@@ -207,17 +207,75 @@ function HTCustomerSuccessPage() {
 
   const dragged = dragId ? rows.find((r) => r.id === dragId) ?? null : null;
 
-  return (
-    <div className="flex h-full flex-col p-4 md:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+  if (!categoria) {
+    return (
+      <div className="flex h-full flex-col p-4 md:p-6">
+        <div className="mb-6 flex items-center gap-3">
           <div className="rounded-xl bg-emerald-500/15 p-2 text-emerald-400">
             <HeartHandshake className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold md:text-2xl">Sucesso do Cliente</h1>
+            <h1 className="text-xl font-bold md:text-2xl">Sucesso do Cliente · Alunos</h1>
             <p className="text-xs text-muted-foreground md:text-sm">
-              Acompanhe cada aluno da mentoria por fase — arraste os cards pra mover.
+              Escolha o grupo de alunos que você quer acompanhar.
+            </p>
+          </div>
+        </div>
+        <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
+          {CATEGORIAS.map((c) => {
+            const meta = CATEGORIA_META[c];
+            const Icon = meta.icon;
+            return (
+              <button
+                key={c}
+                onClick={() => setCategoria(c)}
+                className={`group flex flex-col items-start justify-between rounded-2xl border bg-gradient-to-br ${meta.accent} p-6 text-left transition hover:scale-[1.01] hover:shadow-xl`}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <div className="rounded-xl bg-background/50 p-3">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <span className="rounded-full bg-background/60 px-3 py-1 text-xs font-semibold text-foreground">
+                    {countsByCategoria[c]} {countsByCategoria[c] === 1 ? "aluno" : "alunos"}
+                  </span>
+                </div>
+                <div className="mt-6">
+                  <div className="text-lg font-bold">{meta.label}</div>
+                  <div className="mt-1 text-xs opacity-80">{meta.description}</div>
+                </div>
+                <div className="mt-6 text-xs font-semibold opacity-90 group-hover:opacity-100">
+                  Abrir kanban →
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <EditDialog
+          open={creating}
+          row={null}
+          defaultCategoria="x1"
+          onClose={() => setCreating(false)}
+        />
+      </div>
+    );
+  }
+
+  const catMeta = CATEGORIA_META[categoria];
+
+  return (
+    <div className="flex h-full flex-col p-4 md:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => setCategoria(null)} className="gap-1">
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </Button>
+          <div className="rounded-xl bg-emerald-500/15 p-2 text-emerald-400">
+            <HeartHandshake className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold md:text-2xl">{catMeta.label}</h1>
+            <p className="text-xs text-muted-foreground md:text-sm">
+              Acompanhe cada aluno por fase — arraste os cards pra mover.
             </p>
           </div>
         </div>
