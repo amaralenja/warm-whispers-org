@@ -35,6 +35,7 @@ type Rule = {
   flow_id: string;
   minutes_before_close: number;
   conditions: Array<{ type: "tag" | "stage"; value: string }>;
+  owner_vendor_id: number | null;
 };
 
 // Tick window: consider conversations whose last inbound was between
@@ -57,6 +58,11 @@ export async function processDueRemarketing() {
 
   for (const rule of rules) {
     try {
+      // Regra de vendedor precisa estar amarrada num canal — sem canal, ignora.
+      if (rule.owner_vendor_id && !rule.channel_id) {
+        console.warn("[remarketing] vendor rule sem channel_id, pulando", { rule: rule.id });
+        continue;
+      }
       const rem = rule.minutes_before_close;
       // Inbound must be older than (24h - rem) so window closes within `rem` minutes.
       const upperTs = new Date(now - (24 * 60 - rem) * 60 * 1000).toISOString();
@@ -135,18 +141,18 @@ export async function processDueRemarketing() {
             const digitsPhone = String(l.telefone ?? "").replace(/\D+/g, "");
             return variants.includes(digitsPhone);
           });
-          // If no matching lead exists, only pass if there are no conditions — else skip.
-          if (leadList.length === 0) { matches = false; }
-          else {
+          if (leadList.length === 0) {
+            matches = false;
+          } else {
             const lead = leadList[0];
             const tags = (Array.isArray(lead.tags) ? lead.tags : []).map((t: any) => String(t).toLowerCase());
-            for (const cond of rule.conditions) {
-              if (cond.type === "tag") {
-                if (!tags.includes(String(cond.value).toLowerCase())) { matches = false; break; }
-              } else if (cond.type === "stage") {
-                if (String(lead.status ?? "") !== String(cond.value)) { matches = false; break; }
-              }
-            }
+            const stage = String(lead.status ?? "");
+            // OR semantics: qualquer condição que bater já libera o disparo.
+            matches = rule.conditions.some((cond) => {
+              if (cond.type === "tag") return tags.includes(String(cond.value).toLowerCase());
+              if (cond.type === "stage") return stage === String(cond.value);
+              return false;
+            });
           }
         }
         if (!matches) continue;
