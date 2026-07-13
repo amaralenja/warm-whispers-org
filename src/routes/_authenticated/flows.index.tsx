@@ -305,6 +305,28 @@ function FlowsListPage() {
     };
 
     const preuploaded = new Map<string, { url: string; mime: string | null; filename: string | null }>();
+    const getItemSources = (itemId: string) => [
+      objectsIdx.get(itemId),
+      audiosIdx.get(itemId),
+      mediasIdx.get(itemId),
+      docsIdx.get(itemId),
+      messagesIdx.get(itemId),
+      sequenceIdx.get(itemId),
+    ].filter(Boolean);
+
+    const extractFromAnySource = (itemId: string) => {
+      const sources = getItemSources(itemId);
+      const merged = Object.assign({}, ...sources);
+      let extracted = extractB64(merged);
+      if (!extracted) {
+        for (const source of sources) {
+          extracted = extractB64(source);
+          if (extracted) break;
+        }
+      }
+      return extracted;
+    };
+
     const allItemIds = new Set<string>();
     for (const f of allFunnels) {
       const seq = Array.isArray(f?.itemsSequence) ? f.itemsSequence : [];
@@ -321,9 +343,7 @@ function FlowsListPage() {
     if (mediaTotal > 0) toast.loading(`Enviando mídias 0 / ${mediaTotal}…`, { id: t });
 
     for (const itemId of allItemIds) {
-      const src = objectsIdx.get(itemId) ?? audiosIdx.get(itemId) ?? mediasIdx.get(itemId) ?? docsIdx.get(itemId) ?? messagesIdx.get(itemId) ?? sequenceIdx.get(itemId);
-      if (!src) { mediaDone++; continue; }
-      const ex = extractB64(src);
+      const ex = extractFromAnySource(itemId);
       if (!ex) { mediaDone++; continue; }
       try {
         const ext = extOf(ex.mime ?? null, ex.filename ?? null);
@@ -369,7 +389,9 @@ function FlowsListPage() {
     const pickSlimItem = (itemId: string, idx: Map<string, any>, fallback?: any) => {
       const original = idx.get(itemId) ?? fallback;
       if (!original) return null;
-      return scrubPayload(slimItem(itemId, original));
+      const pu = preuploaded.get(itemId);
+      const item = slimItem(itemId, original);
+      return pu ? scrubPayload(item) : item;
     };
 
 
