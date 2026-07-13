@@ -14,7 +14,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
-import { Calendar, ExternalLink, HeartHandshake, Link2, Pencil, Phone, Plus, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, HeartHandshake, Link2, Pencil, Phone, Plus, Trash2, User, Users, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +35,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  CATEGORIAS,
   FASES,
+  type Categoria,
   type Fase,
   type HTCustomerSuccess,
   deleteCustomerSuccess,
