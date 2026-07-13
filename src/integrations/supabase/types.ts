@@ -2617,6 +2617,7 @@ export type Database = {
           minutes_before_close: number
           nome: string
           operacao: string
+          owner_vendor_id: number | null
           updated_at: string
         }
         Insert: {
@@ -2631,6 +2632,7 @@ export type Database = {
           minutes_before_close?: number
           nome: string
           operacao: string
+          owner_vendor_id?: number | null
           updated_at?: string
         }
         Update: {
@@ -2645,6 +2647,7 @@ export type Database = {
           minutes_before_close?: number
           nome?: string
           operacao?: string
+          owner_vendor_id?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -3201,6 +3204,7 @@ export type Database = {
           minutes_before_close: number
           nome: string
           operacao: string
+          owner_vendor_id: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3412,6 +3416,7 @@ export type Database = {
           minutes_before_close: number
           nome: string
           operacao: string
+          owner_vendor_id: number | null
           updated_at: string
         }[]
         SetofOptions: {
@@ -3820,6 +3825,7 @@ export type Database = {
           minutes_before_close: number
           nome: string
           operacao: string
+          owner_vendor_id: number | null
           updated_at: string
         }
         SetofOptions: {
