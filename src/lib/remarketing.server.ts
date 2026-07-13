@@ -58,6 +58,11 @@ export async function processDueRemarketing() {
 
   for (const rule of rules) {
     try {
+      // Regra de vendedor precisa estar amarrada num canal — sem canal, ignora.
+      if (rule.owner_vendor_id && !rule.channel_id) {
+        console.warn("[remarketing] vendor rule sem channel_id, pulando", { rule: rule.id });
+        continue;
+      }
       const rem = rule.minutes_before_close;
       // Inbound must be older than (24h - rem) so window closes within `rem` minutes.
       const upperTs = new Date(now - (24 * 60 - rem) * 60 * 1000).toISOString();
