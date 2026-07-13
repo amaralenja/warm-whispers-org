@@ -497,10 +497,12 @@ function toDateTimeInput(v: string | null) {
 function EditDialog({
   open,
   row,
+  defaultCategoria,
   onClose,
 }: {
   open: boolean;
   row: HTCustomerSuccess | null;
+  defaultCategoria: Categoria | null;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -508,6 +510,7 @@ function EditDialog({
 
   const [form, setForm] = useState({
     aluno_nome: "",
+    categoria: "x1" as Categoria,
     entrada_mentoria: "",
     fase: "espionagem" as Fase,
     ultima_call: "",
@@ -520,6 +523,7 @@ function EditDialog({
     if (!open) return;
     setForm({
       aluno_nome: row?.aluno_nome ?? "",
+      categoria: (row?.categoria as Categoria) ?? defaultCategoria ?? "x1",
       entrada_mentoria: toDateInput(row?.entrada_mentoria ?? null),
       fase: (row?.fase as Fase) ?? "espionagem",
       ultima_call: toDateTimeInput(row?.ultima_call ?? null),
@@ -527,7 +531,7 @@ function EditDialog({
       grupo_whatsapp_link: row?.grupo_whatsapp_link ?? "",
       observacoes: row?.observacoes ?? "",
     });
-  }, [open, row]);
+  }, [open, row, defaultCategoria]);
 
   const saveMut = useMutation({
     mutationFn: () =>
@@ -535,6 +539,7 @@ function EditDialog({
         data: {
           id: row?.id ?? null,
           aluno_nome: form.aluno_nome,
+          categoria: form.categoria,
           entrada_mentoria: form.entrada_mentoria || null,
           fase: form.fase,
           ultima_call: form.ultima_call ? new Date(form.ultima_call).toISOString() : null,
