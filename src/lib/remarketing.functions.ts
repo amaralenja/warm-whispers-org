@@ -11,6 +11,33 @@ async function dbFor(context: any) {
   return context.supabase as any;
 }
 
+function vendorRpcArgs(context: any) {
+  const id = Number(context?.vendor?.id);
+  const codigo = String(context?.vendor?.codigo ?? "").trim();
+  return Number.isFinite(id) && id > 0 && codigo ? { _vendor_id: id, _codigo: codigo } : null;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function ensureVendorRpcArgs(context: any) {
+  const args = vendorRpcArgs(context);
+  if (!args) throw new Error("Sessão de vendedor inválida. Saia e entre novamente.");
+  return args;
+}
+
+function parseDbRule(row: any): RemarketingRule {
+  return {
+    ...row,
+    conditions: Array.isArray(row?.conditions) ? row.conditions : [],
+  } as RemarketingRule;
+}
+
 export type RemarketingCondition =
   | { type: "tag"; value: string }
   | { type: "stage"; value: string };
@@ -34,11 +61,18 @@ export const listRemarketingRules = createServerFn({ method: "GET" })
   .inputValidator((d: { operacao?: string }) => ({ operacao: d?.operacao ?? "" }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    if (context?.vendor) {
+      const { data: rows, error } = await db.rpc("vendor_list_remarketing_rules" as any, ensureVendorRpcArgs(context));
+      if (error) throw new Error(error.message);
+      const list = ((rows ?? []) as any[]).map(parseDbRule);
+      if (!data.operacao) return list;
+      return list.filter((r) => normalizeText(r.operacao) === normalizeText(data.operacao));
+    }
     let q = db.from("wa_remarketing_rules" as any).select("*").order("created_at", { ascending: false });
     if (data.operacao) q = q.eq("operacao", data.operacao);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return (rows ?? []) as RemarketingRule[];
+    return ((rows ?? []) as any[]).map(parseDbRule);
   });
 
 export const upsertRemarketingRule = createServerFn({ method: "POST" })
@@ -56,6 +90,23 @@ export const upsertRemarketingRule = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!data.nome || !data.operacao || !data.flow_id) throw new Error("Nome, operação e fluxo são obrigatórios");
     const db = await dbFor(context);
+    if (context?.vendor) {
+      const { data: row, error } = await db.rpc("vendor_upsert_remarketing_rule" as any, {
+        ...ensureVendorRpcArgs(context),
+        _rule_id: data.id ?? null,
+        _nome: data.nome,
+        _ativo: data.ativo,
+        _operacao: data.operacao,
+        _channel_id: data.channel_id,
+        _flow_id: data.flow_id,
+        _minutes_before_close: data.minutes_before_close,
+        _conditions: data.conditions,
+      });
+      if (error) throw new Error(error.message);
+      const saved = Array.isArray(row) ? row[0] : row;
+      if (!saved?.id) throw new Error("A regra foi enviada, mas o banco não retornou o ID.");
+      return { id: saved.id };
+    }
     const payload = {
       nome: data.nome,
       ativo: data.ativo,
@@ -90,6 +141,14 @@ export const deleteRemarketingRule = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d?.id ?? "") }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    if (context?.vendor) {
+      const { error } = await db.rpc("vendor_delete_remarketing_rule" as any, {
+        ...ensureVendorRpcArgs(context),
+        _rule_id: data.id,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
     const { error } = await db.from("wa_remarketing_rules" as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -100,6 +159,15 @@ export const toggleRemarketingRule = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; ativo: boolean }) => ({ id: String(d?.id ?? ""), ativo: !!d?.ativo }))
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
+    if (context?.vendor) {
+      const { error } = await db.rpc("vendor_toggle_remarketing_rule" as any, {
+        ...ensureVendorRpcArgs(context),
+        _rule_id: data.id,
+        _ativo: data.ativo,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
     const { error } = await db.from("wa_remarketing_rules" as any).update({ ativo: data.ativo }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
