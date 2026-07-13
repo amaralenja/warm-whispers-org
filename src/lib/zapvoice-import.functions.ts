@@ -70,6 +70,28 @@ function extractBase64(obj: any): { base64: string; mime?: string; filename?: st
   return null;
 }
 
+function extractRemoteUrl(obj: any): { url: string; mime?: string; filename?: string } | null {
+  if (!obj || typeof obj !== "object") return null;
+  const filename = obj.filename || obj.name || obj.fileName || undefined;
+  const mime = obj.mimeType || obj.mimetype || obj.type || obj.contentType || undefined;
+  const candidates = [
+    obj.url, obj.mediaUrl, obj.fileUrl, obj.downloadUrl, obj.src, obj.link,
+    obj.media, obj.audio, obj.document, obj.file,
+  ];
+  for (const c of candidates) {
+    if (typeof c !== "string") continue;
+    if (/^https?:\/\//i.test(c) && !c.startsWith("data:")) return { url: c, mime, filename };
+  }
+  for (const k of Object.keys(obj)) {
+    const v = (obj as any)[k];
+    if (v && typeof v === "object") {
+      const r = extractRemoteUrl(v);
+      if (r) return { ...r, filename: r.filename ?? filename, mime: r.mime ?? mime };
+    }
+  }
+  return null;
+}
+
 function extOf(mime?: string, filename?: string): string {
   if (filename && /\.[a-z0-9]{1,6}$/i.test(filename)) {
     return filename.match(/\.[a-z0-9]{1,6}$/i)![0].toLowerCase();
@@ -234,6 +256,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         filename: item.filename ?? item.fileName ?? item.name ?? null,
         keys: Object.keys(item).slice(0, 40),
         hasPreuploadedUrl: typeof item.preuploaded_url === "string" && item.preuploaded_url.length > 0,
+        hasHttpUrl: Object.values(item).some((value) => typeof value === "string" && /^https?:\/\//i.test(value)),
         hasDataUrl: Object.values(item).some((value) => typeof value === "string" && value.startsWith("data:") && value.includes(";base64,")),
         hasBase64LikeString: Object.values(item).some((value) => typeof value === "string" && value.length > 200 && /^[A-Za-z0-9+/=\r\n]+$/.test(value)),
         stringFields,
@@ -324,22 +347,60 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
           if (extracted) break;
         }
       }
-      if (!extracted) {
-        console.warn("[zapvoice-import] mídia sem payload extraível", mediaDiagnostics(itemId, kind, sequence, "fonte encontrada, mas sem base64/data-url/preuploaded_url válido"));
+
+      let bytes: Uint8Array | null = null;
+      let uploadMime: string | undefined;
+      let uploadFilename: string | undefined;
+      let remote: { url: string; mime?: string; filename?: string } | null = null;
+
+      if (extracted) {
+        try {
+          const bin = typeof Buffer !== "undefined"
+            ? Buffer.from(extracted.base64, "base64")
+            : Uint8Array.from(atob(extracted.base64), (c) => c.charCodeAt(0));
+          bytes = bin instanceof Uint8Array ? bin : new Uint8Array(bin);
+          uploadMime = extracted.mime;
+          uploadFilename = extracted.filename;
+        } catch (e: any) {
+          throw new Error(`base64 inválido: ${e?.message ?? e}`);
+        }
+      }
+
+      if (!bytes) {
+        remote = extractRemoteUrl(merged);
+        if (!remote) {
+          for (const src of sources) {
+            remote = extractRemoteUrl(src);
+            if (remote) break;
+          }
+        }
+        if (remote) {
+          try {
+            console.info("[zapvoice-import] baixando mídia remota", { itemId, kind, urlPreview: previewString(remote.url) });
+            const response = await fetch(remote.url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            bytes = new Uint8Array(await response.arrayBuffer());
+            uploadMime = remote.mime ?? response.headers.get("content-type") ?? undefined;
+            uploadFilename = remote.filename;
+          } catch (e: any) {
+            console.warn("[zapvoice-import] falha ao baixar mídia remota", {
+              itemId,
+              kind,
+              urlPreview: previewString(remote.url),
+              error: e?.message ?? String(e),
+              debug: mediaDiagnostics(itemId, kind, sequence, "URL remota encontrada, mas download falhou"),
+            });
+            return null;
+          }
+        }
+      }
+
+      if (!bytes) {
+        console.warn("[zapvoice-import] mídia sem payload extraível", mediaDiagnostics(itemId, kind, sequence, "fonte encontrada, mas sem base64/data-url/preuploaded_url/URL remota válida"));
         return null;
       }
 
-      let bytes: Uint8Array;
-      try {
-        const bin = typeof Buffer !== "undefined"
-          ? Buffer.from(extracted.base64, "base64")
-          : Uint8Array.from(atob(extracted.base64), (c) => c.charCodeAt(0));
-        bytes = bin instanceof Uint8Array ? bin : new Uint8Array(bin);
-      } catch (e: any) {
-        throw new Error(`base64 inválido: ${e?.message ?? e}`);
-      }
-
-      const ext = extOf(extracted.mime, extracted.filename);
+      const ext = extOf(uploadMime, uploadFilename);
       // Sanitiza userId — vendedores têm id "vendor:13" (colon quebra alguns paths).
       const safeUser = String(context.userId ?? "shared").replace(/[^a-zA-Z0-9_-]/g, "_");
       const path = `zapvoice/${safeUser}/${itemId}${ext}`;
@@ -348,6 +409,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         .from("wa-media")
         .upload(path, bytes, {
           contentType: extracted.mime ?? "application/octet-stream",
+          contentType: uploadMime ?? "application/octet-stream",
           upsert: true,
         });
       if (upErr) throw new Error(`upload falhou: ${upErr.message}`);
@@ -359,7 +421,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       if (signErr || !signed?.signedUrl) throw new Error(`signed url falhou: ${signErr?.message ?? "?"}`);
 
       summary.uploads += 1;
-      const result = { url: signed.signedUrl, filename: extracted.filename, mime: extracted.mime };
+      const result = { url: signed.signedUrl, filename: uploadFilename, mime: uploadMime };
       uploadCache.set(itemId, result);
       return result;
     }
