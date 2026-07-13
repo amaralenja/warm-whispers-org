@@ -135,17 +135,32 @@ function HTCustomerSuccessPage() {
   const [editing, setEditing] = useState<HTCustomerSuccess | null>(null);
   const [creating, setCreating] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [categoria, setCategoria] = useState<Categoria | null>(null);
+
+  const countsByCategoria = useMemo(() => {
+    const c: Record<Categoria, number> = { x1: 0, grupo: 0, individual: 0 };
+    for (const r of rows) {
+      const k = (CATEGORIAS as readonly string[]).includes(r.categoria) ? (r.categoria as Categoria) : "x1";
+      c[k] += 1;
+    }
+    return c;
+  }, [rows]);
+
+  const filteredRows = useMemo(
+    () => (categoria ? rows.filter((r) => (r.categoria ?? "x1") === categoria) : rows),
+    [rows, categoria],
+  );
 
   const byFase = useMemo(() => {
     const map: Record<Fase, HTCustomerSuccess[]> = {
       espionagem: [], modelagem: [], construcao: [], concluido: [],
     };
-    for (const r of rows) {
+    for (const r of filteredRows) {
       const f = (FASES as readonly string[]).includes(r.fase) ? (r.fase as Fase) : "espionagem";
       map[f].push(r);
     }
     return map;
-  }, [rows]);
+  }, [filteredRows]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
