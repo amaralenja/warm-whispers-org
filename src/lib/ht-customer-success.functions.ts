@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const FASES = ["espionagem", "modelagem", "construcao", "concluido"] as const;
 export type Fase = (typeof FASES)[number];
@@ -46,7 +45,6 @@ async function db() {
 }
 
 export const listCustomerSuccess = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
   .handler(async () => {
     const sb = await db();
     const { data, error } = await sb
@@ -60,7 +58,6 @@ export const listCustomerSuccess = createServerFn({ method: "GET" })
   });
 
 export const upsertCustomerSuccess = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     id?: string | null;
     aluno_nome: string;
@@ -113,7 +110,6 @@ export const upsertCustomerSuccess = createServerFn({ method: "POST" })
   });
 
 export const updateCustomerSuccessFase = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string; fase: Fase; sort_order?: number }) => d)
   .handler(async ({ data }) => {
     const sb = await db();
@@ -126,7 +122,6 @@ export const updateCustomerSuccessFase = createServerFn({ method: "POST" })
   });
 
 export const deleteCustomerSuccess = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }) => {
     const sb = await db();
@@ -140,7 +135,6 @@ export const deleteCustomerSuccess = createServerFn({ method: "POST" })
 // ============================================================
 
 export const listCustomerSuccessCalls = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { aluno_id: string }) => d)
   .handler(async ({ data }) => {
     const sb = await db();
@@ -155,7 +149,6 @@ export const listCustomerSuccessCalls = createServerFn({ method: "GET" })
   });
 
 export const upsertCustomerSuccessCall = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     id?: string | null;
     aluno_id: string;
@@ -191,7 +184,6 @@ export const upsertCustomerSuccessCall = createServerFn({ method: "POST" })
   });
 
 export const deleteCustomerSuccessCall = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }) => {
     const sb = await db();
