@@ -1869,7 +1869,10 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
   const [schedMap, setSched] = useSchedMap();
+  const [closerEmailMap, setCloserEmail] = useCloserEmailMap();
+  const closersList = useClosersList();
   const sdrStageMap = useSdrStageMap();
+
 
 
 
