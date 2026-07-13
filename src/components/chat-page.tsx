@@ -837,7 +837,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     });
   }
 
-  // Auto-scroll to bottom when messages change or conversation opens
+  // Auto-scroll: sempre ao abrir uma conversa; ao chegar msg nova só se o
+  // vendedor já estiver perto do rodapé (senão atrapalha ele lendo msgs antigas).
   const messagesLen = messageList.length;
   useEffect(() => {
     scrollToBottom();
@@ -847,7 +848,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messagesLen, activeId]);
+  }, [activeId]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 150) scrollToBottom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messagesLen]);
 
   // Mark read when opening a conv (depend só em activeId + unread_count pra não loopar com a referência recalculada de `active`)
   const unreadForActive = active?.unread_count ?? 0;
