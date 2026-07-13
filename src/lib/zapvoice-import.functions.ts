@@ -38,6 +38,12 @@ function mapBy<T extends { id?: string }>(arr: any): Map<string, T> {
   return m;
 }
 
+function parseDataUrl(value: string): { base64: string; mime?: string } | null {
+  const match = value.match(/^data:([^;,]+)(?:;[^,]*)*;base64,(.+)$/s);
+  if (!match) return null;
+  return { base64: match[2], mime: match[1] };
+}
+
 // Try to find a base64/data-url payload inside an arbitrary object.
 function extractBase64(obj: any): { base64: string; mime?: string; filename?: string } | null {
   if (!obj || typeof obj !== "object") return null;
@@ -51,8 +57,8 @@ function extractBase64(obj: any): { base64: string; mime?: string; filename?: st
   for (const c of candidates) {
     if (typeof c !== "string" || c.length < 20) continue;
     if (c.startsWith("data:")) {
-      const m = c.match(/^data:([^;]+);base64,(.+)$/);
-      if (m) return { base64: m[2], mime: m[1] ?? mime, filename };
+      const parsed = parseDataUrl(c);
+      if (parsed) return { base64: parsed.base64, mime: parsed.mime ?? mime, filename };
     }
     // Heuristic: long base64-looking string.
     if (/^[A-Za-z0-9+/=\r\n]+$/.test(c) && c.length > 200) {
@@ -619,10 +625,10 @@ export const uploadZapVoiceMedia = createServerFn({ method: "POST" })
     // Aceita data URL ou base64 puro
     let base64 = data.base64;
     let mime = data.mime ?? undefined;
-    const dataUrlMatch = base64.match(/^data:([^;]+);base64,(.+)$/);
+    const dataUrlMatch = parseDataUrl(base64);
     if (dataUrlMatch) {
-      mime = mime ?? dataUrlMatch[1];
-      base64 = dataUrlMatch[2];
+      mime = mime ?? dataUrlMatch.mime;
+      base64 = dataUrlMatch.base64;
     }
     base64 = base64.replace(/\s+/g, "");
 
