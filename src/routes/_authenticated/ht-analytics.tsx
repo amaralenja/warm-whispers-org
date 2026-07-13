@@ -1581,19 +1581,25 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
   }, [leads]);
 
   const eligible = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return leads.filter((l) => {
       const c = (l.caixa_letra ?? "").toUpperCase();
-      if (!"BCDEFG".includes(c)) return false; // Leads > R$ 1k
-      if (caixaFilter !== "all" && c !== caixaFilter) return false;
+      // Busca ativa ignora o gate de caixa (BCDEFG) — encontra qualquer lead
+      if (!q) {
+        if (!"BCDEFG".includes(c)) return false;
+        if (caixaFilter !== "all" && c !== caixaFilter) return false;
+      } else if (caixaFilter !== "all" && c !== caixaFilter) {
+        return false;
+      }
       if (utmFilter !== "all" && (l.utm_source ?? "") !== utmFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const hay = `${l.nome ?? ""} ${l.email ?? ""} ${l.whatsapp ?? ""}`.toLowerCase();
+      if (q) {
+        const hay = `${l.nome ?? ""} ${l.email ?? ""} ${l.whatsapp ?? ""} ${l.instagram ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
   }, [leads, caixaFilter, utmFilter, search]);
+
 
   const byStage = useMemo(() => {
     const m: Record<string, QLead[]> = {};
