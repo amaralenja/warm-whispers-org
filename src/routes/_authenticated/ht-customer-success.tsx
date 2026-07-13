@@ -314,6 +314,7 @@ function HTCustomerSuccessPage() {
       <EditDialog
         open={creating || !!editing}
         row={editing}
+        defaultCategoria={categoria}
         onClose={() => {
           setCreating(false);
           setEditing(null);
