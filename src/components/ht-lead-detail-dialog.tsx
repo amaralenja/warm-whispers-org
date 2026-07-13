@@ -102,7 +102,7 @@ function fmtDate(iso?: string | null) {
 
 export function HtLeadDetailDialog({
   lead, role, open, onOpenChange, scheduledAt, onSchedule, onSaleSaved,
-  closers, closerEmail,
+  closers = [], closerEmail,
 }: {
   lead: LeadLike | null;
   role: Role;
