@@ -68,7 +68,13 @@ export const listRemarketingRules = createServerFn({ method: "GET" })
       if (!data.operacao) return list;
       return list.filter((r) => normalizeText(r.operacao) === normalizeText(data.operacao));
     }
-    let q = db.from("wa_remarketing_rules" as any).select("*").order("created_at", { ascending: false });
+    // Admin/expert só vê as regras da operação — regras de vendedor (owner_vendor_id != null)
+    // ficam privadas pro próprio vendedor.
+    let q = db
+      .from("wa_remarketing_rules" as any)
+      .select("*")
+      .is("owner_vendor_id", null)
+      .order("created_at", { ascending: false });
     if (data.operacao) q = q.eq("operacao", data.operacao);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
