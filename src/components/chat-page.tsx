@@ -1565,7 +1565,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottom} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
                       </div>
                     );
                   })}
