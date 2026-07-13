@@ -1605,7 +1605,7 @@ function useClosersList(): ClosersOption[] {
 
 
 
-function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
+function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: boolean; onReload?: () => void }) {
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
   const [utmFilter, setUtmFilter] = useState<string>("all");
