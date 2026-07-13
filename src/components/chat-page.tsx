@@ -674,8 +674,17 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const source = primary.length === 0 && needsFallback ? asArray<Conv>(convsFallback) : primary;
     const sorted = sortConversationsByLastInteraction(source);
     if (!vendorSession || vendorId == null) return sorted;
-    return sorted.filter((c) => Number((c as any)?.assigned_vendor_id) === Number(vendorId));
-  }, [convs, convsFallback, needsFallback, vendorSession, vendorId]);
+    // Em embed com telefone (abertura via Kanban/CRM), o server já limitou aos
+    // canais do vendedor. Não filtra por assigned_vendor_id aqui — muitas convs
+    // dos leads ainda não têm vendedor atribuído, e isso escondia a conversa
+    // dando "Conversa não encontrada" aleatoriamente.
+    if (searchParams.embed && (requestedPhone || requestedConversationId)) return sorted;
+    return sorted.filter((c) => {
+      const assigned = (c as any)?.assigned_vendor_id;
+      if (assigned == null) return true; // não atribuído → mostra
+      return Number(assigned) === Number(vendorId);
+    });
+  }, [convs, convsFallback, needsFallback, vendorSession, vendorId, searchParams.embed, requestedPhone, requestedConversationId]);
 
 
   // Auto-open a conversation when arriving via ?phone= or ?conversationId=
