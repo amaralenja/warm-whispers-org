@@ -1547,6 +1547,56 @@ function useSchedMap(): [Record<string, string>, (leadId: string, iso: string | 
   return [map, set];
 }
 
+const CLOSER_EMAIL_LS_KEY = "ht_kanban_closer_email_v1";
+function loadCloserEmailMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(CLOSER_EMAIL_LS_KEY) || "{}"); } catch { return {}; }
+}
+function useCloserEmailMap(): [Record<string, string>, (leadId: string, email: string | null) => void] {
+  const [map, setMap] = useState<Record<string, string>>(() => loadCloserEmailMap());
+  useEffect(() => {
+    const sync = () => setMap(loadCloserEmailMap());
+    window.addEventListener("storage", sync);
+    window.addEventListener("ht-closer-email-updated", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("ht-closer-email-updated", sync);
+    };
+  }, []);
+  const set = (leadId: string, email: string | null) => {
+    setMap((prev) => {
+      const next = { ...prev };
+      if (email) next[leadId] = email; else delete next[leadId];
+      try {
+        localStorage.setItem(CLOSER_EMAIL_LS_KEY, JSON.stringify(next));
+        window.dispatchEvent(new Event("ht-closer-email-updated"));
+      } catch {}
+      return next;
+    });
+  };
+  return [map, set];
+}
+
+type ClosersOption = { id: string | number; nome: string; email: string | null };
+function useClosersList(): ClosersOption[] {
+  const [list, setList] = useState<ClosersOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from("ht_team")
+      .select("id, nome, email, tipo, ativo")
+      .eq("tipo", "closer")
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setList((data ?? []).map((r: any) => ({ id: r.id, nome: r.nome, email: r.email ?? null })));
+      });
+    return () => { cancelled = true; };
+  }, []);
+  return list;
+}
+
+
 
 
 
