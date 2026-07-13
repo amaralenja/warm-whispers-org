@@ -450,7 +450,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         </div>
       </div>
 
-      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} />}
+      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} onReload={() => setNonce((n) => n + 1)} />}
       {tab === "closer" && (
         <>
           <KanbanCloser leads={leads} vendas={vendas} loading={loading} onReload={() => setNonce((n) => n + 1)} />
