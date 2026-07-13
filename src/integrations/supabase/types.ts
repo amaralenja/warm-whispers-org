@@ -843,9 +843,15 @@ export type Database = {
         Row: {
           aluno_nome: string
           categoria: string
+          celular: string | null
+          cpf: string | null
           created_at: string
+          data_nascimento: string | null
+          email: string | null
+          endereco: string | null
           entrada_mentoria: string | null
           fase: string
+          formulario_integracao_url: string | null
           grupo_whatsapp_link: string | null
           id: string
           observacoes: string | null
@@ -857,9 +863,15 @@ export type Database = {
         Insert: {
           aluno_nome: string
           categoria?: string
+          celular?: string | null
+          cpf?: string | null
           created_at?: string
+          data_nascimento?: string | null
+          email?: string | null
+          endereco?: string | null
           entrada_mentoria?: string | null
           fase?: string
+          formulario_integracao_url?: string | null
           grupo_whatsapp_link?: string | null
           id?: string
           observacoes?: string | null
@@ -871,9 +883,15 @@ export type Database = {
         Update: {
           aluno_nome?: string
           categoria?: string
+          celular?: string | null
+          cpf?: string | null
           created_at?: string
+          data_nascimento?: string | null
+          email?: string | null
+          endereco?: string | null
           entrada_mentoria?: string | null
           fase?: string
+          formulario_integracao_url?: string | null
           grupo_whatsapp_link?: string | null
           id?: string
           observacoes?: string | null
@@ -883,6 +901,50 @@ export type Database = {
           whatsapp_privado?: string | null
         }
         Relationships: []
+      }
+      ht_customer_success_calls: {
+        Row: {
+          aluno_id: string
+          created_at: string
+          data: string | null
+          evento: string | null
+          id: string
+          link: string | null
+          responsavel: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          aluno_id: string
+          created_at?: string
+          data?: string | null
+          evento?: string | null
+          id?: string
+          link?: string | null
+          responsavel?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          aluno_id?: string
+          created_at?: string
+          data?: string | null
+          evento?: string | null
+          id?: string
+          link?: string | null
+          responsavel?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ht_customer_success_calls_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "ht_customer_success"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ht_lead_notes: {
         Row: {
