@@ -5,10 +5,18 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Component, type ReactNode } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+
+function safeReportLovableError(error: unknown, context: Record<string, unknown>) {
+  try {
+    reportLovableError(error, context);
+  } catch (reportError) {
+    console.error(reportError);
+  }
+}
 
 function NotFoundComponent() {
   return (
@@ -35,7 +43,9 @@ function NotFoundComponent() {
 function ErrorComponent(props?: { error?: Error; reset?: () => void }) {
   const safeError = props?.error ?? new Error("Erro desconhecido");
   console.error(props?.error);
-  reportLovableError(safeError, { boundary: "tanstack_root_error_component" });
+  useEffect(() => {
+    safeReportLovableError(safeError, { boundary: "tanstack_root_error_component" });
+  }, [safeError]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -126,7 +136,7 @@ class ShellBoundary extends Component<{ children: ReactNode; fallback: ReactNode
   }
 
   componentDidCatch(error: Error) {
-    reportLovableError(error, { boundary: "root_shell" });
+    safeReportLovableError(error, { boundary: "root_shell" });
   }
 
   render() {
@@ -152,7 +162,7 @@ class RouteBoundary extends Component<{ children: ReactNode }, { error: Error | 
     return { error };
   }
   componentDidCatch(error: Error) {
-    reportLovableError(error, { boundary: "route_boundary" });
+    safeReportLovableError(error, { boundary: "route_boundary" });
   }
   render() {
     if (this.state.error) {
