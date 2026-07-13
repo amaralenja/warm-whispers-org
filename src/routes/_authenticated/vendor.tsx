@@ -69,6 +69,19 @@ function VendorPortal() {
     refetchInterval: 60_000,
   });
 
+  const { data: paymentLinks = [] } = useQuery({
+    queryKey: ["vendor-payment-links", v?.id],
+    queryFn: () => fetchLinks({ data: { vendorId: v!.id } }),
+    enabled: !!v?.id,
+  });
+
+  function copyLink(url: string) {
+    navigator.clipboard.writeText(url).then(
+      () => toast.success("Link copiado"),
+      () => toast.error("Não consegui copiar"),
+    );
+  }
+
   function logout() {
     localStorage.removeItem("vendor_session");
     navigate({ to: "/auth" });
