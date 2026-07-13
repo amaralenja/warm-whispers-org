@@ -29,6 +29,7 @@ import { Route as AuthenticatedMetaAdsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedHtTeamRouteImport } from './routes/_authenticated/ht-team'
 import { Route as AuthenticatedHtKanbanSdrRouteImport } from './routes/_authenticated/ht-kanban-sdr'
 import { Route as AuthenticatedHtKanbanCloserRouteImport } from './routes/_authenticated/ht-kanban-closer'
+import { Route as AuthenticatedHtCustomerSuccessRouteImport } from './routes/_authenticated/ht-customer-success'
 import { Route as AuthenticatedHtApiRouteImport } from './routes/_authenticated/ht-api'
 import { Route as AuthenticatedHtAnalyticsRouteImport } from './routes/_authenticated/ht-analytics'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -155,6 +156,12 @@ const AuthenticatedHtKanbanCloserRoute =
   AuthenticatedHtKanbanCloserRouteImport.update({
     id: '/ht-kanban-closer',
     path: '/ht-kanban-closer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedHtCustomerSuccessRoute =
+  AuthenticatedHtCustomerSuccessRouteImport.update({
+    id: '/ht-customer-success',
+    path: '/ht-customer-success',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedHtApiRoute = AuthenticatedHtApiRouteImport.update({
@@ -290,6 +297,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
   '/ht-api': typeof AuthenticatedHtApiRoute
+  '/ht-customer-success': typeof AuthenticatedHtCustomerSuccessRoute
   '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/ht-team': typeof AuthenticatedHtTeamRoute
@@ -333,6 +341,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
   '/ht-api': typeof AuthenticatedHtApiRoute
+  '/ht-customer-success': typeof AuthenticatedHtCustomerSuccessRoute
   '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/ht-team': typeof AuthenticatedHtTeamRoute
@@ -378,6 +387,7 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/ht-analytics': typeof AuthenticatedHtAnalyticsRoute
   '/_authenticated/ht-api': typeof AuthenticatedHtApiRoute
+  '/_authenticated/ht-customer-success': typeof AuthenticatedHtCustomerSuccessRoute
   '/_authenticated/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/_authenticated/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
   '/_authenticated/ht-team': typeof AuthenticatedHtTeamRoute
@@ -423,6 +433,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/ht-analytics'
     | '/ht-api'
+    | '/ht-customer-success'
     | '/ht-kanban-closer'
     | '/ht-kanban-sdr'
     | '/ht-team'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/ht-analytics'
     | '/ht-api'
+    | '/ht-customer-success'
     | '/ht-kanban-closer'
     | '/ht-kanban-sdr'
     | '/ht-team'
@@ -510,6 +522,7 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/ht-analytics'
     | '/_authenticated/ht-api'
+    | '/_authenticated/ht-customer-success'
     | '/_authenticated/ht-kanban-closer'
     | '/_authenticated/ht-kanban-sdr'
     | '/_authenticated/ht-team'
@@ -703,6 +716,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHtKanbanCloserRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ht-customer-success': {
+      id: '/_authenticated/ht-customer-success'
+      path: '/ht-customer-success'
+      fullPath: '/ht-customer-success'
+      preLoaderRoute: typeof AuthenticatedHtCustomerSuccessRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ht-api': {
       id: '/_authenticated/ht-api'
       path: '/ht-api'
@@ -869,6 +889,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedHtAnalyticsRoute: typeof AuthenticatedHtAnalyticsRoute
   AuthenticatedHtApiRoute: typeof AuthenticatedHtApiRoute
+  AuthenticatedHtCustomerSuccessRoute: typeof AuthenticatedHtCustomerSuccessRoute
   AuthenticatedHtKanbanCloserRoute: typeof AuthenticatedHtKanbanCloserRoute
   AuthenticatedHtKanbanSdrRoute: typeof AuthenticatedHtKanbanSdrRoute
   AuthenticatedHtTeamRoute: typeof AuthenticatedHtTeamRoute
@@ -898,6 +919,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedHtAnalyticsRoute: AuthenticatedHtAnalyticsRoute,
   AuthenticatedHtApiRoute: AuthenticatedHtApiRoute,
+  AuthenticatedHtCustomerSuccessRoute: AuthenticatedHtCustomerSuccessRoute,
   AuthenticatedHtKanbanCloserRoute: AuthenticatedHtKanbanCloserRoute,
   AuthenticatedHtKanbanSdrRoute: AuthenticatedHtKanbanSdrRoute,
   AuthenticatedHtTeamRoute: AuthenticatedHtTeamRoute,
