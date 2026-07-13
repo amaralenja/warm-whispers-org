@@ -574,7 +574,18 @@ function EditDialog({
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div>
+            <Label className="text-xs">Grupo</Label>
+            <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v as Categoria })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORIAS.map((c) => (
+                  <SelectItem key={c} value={c}>{CATEGORIA_META[c].label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
               <Label className="text-xs">Entrada na mentoria</Label>
               <Input
                 type="date"
