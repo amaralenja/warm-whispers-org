@@ -2,9 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar } from "lucide-react";
+import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar, Copy, Link2 } from "lucide-react";
+import { toast } from "sonner";
 import logoMultium from "@/assets/logo-multium.webp";
 import { getVendorStats } from "@/lib/vendor.functions";
+import { listVendorLinksPublic } from "@/lib/vendor-links.functions";
 import { DesempenhoDiario } from "@/components/desempenho-diario";
 
 
@@ -49,6 +51,7 @@ function VendorPortal() {
   const [v, setV] = useState<VendorSession | null>(null);
   const [preset, setPreset] = useState<RangePreset>("mes");
   const fetchStats = useServerFn(getVendorStats);
+  const fetchLinks = useServerFn(listVendorLinksPublic);
 
   useEffect(() => {
     const raw = localStorage.getItem("vendor_session");
