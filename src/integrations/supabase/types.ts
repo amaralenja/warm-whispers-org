@@ -842,6 +842,7 @@ export type Database = {
       ht_customer_success: {
         Row: {
           aluno_nome: string
+          categoria: string
           created_at: string
           entrada_mentoria: string | null
           fase: string
@@ -855,6 +856,7 @@ export type Database = {
         }
         Insert: {
           aluno_nome: string
+          categoria?: string
           created_at?: string
           entrada_mentoria?: string | null
           fase?: string
@@ -868,6 +870,7 @@ export type Database = {
         }
         Update: {
           aluno_nome?: string
+          categoria?: string
           created_at?: string
           entrada_mentoria?: string | null
           fase?: string
