@@ -4,9 +4,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const FASES = ["espionagem", "modelagem", "construcao", "concluido"] as const;
 export type Fase = (typeof FASES)[number];
 
+export const CATEGORIAS = ["x1", "grupo", "individual"] as const;
+export type Categoria = (typeof CATEGORIAS)[number];
+
 export type HTCustomerSuccess = {
   id: string;
   aluno_nome: string;
+  categoria: Categoria;
   entrada_mentoria: string | null;
   fase: Fase;
   ultima_call: string | null;
@@ -42,6 +46,7 @@ export const upsertCustomerSuccess = createServerFn({ method: "POST" })
   .inputValidator((d: {
     id?: string | null;
     aluno_nome: string;
+    categoria?: Categoria;
     entrada_mentoria?: string | null;
     fase?: Fase;
     ultima_call?: string | null;
@@ -54,6 +59,7 @@ export const upsertCustomerSuccess = createServerFn({ method: "POST" })
     if (!nome) throw new Error("Nome do aluno é obrigatório");
     const payload: any = {
       aluno_nome: nome,
+      categoria: data.categoria ?? "x1",
       entrada_mentoria: data.entrada_mentoria || null,
       fase: data.fase ?? "espionagem",
       ultima_call: data.ultima_call || null,
