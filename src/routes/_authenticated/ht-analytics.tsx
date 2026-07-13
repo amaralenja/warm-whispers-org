@@ -135,6 +135,50 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         if (data.length < pageSize) break;
       }
 
+      // Quiz leads vindos pela API pública (tabela ht_quiz_submissions neste projeto).
+      // Precisa entrar no Kanban SDR igual os leads do quiz externo.
+      try {
+        let qz = supabase.from("ht_quiz_submissions" as any)
+          .select("id, received_at, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas")
+          .order("received_at", { ascending: false })
+          .limit(5000);
+        if (startIso) qz = qz.gte("received_at", startIso);
+        if (endIso) qz = qz.lt("received_at", endIso);
+        const { data: qzData } = await qz;
+        if (qzData) {
+          for (const s of qzData as any[]) {
+            const r = (s.respostas ?? {}) as Record<string, any>;
+            all.push({
+              id: `htq:${s.id}`,
+              data_criacao: s.received_at,
+              nome: s.nome ?? null,
+              email: s.email ?? null,
+              whatsapp: s.whatsapp ?? null,
+              instagram: s.instagram ?? null,
+              caixa_letra: r.caixa_letra ?? null,
+              caixa_label: r.caixa_label ?? null,
+              faturamento: r.faturamento ?? null,
+              momento: r.momento ?? null,
+              objetivo: r.objetivo ?? null,
+              investir: r.investir ?? null,
+              minicurso: r.minicurso ?? null,
+              socio: r.socio ?? null,
+              comprometimento: r.comprometimento ?? null,
+              last_step: r.step_atual != null ? String(r.step_atual) : null,
+              funil: r.funil ?? null,
+              utm_source: s.utm_source ?? null,
+              utm_medium: s.utm_medium ?? null,
+              utm_campaign: s.utm_campaign ?? null,
+              crm_status: null,
+              crm_valor: null,
+              crm_data_agendamento: null,
+            } as QLead);
+          }
+        }
+      } catch {
+        /* silencioso — se falhar, só não mostra os leads da API */
+      }
+
       // HT tables in parallel
       const [v, hl, r, ag] = await Promise.all([
         (() => {
@@ -164,7 +208,19 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       ]);
 
       if (cancel) return;
-      setLeads(all);
+      // Deduplica por whatsapp: leads da API só entram se não vieram do quiz externo.
+      const seenWa = new Set<string>();
+      const merged: QLead[] = [];
+      for (const l of all) {
+        const key = (l.whatsapp || "").replace(/\D+/g, "");
+        if (key) {
+          if (seenWa.has(key)) continue;
+          seenWa.add(key);
+        }
+        merged.push(l);
+      }
+      merged.sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
+      setLeads(merged);
       setVendas(v.data ?? []);
       setHtLeads(hl.data ?? []);
       setReunioes(r.data ?? []);
