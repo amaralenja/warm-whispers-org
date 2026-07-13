@@ -1557,7 +1557,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       null;
                     const quoted = ctxId ? messageList.find((x) => x.wa_message_id === ctxId) ?? null : null;
                     return (
-                      <div key={String(m.id)}>
+                      <div key={String(m.id)} id={`msg-${m.id}`} className="scroll-mt-20 rounded-xl transition-colors duration-500">
                         {showDate && (
                           <div className="my-5 flex justify-center">
                             <span className="rounded-full border border-chat-line bg-chat-panel px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
@@ -1565,7 +1565,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} />
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} onQuotedClick={(target) => {
+                          const el = document.getElementById(`msg-${target.id}`);
+                          if (!el) return;
+                          el.scrollIntoView({ behavior: "smooth", block: "center" });
+                          el.classList.add("ring-2", "ring-chat-accent", "bg-chat-accent/10");
+                          window.setTimeout(() => {
+                            el.classList.remove("ring-2", "ring-chat-accent", "bg-chat-accent/10");
+                          }, 1600);
+                        }} />
                       </div>
                     );
                   })}
