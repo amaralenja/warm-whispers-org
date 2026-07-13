@@ -102,14 +102,17 @@ function fmtDate(iso?: string | null) {
 
 export function HtLeadDetailDialog({
   lead, role, open, onOpenChange, scheduledAt, onSchedule, onSaleSaved,
+  closers, closerEmail,
 }: {
   lead: LeadLike | null;
   role: Role;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   scheduledAt?: string | null;
-  onSchedule?: (iso: string | null) => void;
+  onSchedule?: (iso: string | null, closerEmail?: string | null) => void;
   onSaleSaved?: () => void;
+  closers?: { id: string | number; nome: string; email: string | null }[];
+  closerEmail?: string | null;
 }) {
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -119,6 +122,8 @@ export function HtLeadDetailDialog({
   const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
 
   const [schedDraft, setSchedDraft] = useState<string>("");
+  const [closerDraft, setCloserDraft] = useState<string>("");
+
 
   // Registro de venda
   const [saleOpen, setSaleOpen] = useState(false);
