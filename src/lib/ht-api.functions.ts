@@ -33,9 +33,10 @@ export const createHtApiToken = createServerFn({ method: "POST" })
     return { name };
   })
   .handler(async ({ data, context }) => {
+    const { randomBytes } = await import("crypto");
     const raw = randomBytes(30).toString("base64").replace(/[+/=]/g, "").slice(0, 40);
     const token = `htq_${raw}`;
-    const token_hash = hashToken(token);
+    const token_hash = await hashToken(token);
     const token_prefix = token.slice(0, 12);
     const { data: row, error } = await context.supabase
       .from("ht_api_tokens" as any)
