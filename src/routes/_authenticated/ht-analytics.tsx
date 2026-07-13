@@ -1616,6 +1616,7 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
   const [schedMap, setSched] = useSchedMap();
   const [closerEmailMap, setCloserEmail] = useCloserEmailMap();
   const closersList = useClosersList();
+  const [addOpen, setAddOpen] = useState(false);
 
 
 
