@@ -68,10 +68,15 @@ export const upsertRemarketingRule = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const userId = (context as any)?.userId ?? null;
+    const rawUserId = (context as any)?.userId ?? null;
+    // created_by é uuid — vendedor tem userId "vendor:123", que quebra o insert.
+    const createdBy =
+      typeof rawUserId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUserId)
+        ? rawUserId
+        : null;
     const { data: ins, error } = await db
       .from("wa_remarketing_rules" as any)
-      .insert({ ...payload, created_by: userId })
+      .insert({ ...payload, created_by: createdBy })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
