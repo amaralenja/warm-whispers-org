@@ -1805,8 +1805,15 @@ function KanbanSDR({ leads, loading }: { leads: QLead[]; loading: boolean }) {
         open={!!selectedLead}
         onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
-        onSchedule={(iso) => selectedLead && setSched(selectedLead.id, iso)}
+        closers={closersList}
+        closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
+        onSchedule={(iso, email) => {
+          if (!selectedLead) return;
+          setSched(selectedLead.id, iso);
+          setCloserEmail(selectedLead.id, email ?? null);
+        }}
       />
+
     </div>
   );
 }
