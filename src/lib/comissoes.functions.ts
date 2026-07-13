@@ -41,6 +41,7 @@ export const getComissoes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: ComissoesRange | undefined) => input ?? {})
   .handler(async (opts): Promise<ComissoesPayload> => {
+    const { parseTicket, parseDataField, tierRate } = await import("@/lib/comissoes.server");
     const context = opts?.context;
     assertAdmin(context);
     const supabase = context.supabase as any;
