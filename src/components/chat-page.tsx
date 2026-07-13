@@ -1870,14 +1870,19 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             }`}
           >
             {(quotedPreview || quotedFrom) && (
-              <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"}`}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); if (quotedFrom && onQuotedClick) onQuotedClick(quotedFrom); }}
+                disabled={!quotedFrom || !onQuotedClick}
+                className={`mb-2 block w-full text-left rounded-lg border-l-4 px-3 py-2 text-xs transition-colors ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"} ${quotedFrom && onQuotedClick ? "hover:bg-black/30 cursor-pointer" : "cursor-default"}`}
+              >
                 <div className="font-semibold opacity-80">
                   {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
                 </div>
                 <div className="mt-0.5 truncate opacity-90">
                   {quotedPreview || (quotedFrom ? (toText(quotedFrom.text_body) || toText(quotedFrom.caption) || toText(quotedFrom.msg_type)) : "")}
                 </div>
-              </div>
+              </button>
             )}
             <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
             {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
