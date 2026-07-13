@@ -26,7 +26,7 @@ type Summary = {
   funnels: number;
   steps: number;
   uploads: number;
-  errors: { funnel?: string; item?: string; message: string }[];
+  errors: { funnel?: string; item?: string; message: string; debug?: any }[];
 };
 
 function mapBy<T extends { id?: string }>(arr: any): Map<string, T> {
@@ -64,6 +64,28 @@ function extractBase64(obj: any): { base64: string; mime?: string; filename?: st
     const v = (obj as any)[k];
     if (v && typeof v === "object") {
       const r = extractBase64(v);
+      if (r) return { ...r, filename: r.filename ?? filename, mime: r.mime ?? mime };
+    }
+  }
+  return null;
+}
+
+function extractRemoteUrl(obj: any): { url: string; mime?: string; filename?: string } | null {
+  if (!obj || typeof obj !== "object") return null;
+  const filename = obj.filename || obj.name || obj.fileName || undefined;
+  const mime = obj.mimeType || obj.mimetype || obj.type || obj.contentType || undefined;
+  const candidates = [
+    obj.url, obj.mediaUrl, obj.fileUrl, obj.downloadUrl, obj.src, obj.link,
+    obj.media, obj.audio, obj.document, obj.file,
+  ];
+  for (const c of candidates) {
+    if (typeof c !== "string") continue;
+    if (/^https?:\/\//i.test(c) && !c.startsWith("data:")) return { url: c, mime, filename };
+  }
+  for (const k of Object.keys(obj)) {
+    const v = (obj as any)[k];
+    if (v && typeof v === "object") {
+      const r = extractRemoteUrl(v);
       if (r) return { ...r, filename: r.filename ?? filename, mime: r.mime ?? mime };
     }
   }
@@ -210,7 +232,90 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
     // Cache uploads (same itemId may repeat across funnels)
     const uploadCache = new Map<string, { url: string; filename?: string; mime?: string }>();
 
-    async function uploadMedia(itemId: string, kind: "audio" | "media" | "document"): Promise<{ url: string; filename?: string; mime?: string } | null> {
+    const previewString = (value: unknown) => {
+      if (typeof value !== "string") return null;
+      const clean = value.replace(/\s+/g, " ").slice(0, 80);
+      if (value.startsWith("data:")) return `${value.slice(0, 48)}… (${value.length} chars)`;
+      if (/^[A-Za-z0-9+/=\r\n]+$/.test(value) && value.length > 200) return `[base64 ${value.length} chars]`;
+      if (/^https?:\/\//i.test(value)) return `${value.slice(0, 72)}… (${value.length} chars)`;
+      return `${clean}${value.length > 80 ? "…" : ""} (${value.length} chars)`;
+    };
+
+    const describeSource = (bucket: string, item: any) => {
+      if (!item || typeof item !== "object") return { bucket, found: false };
+      const stringFields = Object.entries(item)
+        .filter(([, value]) => typeof value === "string")
+        .slice(0, 20)
+        .map(([key, value]) => ({ key, preview: previewString(value) }));
+      return {
+        bucket,
+        found: true,
+        id: item.id ?? null,
+        itemId: item.itemId ?? null,
+        type: item.type ?? item.mimeType ?? item.mimetype ?? item.contentType ?? null,
+        filename: item.filename ?? item.fileName ?? item.name ?? null,
+        keys: Object.keys(item).slice(0, 40),
+        hasPreuploadedUrl: typeof item.preuploaded_url === "string" && item.preuploaded_url.length > 0,
+        hasHttpUrl: Object.values(item).some((value) => typeof value === "string" && /^https?:\/\//i.test(value)),
+        hasDataUrl: Object.values(item).some((value) => typeof value === "string" && value.startsWith("data:") && value.includes(";base64,")),
+        hasBase64LikeString: Object.values(item).some((value) => typeof value === "string" && value.length > 200 && /^[A-Za-z0-9+/=\r\n]+$/.test(value)),
+        stringFields,
+      };
+    };
+
+    const findByItemId = (bucket: string, arr: any, itemId: string) => {
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter((item: any) => String(item?.itemId ?? item?.data?.itemId ?? "") === itemId)
+        .slice(0, 5)
+        .map((item: any) => describeSource(`${bucket}[itemId]`, item));
+    };
+
+    const findRawByItemId = (arr: any, itemId: string) => {
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter((item: any) => item && typeof item === "object" && String(item?.itemId ?? item?.data?.itemId ?? "") === itemId)
+        .slice(0, 5);
+    };
+
+    const mediaDiagnostics = (itemId: string, kind: string, sequence?: any, reason?: string) => {
+      const direct = [
+        describeSource("objectsList[id]", objectsById.get(itemId)),
+        describeSource("audios[id]", audiosById.get(itemId)),
+        describeSource("medias[id]", mediasById.get(itemId)),
+        describeSource("docs[id]", docsById.get(itemId)),
+      ];
+      const indirect = [
+        ...findByItemId("objectsList", b.objectsList, itemId),
+        ...findByItemId("audios", b.audios, itemId),
+        ...findByItemId("medias", b.medias, itemId),
+        ...findByItemId("docs", b.docs, itemId),
+      ];
+      const foundIn = direct.filter((source) => source.found).map((source) => source.bucket);
+      return {
+        reason,
+        itemId,
+        requestedKind: kind,
+        sequence: sequence ? {
+          id: sequence.id ?? null,
+          itemId: sequence.itemId ?? null,
+          type: sequence.type ?? null,
+          keys: typeof sequence === "object" ? Object.keys(sequence).slice(0, 30) : [],
+        } : null,
+        backupCounts: {
+          objectsList: Array.isArray(b.objectsList) ? b.objectsList.length : null,
+          messages: Array.isArray(b.messages) ? b.messages.length : null,
+          audios: Array.isArray(b.audios) ? b.audios.length : null,
+          medias: Array.isArray(b.medias) ? b.medias.length : null,
+          docs: Array.isArray(b.docs) ? b.docs.length : null,
+        },
+        foundIn,
+        directSources: direct,
+        itemIdMatchesWithDifferentId: indirect,
+      };
+    };
+
+    async function uploadMedia(itemId: string, kind: "audio" | "media" | "document", sequence?: any): Promise<{ url: string; filename?: string; mime?: string } | null> {
       if (uploadCache.has(itemId)) return uploadCache.get(itemId)!;
 
       // Tenta TODAS as fontes possíveis, não só a do tipo declarado.
@@ -221,9 +326,16 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         audiosById.get(itemId),
         mediasById.get(itemId),
         docsById.get(itemId),
+        ...findRawByItemId(b.objectsList, itemId),
+        ...findRawByItemId(b.audios, itemId),
+        ...findRawByItemId(b.medias, itemId),
+        ...findRawByItemId(b.docs, itemId),
       ].filter(Boolean) as any[];
 
-      if (sources.length === 0) return null;
+      if (sources.length === 0) {
+        console.warn("[zapvoice-import] mídia sem fonte no backup", mediaDiagnostics(itemId, kind, sequence, "itemId não apareceu por id em objectsList/audios/medias/docs"));
+        return null;
+      }
       const merged: any = Object.assign({}, ...sources);
 
       // Pre-uploaded from client (evita estourar limite de request body)
@@ -246,19 +358,60 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
           if (extracted) break;
         }
       }
-      if (!extracted) return null;
 
-      let bytes: Uint8Array;
-      try {
-        const bin = typeof Buffer !== "undefined"
-          ? Buffer.from(extracted.base64, "base64")
-          : Uint8Array.from(atob(extracted.base64), (c) => c.charCodeAt(0));
-        bytes = bin instanceof Uint8Array ? bin : new Uint8Array(bin);
-      } catch (e: any) {
-        throw new Error(`base64 inválido: ${e?.message ?? e}`);
+      let bytes: Uint8Array | null = null;
+      let uploadMime: string | undefined;
+      let uploadFilename: string | undefined;
+      let remote: { url: string; mime?: string; filename?: string } | null = null;
+
+      if (extracted) {
+        try {
+          const bin = typeof Buffer !== "undefined"
+            ? Buffer.from(extracted.base64, "base64")
+            : Uint8Array.from(atob(extracted.base64), (c) => c.charCodeAt(0));
+          bytes = bin instanceof Uint8Array ? bin : new Uint8Array(bin);
+          uploadMime = extracted.mime;
+          uploadFilename = extracted.filename;
+        } catch (e: any) {
+          throw new Error(`base64 inválido: ${e?.message ?? e}`);
+        }
       }
 
-      const ext = extOf(extracted.mime, extracted.filename);
+      if (!bytes) {
+        remote = extractRemoteUrl(merged);
+        if (!remote) {
+          for (const src of sources) {
+            remote = extractRemoteUrl(src);
+            if (remote) break;
+          }
+        }
+        if (remote) {
+          try {
+            console.info("[zapvoice-import] baixando mídia remota", { itemId, kind, urlPreview: previewString(remote.url) });
+            const response = await fetch(remote.url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            bytes = new Uint8Array(await response.arrayBuffer());
+            uploadMime = remote.mime ?? response.headers.get("content-type") ?? undefined;
+            uploadFilename = remote.filename;
+          } catch (e: any) {
+            console.warn("[zapvoice-import] falha ao baixar mídia remota", {
+              itemId,
+              kind,
+              urlPreview: previewString(remote.url),
+              error: e?.message ?? String(e),
+              debug: mediaDiagnostics(itemId, kind, sequence, "URL remota encontrada, mas download falhou"),
+            });
+            return null;
+          }
+        }
+      }
+
+      if (!bytes) {
+        console.warn("[zapvoice-import] mídia sem payload extraível", mediaDiagnostics(itemId, kind, sequence, "fonte encontrada, mas sem base64/data-url/preuploaded_url/URL remota válida"));
+        return null;
+      }
+
+      const ext = extOf(uploadMime, uploadFilename);
       // Sanitiza userId — vendedores têm id "vendor:13" (colon quebra alguns paths).
       const safeUser = String(context.userId ?? "shared").replace(/[^a-zA-Z0-9_-]/g, "_");
       const path = `zapvoice/${safeUser}/${itemId}${ext}`;
@@ -266,7 +419,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       const { error: upErr } = await db.storage
         .from("wa-media")
         .upload(path, bytes, {
-          contentType: extracted.mime ?? "application/octet-stream",
+          contentType: uploadMime ?? "application/octet-stream",
           upsert: true,
         });
       if (upErr) throw new Error(`upload falhou: ${upErr.message}`);
@@ -278,7 +431,7 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
       if (signErr || !signed?.signedUrl) throw new Error(`signed url falhou: ${signErr?.message ?? "?"}`);
 
       summary.uploads += 1;
-      const result = { url: signed.signedUrl, filename: extracted.filename, mime: extracted.mime };
+      const result = { url: signed.signedUrl, filename: uploadFilename, mime: uploadMime };
       uploadCache.set(itemId, result);
       return result;
     }
@@ -362,9 +515,17 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
               }
             } else {
               const kind = s.type === "audio" ? "audio" : s.type === "document" ? "document" : "media";
-              const up = await uploadMedia(s.itemId, kind);
+              const up = await uploadMedia(s.itemId, kind, s);
               if (!up) {
-                summary.errors.push({ funnel: f.name, item: s.itemId, message: "mídia não encontrada no objectsList" });
+                const debug = mediaDiagnostics(s.itemId, kind, s, "uploadMedia retornou vazio");
+                const sourceLabel = debug.foundIn.length > 0 ? debug.foundIn.join(", ") : "nenhuma fonte por id";
+                const differentIdMatches = debug.itemIdMatchesWithDifferentId.length;
+                summary.errors.push({
+                  funnel: f.name,
+                  item: s.itemId,
+                  message: `mídia não importada: ${sourceLabel}${differentIdMatches ? `; ${differentIdMatches} registro(s) têm itemId igual mas id diferente` : ""}`,
+                  debug,
+                });
                 continue;
               }
               // refina tipo baseado no mime
