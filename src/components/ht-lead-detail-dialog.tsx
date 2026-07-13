@@ -411,12 +411,26 @@ export function HtLeadDetailDialog({
                   onChange={(e) => setSchedDraft(e.target.value)}
                   className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60"
                 />
+                {closers && closers.length > 0 && (
+                  <select
+                    value={closerDraft}
+                    onChange={(e) => setCloserDraft(e.target.value)}
+                    className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60 min-w-[180px]"
+                  >
+                    <option value="">Selecionar closer…</option>
+                    {closers.filter((c) => c.email).map((c) => (
+                      <option key={c.id} value={c.email!}>
+                        {c.nome} — {c.email}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     if (!schedDraft) return;
                     const iso = new Date(schedDraft).toISOString();
-                    onSchedule(iso);
+                    onSchedule(iso, closerDraft || null);
                   }}
                   className="text-[11px] font-semibold px-3 py-1.5 rounded-md bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors"
                 >
@@ -425,12 +439,13 @@ export function HtLeadDetailDialog({
                 {scheduledAt && (
                   <button
                     type="button"
-                    onClick={() => onSchedule(null)}
+                    onClick={() => onSchedule(null, null)}
                     className="text-[11px] px-3 py-1.5 rounded-md bg-muted/40 text-muted-foreground border border-border/60 hover:text-foreground transition-colors"
                   >
                     Desmarcar
                   </button>
                 )}
+
                 <div className="ml-auto text-[10px] text-muted-foreground">
                   Sincroniza automaticamente com o Kanban Closer.
                 </div>
