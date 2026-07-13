@@ -406,13 +406,18 @@ function Card({
       className={`group rounded-xl border border-border bg-card p-3 shadow-sm transition ${dragging ? "rotate-1 shadow-xl" : "hover:border-emerald-500/40"}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{row.aluno_nome}</div>
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="truncate text-sm font-semibold hover:text-emerald-400">{row.aluno_nome}</div>
           <div className="mt-0.5 flex items-center gap-1 text-[0.65rem] text-muted-foreground">
             <Calendar className="h-3 w-3" />
             Entrada: {fmtDate(row.entrada_mentoria)}
           </div>
-        </div>
+        </button>
         {(onEdit || onDelete) && (
           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
             {onEdit && (
