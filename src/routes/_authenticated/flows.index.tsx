@@ -23,7 +23,7 @@ import {
   listFlows, createFlow, deleteFlow, saveFlow,
   duplicateFlow, exportFlow, importFlow,
 } from "@/lib/flow-engine.functions";
-import { importZapVoiceBackup } from "@/lib/zapvoice-import.functions";
+import { importZapVoiceBackup, uploadZapVoiceMedia } from "@/lib/zapvoice-import.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -43,6 +43,7 @@ function FlowsListPage() {
   const exportFn = useServerFn(exportFlow);
   const importFn = useServerFn(importFlow);
   const importZvFn = useServerFn(importZapVoiceBackup);
+  const uploadZvMediaFn = useServerFn(uploadZapVoiceMedia);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -188,6 +189,33 @@ function FlowsListPage() {
     setZvLogs((logs) => [...logs.slice(-79), `[${time}] ${message}`]);
   };
 
+  const previewValue = (value: unknown) => {
+    if (typeof value !== "string") return null;
+    if (value.startsWith("data:")) return `${value.slice(0, 56)}… (${value.length} chars)`;
+    if (/^[A-Za-z0-9+/=\r\n]+$/.test(value) && value.length > 200) return `[base64 ${value.length} chars]`;
+    if (/^https?:\/\//i.test(value)) return `${value.slice(0, 80)}… (${value.length} chars)`;
+    return `${value.slice(0, 80)}${value.length > 80 ? "…" : ""} (${value.length} chars)`;
+  };
+
+  const describeLocalSource = (bucket: string, item: any) => {
+    if (!item || typeof item !== "object") return { bucket, found: false };
+    return {
+      bucket,
+      found: true,
+      id: item.id ?? null,
+      itemId: item.itemId ?? item.data?.itemId ?? null,
+      type: item.type ?? item.mimeType ?? item.mimetype ?? item.contentType ?? null,
+      filename: item.filename ?? item.fileName ?? item.name ?? null,
+      keys: Object.keys(item).slice(0, 35),
+      stringFields: Object.entries(item)
+        .filter(([, value]) => typeof value === "string")
+        .slice(0, 14)
+        .map(([key, value]) => ({ key, preview: previewValue(value) })),
+      hasDataUrl: Object.values(item).some((value) => typeof value === "string" && value.startsWith("data:") && value.includes(";base64,")),
+      hasBase64LikeString: Object.values(item).some((value) => typeof value === "string" && value.length > 200 && /^[A-Za-z0-9+/=\r\n]+$/.test(value)),
+    };
+  };
+
   async function runZvImport() {
     if (!zvFile) return toast.error("Selecione o arquivo .json");
     const t = toast.loading("Lendo arquivo…");
@@ -314,6 +342,33 @@ function FlowsListPage() {
       sequenceIdx.get(itemId),
     ].filter(Boolean);
 
+    const localMediaDebug = (itemId: string) => {
+      const byItemId = (bucket: string, arr: any) => Array.isArray(arr)
+        ? arr
+          .filter((item: any) => String(item?.itemId ?? item?.data?.itemId ?? "") === itemId)
+          .slice(0, 5)
+          .map((item: any) => describeLocalSource(`${bucket}[itemId]`, item))
+        : [];
+      return {
+        itemId,
+        directSources: [
+          describeLocalSource("objectsList[id]", objectsIdx.get(itemId)),
+          describeLocalSource("messages[id]", messagesIdx.get(itemId)),
+          describeLocalSource("audios[id]", audiosIdx.get(itemId)),
+          describeLocalSource("medias[id]", mediasIdx.get(itemId)),
+          describeLocalSource("docs[id]", docsIdx.get(itemId)),
+          describeLocalSource("itemsSequence", sequenceIdx.get(itemId)),
+        ],
+        itemIdMatchesWithDifferentId: [
+          ...byItemId("objectsList", parsed.objectsList),
+          ...byItemId("messages", parsed.messages),
+          ...byItemId("audios", parsed.audios),
+          ...byItemId("medias", parsed.medias),
+          ...byItemId("docs", parsed.docs),
+        ],
+      };
+    };
+
     const extractFromAnySource = (itemId: string) => {
       const sources = getItemSources(itemId);
       const merged = Object.assign({}, ...sources);
@@ -344,25 +399,34 @@ function FlowsListPage() {
 
     for (const itemId of allItemIds) {
       const ex = extractFromAnySource(itemId);
-      if (!ex) { mediaDone++; continue; }
+      if (!ex) {
+        const dbg = localMediaDebug(itemId);
+        const foundIn = dbg.directSources.filter((s: any) => s.found).map((s: any) => s.bucket);
+        if (foundIn.length > 0 || dbg.itemIdMatchesWithDifferentId.length > 0) {
+          console.warn("[zv-import] item sem base64/preupload no arquivo local", dbg);
+          addZvLog(`Sem arquivo extraível ${itemId}: fontes=${foundIn.join(", ") || "nenhuma por id"}; itemIdMatches=${dbg.itemIdMatchesWithDifferentId.length}`);
+        }
+        mediaDone++;
+        continue;
+      }
       try {
         const ext = extOf(ex.mime ?? null, ex.filename ?? null);
-        const path = `zapvoice-import/${Date.now()}-${safePathPart(itemId)}${ext}`;
         const blob = base64ToBlob(ex.base64, ex.mime ?? null);
-        const { error: upErr } = await supabase.storage.from("wa-media").upload(path, blob, {
-          contentType: ex.mime ?? "application/octet-stream",
-          upsert: true,
+        addZvLog(`Mídia detectada ${itemId}: mime=${ex.mime ?? "?"}, arquivo=${ex.filename ?? `${safePathPart(itemId)}${ext}`}, tamanho=${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+        const uploaded: any = await uploadZvMediaFn({
+          data: {
+            itemId,
+            base64: ex.base64,
+            mime: ex.mime ?? null,
+            filename: ex.filename ?? `${safePathPart(itemId)}${ext}`,
+          },
         });
-        if (upErr) throw upErr;
-        const { data: signed, error: signErr } = await supabase.storage
-          .from("wa-media")
-          .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
-        if (signErr || !signed?.signedUrl) throw signErr ?? new Error("signed url ausente");
-        preuploaded.set(itemId, { url: signed.signedUrl, mime: ex.mime ?? null, filename: ex.filename ?? null });
-        addZvLog(`Mídia enviada: ${itemId} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+        preuploaded.set(itemId, { url: uploaded.url, mime: uploaded.mime ?? ex.mime ?? null, filename: uploaded.filename ?? ex.filename ?? null });
+        addZvLog(`Mídia enviada server-side: ${itemId} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
       } catch (upErr: any) {
-        console.error("[zv-import] preupload fail", itemId, upErr);
-        addZvLog(`Falha ao enviar mídia ${itemId}: ${upErr?.message ?? String(upErr)}`);
+        const dbg = localMediaDebug(itemId);
+        console.error("[zv-import] preupload fail", { itemId, error: upErr, debug: dbg });
+        addZvLog(`Falha ao enviar mídia ${itemId}: ${upErr?.message ?? String(upErr)} | debug=${JSON.stringify(dbg).slice(0, 900)}`);
       }
       mediaDone++;
       if (mediaDone % 3 === 0 || mediaDone === mediaTotal) {
@@ -442,6 +506,11 @@ function FlowsListPage() {
           acc.steps += r?.steps ?? 0;
           acc.uploads += r?.uploads ?? 0;
           if (Array.isArray(r?.errors)) acc.errors.push(...r.errors);
+          if (Array.isArray(r?.errors) && r.errors.length > 0) {
+            for (const err of r.errors.slice(0, 8)) {
+              addZvLog(`Aviso servidor ${err?.item ?? "sem item"}: ${err?.message ?? "erro"}${err?.debug ? ` | debug=${JSON.stringify(err.debug).slice(0, 900)}` : ""}`);
+            }
+          }
           addZvLog(`Funil ${i + 1} importado: ${r?.funnels ?? 0} fluxo(s), ${r?.steps ?? 0} etapa(s)`);
         } catch (chunkErr: any) {
           console.error("[zv-import] chunk fail", { chunkIdx, error: chunkErr });
@@ -847,8 +916,11 @@ function FlowsListPage() {
                   <details className="text-xs text-amber-600 mt-1">
                     <summary>{zvSummary.errors.length} erro(s) — clique para ver</summary>
                     <ul className="mt-1 max-h-40 overflow-auto space-y-0.5 pl-3 list-disc">
-                      {zvSummary.errors.slice(0, 30).map((e: any, i: number) => (
-                        <li key={i}>{e.funnel ? `[${e.funnel}] ` : ""}{e.item ? `${e.item}: ` : ""}{e.message}</li>
+                      {zvSummary.errors.slice(0, 60).map((e: any, i: number) => (
+                        <li key={i}>
+                          {e.funnel ? `[${e.funnel}] ` : ""}{e.item ? `${e.item}: ` : ""}{e.message}
+                          {e.debug && <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-background/60 p-2 text-[10px] text-muted-foreground">{JSON.stringify(e.debug, null, 2)}</pre>}
+                        </li>
                       ))}
                     </ul>
                   </details>
