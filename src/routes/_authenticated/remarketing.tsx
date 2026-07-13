@@ -59,6 +59,13 @@ function RemarketingPage() {
     queryKey: ["remarketing-rules"],
     queryFn: () => listFn({ data: {} }),
   });
+  const rules = useMemo(
+    () => (Array.isArray(rulesQ.data) ? rulesQ.data : []).map((rule: any) => ({
+      ...rule,
+      conditions: Array.isArray(rule?.conditions) ? rule.conditions : [],
+    })) as RemarketingRule[],
+    [rulesQ.data],
+  );
 
   const toggleMut = useMutation({
     mutationFn: async (v: { id: string; ativo: boolean }) => toggleFn({ data: v }),
@@ -94,7 +101,7 @@ function RemarketingPage() {
 
       {rulesQ.isLoading ? (
         <div className="text-sm text-muted-foreground">Carregando…</div>
-      ) : (rulesQ.data ?? []).length === 0 ? (
+      ) : rules.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
             <Zap className="h-8 w-8 text-muted-foreground" />
@@ -104,7 +111,7 @@ function RemarketingPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {(rulesQ.data ?? []).map((rule) => (
+          {rules.map((rule) => (
             <Card key={rule.id} className={rule.ativo ? "" : "opacity-60"}>
               <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
                 <div className="min-w-0 flex-1">
@@ -190,7 +197,7 @@ function RuleDialog({
   const [channelId, setChannelId] = useState<string>(rule?.channel_id ?? vendorFirstChannel ?? "");
   const [flowId, setFlowId] = useState<string>(rule?.flow_id ?? "");
   const [minutesBefore, setMinutesBefore] = useState<number>(rule?.minutes_before_close ?? 30);
-  const [conditions, setConditions] = useState<RemarketingCondition[]>(rule?.conditions ?? []);
+  const [conditions, setConditions] = useState<RemarketingCondition[]>(Array.isArray(rule?.conditions) ? rule.conditions : []);
   const [flowPickerOpen, setFlowPickerOpen] = useState(false);
 
   const expertsQ = useQuery({ queryKey: ["crm-experts-all"], queryFn: () => listExpertsFn({}) });
