@@ -196,6 +196,12 @@ function FlowsListPage() {
     return `${value.slice(0, 80)}${value.length > 80 ? "…" : ""} (${value.length} chars)`;
   };
 
+  const parseDataUrl = (value: string): { base64: string; mime?: string } | null => {
+    const match = value.match(/^data:([^;,]+)(?:;[^,]*)*;base64,(.+)$/s);
+    if (!match) return null;
+    return { base64: match[2], mime: match[1] };
+  };
+
   const describeLocalSource = (bucket: string, item: any) => {
     if (!item || typeof item !== "object") return { bucket, found: false };
     return {
@@ -314,8 +320,8 @@ function FlowsListPage() {
       for (const c of cands) {
         if (typeof c !== "string" || c.length < 20) continue;
         if (c.startsWith("data:")) {
-          const m = c.match(/^data:([^;]+);base64,(.+)$/);
-          if (m) return { base64: m[2], mime: m[1] ?? mime, filename };
+          const parsedDataUrl = parseDataUrl(c);
+          if (parsedDataUrl) return { base64: parsedDataUrl.base64, mime: parsedDataUrl.mime ?? mime, filename };
         }
         if (/^[A-Za-z0-9+/=\r\n]+$/.test(c) && c.length > 200) {
           return { base64: c.replace(/\s+/g, ""), mime, filename };
