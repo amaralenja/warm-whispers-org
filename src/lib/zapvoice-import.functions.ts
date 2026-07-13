@@ -212,12 +212,19 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
 
     async function uploadMedia(itemId: string, kind: "audio" | "media" | "document"): Promise<{ url: string; filename?: string; mime?: string } | null> {
       if (uploadCache.has(itemId)) return uploadCache.get(itemId)!;
-      const itemRef =
-        kind === "audio" ? audiosById.get(itemId)
-        : kind === "document" ? docsById.get(itemId)
-        : mediasById.get(itemId);
-      const obj = objectsById.get(itemId) ?? itemRef;
-      const merged: any = { ...(itemRef ?? {}), ...(obj ?? {}) };
+
+      // Tenta TODAS as fontes possíveis, não só a do tipo declarado.
+      // Zapvoice às vezes referencia um itemId de audio dentro de um step "media" (e vice-versa),
+      // e o mesmo id pode estar só em objectsList, ou só num bucket específico.
+      const sources = [
+        objectsById.get(itemId),
+        audiosById.get(itemId),
+        mediasById.get(itemId),
+        docsById.get(itemId),
+      ].filter(Boolean) as any[];
+
+      if (sources.length === 0) return null;
+      const merged: any = Object.assign({}, ...sources);
 
       // Pre-uploaded from client (evita estourar limite de request body)
       if (typeof merged?.preuploaded_url === "string" && merged.preuploaded_url) {
@@ -230,7 +237,15 @@ export const importZapVoiceBackup = createServerFn({ method: "POST" })
         return result;
       }
 
-      const extracted = extractBase64(merged);
+      // Tenta extrair base64 do merge e depois de cada fonte isolada
+      // (o merge pode sobrescrever campo válido com vazio de outra fonte).
+      let extracted = extractBase64(merged);
+      if (!extracted) {
+        for (const src of sources) {
+          extracted = extractBase64(src);
+          if (extracted) break;
+        }
+      }
       if (!extracted) return null;
 
       let bytes: Uint8Array;
