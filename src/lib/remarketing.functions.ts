@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function dbFor(context: any) {
-  if (context?.vendor && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // Vendedor não tem sessão Supabase Auth, então RLS anon bloqueia leitura/escrita.
+  // Usa o admin client (fallback pra anon em dev; service role em prod).
+  if (context?.vendor) {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return supabaseAdmin as any;
   }
