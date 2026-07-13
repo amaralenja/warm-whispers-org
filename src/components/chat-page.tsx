@@ -32,8 +32,7 @@ import {
   GripVertical,
   Columns3,
   ArrowLeft,
-  
-  
+  ChevronDown,
 } from "lucide-react";
 import {
   DndContext,
@@ -837,9 +836,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     });
   }
 
-  // Auto-scroll: sempre ao abrir uma conversa; ao chegar msg nova só se o
-  // vendedor já estiver perto do rodapé (senão atrapalha ele lendo msgs antigas).
-  const messagesLen = messageList.length;
+  // Auto-scroll SÓ ao abrir a conversa. Depois é o vendedor que decide.
   useEffect(() => {
     scrollToBottom();
     const timer = window.setTimeout(scrollToBottom, 120);
@@ -850,13 +847,20 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
+  // Mostra a setinha "voltar pro rodapé" quando o vendedor rolou pra cima.
+  const [showScrollDown, setShowScrollDown] = useState(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceFromBottom < 150) scrollToBottom();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messagesLen]);
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollDown(distance > 300);
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [activeId]);
+
 
   // Mark read when opening a conv (depend só em activeId + unread_count pra não loopar com a referência recalculada de `active`)
   const unreadForActive = active?.unread_count ?? 0;
@@ -1521,9 +1525,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
               <CurrentConversationProvider value={{ conversationId: String(active.id), phone: (active as any).contact_wa_id ?? null, title: (active as any).contact_name ?? (active as any).contact_wa_id ?? "Conversa" }}>
+              <div className="relative min-h-0 flex-1">
               <div
                 ref={scrollRef}
-                className="min-h-0 flex-1 overflow-y-auto bg-chat-thread px-3 py-4 scrollbar-fancy md:px-6 md:py-6"
+                className="absolute inset-0 overflow-y-auto bg-chat-thread px-3 py-4 scrollbar-fancy md:px-6 md:py-6"
               >
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
                   {messagesError ? (
@@ -1557,7 +1562,19 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
                 </div>
               </div>
+              {showScrollDown && (
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  aria-label="Ir para o final da conversa"
+                  className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-chat-line bg-chat-panel text-foreground shadow-lg transition-colors hover:bg-chat-soft"
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </button>
+              )}
+              </div>
               </CurrentConversationProvider>
+
 
 
 
