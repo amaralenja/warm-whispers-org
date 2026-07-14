@@ -2067,12 +2067,10 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
     const card = filtered.find((c) => c.id === id);
     const quizId = card?.lead?.id;
     if (quizId) setFake(quizId, stage === "fake");
-    setStageMap((prev) => {
-      const next = { ...prev, [id]: stage };
-      saveCloserMap(next);
-      return next;
-    });
+    dbSetCloserStage(id, stage);
+    setStageMap((prev) => ({ ...prev, [id]: stage }));
   }
+
 
 
   return (
