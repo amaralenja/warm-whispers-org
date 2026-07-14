@@ -1445,10 +1445,10 @@ function FunilVisual({ stages }: {
 // Kanban SDR
 // ============================================================
 const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
-  { id: "novos", label: "Novos Leads (> 1k)" },
-  { id: "c1", label: "1º Contato (Msg Caio)" },
-  { id: "c2", label: "2º Contato (SDR)" },
-  { id: "c3", label: "3º Contato (Msg Caio)" },
+  { id: "novos", label: "Novos Leads" },
+  { id: "c1", label: "1º Contato" },
+  { id: "c2", label: "2º Contato" },
+  { id: "c3", label: "3º Contato" },
   { id: "convite", label: "Convite do Grupo" },
   { id: "no_grupo", label: "1-3k no Grupo" },
   { id: "agendado", label: "Agendado", accent: "text-emerald-400" },
