@@ -1567,7 +1567,8 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
   );
   const igMap = useIgProfileMap(igUsernames);
 
-  useEffect(() => { setStageMap(loadKanbanMap()); }, []);
+  const sdrCacheTick = useKanbanCacheReady();
+  useEffect(() => { setStageMap(snapshotSdrStages()); }, [sdrCacheTick]);
 
   const utmOptions = useMemo(() => {
     const s = new Set<string>();
