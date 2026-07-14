@@ -1643,7 +1643,6 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
     const q = search.trim().toLowerCase();
     return leads.filter((l) => {
       const c = (l.caixa_letra ?? "").toUpperCase();
-      // Busca ativa ignora o gate de caixa (BCDEFG) — encontra qualquer lead
       if (!q) {
         if (!"BCDEFG".includes(c)) return false;
         if (caixaFilter !== "all" && c !== caixaFilter) return false;
@@ -1651,13 +1650,14 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
         return false;
       }
       if (utmFilter !== "all" && (l.utm_source ?? "") !== utmFilter) return false;
+      if (onlyFinalizados && !isFinalizado(l)) return false;
       if (q) {
         const hay = `${l.nome ?? ""} ${l.email ?? ""} ${l.whatsapp ?? ""} ${l.instagram ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [leads, caixaFilter, utmFilter, search]);
+  }, [leads, caixaFilter, utmFilter, search, onlyFinalizados]);
 
 
   const byStage = useMemo(() => {
