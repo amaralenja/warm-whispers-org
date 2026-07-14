@@ -946,6 +946,36 @@ export type Database = {
           },
         ]
       }
+      ht_kanban_state: {
+        Row: {
+          closer_email: string | null
+          closer_stage: string | null
+          is_fake: boolean
+          lead_id: string
+          scheduled_at: string | null
+          sdr_stage: string | null
+          updated_at: string
+        }
+        Insert: {
+          closer_email?: string | null
+          closer_stage?: string | null
+          is_fake?: boolean
+          lead_id: string
+          scheduled_at?: string | null
+          sdr_stage?: string | null
+          updated_at?: string
+        }
+        Update: {
+          closer_email?: string | null
+          closer_stage?: string | null
+          is_fake?: boolean
+          lead_id?: string
+          scheduled_at?: string | null
+          sdr_stage?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ht_lead_notes: {
         Row: {
           author: string | null
