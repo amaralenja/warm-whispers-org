@@ -1906,15 +1906,8 @@ const CLOSER_STAGES: { id: string; label: string; accent?: string }[] = [
 
 ];
 
-const CLOSER_LS_KEY = "ht_kanban_closer_v1";
+// (closer stage map agora vem do cache compartilhado — snapshotCloserStages)
 
-function loadCloserMap(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(CLOSER_LS_KEY) || "{}"); } catch { return {}; }
-}
-function saveCloserMap(m: Record<string, string>) {
-  try { localStorage.setItem(CLOSER_LS_KEY, JSON.stringify(m)); } catch {}
-}
 
 type CloserCard = {
   id: string; nome: string; valor: number; created_at: string;
