@@ -33,11 +33,12 @@ export function VendorLinksDialog({ open, onOpenChange, vendorId, vendorName }: 
   const deleteFn = useServerFn(deleteVendorLink);
 
   const key = ["vendor-payment-links", vendorId];
-  const { data: links = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: key,
     queryFn: () => listFn({ data: { vendorId: vendorId! } }),
     enabled: open && !!vendorId,
   });
+  const links: VendorPaymentLink[] = Array.isArray(data) ? data : [];
 
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
