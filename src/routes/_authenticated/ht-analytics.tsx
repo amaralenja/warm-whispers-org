@@ -2050,16 +2050,21 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
 
   const cards: CloserCard[] = useMemo(() => {
     const list: CloserCard[] = [];
+    const q = (search || "").trim().toLowerCase();
+    const matchesSearch = (l: any) => {
+      if (!q) return false;
+      const hay = `${l?.nome ?? ""} ${l?.whatsapp ?? ""} ${l?.email ?? ""} ${l?.instagram ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    };
     for (const l of leads || []) {
-      if (!isFinalizado(l)) continue;
       const caixa = (l.caixa_letra ?? "").toUpperCase();
-      if (!"DEFG".includes(caixa)) continue;
       const sdr = sdrStageOf(l);
       const def = sdrToCloser(sdr);
       const cardId = `qlead-${l.id}`;
-      // Só entra no closer se o SDR marcou como agendado/descartado/fake/fechado,
-      // ou se o closer já moveu o card manualmente (override local).
-      if (!def && !stageMap[cardId]) continue;
+      const finalizado = isFinalizado(l);
+      const inPipeline = finalizado && "DEFG".includes(caixa) && (def || stageMap[cardId]);
+      const bySearch = matchesSearch(l);
+      if (!inPipeline && !bySearch) continue;
       list.push({
         id: cardId,
         nome: l.nome || l.whatsapp || "Sem nome",
@@ -2085,7 +2090,7 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
       });
     }
     return list;
-  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap]);
+  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
@@ -2094,11 +2099,12 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
   }, [cards]);
 
   const filtered = useMemo(() => cards.filter((c) => {
-    // Leads sem closer atribuído (source: "lead") aparecem para todos os closers.
     if (closerFilter !== "all" && c.closer && c.closer !== closerFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!`${c.nome} ${c.closer ?? ""}`.toLowerCase().includes(q)) return false;
+      const l: any = (c as any).lead || {};
+      const hay = `${c.nome} ${c.closer ?? ""} ${l.whatsapp ?? ""} ${l.email ?? ""} ${l.instagram ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
     }
     return true;
   }), [cards, closerFilter, search]);
