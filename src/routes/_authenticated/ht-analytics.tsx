@@ -1491,8 +1491,8 @@ function useKanbanCacheReady(): number {
 }
 
 function useSdrStageMap(): Record<string, string> {
-  useKanbanCacheReady();
-  return useMemo(() => snapshotSdrStages(), [useKanbanCacheReady()]);
+  const tick = useKanbanCacheReady();
+  return useMemo(() => snapshotSdrStages(), [tick]);
 }
 
 function useFakeSet(): [Set<string>, (leadId: string, fake: boolean) => void] {
