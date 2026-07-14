@@ -1610,6 +1610,7 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
   const [utmFilter, setUtmFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [onlyFinalizados, setOnlyFinalizados] = useState(true);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
