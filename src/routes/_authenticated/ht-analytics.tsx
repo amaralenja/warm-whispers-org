@@ -1630,13 +1630,10 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
 
   function moveTo(leadId: string, stage: string) {
     setFake(leadId, stage === "fake");
-    setStageMap((prev) => {
-      const next = { ...prev, [leadId]: stage };
-      saveKanbanMap(next);
-      return next;
-
-    });
+    dbSetSdrStage(leadId, stage);
+    setStageMap((prev) => ({ ...prev, [leadId]: stage }));
   }
+
 
   return (
     <div className="px-6 md:px-10 py-6 space-y-4">
