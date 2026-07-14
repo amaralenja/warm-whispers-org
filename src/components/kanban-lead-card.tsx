@@ -144,12 +144,13 @@ export function KanbanLeadCard(props: {
   const caixaLabel = safeStr(lead.caixa_label);
   const utmSource = safeStr(lead.utm_source);
   const whatsappStr = safeStr(lead.whatsapp);
-  const initials = (name || "?")
+  const initials = String(name || "?")
     .split(/\s+/)
+    .filter(Boolean)
     .slice(0, 2)
-    .map((s) => s[0] || "")
+    .map((s) => (s && s[0]) || "")
     .join("")
-    .toUpperCase();
+    .toUpperCase() || "?";
 
 
   return (
