@@ -109,17 +109,8 @@ function safeStr(v: unknown): string {
 }
 
 
-export function KanbanLeadCard({
-  lead,
-  ig,
-  onClick,
-  onDragStart,
-  onDragEnd,
-  dragging,
-  footer,
-  scheduledAt,
-}: {
-  lead: KanbanLeadLike;
+export function KanbanLeadCard(props: {
+  lead?: KanbanLeadLike | null;
   ig?: IgLite | null;
   onClick?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
@@ -127,7 +118,19 @@ export function KanbanLeadCard({
   dragging?: boolean;
   footer?: React.ReactNode;
   scheduledAt?: string | null;
-}) {
+} = {}) {
+  const {
+    lead,
+    ig,
+    onClick,
+    onDragStart,
+    onDragEnd,
+    dragging,
+    footer,
+    scheduledAt,
+  } = props ?? {};
+
+  if (!lead) return null;
 
   const letter = (lead.caixa_letra ?? "").toUpperCase();
   const tier = TICKET_TIERS[letter];
