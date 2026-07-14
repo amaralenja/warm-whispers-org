@@ -1464,128 +1464,58 @@ const KANBAN_STAGES: { id: string; label: string; accent?: string }[] = [
 
 ];
 
-const KANBAN_LS_KEY = "ht_kanban_sdr_v1";
-const FAKE_LS_KEY = "ht_kanban_fake_v1";
+// Todos os estados abaixo agora vêm da tabela ht_kanban_state (compartilhada
+// entre SDR e Closer). ensureHtKanbanState() faz um único fetch + realtime.
 
-function loadKanbanMap(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(KANBAN_LS_KEY) || "{}"); } catch { return {}; }
+function useKanbanCacheReady(): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    ensureHtKanbanState().then(() => { if (alive) setTick((t) => t + 1); });
+    const bump = () => setTick((t) => t + 1);
+    window.addEventListener("ht-sdr-updated", bump);
+    window.addEventListener("ht-fake-updated", bump);
+    window.addEventListener("ht-sched-updated", bump);
+    window.addEventListener("ht-closer-email-updated", bump);
+    window.addEventListener("ht-closer-updated", bump);
+    return () => {
+      alive = false;
+      window.removeEventListener("ht-sdr-updated", bump);
+      window.removeEventListener("ht-fake-updated", bump);
+      window.removeEventListener("ht-sched-updated", bump);
+      window.removeEventListener("ht-closer-email-updated", bump);
+      window.removeEventListener("ht-closer-updated", bump);
+    };
+  }, []);
+  return tick;
 }
-function saveKanbanMap(m: Record<string, string>) {
-  try {
-    localStorage.setItem(KANBAN_LS_KEY, JSON.stringify(m));
-    window.dispatchEvent(new Event("ht-sdr-updated"));
-  } catch {}
-}
+
 function useSdrStageMap(): Record<string, string> {
-  const [m, setM] = useState<Record<string, string>>({});
-  useEffect(() => {
-    setM(loadKanbanMap());
-    const on = () => setM(loadKanbanMap());
-    window.addEventListener("ht-sdr-updated", on);
-    window.addEventListener("storage", on);
-    return () => {
-      window.removeEventListener("ht-sdr-updated", on);
-      window.removeEventListener("storage", on);
-    };
-  }, []);
-  return m;
+  useKanbanCacheReady();
+  return useMemo(() => snapshotSdrStages(), [useKanbanCacheReady()]);
 }
 
-function loadFakeSet(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try { return new Set(JSON.parse(localStorage.getItem(FAKE_LS_KEY) || "[]")); } catch { return new Set(); }
-}
-function saveFakeSet(s: Set<string>) {
-  try {
-    localStorage.setItem(FAKE_LS_KEY, JSON.stringify(Array.from(s)));
-    window.dispatchEvent(new Event("ht-fake-updated"));
-  } catch {}
-}
 function useFakeSet(): [Set<string>, (leadId: string, fake: boolean) => void] {
-  const [set, setSet] = useState<Set<string>>(() => loadFakeSet());
-  useEffect(() => {
-    const sync = () => setSet(loadFakeSet());
-    window.addEventListener("storage", sync);
-    window.addEventListener("ht-fake-updated", sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("ht-fake-updated", sync);
-    };
-  }, []);
-  const toggle = (leadId: string, fake: boolean) => {
-    setSet((prev) => {
-      const next = new Set(prev);
-      if (fake) next.add(leadId); else next.delete(leadId);
-      saveFakeSet(next);
-      return next;
-    });
-  };
+  const tick = useKanbanCacheReady();
+  const set = useMemo(() => snapshotFakeSet(), [tick]);
+  const toggle = (leadId: string, fake: boolean) => dbSetFake(leadId, fake);
   return [set, toggle];
 }
 
-const SCHED_LS_KEY = "ht_kanban_scheduled_v1";
-function loadSchedMap(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(SCHED_LS_KEY) || "{}"); } catch { return {}; }
-}
-function saveSchedMap(m: Record<string, string>) {
-  try {
-    localStorage.setItem(SCHED_LS_KEY, JSON.stringify(m));
-    window.dispatchEvent(new Event("ht-sched-updated"));
-  } catch {}
-}
 function useSchedMap(): [Record<string, string>, (leadId: string, iso: string | null) => void] {
-  const [map, setMap] = useState<Record<string, string>>(() => loadSchedMap());
-  useEffect(() => {
-    const sync = () => setMap(loadSchedMap());
-    window.addEventListener("storage", sync);
-    window.addEventListener("ht-sched-updated", sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("ht-sched-updated", sync);
-    };
-  }, []);
-  const set = (leadId: string, iso: string | null) => {
-    setMap((prev) => {
-      const next = { ...prev };
-      if (iso) next[leadId] = iso; else delete next[leadId];
-      saveSchedMap(next);
-      return next;
-    });
-  };
+  const tick = useKanbanCacheReady();
+  const map = useMemo(() => snapshotSched(), [tick]);
+  const set = (leadId: string, iso: string | null) => dbSetScheduled(leadId, iso);
   return [map, set];
 }
 
-const CLOSER_EMAIL_LS_KEY = "ht_kanban_closer_email_v1";
-function loadCloserEmailMap(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(CLOSER_EMAIL_LS_KEY) || "{}"); } catch { return {}; }
-}
 function useCloserEmailMap(): [Record<string, string>, (leadId: string, email: string | null) => void] {
-  const [map, setMap] = useState<Record<string, string>>(() => loadCloserEmailMap());
-  useEffect(() => {
-    const sync = () => setMap(loadCloserEmailMap());
-    window.addEventListener("storage", sync);
-    window.addEventListener("ht-closer-email-updated", sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("ht-closer-email-updated", sync);
-    };
-  }, []);
-  const set = (leadId: string, email: string | null) => {
-    setMap((prev) => {
-      const next = { ...prev };
-      if (email) next[leadId] = email; else delete next[leadId];
-      try {
-        localStorage.setItem(CLOSER_EMAIL_LS_KEY, JSON.stringify(next));
-        window.dispatchEvent(new Event("ht-closer-email-updated"));
-      } catch {}
-      return next;
-    });
-  };
+  const tick = useKanbanCacheReady();
+  const map = useMemo(() => snapshotCloserEmail(), [tick]);
+  const set = (leadId: string, email: string | null) => dbSetCloserEmail(leadId, email);
   return [map, set];
 }
+
 
 type ClosersOption = { id: string | number; nome: string; email: string | null };
 function useClosersList(): ClosersOption[] {
