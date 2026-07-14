@@ -1610,6 +1610,7 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
   const [utmFilter, setUtmFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [onlyFinalizados, setOnlyFinalizados] = useState(true);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
   const [fakeSet, setFake] = useFakeSet();
@@ -1642,7 +1643,6 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
     const q = search.trim().toLowerCase();
     return leads.filter((l) => {
       const c = (l.caixa_letra ?? "").toUpperCase();
-      // Busca ativa ignora o gate de caixa (BCDEFG) — encontra qualquer lead
       if (!q) {
         if (!"BCDEFG".includes(c)) return false;
         if (caixaFilter !== "all" && c !== caixaFilter) return false;
@@ -1650,13 +1650,14 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
         return false;
       }
       if (utmFilter !== "all" && (l.utm_source ?? "") !== utmFilter) return false;
+      if (onlyFinalizados && !isFinalizado(l)) return false;
       if (q) {
         const hay = `${l.nome ?? ""} ${l.email ?? ""} ${l.whatsapp ?? ""} ${l.instagram ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [leads, caixaFilter, utmFilter, search]);
+  }, [leads, caixaFilter, utmFilter, search, onlyFinalizados]);
 
 
   const byStage = useMemo(() => {
@@ -1740,6 +1741,14 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
           <input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar lead…"
             className="h-9 px-3 rounded-md bg-card/60 border border-border/60 text-xs w-52 focus:outline-none focus:border-accent/60" />
+          <button
+            type="button"
+            onClick={() => setOnlyFinalizados((v) => !v)}
+            className={`h-9 px-3 rounded-md border text-xs font-semibold transition ${onlyFinalizados ? "bg-accent/20 border-accent/60 text-accent" : "bg-card/60 border-border/60 text-muted-foreground hover:text-foreground"}`}
+            title="Mostrar apenas leads que finalizaram o quiz"
+          >
+            {onlyFinalizados ? "✓ Só finalizados" : "Só finalizados"}
+          </button>
           <Button size="sm" onClick={() => setAddOpen(true)} className="h-9 gap-1.5">
             <Plus className="h-3.5 w-3.5" /> Adicionar Lead
           </Button>
