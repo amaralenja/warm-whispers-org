@@ -411,20 +411,22 @@ export function HtLeadDetailDialog({
                   onChange={(e) => setSchedDraft(e.target.value)}
                   className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60"
                 />
-                {closers && closers.length > 0 && (
-                  <select
-                    value={closerDraft}
-                    onChange={(e) => setCloserDraft(e.target.value)}
-                    className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60 min-w-[180px]"
-                  >
-                    <option value="">Selecionar closer…</option>
-                    {closers.filter((c) => c.email).map((c) => (
-                      <option key={c.id} value={c.email!}>
-                        {c.nome} — {c.email}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  value={closerDraft}
+                  onChange={(e) => setCloserDraft(e.target.value)}
+                  className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60 min-w-[180px]"
+                >
+                  <option value="">
+                    {closers && closers.length > 0 ? "Selecionar closer…" : "Nenhum closer cadastrado (aba Team)"}
+                  </option>
+                  {(closers ?? []).map((c) => {
+                    const val = c.email || c.nome;
+                    const label = c.email ? `${c.nome} — ${c.email}` : c.nome;
+                    return (
+                      <option key={c.id} value={val}>{label}</option>
+                    );
+                  })}
+                </select>
                 <button
                   type="button"
                   onClick={() => {
