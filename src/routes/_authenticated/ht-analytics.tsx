@@ -1741,6 +1741,14 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
           <input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar lead…"
             className="h-9 px-3 rounded-md bg-card/60 border border-border/60 text-xs w-52 focus:outline-none focus:border-accent/60" />
+          <button
+            type="button"
+            onClick={() => setOnlyFinalizados((v) => !v)}
+            className={`h-9 px-3 rounded-md border text-xs font-semibold transition ${onlyFinalizados ? "bg-accent/20 border-accent/60 text-accent" : "bg-card/60 border-border/60 text-muted-foreground hover:text-foreground"}`}
+            title="Mostrar apenas leads que finalizaram o quiz"
+          >
+            {onlyFinalizados ? "✓ Só finalizados" : "Só finalizados"}
+          </button>
           <Button size="sm" onClick={() => setAddOpen(true)} className="h-9 gap-1.5">
             <Plus className="h-3.5 w-3.5" /> Adicionar Lead
           </Button>
