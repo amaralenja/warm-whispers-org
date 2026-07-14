@@ -1950,7 +1950,8 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
   );
   const igMap = useIgProfileMap(igUsernames);
 
-  useEffect(() => { setStageMap(loadCloserMap()); }, []);
+  const closerCacheTick = useKanbanCacheReady();
+  useEffect(() => { setStageMap(snapshotCloserStages()); }, [closerCacheTick]);
 
   // Mesma lógica de resolução de stage do SDR — fonte da verdade
   const mapCrmSdr = (s: string | null | undefined): string => {
