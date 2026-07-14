@@ -44,14 +44,15 @@ function asStr(v: unknown): string {
     const nested = obj.nome ?? obj.name ?? obj.utm ?? obj.label ?? obj.value ?? obj.text ?? obj.title ?? "";
     const text = asStr(nested);
     if (text) return text;
-    try {
-      const json = JSON.stringify(obj);
-      return json && json !== "{}" ? json : "";
-    } catch {
-      return "";
-    }
+    return "";
   }
   return "";
+}
+
+// Garante que qualquer valor vá pro JSX como string/number seguro.
+function safe(v: unknown): string {
+  const s = asStr(v);
+  return s || "";
 }
 
 function asNum(v: unknown): number {

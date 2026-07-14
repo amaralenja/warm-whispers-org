@@ -108,19 +108,23 @@ export const listCrmLeads = createServerFn({ method: "GET" })
       if (error) throw new Error(error.message);
       rows = (data ?? []) as any[];
     }
-    // Escopo por vendedor: só mostra leads cujo responsável bate com o vendedor
-    // logado (utm ou nome). Leads sem responsável ficam visíveis (backlog).
+    // Escopo estrito por vendedor: só mostra leads cujo responsável bate com o
+    // vendedor logado (utm, nome ou código). Leads sem responsável NÃO são
+    // compartilhados — evita vendedor A ver leads do vendedor B via backlog.
     if (context?.vendor) {
       const vUtm = normalizeText(context.vendor.utm);
       const vNome = normalizeText(context.vendor.nome);
       const vCodigo = normalizeText(context.vendor.codigo);
       const mine = new Set([vUtm, vNome, vCodigo].filter(Boolean));
-      if (mine.size > 0) {
+      if (mine.size === 0) {
+        rows = [];
+      } else {
         rows = rows.filter((l: any) => {
           const ru = normalizeText(l?.responsavel_utm);
           const rn = normalizeText(l?.responsavel_nome);
-          if (!ru && !rn) return true; // sem responsável → backlog compartilhado
-          return (ru && mine.has(ru)) || (rn && mine.has(rn));
+          const rc = normalizeText((l as any)?.responsavel_codigo);
+          if (!ru && !rn && !rc) return false; // sem responsável → não vaza
+          return (ru && mine.has(ru)) || (rn && mine.has(rn)) || (rc && mine.has(rc));
         });
       }
     }
