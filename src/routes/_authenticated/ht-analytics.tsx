@@ -24,6 +24,12 @@ import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
+import {
+  ensureHtKanbanState,
+  snapshotSdrStages, snapshotFakeSet, snapshotSched, snapshotCloserEmail, snapshotCloserStages,
+  setSdrStage as dbSetSdrStage, setFake as dbSetFake, setScheduled as dbSetScheduled,
+  setCloserEmail as dbSetCloserEmail, setCloserStage as dbSetCloserStage,
+} from "@/lib/ht-kanban-state";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
