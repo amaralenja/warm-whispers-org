@@ -2024,12 +2024,17 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
       const inPipeline = (finalizado && "DEFG".includes(caixa) && (def || stageMap[cardId])) || isScheduled;
       const bySearch = matchesSearch(l);
       if (!inPipeline && !bySearch) continue;
+      const closerEmail = closerEmailMap[l.id];
+      const closerName = closerEmail 
+        ? closersList.find((c) => c.email === closerEmail)?.nome || closerEmail
+        : null;
+
       list.push({
         id: cardId,
         nome: l.nome || l.whatsapp || "Sem nome",
         valor: Number(l.crm_valor || CAIXA_VALOR[caixa] || 0),
         created_at: l.crm_data_agendamento || l.data_criacao,
-        closer: null,
+        closer: closerName,
         source: "lead",
         defaultStage: def ?? "agendado",
         caixa: l.caixa_label,
@@ -2058,7 +2063,9 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
   }, [cards]);
 
   const filtered = useMemo(() => cards.filter((c) => {
-    if (closerFilter !== "all" && c.closer && c.closer !== closerFilter) return false;
+    // Se o filtro for específico, mostramos apenas os cards que TÊM esse closer.
+    // Antes, se c.closer fosse null, ele passava. Agora barramos se for null e o filtro não for 'all'.
+    if (closerFilter !== "all" && c.closer !== closerFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       const l: any = (c as any).lead || {};
