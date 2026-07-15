@@ -1782,6 +1782,10 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
           }
           setSched(selectedLead.id, iso);
           setCloserEmail(selectedLead.id, email ?? null);
+          if (iso) {
+            moveTo(selectedLead.id, "agendado");
+            setSelectedLead(null);
+          }
         }}
       />
       <AddSDRLeadDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => { setAddOpen(false); onReload?.(); }} />
@@ -2247,6 +2251,10 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
           }
           setSched(selectedLead.id, iso);
           setCloserEmail(selectedLead.id, email ?? null);
+          if (iso) {
+            moveTo(`qlead-${selectedLead.id}`, "agendado");
+            setSelectedLead(null);
+          }
         }}
         onSaleSaved={onReload}
       />
