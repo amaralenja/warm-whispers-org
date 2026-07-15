@@ -2066,7 +2066,12 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
   function moveTo(id: string, stage: string) {
     const card = filtered.find((c) => c.id === id);
     const quizId = card?.lead?.id;
-    if (quizId) setFake(quizId, stage === "fake");
+    if (quizId) {
+      setFake(quizId, stage === "fake");
+      if (stage === "descartado" || stage === "no_show") {
+        dbSetSdrStage(quizId, stage);
+      }
+    }
     dbSetCloserStage(id, stage);
     setStageMap((prev) => ({ ...prev, [id]: stage }));
   }
