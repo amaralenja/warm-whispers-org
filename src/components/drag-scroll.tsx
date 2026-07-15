@@ -18,7 +18,7 @@ export function DragScroll({
   function isInteractive(el: EventTarget | null) {
     if (!(el instanceof HTMLElement)) return false;
     return !!el.closest(
-      'button, a, input, textarea, select, [role="button"], [data-no-drag]'
+      'button, a, input, textarea, select, [role="button"], [draggable="true"], [data-no-drag]'
     );
   }
 
