@@ -2067,9 +2067,11 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
   }, [cards]);
 
   const filtered = useMemo(() => cards.filter((c) => {
-    // Se o filtro for específico, mostramos apenas os cards que TÊM esse closer.
-    // Antes, se c.closer fosse null, ele passava. Agora barramos se for null e o filtro não for 'all'.
-    if (closerFilter !== "all" && c.closer !== closerFilter) return false;
+    if (isCloserSession) {
+      if (!matchesHtCloser(htSession, c.closer)) return false;
+    } else {
+      if (closerFilter !== "all" && c.closer !== closerFilter) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       const l: any = (c as any).lead || {};
