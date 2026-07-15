@@ -24,6 +24,8 @@ import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
+import { useServerFn } from "@tanstack/react-start";
+import { createEvent } from "@/lib/google-calendar.functions";
 import {
   ensureHtKanbanState,
   snapshotSdrStages, snapshotFakeSet, snapshotSched, snapshotCloserEmail, snapshotCloserStages,
@@ -1542,6 +1544,7 @@ function useClosersList(): ClosersOption[] {
 
 
 function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: boolean; onReload?: () => void }) {
+  const scheduleCall = useServerFn(createEvent);
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
   const [utmFilter, setUtmFilter] = useState<string>("all");
@@ -1758,8 +1761,25 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         closers={closersList}
         closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
-        onSchedule={(iso, email) => {
+        onSchedule={async (iso, email) => {
           if (!selectedLead) return;
+          if (iso) {
+            try {
+              const start = new Date(iso);
+              const end = new Date(start.getTime() + 60 * 60 * 1000);
+              await scheduleCall({
+                data: {
+                  summary: `Call - ${selectedLead.nome || "Lead"}`,
+                  start: start.toISOString(),
+                  end: end.toISOString(),
+                  attendees: email ? [email] : []
+                }
+              });
+              toast.success("Call agendada no Google Calendar!");
+            } catch (err: any) {
+              toast.error("Erro GCal: " + err.message);
+            }
+          }
           setSched(selectedLead.id, iso);
           setCloserEmail(selectedLead.id, email ?? null);
         }}
@@ -1922,6 +1942,7 @@ const CAIXA_VALOR: Record<string, number> = {
 };
 
 function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void }) {
+  const scheduleCall = useServerFn(createEvent);
   const htSession = useMemo(() => getHtTeamSession(), []);
   const isCloserSession = htSession?.tipo === "closer";
   const vendasScoped = useMemo(
@@ -1999,7 +2020,8 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
       const def = sdrToCloser(sdr);
       const cardId = `qlead-${l.id}`;
       const finalizado = isFinalizado(l);
-      const inPipeline = finalizado && "DEFG".includes(caixa) && (def || stageMap[cardId]);
+      const isScheduled = sdr === "agendado";
+      const inPipeline = (finalizado && "DEFG".includes(caixa) && (def || stageMap[cardId])) || isScheduled;
       const bySearch = matchesSearch(l);
       if (!inPipeline && !bySearch) continue;
       list.push({
@@ -2197,8 +2219,25 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         closers={closersList}
         closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
-        onSchedule={(iso, email) => {
+        onSchedule={async (iso, email) => {
           if (!selectedLead) return;
+          if (iso) {
+            try {
+              const start = new Date(iso);
+              const end = new Date(start.getTime() + 60 * 60 * 1000);
+              await scheduleCall({
+                data: {
+                  summary: `Call - ${selectedLead.nome || "Lead"}`,
+                  start: start.toISOString(),
+                  end: end.toISOString(),
+                  attendees: email ? [email] : []
+                }
+              });
+              toast.success("Call agendada no Google Calendar!");
+            } catch (err: any) {
+              toast.error("Erro GCal: " + err.message);
+            }
+          }
           setSched(selectedLead.id, iso);
           setCloserEmail(selectedLead.id, email ?? null);
         }}
