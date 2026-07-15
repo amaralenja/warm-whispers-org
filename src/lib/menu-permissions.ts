@@ -95,29 +95,48 @@ export function htDefaultPermissoes(tipo: "sdr" | "closer"): Permissoes {
   return p;
 }
 
+export function mergePermissoes(base: Permissoes, cur: Permissoes): Permissoes {
+  const merged = { ...base };
+  for (const k of Object.keys(base)) {
+    const val = cur[k];
+    if (val !== undefined && val !== null) {
+      if (typeof base[k] === "object" && typeof val === "object" && val !== null) {
+        merged[k] = { ...base[k] as any, ...val as any };
+      } else {
+        merged[k] = val;
+      }
+    }
+  }
+  for (const k of Object.keys(cur)) {
+    if (merged[k] === undefined && cur[k] !== null && cur[k] !== undefined) {
+      merged[k] = cur[k];
+    }
+  }
+  return merged;
+}
+
 /** Grupos/leaves que são exclusivos do admin — vendedor NUNCA vê, mesmo sem permissão setada. */
 const ADMIN_ONLY_GROUPS = new Set(["pv24h"]);
 const ADMIN_ONLY_LEAVES = new Set(["pv24h-analytics", "comissoes", "ht-team", "ht-customer-success"]);
 
 /** Default = true se não setado (admin enxerga tudo), exceto grupos/leaves admin-only. */
 export function canSee(perm: Permissoes | null | undefined, groupKey: string, leafKey?: string): boolean {
-  // Sem perm = admin. Admin vê tudo.
   if (!perm || typeof perm !== "object") return true;
-  // Vendedor: bloqueia áreas admin-only por padrão.
-  if (ADMIN_ONLY_GROUPS.has(groupKey) && perm[groupKey] === undefined) return false;
+  if (ADMIN_ONLY_GROUPS.has(groupKey) && (perm[groupKey] === undefined || perm[groupKey] === null)) return false;
   if (leafKey && ADMIN_ONLY_LEAVES.has(leafKey)) {
     const node = perm[groupKey];
-    if (node === undefined || typeof node === "boolean") return false;
-    return node[leafKey] === true;
+    if (node === undefined || node === null || typeof node === "boolean") return false;
+    return (node as any)[leafKey] === true;
   }
   const node = perm[groupKey];
-  if (node === undefined) return true;
+  if (node === undefined || node === null) return true;
   if (typeof node === "boolean") return node;
   if (leafKey == null) {
-    // grupo: visível se ao menos um filho visível
+    if (typeof node !== "object") return !!node;
     return Object.values(node).some((v) => v !== false);
   }
-  const v = node[leafKey];
+  if (typeof node !== "object") return !!node;
+  const v = (node as any)[leafKey];
   return v === undefined ? true : !!v;
 }
 

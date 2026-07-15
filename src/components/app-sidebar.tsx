@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { canSee, htDefaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
+import { canSee, htDefaultPermissoes, mergePermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getVendorSession } from "@/lib/vendor-session";
@@ -181,9 +181,9 @@ export function AppSidebar() {
               const row = data as any;
               if (Number(row.id) !== Number(s.id)) return;
               const rowTipo = (row.tipo === "sdr" || row.tipo === "closer") ? row.tipo : tipo;
-              const next = (row.permissoes && typeof row.permissoes === "object")
-                ? (row.permissoes as Permissoes)
-                : htDefaultPermissoes(rowTipo);
+              const base = htDefaultPermissoes(rowTipo);
+              const cur = (row.permissoes && typeof row.permissoes === "object") ? row.permissoes : base;
+              const next = mergePermissoes(base, cur);
               setPerm(next);
               try {
                 localStorage.setItem("ht_team_session", JSON.stringify({ ...s, ...row, permissoes: next }));

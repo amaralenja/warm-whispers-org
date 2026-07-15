@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MENU_TREE, htDefaultPermissoes, type Permissoes } from "@/lib/menu-permissions";
+import { MENU_TREE, htDefaultPermissoes, mergePermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/ht-team")({
@@ -447,7 +447,7 @@ function PermissoesDialog({
     if (open && member) {
       const base = htDefaultPermissoes(member.tipo);
       const cur = (member.permissoes && typeof member.permissoes === "object") ? member.permissoes : base;
-      setPerm({ ...base, ...cur });
+      setPerm(mergePermissoes(base, cur));
     }
   }, [open, member]);
 
