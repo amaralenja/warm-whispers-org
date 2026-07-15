@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { getVendorSession } from "@/lib/vendor-session";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalPicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   MessageSquare, Trash2, Phone, Mail, Instagram, Send,
   Wallet, TrendingUp, Target, Rocket, Lightbulb, Users, Flame,
@@ -123,7 +126,11 @@ export function HtLeadDetailDialog({
 
   const [schedDraft, setSchedDraft] = useState<string>("");
   const [closerDraft, setCloserDraft] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string>("14:00");
 
+  const hoursOptions = useMemo(() => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")), []);
+  const minutesOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0")), []);
 
   // Registro de venda
   const [saleOpen, setSaleOpen] = useState(false);
@@ -136,9 +143,14 @@ export function HtLeadDetailDialog({
   useEffect(() => {
     if (scheduledAt) {
       const d = new Date(scheduledAt);
+      setSelectedDate(d);
       const pad = (n: number) => String(n).padStart(2, "0");
-      setSchedDraft(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+      const t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      setSelectedTime(t);
+      setSchedDraft(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${t}`);
     } else {
+      setSelectedDate(undefined);
+      setSelectedTime("14:00");
       setSchedDraft("");
     }
     setCloserDraft(closerEmail ?? "");
@@ -405,12 +417,85 @@ export function HtLeadDetailDialog({
                   <Calendar className="h-3 w-3" />
                   {scheduledAt ? "Call agendada" : "Agendar Call"}
                 </div>
-                <input
-                  type="datetime-local"
-                  value={schedDraft}
-                  onChange={(e) => setSchedDraft(e.target.value)}
-                  className="text-xs bg-background/70 border border-border/60 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500/60"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-background/70 border border-border/60 hover:bg-background h-9 px-3 gap-2 font-normal"
+                    >
+                      <Calendar className="h-3.5 w-3.5 text-emerald-400" />
+                      {selectedDate ? (
+                        format(selectedDate, "dd/MM/yyyy 'às' HH:mm")
+                      ) : (
+                        <span>Escolher data e hora</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 flex flex-col bg-popover border border-border shadow-lg" align="start">
+                    <CalPicker
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(d) => {
+                        setSelectedDate(d);
+                        if (d) {
+                          const [h, m] = selectedTime.split(":");
+                          const next = new Date(d);
+                          next.setHours(Number(h), Number(m), 0, 0);
+                          const pad = (n: number) => String(n).padStart(2, "0");
+                          setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
+                        }
+                      }}
+                      initialFocus
+                    />
+                    <div className="flex items-center justify-between border-t border-border p-3 bg-muted/20">
+                      <span className="text-xs font-medium text-muted-foreground">Horário da call:</span>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={selectedTime.split(":")[0]}
+                          onChange={(e) => {
+                            const newHour = e.target.value;
+                            const newMin = selectedTime.split(":")[1];
+                            const t = `${newHour}:${newMin}`;
+                            setSelectedTime(t);
+                            if (selectedDate) {
+                              const next = new Date(selectedDate);
+                              next.setHours(Number(newHour), Number(newMin), 0, 0);
+                              const pad = (n: number) => String(n).padStart(2, "0");
+                              setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
+                            }
+                          }}
+                          className="bg-background text-xs border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-accent text-foreground"
+                        >
+                          {hoursOptions.map((h) => (
+                            <option key={h} value={h} className="bg-popover text-foreground">{h}h</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-muted-foreground">:</span>
+                        <select
+                          value={selectedTime.split(":")[1]}
+                          onChange={(e) => {
+                            const newHour = selectedTime.split(":")[0];
+                            const newMin = e.target.value;
+                            const t = `${newHour}:${newMin}`;
+                            setSelectedTime(t);
+                            if (selectedDate) {
+                              const next = new Date(selectedDate);
+                              next.setHours(Number(newHour), Number(newMin), 0, 0);
+                              const pad = (n: number) => String(n).padStart(2, "0");
+                              setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
+                            }
+                          }}
+                          className="bg-background text-xs border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-accent text-foreground"
+                        >
+                          {minutesOptions.map((m) => (
+                            <option key={m} value={m} className="bg-popover text-foreground">{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <select
                   value={closerDraft}
                   onChange={(e) => setCloserDraft(e.target.value)}
