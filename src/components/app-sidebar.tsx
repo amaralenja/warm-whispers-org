@@ -57,7 +57,7 @@ import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Início", url: "/dashboard", icon: LayoutDashboard },
   { title: "Relatórios", url: "/relatorios", icon: LineChart },
   { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
