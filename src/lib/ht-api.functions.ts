@@ -75,7 +75,7 @@ export const listHtQuizSubmissions = createServerFn({ method: "GET" })
       .from("ht_quiz_submissions" as any)
       .select("id, received_at, updated_at, status, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, utm_content, fbc, fbp, fbclid, gclid, respostas")
       .order("updated_at", { ascending: false })
-      .limit(50);
+      .limit(1000);
 
     if (error) throw new Error(error.message);
     return { submissions: (data ?? []) as Array<any> };
