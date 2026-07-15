@@ -138,3 +138,8 @@ export function setCloserStage(leadId: string, stage: string | null) {
   void upsertPatch(leadId, { closer_stage: stage ?? null });
   emit("ht-closer-updated");
 }
+export function setScheduledAndCloser(leadId: string, iso: string | null, email: string | null) {
+  void upsertPatch(leadId, { scheduled_at: iso, closer_email: email });
+  emit("ht-sched-updated");
+  emit("ht-closer-email-updated");
+}

@@ -31,6 +31,7 @@ import {
   snapshotSdrStages, snapshotFakeSet, snapshotSched, snapshotCloserEmail, snapshotCloserStages,
   setSdrStage as dbSetSdrStage, setFake as dbSetFake, setScheduled as dbSetScheduled,
   setCloserEmail as dbSetCloserEmail, setCloserStage as dbSetCloserStage,
+  setScheduledAndCloser as dbSetScheduleAndCloser,
 } from "@/lib/ht-kanban-state";
 
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
@@ -1780,8 +1781,7 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
               toast.error("Erro GCal: " + err.message);
             }
           }
-          setSched(selectedLead.id, iso);
-          setCloserEmail(selectedLead.id, email ?? null);
+          dbSetScheduleAndCloser(selectedLead.id, iso, email ?? null);
           if (iso) {
             moveTo(selectedLead.id, "agendado");
             setSelectedLead(null);
@@ -2058,7 +2058,7 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
       });
     }
     return list;
-  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search]);
+  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search, closerEmailMap, closersList]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
@@ -2251,8 +2251,7 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
               toast.error("Erro GCal: " + err.message);
             }
           }
-          setSched(selectedLead.id, iso);
-          setCloserEmail(selectedLead.id, email ?? null);
+          dbSetScheduleAndCloser(selectedLead.id, iso, email ?? null);
           if (iso) {
             moveTo(`qlead-${selectedLead.id}`, "agendado");
             setSelectedLead(null);
