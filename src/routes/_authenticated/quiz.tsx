@@ -54,6 +54,7 @@ import { fetchInstagramProfile, listInstagramLeads } from "@/lib/instagram.funct
 import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
 import { toast } from "sonner";
 import { DragScroll } from "@/components/drag-scroll";
+import { getHtTeamSession } from "@/lib/ht-team-session";
 
 
 export const Route = createFileRoute("/_authenticated/quiz")({
@@ -363,6 +364,8 @@ function QuizPage() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();
   const isGeral = workspace?.id === "all";
+  const htSession = useMemo(() => getHtTeamSession(), []);
+  const isSdr = htSession?.tipo === "sdr" || htSession?.tipo === "closer";
 
   const [period, setPeriod] = useState<Period>("today");
   const [customFrom, setCustomFrom] = useState<string>("");
@@ -456,7 +459,7 @@ function QuizPage() {
 
   const filteredLeads = useMemo(() => {
     let rows = leads.filter(hasUseful);
-    if (!isGeral && workspace?.nome) {
+    if (!isGeral && !isSdr && workspace?.nome) {
       const w = workspace.nome.toLowerCase();
       rows = rows.filter(
         (l) =>
@@ -478,7 +481,7 @@ function QuizPage() {
       );
     }
     return rows;
-  }, [leads, isGeral, workspace, search, originFilter, reality, overrides]);
+  }, [leads, isGeral, isSdr, workspace, search, originFilter, reality, overrides]);
 
   const stats = useMemo(() => {
     const total = filteredLeads.length;
