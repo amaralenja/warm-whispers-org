@@ -43,3 +43,20 @@ export const getVendorStats = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return result as unknown as VendorStats;
   });
+
+export const getVendorByTeamSession = createServerFn({ method: "POST" })
+  .inputValidator((d: { nome: string }) => d)
+  .handler(async ({ data }) => {
+    const sb = createClient<Database>(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_PUBLISHABLE_KEY!,
+      { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
+    );
+    const { data: row, error } = await sb.from("vendedores" as any)
+      .select("id, nome, utm, expert, foto_url, codigo, workspace_ids, wa_channel_ids")
+      .eq("nome", data.nome)
+      .eq("ativo", true)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row as any;
+  });

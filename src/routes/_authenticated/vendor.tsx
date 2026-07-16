@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar, Copy, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import logoMultium from "@/assets/logo-multium.webp";
-import { getVendorStats } from "@/lib/vendor.functions";
+import { getVendorStats, getVendorByTeamSession } from "@/lib/vendor.functions";
 import { listVendorLinksPublic } from "@/lib/vendor-links.functions";
 import { DesempenhoDiario } from "@/components/desempenho-diario";
 
@@ -52,13 +52,57 @@ function VendorPortal() {
   const [preset, setPreset] = useState<RangePreset>("mes");
   const fetchStats = useServerFn(getVendorStats);
   const fetchLinks = useServerFn(listVendorLinksPublic);
+  const fetchVendorByTeam = useServerFn(getVendorByTeamSession);
 
   useEffect(() => {
     const raw = localStorage.getItem("vendor_session");
-    if (!raw) { navigate({ to: "/auth" }); return; }
-    try { setV(JSON.parse(raw)); }
-    catch { localStorage.removeItem("vendor_session"); navigate({ to: "/auth" }); }
-  }, [navigate]);
+    if (raw) {
+      try {
+        setV(JSON.parse(raw));
+        return;
+      } catch {
+        localStorage.removeItem("vendor_session");
+      }
+    }
+
+    // Se não há vendor_session, tenta carregar da ht_team_session (ex: SDR/Closer)
+    const rawHt = localStorage.getItem("ht_team_session");
+    if (rawHt) {
+      try {
+        const ht = JSON.parse(rawHt);
+        if (ht?.nome) {
+          fetchVendorByTeam({ data: { nome: ht.nome } })
+            .then((vendorRow) => {
+              if (vendorRow) {
+                const session = {
+                  id: vendorRow.id,
+                  nome: vendorRow.nome,
+                  utm: vendorRow.utm,
+                  expert: vendorRow.expert,
+                  foto_url: vendorRow.foto_url,
+                  codigo: vendorRow.codigo,
+                  wa_channel_ids: vendorRow.wa_channel_ids,
+                  workspace_ids: vendorRow.workspace_ids,
+                };
+                localStorage.setItem("vendor_session", JSON.stringify(session));
+                window.dispatchEvent(new Event("vendor-session-updated"));
+                setV(session);
+              } else {
+                navigate({ to: "/auth" });
+              }
+            })
+            .catch(() => {
+              navigate({ to: "/auth" });
+            });
+          return;
+        }
+      } catch {
+        // noop
+      }
+    }
+
+    navigate({ to: "/auth" });
+  }, [navigate, fetchVendorByTeam]);
 
   const range = useMemo(() => rangeFor(preset), [preset]);
 
