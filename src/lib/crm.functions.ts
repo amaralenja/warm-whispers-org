@@ -116,14 +116,26 @@ export const listCrmLeads = createServerFn({ method: "GET" })
       const vNome = normalizeText(context.vendor.nome);
       const vCodigo = normalizeText(context.vendor.codigo);
       const mine = new Set([vUtm, vNome, vCodigo].filter(Boolean));
-      if (mine.size === 0) {
+      
+      const vChannels = new Set(
+        Array.isArray(context.vendor.wa_channel_ids)
+          ? context.vendor.wa_channel_ids.map((id: any) => String(id).trim().toLowerCase())
+          : []
+      );
+
+      if (mine.size === 0 && vChannels.size === 0) {
         rows = [];
       } else {
         rows = rows.filter((l: any) => {
+          // 1. Vincular pelo canal do WhatsApp (channel_id nos dados do lead)
+          const channelId = String(l?.dados?.channel_id ?? "").trim().toLowerCase();
+          if (channelId && vChannels.has(channelId)) return true;
+
+          // 2. Vincular pelas informações de responsável (nome, utm, código)
           const ru = normalizeText(l?.responsavel_utm);
           const rn = normalizeText(l?.responsavel_nome);
           const rc = normalizeText((l as any)?.responsavel_codigo);
-          if (!ru && !rn && !rc) return false; // sem responsável → não vaza
+          if (!ru && !rn && !rc) return false; // sem responsável e sem canal → não vaza
           return (ru && mine.has(ru)) || (rn && mine.has(rn)) || (rc && mine.has(rc));
         });
       }
