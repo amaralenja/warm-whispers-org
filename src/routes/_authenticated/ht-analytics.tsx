@@ -23,6 +23,7 @@ import { CalendarPage } from "@/routes/_authenticated/calendar";
 import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
+import { createSdrLead } from "@/lib/ht-api.functions";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
 import { useServerFn } from "@tanstack/react-start";
 import { createEvent } from "@/lib/google-calendar.functions";
@@ -1804,6 +1805,7 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
   const [objetivo, setObjetivo] = useState("");
   const [utmSource, setUtmSource] = useState("manual");
   const [saving, setSaving] = useState(false);
+  const createLeadFn = useServerFn(createSdrLead);
 
   useEffect(() => {
     if (!open) {
@@ -1842,8 +1844,7 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
         },
         raw: { source: "sdr_manual" },
       };
-      const { error } = await supabase.from("ht_quiz_submissions" as any).insert(payload as any);
-      if (error) throw error;
+      await createLeadFn({ data: payload });
       toast.success("Lead adicionado ao Kanban SDR");
       onCreated();
     } catch (e: any) {

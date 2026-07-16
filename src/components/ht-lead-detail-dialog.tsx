@@ -267,6 +267,27 @@ export function HtLeadDetailDialog({
     }
     return String(v);
   };
+
+  const INVESTIR_MAP: Record<string, string> = {
+    A: "Menos de R$ 1.000",
+    B: "De R$ 1.000 a R$ 5.000",
+    C: "De R$ 5.000 a R$ 10.000",
+    D: "De R$ 10.000 a R$ 25.000",
+    E: "De R$ 25.000 a R$ 50.000",
+    F: "De R$ 50.000 a R$ 100.000",
+    G: "Mais de R$ 100.000",
+  };
+
+  const translateInvestir = (v: unknown): string | null => {
+    const s = safeStr(v);
+    if (!s) return null;
+    const clean = s.trim().toUpperCase();
+    if (clean.length === 1 && INVESTIR_MAP[clean]) {
+      return INVESTIR_MAP[clean];
+    }
+    return s;
+  };
+
   const caixaValue = lead
     ? ([safeStr(lead.caixa_label), letter ? `Faixa ${letter}` : null].filter(Boolean).join(" · ") || null)
     : null;
@@ -276,7 +297,7 @@ export function HtLeadDetailDialog({
         { key: "faturamento", label: "Faturamento atual", value: safeStr(lead.faturamento) },
         { key: "momento", label: "Momento atual", value: safeStr(lead.momento) },
         { key: "objetivo", label: "Meta / Objetivo", value: safeStr(lead.objetivo) },
-        { key: "investir", label: "Já investiu em SaaS?", value: safeStr(lead.investir) },
+        { key: "investir", label: "Quanto pode investir?", value: translateInvestir(lead.investir) },
         { key: "minicurso", label: "Tem ideia de SaaS?", value: safeStr(lead.minicurso) },
         { key: "socio", label: "Sócio / Cônjuge", value: safeStr(lead.socio) },
         { key: "comprometimento", label: "Comprometimento", value: safeStr(lead.comprometimento) },

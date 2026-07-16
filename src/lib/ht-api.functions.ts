@@ -80,3 +80,16 @@ export const listHtQuizSubmissions = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { submissions: (data ?? []) as Array<any> };
   });
+
+export const createSdrLead = createServerFn({ method: "POST" })
+  .inputValidator((d: any) => d)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("ht_quiz_submissions" as any)
+      .insert(data)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
