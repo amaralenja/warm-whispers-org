@@ -40,8 +40,8 @@ function Dashboard() {
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["operacoes-stats", range.from, range.to, expertFilter],
-    queryFn: () => fetchOps({ data: { from: range.from, to: range.to, expert: expertFilter } }),
+    queryKey: ["operacoes-stats", range.from, range.to, expertFilter, config.includeHighTicket],
+    queryFn: () => fetchOps({ data: { from: range.from, to: range.to, expert: expertFilter, includeHighTicket: config.includeHighTicket } }),
   });
 
   const experts = data?.experts ?? [];

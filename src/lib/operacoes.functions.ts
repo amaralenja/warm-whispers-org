@@ -86,7 +86,7 @@ export type OperacoesPayload = {
   reembolsos: ReembolsoItem[];
 };
 
-export type DateRange = { from?: string | null; to?: string | null; expert?: string | null };
+export type DateRange = { from?: string | null; to?: string | null; expert?: string | null; includeHighTicket?: boolean };
 
 const CAIO_UTMS = ["GC", "BP"];
 const GUSTAVO_UTMS = ["LS", "LF"];
@@ -169,7 +169,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll] = await Promise.all([
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll, htVendasAll] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
@@ -186,6 +186,11 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       fetchAll<any>((from, to) =>
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
       ),
+      data.includeHighTicket
+        ? fetchAll<any>((from, to) =>
+          supabase.from("ht_vendas").select("valor_total, data, status").neq("status", "reembolso").range(from, to)
+        )
+        : Promise.resolve([]),
     ]);
 
     // Coerce defensivo: alguns campos podem vir como objeto/jsonb vazio do Postgres
@@ -267,8 +272,15 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       })
       .reduce((acc, f: any) => acc + Number(f.valor ?? 0), 0);
 
-    const totalFaturamento = vendasScoped.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
-    const totalVendas = vendasScoped.length;
+    let totalFaturamento = vendasScoped.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
+    let totalVendas = vendasScoped.length;
+
+    const htVendasPeriodo = data.includeHighTicket
+      ? (htVendasAll as any[]).filter((v: any) => inRange(parseDataField(v.data)))
+      : [];
+    const fatHt = htVendasPeriodo.reduce((acc, v) => acc + (parseFloat(v.valor_total) || 0), 0);
+    const vendasHt = htVendasPeriodo.length;
+
 
     // Stats por expert (sempre considera todas as vendas do período, sem o filtro de expert)
     const TICKET_MIN = 97; // mesmo threshold do dashboard antigo — exclui order bumps
@@ -284,7 +296,10 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
         return getRefundExpert(r) === e.nome;
       }).length;
-      const totalFatPeriodo = vendasPeriodo.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
+      let totalFatPeriodo = vendasPeriodo.reduce((a, v: any) => a + parseTicket(v.Ticket), 0);
+      if (data.includeHighTicket) {
+        totalFatPeriodo += fatHt;
+      }
       return {
         id: e.id,
         nome: e.nome,
@@ -298,6 +313,29 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         pctTotal: totalFatPeriodo > 0 ? faturamento / totalFatPeriodo : 0,
       };
     });
+
+    if (data.includeHighTicket) {
+      if (expertFilter == null || expertFilter === "High Ticket") {
+        totalFaturamento += fatHt;
+        totalVendas += vendasHt;
+      }
+      const totalFatPeriodo = vendasPeriodo.reduce((a, v: any) => a + parseTicket(v.Ticket), 0) + fatHt;
+      expertStats.push({
+        id: -1,
+        nome: "High Ticket",
+        foto_url: null,
+        ativo: true,
+        vendedoresCount: 0,
+        faturamento: fatHt,
+        vendas: vendasHt,
+        ticketMedio: vendasHt > 0 ? fatHt / vendasHt : 0,
+        reembolsos: 0,
+        pctTotal: totalFatPeriodo > 0 ? fatHt / totalFatPeriodo : 0,
+      });
+      expertStats.forEach((e) => {
+        e.pctTotal = totalFatPeriodo > 0 ? e.faturamento / totalFatPeriodo : 0;
+      });
+    }
 
     // Participação por vendedor (UTM)
     const vendedorMap = new Map<string, VendedorStat>();
@@ -340,6 +378,18 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       entry.total += parseTicket(v.Ticket);
       entry.vendas += 1;
       serieMap.set(iso, entry);
+    }
+    if (data.includeHighTicket && (expertFilter == null || expertFilter === "High Ticket")) {
+      for (const v of htVendasPeriodo) {
+        const t = parseDataField(v.data);
+        if (t == null) continue;
+        const d = new Date(t);
+        const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+        const entry = serieMap.get(iso) ?? { total: 0, vendas: 0 };
+        entry.total += (parseFloat(v.valor_total) || 0);
+        entry.vendas += 1;
+        serieMap.set(iso, entry);
+      }
     }
     // Preenche dias vazios entre from e to (ou min/max)
     let startTs = fromTs;
