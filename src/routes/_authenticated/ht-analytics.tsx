@@ -1793,9 +1793,12 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
             try {
               const start = new Date(iso);
               const end = new Date(start.getTime() + 60 * 60 * 1000);
+              const closerObj = email ? closersList.find((c) => c.email === email || c.nome === email) : null;
+              const closerInfo = closerObj ? `Closer: ${closerObj.nome} (${closerObj.email || "Sem e-mail"})` : "";
               await scheduleCall({
                 data: {
                   summary: `Call - ${selectedLead.nome || "Lead"}`,
+                  description: `Agendado pelo SDR\n\n${closerInfo}`,
                   start: start.toISOString(),
                   end: end.toISOString(),
                   attendees: email ? [email] : []
@@ -2264,9 +2267,12 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
             try {
               const start = new Date(iso);
               const end = new Date(start.getTime() + 60 * 60 * 1000);
+              const closerObj = email ? closersList.find((c) => c.email === email || c.nome === email) : null;
+              const closerInfo = closerObj ? `Closer: ${closerObj.nome} (${closerObj.email || "Sem e-mail"})` : "";
               await scheduleCall({
                 data: {
                   summary: `Call - ${selectedLead.nome || "Lead"}`,
+                  description: `Agendado pelo Closer\n\n${closerInfo}`,
                   start: start.toISOString(),
                   end: end.toISOString(),
                   attendees: email ? [email] : []
