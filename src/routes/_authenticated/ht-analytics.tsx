@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
 });
 
-type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics" | "utm-generator";
+type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics";
 
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
@@ -453,7 +453,6 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             if (s && s.tipo === "sdr") tabs.push({ id: "sdr-metrics", label: "Métricas SDR" });
             tabs.push({ id: "receber", label: "Contas a Receber" });
             tabs.push({ id: "leads", label: "Lista de Leads" });
-            if (!s) tabs.push({ id: "utm-generator", label: "Gerador de UTM" });
             return tabs.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative whitespace-nowrap ${
@@ -499,9 +498,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       {tab === "sdr-metrics" && (
         <SdrDashboard leads={leads} notesMap={notesMap} onReload={() => setNonce((n) => n + 1)} />
       )}
-      {tab === "utm-generator" && (
-        <UtmGenerator />
-      )}
+
 
       {tab === "dashboard" && (
       <div className="px-6 md:px-10 py-8 space-y-10">
