@@ -32,6 +32,7 @@ export const MENU_TREE: MenuNode[] = [
     title: "High Ticket",
     children: [
       { key: "ht-analytics", title: "Analytics", url: "/ht-analytics" },
+      { key: "ht-utm", title: "Gerador de UTM", url: "/ht-utm" },
       { key: "ht-sdr-metrics", title: "Métricas SDR", url: "/ht-sdr-metrics" },
       { key: "ht-kanban-sdr", title: "Kanban SDR", url: "/ht-kanban-sdr" },
       { key: "ht-kanban-closer", title: "Kanban Closer", url: "/ht-kanban-closer" },
@@ -85,6 +86,7 @@ export function htDefaultPermissoes(tipo: "sdr" | "closer"): Permissoes {
       for (const c of n.children) sub[c.key] = false;
       if (n.key === "high-ticket") {
         sub["ht-analytics"] = true;
+        sub["ht-utm"] = true;
         sub[tipo === "sdr" ? "ht-kanban-sdr" : "ht-kanban-closer"] = true;
         if (tipo === "sdr") {
           sub["quiz"] = true;

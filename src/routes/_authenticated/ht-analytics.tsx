@@ -2526,8 +2526,12 @@ function UtmGenerator() {
       const parsed = new URL(cleanUrl);
       const params = new URLSearchParams(parsed.search);
 
-      // Formatar string de UTM (remover espaços e transformar em slug amigável)
-      const slugify = (val: string) => val.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_-]/g, "");
+      // Formatar string de UTM (preservar macros {{...}} do Facebook Ads)
+      const slugify = (val: string) => {
+        const trimmed = val.trim();
+        if (/^\{\{.*\}\}$/.test(trimmed)) return trimmed;
+        return trimmed.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_.-]/g, "");
+      };
 
       if (source.trim()) params.set("utm_source", slugify(source));
       else params.delete("utm_source");
@@ -2645,6 +2649,30 @@ function UtmGenerator() {
                 placeholder="Ex: https://criarsaas.com/quiz"
                 className="w-full h-10 px-3 bg-background/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
               />
+            </div>
+
+            {/* Meta Ads Preset Button */}
+            <div className="pt-2 border-t border-border/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-blue-500/5 p-3 rounded-lg border border-blue-500/10">
+              <div className="text-xs text-muted-foreground">
+                <span className="font-semibold text-accent block sm:inline mr-1">Rastreamento do Facebook Ads:</span>
+                Preencha as UTMs usando os parâmetros dinâmicos nativos do Meta.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 font-semibold gap-1.5 shrink-0"
+                onClick={() => {
+                  setSource("fb");
+                  setMedium("cpc");
+                  setCampaign("{{campaign.name}}");
+                  setContent("{{ad.name}}");
+                  setTerm("{{adset.name}}");
+                  toast.success("Parâmetros do Meta Ads aplicados!");
+                }}
+              >
+                ⚡ Usar Parâmetros do Meta Ads
+              </Button>
             </div>
 
             {/* Source */}
@@ -2836,6 +2864,10 @@ function UtmGenerator() {
       </Card>
     </div>
   );
+}
+
+export function UtmGeneratorPage() {
+  return <UtmGenerator />;
 }
 
 
