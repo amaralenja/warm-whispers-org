@@ -1,6 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { createClient } from "@supabase/supabase-js";
+
+async function getAdminClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+              process.env.SUPABASE_SECRET_KEY || 
+              process.env.SUPABASE_SECRET_KEYS || 
+              process.env.SUPABASE_SERVICE_KEY ||
+              process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error("Credenciais do Supabase não configuradas no servidor.");
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+
 async function hashToken(token: string): Promise<string> {
   const { createHash } = await import("crypto");
   return createHash("sha256").update(token, "utf8").digest("hex");
@@ -131,3 +149,83 @@ export const getKanbanLocalData = createServerFn({ method: "POST" })
       notes: notesRes.data || [],
     };
   });
+
+export const resolveShortLink = createServerFn({ method: "GET" })
+  .inputValidator((slug: string) => String(slug || "").trim())
+  .handler(async ({ data: slug }) => {
+    const admin = await getAdminClient();
+    const { data, error } = await admin
+      .from("ht_assets" as any)
+      .select("link")
+      .eq("categoria", "short_link")
+      .eq("nome", slug)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data.link as string;
+  });
+
+export const listShortLinks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("ht_assets" as any)
+      .select("id, nome, link, created_at")
+      .eq("categoria", "short_link")
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data as any as Array<{ id: string; nome: string; link: string; created_at: string }>;
+  });
+
+export const createShortLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { slug: string; url: string }) => {
+    const slug = String(data?.slug ?? "").trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9_-]/g, "");
+    const url = String(data?.url ?? "").trim();
+    if (!slug) throw new Error("Slug curto obrigatório");
+    if (!url) throw new Error("URL de destino obrigatória");
+    return { slug, url };
+  })
+  .handler(async ({ data, context }) => {
+    // Valida duplicidade
+    const { data: existing } = await context.supabase
+      .from("ht_assets" as any)
+      .select("id")
+      .eq("categoria", "short_link")
+      .eq("nome", data.slug)
+      .maybeSingle();
+
+    if (existing) {
+      throw new Error("Este slug curto já está em uso!");
+    }
+
+    const { data: inserted, error } = await context.supabase
+      .from("ht_assets" as any)
+      .insert({
+        nome: data.slug,
+        link: data.url,
+        categoria: "short_link",
+        descricao: "Link Curto Encurtado de UTM"
+      })
+      .select("id, nome, link, created_at")
+      .single();
+
+    if (error) throw new Error(error.message);
+    return inserted as any;
+  });
+
+export const deleteShortLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((id: string) => String(id || "").trim())
+  .handler(async ({ data: id, context }) => {
+    const { error } = await context.supabase
+      .from("ht_assets" as any)
+      .delete()
+      .eq("id", id)
+      .eq("categoria", "short_link");
+
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
