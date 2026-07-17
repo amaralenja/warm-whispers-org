@@ -118,6 +118,7 @@ export function KanbanLeadCard(props: {
   dragging?: boolean;
   footer?: React.ReactNode;
   scheduledAt?: string | null;
+  lastNote?: { body: string; author: string | null; role: string } | null;
 } = {}) {
   const {
     lead,
@@ -128,6 +129,7 @@ export function KanbanLeadCard(props: {
     dragging,
     footer,
     scheduledAt,
+    lastNote,
   } = props ?? {};
 
   if (!lead) return null;
@@ -245,6 +247,15 @@ export function KanbanLeadCard(props: {
         )}
       </div>
 
+      {lastNote && (
+        <div className="mt-2 text-[10px] bg-muted/20 hover:bg-muted/30 rounded border border-border/30 p-2 leading-relaxed text-muted-foreground break-words transition-colors">
+          <div className="flex items-center gap-1.5 font-black text-[8px] uppercase tracking-widest mb-1 text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+            <span>Obs por {lastNote.author || lastNote.role}</span>
+          </div>
+          <p className="line-clamp-3 italic text-foreground/80 font-serif">"{lastNote.body}"</p>
+        </div>
+      )}
 
       {scheduledAt && (
         <div className="mt-2 flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-300">

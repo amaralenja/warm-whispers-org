@@ -110,6 +110,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<QLead[]>([]);
+  const [notesMap, setNotesMap] = useState<Record<string, { body: string; author: string | null; role: string }>>({});
   const [vendas, setVendas] = useState<any[]>([]);
   const [htLeads, setHtLeads] = useState<any[]>([]);
   const [reunioes, setReunioes] = useState<any[]>([]);
@@ -194,7 +195,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       }
 
       // HT tables in parallel
-      const [v, hl, r, ag] = await Promise.all([
+      const [v, hl, r, ag, nt] = await Promise.all([
         (() => {
           let q = supabase.from("ht_vendas").select("*").limit(5000);
           if (startIso) q = q.gte("data", startIso);
@@ -219,6 +220,14 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           if (endIso) q = q.lt("data_agendada", endIso);
           return q;
         })(),
+        (() => {
+          // Buscamos todas as notas criadas de forma ascendente para que a última nota
+          // sobresscreva as anteriores no loop
+          return supabase
+            .from("ht_lead_notes" as any)
+            .select("lead_id, role, author, body, created_at")
+            .order("created_at", { ascending: true });
+        })(),
       ]);
 
       if (cancel) return;
@@ -239,6 +248,20 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       setHtLeads(hl.data ?? []);
       setReunioes(r.data ?? []);
       setAgenda(ag.data ?? []);
+
+      // Preenche o mapa com a observação mais recente
+      const nMap: Record<string, { body: string; author: string | null; role: string }> = {};
+      if (nt.data) {
+        for (const n of nt.data as any[]) {
+          nMap[n.lead_id] = {
+            body: n.body,
+            author: n.author,
+            role: n.role,
+          };
+        }
+      }
+      setNotesMap(nMap);
+
       setLoading(false);
     })();
     return () => { cancel = true; };
@@ -460,10 +483,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         </div>
       </div>
 
-      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} onReload={() => setNonce((n) => n + 1)} />}
+      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />}
       {tab === "closer" && (
         <>
-          <KanbanCloser leads={leads} vendas={vendas} loading={loading} onReload={() => setNonce((n) => n + 1)} />
+          <KanbanCloser leads={leads} vendas={vendas} loading={loading} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />
 
           <div className="border-t border-border/50 mt-6">
             <div className="px-6 md:px-10 pt-6 pb-2">
@@ -1545,7 +1568,7 @@ function useClosersList(): ClosersOption[] {
 
 
 
-function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: boolean; onReload?: () => void }) {
+function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }> }) {
   const scheduleCall = useServerFn(createEvent);
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
@@ -1725,6 +1748,7 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
                   lead={l}
                   ig={igMap.get((l.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, ""))}
                   scheduledAt={schedMap[l.id] ?? null}
+                  lastNote={notesMap[l.id]}
                   dragging={draggingId === l.id}
 
                   onClick={() => setSelectedLead(l)}
@@ -1759,7 +1783,7 @@ function KanbanSDR({ leads, loading, onReload }: { leads: QLead[]; loading: bool
         lead={selectedLead}
         role="sdr"
         open={!!selectedLead}
-        onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+        onOpenChange={(v) => { if (!v) { setSelectedLead(null); onReload?.(); } }}
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         closers={closersList}
         closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
@@ -1946,7 +1970,7 @@ const CAIXA_VALOR: Record<string, number> = {
   D: 3000, E: 5000, F: 8000, G: 15000,
 };
 
-function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void }) {
+function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }> }) {
   const scheduleCall = useServerFn(createEvent);
   const htSession = useMemo(() => getHtTeamSession(), []);
   const isCloserSession = htSession?.tipo === "closer";
@@ -2183,6 +2207,7 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
                       lead={leadObj as any}
                       ig={handle ? igMap.get(handle) : undefined}
                       scheduledAt={c.lead ? (schedMap[c.lead.id] ?? null) : null}
+                      lastNote={c.lead ? notesMap[c.lead.id] : null}
                       dragging={draggingId === c.id}
 
                       onClick={c.lead ? () => setSelectedLead(c.lead!) : undefined}
@@ -2229,7 +2254,7 @@ function KanbanCloser({ leads, vendas, loading, onReload }: { leads: QLead[]; ve
         lead={selectedLead}
         role="closer"
         open={!!selectedLead}
-        onOpenChange={(v) => { if (!v) setSelectedLead(null); }}
+        onOpenChange={(v) => { if (!v) { setSelectedLead(null); onReload?.(); } }}
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         closers={closersList}
         closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
