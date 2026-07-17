@@ -2555,6 +2555,16 @@ function UtmGenerator() {
     }
   }, [url, source, medium, campaign, content, term]);
 
+  const utmParamsString = useMemo(() => {
+    try {
+      if (finalUrl === "URL Inválida") return "";
+      const parsed = new URL(finalUrl);
+      return parsed.search.replace(/^\?/, "");
+    } catch {
+      return "";
+    }
+  }, [finalUrl]);
+
   const handleCopy = (link: string) => {
     if (!link || link === "URL Inválida") return;
     navigator.clipboard.writeText(link);
@@ -2795,6 +2805,23 @@ function UtmGenerator() {
               >
                 <Copy className="h-4 w-4" />
                 Copiar Link Final
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 border-border/50 bg-background/50 hover:bg-muted text-foreground flex items-center justify-center gap-2 rounded-lg font-medium transition-colors"
+                onClick={() => {
+                  if (utmParamsString) {
+                    navigator.clipboard.writeText(utmParamsString);
+                    toast.success("Apenas os parâmetros de UTM foram copiados!");
+                  } else {
+                    toast.error("Nenhum parâmetro UTM configurado");
+                  }
+                }}
+                disabled={!utmParamsString}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Copiar Apenas UTMs
               </Button>
             </CardContent>
           </Card>
