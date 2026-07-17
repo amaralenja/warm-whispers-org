@@ -81,6 +81,7 @@ const operacaoX1Items: Item[] = [
 
 const highTicketItems: Item[] = [
   { title: "Analytics", url: "/ht-analytics", icon: LineChart },
+  { title: "Métricas SDR", url: "/ht-sdr-metrics", icon: LineChart },
   { title: "Kanban SDR", url: "/ht-kanban-sdr", icon: Kanban },
   { title: "Kanban Closer", url: "/ht-kanban-closer", icon: Target },
   { title: "SDRs & Closers", url: "/ht-team", icon: Briefcase },
@@ -110,6 +111,7 @@ const URL_TO_KEY: Record<string, string> = {
   "/quiz": "quiz",
   "/meta-ads": "meta-ads",
   "/ht-analytics": "ht-analytics",
+  "/ht-sdr-metrics": "ht-sdr-metrics",
   "/ht-kanban-sdr": "ht-kanban-sdr",
   "/ht-kanban-closer": "ht-kanban-closer",
   "/ht-api": "ht-api",

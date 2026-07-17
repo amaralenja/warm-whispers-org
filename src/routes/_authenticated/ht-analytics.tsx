@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
 });
 
-type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads";
+type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics";
 
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
@@ -450,6 +450,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             if (!s || s.tipo === "sdr") tabs.push({ id: "kanban", label: "Kanban SDR" });
             if (!s || s.tipo === "closer") tabs.push({ id: "closer", label: "Kanban Closer" });
             tabs.push({ id: "dashboard", label: "Dashboard" });
+            if (s && s.tipo === "sdr") tabs.push({ id: "sdr-metrics", label: "Métricas SDR" });
             tabs.push({ id: "receber", label: "Contas a Receber" });
             tabs.push({ id: "leads", label: "Lista de Leads" });
             return tabs.map((t) => (
@@ -493,6 +494,9 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             listLimit={listLimit} setListLimit={setListLimit}
           />
         </div>
+      )}
+      {tab === "sdr-metrics" && (
+        <SdrDashboard leads={leads} notesMap={notesMap} onReload={() => setNonce((n) => n + 1)} />
       )}
 
       {tab === "dashboard" && (

@@ -708,7 +708,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     if (match) {
       autoOpenedRef.current = wanted;
       setActiveId(String(match.id));
-      if (!searchParams.embed) navigate({ to: "/chat", search: {}, replace: true });
+      if (!searchParams.embed) navigate({ to: "/chat", search: (prev: any) => ({ ...prev, phone: undefined, conversationId: undefined }), replace: true });
     }
   }, [requestedPhone, requestedConversationId, searchParams.embed, conversationList, navigate]);
 
