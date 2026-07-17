@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
+import { getKanbanLocalData } from "@/lib/ht-api.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { createEvent } from "@/lib/google-calendar.functions";
 import {
@@ -108,6 +109,7 @@ const SCORE_GROUPS: { id: string; label: string; letras: string[] }[] = [
 ];
 
 export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab } = {}) {
+  const getLocalDataFn = useServerFn(getKanbanLocalData);
   const [period, setPeriod] = useState<Period>("30d");
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -196,41 +198,19 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         /* silencioso — se falhar, só não mostra os leads da API */
       }
 
-      // HT tables in parallel
-      const [v, hl, r, ag, nt] = await Promise.all([
-        (() => {
-          let q = supabase.from("ht_vendas").select("*").limit(5000);
-          if (startIso) q = q.gte("data", startIso);
-          if (endIso) q = q.lt("data", endIso);
-          return q;
-        })(),
-        (() => {
-          let q = supabase.from("ht_leads").select("*").limit(5000);
-          if (startIso) q = q.gte("created_at", startIso);
-          if (endIso) q = q.lt("created_at", endIso);
-          return q;
-        })(),
-        (() => {
-          let q = supabase.from("ht_reunioes").select("*").limit(5000);
-          if (startIso) q = q.gte("data", startIso);
-          if (endIso) q = q.lt("data", endIso);
-          return q;
-        })(),
-        (() => {
-          let q = supabase.from("agenda_leads").select("*").limit(5000);
-          if (startIso) q = q.gte("data_agendada", startIso);
-          if (endIso) q = q.lt("data_agendada", endIso);
-          return q;
-        })(),
-        (() => {
-          // Buscamos todas as notas criadas de forma ascendente para que a última nota
-          // sobresscreva as anteriores no loop
-          return supabase
-            .from("ht_lead_notes" as any)
-            .select("lead_id, role, author, body, created_at")
-            .order("created_at", { ascending: true });
-        })(),
-      ]);
+      // HT tables via secure server function to bypass RLS 401s
+      let localData = {
+        vendas: [] as any[],
+        reunioes: [] as any[],
+        leads: [] as any[],
+        agenda: [] as any[],
+        notes: [] as any[]
+      };
+      try {
+        localData = await getLocalDataFn({ data: { startIso, endIso } });
+      } catch (err) {
+        console.error("Erro ao buscar dados locais do HT:", err);
+      }
 
       if (cancel) return;
       // Deduplica por whatsapp: leads da API só entram se não vieram do quiz externo.
@@ -246,15 +226,15 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       }
       merged.sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
       setLeads(merged);
-      setVendas(v.data ?? []);
-      setHtLeads(hl.data ?? []);
-      setReunioes(r.data ?? []);
-      setAgenda(ag.data ?? []);
+      setVendas(localData.vendas);
+      setHtLeads(localData.leads);
+      setReunioes(localData.reunioes);
+      setAgenda(localData.agenda);
 
       // Preenche o mapa com a observação mais recente
       const nMap: Record<string, { body: string; author: string | null; role: string }> = {};
-      if (nt.data) {
-        for (const n of nt.data as any[]) {
+      if (localData.notes) {
+        for (const n of localData.notes as any[]) {
           nMap[n.lead_id] = {
             body: n.body,
             author: n.author,
@@ -515,8 +495,13 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         </div>
       )}
 
-      {tab === "dashboard" && (
-      <div className="px-6 md:px-10 py-8 space-y-10">
+      {tab === "dashboard" && (() => {
+        const s = getHtTeamSession();
+        if (s?.tipo === "sdr") {
+          return <SdrDashboard leads={leads} notesMap={notesMap} onReload={() => setNonce((n) => n + 1)} />;
+        }
+        return (
+          <div className="px-6 md:px-10 py-8 space-y-10">
 
         {/* KPIs — Receita */}
         <section>
@@ -773,8 +758,9 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             </CardContent>
           </Card>
         </section>
-      </div>
-      )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2311,6 +2297,193 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
 
 
 
+    </div>
+  );
+}
+
+interface SdrDashboardProps {
+  leads: QLead[];
+  notesMap: Record<string, { body: string; author: string | null; role: string }>;
+  onReload?: () => void;
+}
+
+function SdrDashboard({ leads, notesMap, onReload }: SdrDashboardProps) {
+  const session = getHtTeamSession();
+  const sdrName = session?.nome || "SDR";
+
+  const metrics = useMemo(() => {
+    const sdrStages = snapshotSdrStages();
+    const sched = snapshotSched();
+
+    // Filtra os leads que esse SDR interagiu (colocou nota)
+    const myLeads = leads.filter((l) => {
+      // Checa nota no lead original ou com prefixo
+      const note = notesMap[l.id] || notesMap[`htq:${l.id}`];
+      return note?.author === sdrName;
+    });
+
+    // Mapeia estágios
+    const stageCounts: Record<string, number> = {
+      novos: 0,
+      c1: 0,
+      c2: 0,
+      convite: 0,
+      agendado: 0,
+      no_show: 0,
+      descartado: 0,
+    };
+
+    // Mapeia crm_status do quiz DB → nossas colunas se não estiver cacheado
+    const mapCrmSdr = (s: string | null | undefined): string => {
+      switch ((s ?? "").toLowerCase()) {
+        case "followup": return "c2";
+        case "grupo13k": return "no_grupo";
+        case "reagendamento": return "convite";
+        case "fechado":
+        case "agendado": return "agendado";
+        case "noshow": return "no_show";
+        case "descartado_sdr":
+        case "descartado_closer":
+        case "descartado": return "descartado";
+        default: return "novos";
+      }
+    };
+
+    let agendadosCount = 0;
+    const upcomingCalls: any[] = [];
+
+    for (const l of myLeads) {
+      // Estágio no cache local do SDR
+      const localStage = sdrStages[l.id];
+      // Se agendado por data no banco do Kanban
+      const isSched = !!sched[l.id];
+      const stage = localStage || (isSched ? "agendado" : mapCrmSdr(l.crm_status));
+      
+      const normalizedStage = stageCounts[stage] !== undefined ? stage : "novos";
+      stageCounts[normalizedStage] += 1;
+
+      if (stage === "agendado") {
+        agendadosCount += 1;
+        upcomingCalls.push(l);
+      }
+    }
+
+    // Ordenar próximas calls pela data de agendamento (mais recentes primeiro)
+    upcomingCalls.sort((a, b) => {
+      const dateA = sched[a.id] || a.crm_data_agendamento || "";
+      const dateB = sched[b.id] || b.crm_data_agendamento || "";
+      return dateB.localeCompare(dateA);
+    });
+
+    const totalTrabalhados = myLeads.length;
+    const taxaAgendamento = totalTrabalhados > 0 ? (agendadosCount / totalTrabalhados) * 100 : 0;
+
+    return {
+      totalTrabalhados,
+      stageCounts,
+      agendadosCount,
+      taxaAgendamento,
+      upcomingCalls: upcomingCalls.slice(0, 10), // limita a 10
+    };
+  }, [leads, notesMap, sdrName]);
+
+  const kpis = metrics;
+
+  return (
+    <div className="px-6 md:px-10 py-8 space-y-10">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Meu Painel SDR</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Bem-vindo de volta, <span className="text-accent font-semibold">{sdrName}</span>. Acompanhe seus agendamentos e métricas abaixo.
+        </p>
+      </div>
+
+      {/* KPI Cards */}
+      <section>
+        <SectionTitle overline="Métricas Pessoais" title="Resumo de Performance" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Kpi accent icon={<Users className="h-4 w-4" />} label="Leads Atendidos por Mim"
+            value={fmtInt(kpis.totalTrabalhados)} sub="Com observações salvas" />
+          <Kpi icon={<Calendar className="h-4 w-4" />} label="Calls Agendadas por Mim"
+            value={fmtInt(kpis.agendadosCount)} sub="Movidos para a coluna de Agendado" />
+          <Kpi icon={<Target className="h-4 w-4" />} label="Taxa de Agendamento"
+            value={`${kpis.taxaAgendamento.toFixed(1)}%`} sub="Conversão de leads em reunião" />
+        </div>
+      </section>
+
+      {/* Funil de Contatos */}
+      <section className="grid gap-6 md:grid-cols-2">
+        <Card className="border-border/50 bg-card/50 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold tracking-wider uppercase text-muted-foreground">Distribuição do Meu Funil</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              { id: "novos", label: "Novos Leads", count: kpis.stageCounts.novos, color: "bg-muted-foreground/30" },
+              { id: "c1", label: "Contato 1 (WhatsApp/Insta)", count: kpis.stageCounts.c1, color: "bg-blue-400" },
+              { id: "c2", label: "Contato 2 (Follow-up)", count: kpis.stageCounts.c2, color: "bg-sky-400" },
+              { id: "convite", label: "Convite para Call", count: kpis.stageCounts.convite, color: "bg-amber-400" },
+              { id: "agendado", label: "Agendado (Reunião)", count: kpis.stageCounts.agendado, color: "bg-emerald-400" },
+              { id: "no_show", label: "No Show / Perdeu Call", count: kpis.stageCounts.no_show, color: "bg-red-400" },
+              { id: "descartado", label: "Leads Descartados", count: kpis.stageCounts.descartado, color: "bg-muted-foreground/55" },
+            ].map((item) => {
+              const pct = kpis.totalTrabalhados > 0 ? (item.count / kpis.totalTrabalhados) * 100 : 0;
+              return (
+                <div key={item.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">{item.label}</span>
+                    <span className="font-mono text-muted-foreground font-semibold">
+                      {item.count} ({pct.toFixed(0)}%)
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-border/20 rounded-full overflow-hidden">
+                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        {/* Próximas Calls do SDR */}
+        <Card className="border-border/50 bg-card/50 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold tracking-wider uppercase text-muted-foreground">Últimos Agendamentos Efetuados</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/30 max-h-[380px] overflow-y-auto pr-1">
+              {kpis.upcomingCalls.length === 0 ? (
+                <div className="text-center text-xs text-muted-foreground py-8">
+                  Nenhuma call agendada por você nos registros.
+                </div>
+              ) : (
+                kpis.upcomingCalls.map((l) => {
+                  const dateVal = snapshotSched()[l.id] || l.crm_data_agendamento;
+                  const formattedDate = dateVal ? new Date(dateVal).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }) : "Data não definida";
+                  return (
+                    <div key={l.id} className="p-3 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">{l.nome || "Lead Sem Nome"}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{l.whatsapp || l.email || "@" + (l.instagram || "")}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded px-1.5 py-0.5 font-mono">
+                          {formattedDate}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

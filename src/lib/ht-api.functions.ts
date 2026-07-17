@@ -81,4 +81,53 @@ export const listHtQuizSubmissions = createServerFn({ method: "GET" })
     return { submissions: (data ?? []) as Array<any> };
   });
 
+export const getKanbanLocalData = createServerFn({ method: "POST" })
+  .inputValidator((d: { startIso?: string | null; endIso?: string | null }) => d)
+  .handler(async ({ data: { startIso, endIso } }) => {
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                process.env.SUPABASE_SECRET_KEY || 
+                process.env.SUPABASE_SECRET_KEYS || 
+                process.env.SUPABASE_SERVICE_KEY ||
+                process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
+    if (!url || !key) {
+      throw new Error("Credenciais do Supabase não configuradas no servidor.");
+    }
+    const { createClient } = await import("@supabase/supabase-js");
+    const client = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
+    let qVendas = client.from("ht_vendas").select("*").limit(5000);
+    if (startIso) qVendas = qVendas.gte("data", startIso);
+    if (endIso) qVendas = qVendas.lt("data", endIso);
+
+    let qLeads = client.from("ht_leads").select("*").limit(5000);
+    if (startIso) qLeads = qLeads.gte("created_at", startIso);
+    if (endIso) qLeads = qLeads.lt("created_at", endIso);
+
+    let qReunioes = client.from("ht_reunioes").select("*").limit(5000);
+    if (startIso) qReunioes = qReunioes.gte("data", startIso);
+    if (endIso) qReunioes = qReunioes.lt("data", endIso);
+
+    let qAgenda = client.from("agenda_leads").select("*").limit(5000);
+    if (startIso) qAgenda = qAgenda.gte("data_agendada", startIso);
+    if (endIso) qAgenda = qAgenda.lt("data_agendada", endIso);
+
+    const [vendasRes, reunioesRes, leadsRes, agendaRes, notesRes] = await Promise.all([
+      qVendas,
+      qReunioes,
+      qLeads,
+      qAgenda,
+      client.from("ht_lead_notes").select("lead_id, role, author, body, created_at").order("created_at", { ascending: true }),
+    ]);
+
+    return {
+      vendas: vendasRes.data || [],
+      reunioes: reunioesRes.data || [],
+      leads: leadsRes.data || [],
+      agenda: agendaRes.data || [],
+      notes: notesRes.data || [],
+    };
+  });
