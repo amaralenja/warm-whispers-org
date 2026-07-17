@@ -203,8 +203,14 @@ export function HtLeadDetailDialog({
 
   const authorName = useMemo(() => {
     try {
-      const s = getVendorSession() as any;
-      return s?.nome || s?.codigo || (role === "sdr" ? "SDR" : "Closer");
+      const s = typeof window !== "undefined"
+        ? (localStorage.getItem("vendor_session") || localStorage.getItem("ht_team_session"))
+        : null;
+      if (s) {
+        const parsed = JSON.parse(s);
+        return parsed?.nome || parsed?.codigo || (role === "sdr" ? "SDR" : "Closer");
+      }
+      return role === "sdr" ? "SDR" : "Closer";
     } catch { return role === "sdr" ? "SDR" : "Closer"; }
   }, [role]);
 

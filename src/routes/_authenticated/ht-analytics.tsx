@@ -2313,12 +2313,8 @@ function SdrDashboard({ leads, notesMap, onReload }: SdrDashboardProps) {
     const sdrStages = snapshotSdrStages();
     const sched = snapshotSched();
 
-    // Filtra os leads que esse SDR interagiu (colocou nota)
-    const myLeads = leads.filter((l) => {
-      // Checa nota no lead original ou com prefixo
-      const note = notesMap[l.id] || notesMap[`htq:${l.id}`];
-      return note?.author === sdrName;
-    });
+    // Usa todos os leads qualificados e ativos no funil do SDR
+    const myLeads = leads.filter((l) => isFinalizado(l));
 
     // Mapeia estágios
     const stageCounts: Record<string, number> = {
@@ -2400,10 +2396,10 @@ function SdrDashboard({ leads, notesMap, onReload }: SdrDashboardProps) {
       <section>
         <SectionTitle overline="Métricas Pessoais" title="Resumo de Performance" />
         <div className="grid gap-4 md:grid-cols-3">
-          <Kpi accent icon={<Users className="h-4 w-4" />} label="Leads Atendidos por Mim"
-            value={fmtInt(kpis.totalTrabalhados)} sub="Com observações salvas" />
-          <Kpi icon={<Calendar className="h-4 w-4" />} label="Calls Agendadas por Mim"
-            value={fmtInt(kpis.agendadosCount)} sub="Movidos para a coluna de Agendado" />
+          <Kpi accent icon={<Users className="h-4 w-4" />} label="Total de Leads no Funil"
+            value={fmtInt(kpis.totalTrabalhados)} sub="Leads qualificados e ativos" />
+          <Kpi icon={<Calendar className="h-4 w-4" />} label="Total de Calls Agendadas"
+            value={fmtInt(kpis.agendadosCount)} sub="Reuniões marcadas com closers" />
           <Kpi icon={<Target className="h-4 w-4" />} label="Taxa de Agendamento"
             value={`${kpis.taxaAgendamento.toFixed(1)}%`} sub="Conversão de leads em reunião" />
         </div>
