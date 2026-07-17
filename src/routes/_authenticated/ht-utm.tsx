@@ -1,49 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Copy, Trash2, SlidersHorizontal, Zap, Users, Calendar, Target } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
-import { listShortLinks, createShortLink, deleteShortLink } from "@/lib/ht-api.functions";
+import { Copy, Trash2, SlidersHorizontal, DollarSign, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/ht-utm")({
   component: () => <UtmGeneratorPage />,
 });
-
-const fmtInt = (n: number) => Math.round(n || 0).toLocaleString("pt-BR");
-
-function SectionTitle({ overline, title }: { overline: string; title: string }) {
-  return (
-    <div className="mb-4 flex items-baseline gap-3">
-      <span className="text-[10px] uppercase tracking-[0.25em] text-accent font-mono">{overline}</span>
-      <span className="h-px flex-1 bg-border/20" />
-    </div>
-  );
-}
-
-function Kpi({ accent, icon, label, value, sub }: {
-  accent?: boolean;
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <Card className={`border-border/50 bg-card/50 backdrop-blur ${accent ? "ring-1 ring-accent" : ""}`}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
-          <span className={accent ? "text-accent" : "text-muted-foreground"}>{icon}</span>
-        </div>
-        <div className="mt-4 flex items-baseline gap-2">
-          <span className="text-3xl font-bold tracking-tight tabular-nums">{value}</span>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
-      </CardContent>
-    </Card>
-  );
-}
 
 export function UtmGeneratorPage() {
   const [url, setUrl] = useState("https://criarsaas.com/");
@@ -52,64 +16,6 @@ export function UtmGeneratorPage() {
   const [campaign, setCampaign] = useState("");
   const [content, setContent] = useState("");
   const [term, setTerm] = useState("");
-
-  const listShortLinksFn = useServerFn(listShortLinks);
-  const createShortLinkFn = useServerFn(createShortLink);
-  const deleteShortLinkFn = useServerFn(deleteShortLink);
-
-  const [shortLinks, setShortLinks] = useState<Array<{ id: string; nome: string; link: string; created_at: string }>>([]);
-  const [loadingShortLinks, setLoadingShortLinks] = useState(false);
-  const [shortSlug, setShortSlug] = useState("");
-  const [shortUrl, setShortUrl] = useState("");
-  const [creatingLink, setCreatingLink] = useState(false);
-
-  const loadShortLinks = async () => {
-    setLoadingShortLinks(true);
-    try {
-      const data = await listShortLinksFn();
-      setShortLinks(data || []);
-    } catch (err: any) {
-      toast.error("Erro ao carregar links curtos: " + err.message);
-    } finally {
-      setLoadingShortLinks(false);
-    }
-  };
-
-  useEffect(() => {
-    loadShortLinks();
-  }, []);
-
-  const handleCreateShortLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const slug = shortSlug.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9_-]/g, "");
-    const dest = shortUrl.trim();
-    if (!slug) { toast.error("Digite o caminho curto (slug)!"); return; }
-    if (!dest) { toast.error("Digite ou selecione a URL de destino!"); return; }
-
-    setCreatingLink(true);
-    try {
-      await createShortLinkFn({ data: { slug, url: dest } });
-      toast.success("Link encurtado criado com sucesso!");
-      setShortSlug("");
-      setShortUrl("");
-      loadShortLinks();
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao criar link curto");
-    } finally {
-      setCreatingLink(false);
-    }
-  };
-
-  const handleDeleteShortLink = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este link curto?")) return;
-    try {
-      await deleteShortLinkFn({ data: id });
-      toast.success("Link curto removido!");
-      loadShortLinks();
-    } catch (err: any) {
-      toast.error("Erro ao remover link: " + err.message);
-    }
-  };
 
   const [history, setHistory] = useState<Array<{
     id: string;
@@ -495,128 +401,6 @@ export function UtmGeneratorPage() {
           </div>
         </CardContent>
       </Card>
-
-      <div className="border-t border-border/40 my-8 pt-8">
-        <h2 className="text-xl font-bold tracking-tight text-foreground">Encurtador de Links (Redirects)</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Crie links curtos personalizados (ex: <code className="text-accent font-semibold">/go/youtube</code>) que redirecionam automaticamente para as URLs longas parametrizadas.
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-border/50 bg-card/50 backdrop-blur">
-          <CardHeader className="pb-2 border-b border-border/20">
-            <CardTitle className="text-sm font-semibold tracking-wider uppercase text-muted-foreground">Criar Link Curto</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <form onSubmit={handleCreateShortLink} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center justify-between">
-                  <span>Caminho Curto (Slug)</span>
-                  <span className="text-[10px] text-muted-foreground lowercase">Letras, números e traço</span>
-                </label>
-                <div className="flex items-center bg-background/50 border border-border/50 rounded-lg overflow-hidden px-3 h-10">
-                  <span className="text-muted-foreground text-xs font-mono select-none">/go/</span>
-                  <input
-                    type="text"
-                    value={shortSlug}
-                    onChange={(e) => setShortSlug(e.target.value)}
-                    placeholder="youtube"
-                    className="w-full h-full bg-transparent border-0 text-sm focus:outline-none pl-1 text-foreground"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center justify-between">
-                  <span>URL de Destino (Longa)</span>
-                  <span className="text-[10px] text-muted-foreground lowercase">Obrigatório</span>
-                </label>
-                <textarea
-                  value={shortUrl}
-                  onChange={(e) => setShortUrl(e.target.value)}
-                  placeholder="Cole aqui a URL gerada com UTMs"
-                  rows={4}
-                  className="w-full p-3 bg-background/50 border border-border/50 rounded-lg text-xs font-mono focus:outline-none focus:border-accent transition-colors resize-none text-foreground"
-                />
-                {finalUrl && finalUrl !== "URL Inválida" && (
-                  <button
-                    type="button"
-                    className="text-[10px] text-accent hover:underline text-left block mt-1 font-semibold"
-                    onClick={() => setShortUrl(finalUrl)}
-                  >
-                    👉 Usar link do gerador de UTM acima
-                  </button>
-                )}
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-10 bg-accent text-accent-foreground hover:bg-accent/90 flex items-center justify-center gap-2 rounded-lg font-medium transition-colors"
-                disabled={creatingLink}
-              >
-                {creatingLink ? "Criando..." : "Criar Link Curto"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2 border-border/50 bg-card/50 backdrop-blur">
-          <CardHeader className="pb-2 border-b border-border/20 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold tracking-wider uppercase text-muted-foreground">Meus Links Curtos Ativos</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              className="h-8 text-xs text-muted-foreground"
-              onClick={loadShortLinks}
-              disabled={loadingShortLinks}
-            >
-              {loadingShortLinks ? "Atualizando..." : "Atualizar"}
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-border/30 max-h-[400px] overflow-y-auto">
-              {loadingShortLinks ? (
-                <div className="text-center text-xs text-muted-foreground py-10">
-                  Carregando links curtos do banco...
-                </div>
-              ) : shortLinks.length === 0 ? (
-                <div className="text-center text-xs text-muted-foreground py-10">
-                  Nenhum link curto cadastrado. Crie um ao lado!
-                </div>
-              ) : (
-                shortLinks.map((sl) => {
-                  const localOrigin = typeof window !== "undefined" ? window.location.origin : "";
-                  const shortUrlCompiled = `${localOrigin}/go/${sl.nome}`;
-                  return (
-                    <div key={sl.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/10 transition-colors">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-accent">/go/{sl.nome}</span>
-                          <span className="text-[10px] text-muted-foreground truncate font-mono max-w-[200px] sm:max-w-none">({sl.link})</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground font-mono truncate">{shortUrlCompiled}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button variant="ghost" size="icon" type="button" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => {
-                          navigator.clipboard.writeText(shortUrlCompiled);
-                          toast.success("Link encurtado copiado!");
-                        }}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" type="button" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteShortLink(sl.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
