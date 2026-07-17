@@ -66,15 +66,21 @@ function decodeVendorHeader(value: string | null): { id: number; codigo: string 
 }
 
 async function validateVendorSession(supabase: any, request: Request): Promise<VendorContext | null> {
-  const decoded = decodeVendorHeader(request.headers.get('x-vendor-session'));
+  const rawHeader = request.headers.get('x-vendor-session');
+  const decoded = decodeVendorHeader(rawHeader);
   if (!decoded) {
-    console.info('[vendor-session] no vendor header on server request');
+    console.info('[vendor-session] no vendor header on server request', {
+      rawHeaderPresent: !!rawHeader,
+      rawHeaderLength: rawHeader?.length ?? 0,
+    });
     return null;
   }
+  console.info('[vendor-session] decoded vendor header', { vendorId: decoded.id, codigo: decoded.codigo });
   const { data, error } = await supabase.rpc('login_vendedor_by_codigo', { _codigo: decoded.codigo });
   if (error || !data) {
     console.warn('[vendor-session] invalid vendor code on server', {
       vendorId: decoded.id,
+      codigo: decoded.codigo,
       hasData: Boolean(data),
       error: error?.message ?? null,
     });
@@ -122,6 +128,14 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
 
     const incomingVendorHeader = request.headers.get('x-vendor-session');
     const authHeader = request.headers.get('authorization');
+
+    console.info('[auth-middleware] incoming headers check', {
+      hasVendorHeader: !!incomingVendorHeader,
+      vendorHeaderLength: incomingVendorHeader?.length ?? 0,
+      hasAuthHeader: !!authHeader,
+      url: request.url,
+    });
+
     const baseSupabase = createClient<Database>(
       SUPABASE_URL!,
       SUPABASE_PUBLISHABLE_KEY!,
@@ -157,6 +171,10 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     }
 
     if (!authHeader) {
+      console.error('[auth-middleware] REJECTING request — no vendor session AND no auth header', {
+        hasVendorHeader: !!incomingVendorHeader,
+        vendorDecoded: incomingVendorHeader ? decodeVendorHeader(incomingVendorHeader) : 'no-header',
+      });
       throw new Error('Unauthorized: No authorization header provided');
     }
 
