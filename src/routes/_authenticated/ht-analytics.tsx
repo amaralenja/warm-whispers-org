@@ -495,13 +495,8 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         </div>
       )}
 
-      {tab === "dashboard" && (() => {
-        const s = getHtTeamSession();
-        if (s?.tipo === "sdr") {
-          return <SdrDashboard leads={leads} notesMap={notesMap} onReload={() => setNonce((n) => n + 1)} />;
-        }
-        return (
-          <div className="px-6 md:px-10 py-8 space-y-10">
+      {tab === "dashboard" && (
+      <div className="px-6 md:px-10 py-8 space-y-10">
 
         {/* KPIs — Receita */}
         <section>
@@ -758,9 +753,8 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             </CardContent>
           </Card>
         </section>
-          </div>
-        );
-      })()}
+      </div>
+      )}
     </div>
   );
 }

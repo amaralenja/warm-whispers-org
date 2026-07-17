@@ -307,7 +307,11 @@ export function AppSidebar() {
           )}
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
-              {perm !== null && renderMenuItem({ title: "Meu Painel", url: "/vendor", icon: User })}
+              {perm !== null && (() => {
+                const isHt = typeof window !== "undefined" && !!localStorage.getItem("ht_team_session");
+                const targetUrl = isHt ? "/ht-analytics" : "/vendor";
+                return renderMenuItem({ title: "Meu Painel", url: targetUrl, icon: User });
+              })()}
               {visibleMain.map(renderMenuItem)}
               
 
