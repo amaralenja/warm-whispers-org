@@ -1857,6 +1857,7 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
     setSaving(true);
     try {
       const payload = {
+        id: crypto.randomUUID(),
         nome: nome.trim() || null,
         email: email.trim() || null,
         whatsapp: whatsapp.trim() || null,
