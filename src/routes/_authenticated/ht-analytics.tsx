@@ -1850,7 +1850,9 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
   };
 
   async function handleSave() {
+    console.log("[AddSDRLeadDialog] handleSave acionado", { nome, whatsapp, email, instagram, caixa, faturamento, objetivo, utmSource });
     if (!nome.trim() && !whatsapp.trim() && !email.trim()) {
+      console.warn("[AddSDRLeadDialog] validação de campos obrigatórios falhou. Nome, WhatsApp e E-mail estão vazios.");
       toast.error("Preencha ao menos nome, whatsapp ou email");
       return;
     }
@@ -1874,10 +1876,13 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
         },
         raw: { source: "sdr_manual" },
       };
-      await createLeadFn({ data: payload });
+      console.log("[AddSDRLeadDialog] disparando createLeadFn com payload:", payload);
+      const res = await createLeadFn({ data: payload });
+      console.log("[AddSDRLeadDialog] resposta da server function de criação de lead:", res);
       toast.success("Lead adicionado ao Kanban SDR");
       onCreated();
     } catch (e: any) {
+      console.error("[AddSDRLeadDialog] falha ao salvar lead manual:", e);
       toast.error(e?.message ?? "Erro ao salvar lead");
     } finally {
       setSaving(false);
@@ -1936,8 +1941,8 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button variant="outline" onClick={() => { console.log('[AddSDRLeadDialog] cancelado'); onOpenChange(false); }} disabled={saving}>Cancelar</Button>
+          <Button onClick={() => { console.log('[AddSDRLeadDialog] clicado em salvar'); handleSave(); }} disabled={saving}>
             {saving ? "Salvando…" : "Adicionar Lead"}
           </Button>
         </DialogFooter>
