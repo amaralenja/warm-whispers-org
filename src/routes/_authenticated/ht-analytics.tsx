@@ -83,7 +83,10 @@ type QLead = {
   utm_source: string | null; utm_medium: string | null; utm_campaign: string | null;
   crm_status: string | null; crm_valor: number | null; crm_data_agendamento: string | null;
 };
-const isFinalizado = (l: QLead) => !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
+const isFinalizado = (l: QLead) => {
+  if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
+  return !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
+};
 const isQuente = (l: QLead) => {
   const c = (l.caixa_letra ?? "").toUpperCase();
   return "DEFG".includes(c) && /(sim|compromet)/i.test(l.comprometimento ?? "");
