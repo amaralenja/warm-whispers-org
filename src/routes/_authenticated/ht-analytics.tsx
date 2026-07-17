@@ -24,7 +24,6 @@ import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
-import { createSdrLead } from "@/lib/ht-api.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { createEvent } from "@/lib/google-calendar.functions";
 import {
@@ -1835,7 +1834,6 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
   const [objetivo, setObjetivo] = useState("");
   const [utmSource, setUtmSource] = useState("manual");
   const [saving, setSaving] = useState(false);
-  const createLeadFn = useServerFn(createSdrLead);
 
   useEffect(() => {
     if (!open) {
@@ -1863,31 +1861,36 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
         email: email.trim() || null,
         whatsapp: whatsapp.trim() || null,
         instagram: instagram.trim() || null,
+        caixa_letra: caixa,
+        caixa_label: caixaLabelMap[caixa] ?? null,
+        faturamento: faturamento.trim() || null,
+        objetivo: objetivo.trim() || null,
+        comprometimento: "Alto (manual)",
+        momento: "manual",
         utm_source: utmSource.trim() || "manual",
         utm_medium: "sdr-manual",
-        utm_campaign: null,
-        status: "finalizado",
-        respostas: {
-          caixa_letra: caixa,
-          caixa_label: caixaLabelMap[caixa] ?? null,
-          faturamento: faturamento.trim() || null,
-          objetivo: objetivo.trim() || null,
-          origem: "sdr_manual",
-        },
-        raw: { source: "sdr_manual" },
+        data_criacao: new Date().toISOString(),
+        crm_status: "novos",
       };
-      console.log("[AddSDRLeadDialog] disparando createLeadFn com payload:", payload);
-      const res = await createLeadFn({ data: payload });
-      console.log("[AddSDRLeadDialog] resposta da server function de criação de lead:", res);
+      console.log("[AddSDRLeadDialog] disparando insert no Quiz Supabase (tabela leads) com payload:", payload);
+      const { data: res, error } = await quizSb
+        .from("leads")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) throw error;
+      console.log("[AddSDRLeadDialog] resposta do insert no Quiz Supabase:", res);
       toast.success("Lead adicionado ao Kanban SDR");
       onCreated();
     } catch (e: any) {
-      console.error("[AddSDRLeadDialog] falha ao salvar lead manual:", e);
+      console.error("[AddSDRLeadDialog] falha ao salvar lead manual no Quiz Supabase:", e);
       toast.error(e?.message ?? "Erro ao salvar lead");
     } finally {
       setSaving(false);
     }
   }
+
+  const isFormInvalid = !nome.trim() && !whatsapp.trim() && !email.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1939,10 +1942,15 @@ function AddSDRLeadDialog({ open, onOpenChange, onCreated }: { open: boolean; on
             <Label>Meta / Objetivo</Label>
             <Input value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex: R$ 50k/mês em 6 meses" />
           </div>
+          {isFormInvalid && (
+            <p className="text-[11px] text-red-400 font-medium bg-red-500/10 border border-red-500/20 rounded-md p-2 mt-2">
+              ⚠️ Preencha ao menos Nome, WhatsApp ou E-mail para poder salvar.
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { console.log('[AddSDRLeadDialog] cancelado'); onOpenChange(false); }} disabled={saving}>Cancelar</Button>
-          <Button onClick={() => { console.log('[AddSDRLeadDialog] clicado em salvar'); handleSave(); }} disabled={saving}>
+          <Button onClick={() => { console.log('[AddSDRLeadDialog] clicado em salvar'); handleSave(); }} disabled={saving || isFormInvalid}>
             {saving ? "Salvando…" : "Adicionar Lead"}
           </Button>
         </DialogFooter>

@@ -81,23 +81,4 @@ export const listHtQuizSubmissions = createServerFn({ method: "GET" })
     return { submissions: (data ?? []) as Array<any> };
   });
 
-export const createSdrLead = createServerFn({ method: "POST" })
-  .inputValidator((d: any) => d)
-  .handler(async ({ data }) => {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEYS;
-    if (!url || !key) {
-      throw new Error("Credenciais do Supabase não configuradas no servidor.");
-    }
-    const { createClient } = await import("@supabase/supabase-js");
-    const client = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: row, error } = await client
-      .from("ht_quiz_submissions" as any)
-      .insert(data)
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
-  });
+
