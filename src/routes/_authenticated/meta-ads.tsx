@@ -302,10 +302,11 @@ function MetaAdsManagerPage() {
     return campaignsRaw.map((c: any) => {
       const campaignLeads = leads.filter((l: any) => {
         if (!l.utm_campaign) return false;
+        const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
         const cName = String(c.name).toLowerCase().trim();
         const cId = String(c.id).toLowerCase().trim();
         const utmCampaign = String(l.utm_campaign).toLowerCase().trim();
-        return cName.includes(utmCampaign) || utmCampaign.includes(cName) || cId === utmCampaign;
+        return normName(cName).includes(normName(utmCampaign)) || normName(utmCampaign).includes(normName(cName)) || cId === utmCampaign;
       });
       const finalizados = campaignLeads.filter(isFinalizado).length;
       const showups = campaignLeads.filter(isShowUp).length;
@@ -325,10 +326,11 @@ function MetaAdsManagerPage() {
     return adsetsRaw.map((a: any) => {
       const adsetLeads = leads.filter((l: any) => {
         if (!l.utm_term) return false;
+        const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
         const aName = String(a.name).toLowerCase().trim();
         const aId = String(a.id).toLowerCase().trim();
         const utmTerm = String(l.utm_term).toLowerCase().trim();
-        return aName.includes(utmTerm) || utmTerm.includes(aName) || aId === utmTerm;
+        return normName(aName).includes(normName(utmTerm)) || normName(utmTerm).includes(normName(aName)) || aId === utmTerm;
       });
       const finalizados = adsetLeads.filter(isFinalizado).length;
       const showups = adsetLeads.filter(isShowUp).length;
@@ -348,10 +350,11 @@ function MetaAdsManagerPage() {
     return adsRaw.map((ad: any) => {
       const adLeads = leads.filter((l: any) => {
         if (!l.utm_content) return false;
+        const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
         const adName = String(ad.name).toLowerCase().trim();
         const adId = String(ad.id).toLowerCase().trim();
         const utmContent = String(l.utm_content).toLowerCase().trim();
-        return adName.includes(utmContent) || utmContent.includes(adName) || adId === utmContent;
+        return normName(adName).includes(normName(utmContent)) || normName(utmContent).includes(normName(adName)) || adId === utmContent;
       });
       const finalizados = adLeads.filter(isFinalizado).length;
       const showups = adLeads.filter(isShowUp).length;
