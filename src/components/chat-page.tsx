@@ -33,6 +33,7 @@ import {
   Columns3,
   ArrowLeft,
   ChevronDown,
+  Pencil,
 } from "lucide-react";
 import {
   DndContext,
@@ -533,6 +534,34 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned" | "archived">("all");
+
+  const [editingNameConv, setEditingNameConv] = useState<Conv | null>(null);
+  const [newName, setNewName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+
+  const handleSaveContactName = async () => {
+    if (!editingNameConv) return;
+    const name = newName.trim();
+    if (!name) {
+      toast.error("O nome não pode ser vazio");
+      return;
+    }
+    setSavingName(true);
+    try {
+      const { error } = await supabase
+        .from("wa_conversations")
+        .update({ contact_name: name })
+        .eq("id", editingNameConv.id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      toast.success("Nome atualizado com sucesso");
+      setEditingNameConv(null);
+    } catch (e: any) {
+      toast.error("Falha ao salvar nome: " + (e.message || String(e)));
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
@@ -1320,10 +1349,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           </Avatar>
                         </button>
                         <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="truncate text-[15px] font-semibold tracking-normal">
+                          <div className="flex min-w-0 items-center justify-between">
+                            <span className="truncate text-[15px] font-semibold tracking-normal text-foreground">
                               {contactName || contactWaId}
                             </span>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
                             {isTypebotLead && (
                               <Badge variant="outline" className="shrink-0 h-4 px-1 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/30 flex items-center gap-0.5 font-semibold">
                                 🤖 Quiz
@@ -1331,17 +1363,17 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             )}
                             {isArchived ? (
                               <span
-                                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
                                 title="Conversa arquivada"
                               >
-                                <Archive className="h-3 w-3" /> Arquivada
+                                <Archive className="h-2.5 w-2.5" /> Arquivada
                               </span>
                             ) : null}
                             {(() => {
                               const b = opBadgeFor((c as any).operacao_id);
                               return b ? (
                                 <span
-                                  className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                  className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
                                   style={{ color: b.hex, borderColor: `${b.hex}55`, backgroundColor: `${b.hex}1a` }}
                                   title={`Operação: ${b.nome}`}
                                 >
@@ -1351,7 +1383,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             })()}
                             {leadStage ? (
                               <span
-                                className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
                                 style={{ color: leadStage.cor, borderColor: `${leadStage.cor}66`, backgroundColor: `${leadStage.cor}1a` }}
                                 title={`Etapa CRM: ${leadStage.nome}`}
                               >
@@ -1506,9 +1538,22 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   </button>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
-                      <h3 className="truncate text-lg font-semibold tracking-normal">
-                        {toText(active.contact_name) || toText(active.contact_wa_id)}
-                      </h3>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="truncate text-lg font-semibold tracking-normal">
+                          {toText(active.contact_name) || toText(active.contact_wa_id)}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingNameConv(active);
+                            setNewName(toText(active.contact_name) || toText(active.contact_wa_id));
+                          }}
+                          className="rounded-full p-1 text-muted-foreground hover:bg-chat-soft hover:text-foreground transition-colors"
+                          title="Editar nome do lead"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                       <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
@@ -1785,6 +1830,38 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           )}
         </main>
       </div>
+
+      {/* Modal para editar o nome do contato */}
+      <Dialog open={!!editingNameConv} onOpenChange={(open) => { if (!open) setEditingNameConv(null); }}>
+        <DialogContent className="max-w-md border-chat-line bg-chat-panel text-foreground">
+          <DialogHeader>
+            <DialogTitle>Editar nome do lead</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Telefone: {editingNameConv?.contact_wa_id}</div>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Novo nome do lead..."
+                className="border-chat-line bg-chat-soft text-foreground focus:ring-1 focus:ring-chat-accent"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveContactName();
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingNameConv(null)} disabled={savingName}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveContactName} disabled={savingName}>
+              {savingName ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!preview} onOpenChange={(o) => { if (!o) cancelPreview(); }}>
           <DialogContent className="max-w-lg">
