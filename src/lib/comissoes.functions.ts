@@ -156,7 +156,18 @@ export const getComissoes = createServerFn({ method: "POST" })
 
             cumulativo += day.faturamento;
             const rate = tierRate(cumulativo);
-            const milhares = Math.floor(day.faturamento / 1000);
+            let milhares = 0;
+            if (day.faturamento >= 991) {
+              milhares = 1;
+              while (true) {
+                const proximoMinimo = ((milhares + 1) * 1000) - ((milhares + 1) * 10 - 1);
+                if (day.faturamento >= proximoMinimo) {
+                  milhares++;
+                } else {
+                  break;
+                }
+              }
+            }
             const valor = milhares * rate;
 
             dias.push({
