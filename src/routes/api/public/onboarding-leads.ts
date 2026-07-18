@@ -1,19 +1,78 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
-function getAdminClient() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://wvcwrozwnwdlpandwubp.supabase.co";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
-              process.env.SUPABASE_SECRET_KEY || 
-              process.env.SUPABASE_SECRET_KEYS || 
-              process.env.SUPABASE_SERVICE_KEY ||
-              process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+function isNewSupabaseApiKey(value: string): boolean {
+  return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
+}
 
-  if (!url || !key) {
-    throw new Error("Credenciais do Supabase não configuradas no servidor.");
+function jwtRole(value: string): string | null {
+  try {
+    const [, payload] = value.split(".");
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
+    return typeof json?.role === "string" ? json.role : null;
+  } catch {
+    return null;
   }
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false }
+}
+
+function collectSecretCandidates(value: unknown, out: string[] = []): string[] {
+  if (!value) return out;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return out;
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        collectSecretCandidates(JSON.parse(trimmed), out);
+        return out;
+      } catch {
+        // keep raw string fallback below
+      }
+    }
+    for (const part of trimmed.split(/[\n,]+/).map((p) => p.trim()).filter(Boolean)) out.push(part);
+    return out;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectSecretCandidates(item, out);
+    return out;
+  }
+  if (typeof value === "object") {
+    for (const item of Object.values(value as Record<string, unknown>)) collectSecretCandidates(item, out);
+  }
+  return out;
+}
+
+function pickSupabaseAdminKey(): string | null {
+  const candidates = collectSecretCandidates([
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_SECRET_KEY,
+    process.env.SUPABASE_SECRET_KEYS,
+  ]);
+  return (
+    candidates.find((k) => k.startsWith("sb_secret_")) ||
+    candidates.find((k) => jwtRole(k) === "service_role") ||
+    null
+  );
+}
+
+async function createRouteSupabaseAdmin() {
+  const SUPABASE_URL = process.env.SUPABASE_URL || "https://wvcwrozwnwdlpandwubp.supabase.co";
+  const key = pickSupabaseAdminKey();
+  if (!key) {
+    throw new Error("Supabase admin key (service role) não encontrada no servidor.");
+  }
+  return createClient(SUPABASE_URL, key, {
+    global: {
+      fetch: (input, init) => {
+        const headers = new Headers(typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined);
+        if (init?.headers) new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+        if (isNewSupabaseApiKey(key) && headers.get("Authorization") === `Bearer ${key}`) headers.delete("Authorization");
+        headers.set("apikey", key);
+        return fetch(input, { ...init, headers });
+      },
+    },
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
   });
 }
 
@@ -21,7 +80,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "X-API-Key, Content-Type",
-  "Access-Control-Max-Age": "86400",
+  "Access-Age": "86400",
 };
 
 function json(status: number, body: unknown) {
@@ -45,7 +104,7 @@ export const Route = (createFileRoute as any)("/api/public/onboarding-leads")({
             return json(401, { ok: false, error: "API Key inválida ou ausente no header X-API-Key" });
           }
 
-          const adminSb = getAdminClient();
+          const adminSb = await createRouteSupabaseAdmin();
           const { data, error } = await adminSb
             .from("ht_quiz_submissions")
             .select("*")
@@ -101,7 +160,7 @@ export const Route = (createFileRoute as any)("/api/public/onboarding-leads")({
             return json(400, { ok: false, error: "Os campos email e display_name são obrigatórios" });
           }
 
-          const adminSb = getAdminClient();
+          const adminSb = await createRouteSupabaseAdmin();
 
           const insertPayload = {
             nome: display_name,
