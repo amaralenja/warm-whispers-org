@@ -14,7 +14,7 @@ import {
   RefreshCw, DollarSign, TrendingUp, Target, ShoppingBag,
   Users, CheckCircle2, XCircle, Flame, Activity, Plus,
   Search, SlidersHorizontal, X, Mail, Phone, Calendar, TrendingDown, ArrowUpRight, Copy, Trash2,
-  Sparkles, Zap, Megaphone, Loader2, Trophy
+  Sparkles, Zap, Megaphone, Loader2, Trophy, ChevronDown, ArrowDown
 } from "lucide-react";
 import { listCampaigns } from "@/lib/meta-ads-manager.functions";
 import {
@@ -529,6 +529,12 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             <Kpi icon={<ShoppingBag className="h-4 w-4" />} label="Reuniões"
               value={fmtInt(kpis.qtdReunioes)} sub={`${fmtInt(kpis.qtdHtLeads)} leads HT`} />
           </div>
+        </section>
+
+        {/* Funil de Vendas Hight Ticket */}
+        <section>
+          <SectionTitle overline="Bloco 02" title="Funil de Vendas HT" />
+          <SalesFunnelView leads={leads} vendas={vendas} period={period} />
         </section>
 
         {/* KPIs — Funil */}
@@ -2695,5 +2701,416 @@ function FacebookAdsAnalyticsSection({
   );
 }
 
+function SalesFunnelView({
+  leads,
+  vendas,
+  period,
+}: {
+  leads: QLead[];
+  vendas: any[];
+  period: Period;
+}) {
+  const [openLevel, setOpenLevel] = useState<number | null>(null);
+  const { start: pStart, end: pEnd } = useMemo(() => periodRange(period), [period]);
 
+  const periodVendas = useMemo(() => {
+    return (vendas || []).filter((v: any) => {
+      if (pStart && new Date(v.data) < pStart) return false;
+      if (pEnd && new Date(v.data) >= pEnd) return false;
+      return true;
+    });
+  }, [vendas, pStart, pEnd, period]);
 
+  // 1. Topo: Entrada de Leads (Canais & Total)
+  const topo = useMemo(() => {
+    const total = leads.length;
+    const channels: Record<string, number> = {};
+    for (const l of leads) {
+      const src = String(l.utm_source || (l as any).origem || "orgânico/direto").toLowerCase();
+      let label = "Orgânico/Direto";
+      if (src.includes("facebook") || src.includes("fb") || src.includes("meta")) label = "Meta Ads";
+      else if (src.includes("instagram") || src.includes("ig")) label = "Instagram Ads";
+      else if (src.includes("criar_saas")) label = "Criar SaaS";
+      else if (src.includes("youtube") || src.includes("yt")) label = "YouTube";
+      else if (src.includes("sdr")) label = "Prospecção Manual";
+      channels[label] = (channels[label] || 0) + 1;
+    }
+    return { total, channels };
+  }, [leads]);
+
+  // 2. Nível 2: SDR Tratou (Ligados vs Não Ligados)
+  const sdrAction = useMemo(() => {
+    let ligados = 0;
+    let naoLigados = 0;
+    for (const l of leads) {
+      const stage = String(l.crm_status || "").toLowerCase();
+      if (!stage || stage === "novo" || stage === "new") {
+        naoLigados++;
+      } else {
+        ligados++;
+      }
+    }
+    return { ligados, naoLigados };
+  }, [leads]);
+
+  // 3. Nível 3: Qualificação (Qualificados para Call vs Não Qualificados)
+  const qualification = useMemo(() => {
+    let qualificados = 0;
+    let naoQualificados = 0;
+    for (const l of leads) {
+      const c = (l.caixa_letra ?? "").toUpperCase();
+      if ("BCDEFG".includes(c) || isQuente(l)) {
+        qualificados++;
+      } else {
+        naoQualificados++;
+      }
+    }
+    return { qualificados, naoQualificados };
+  }, [leads]);
+
+  // 4. Nível 4: Comparecimento (Compareceram vs No-Show)
+  const attendance = useMemo(() => {
+    let compareceram = 0;
+    let noShow = 0;
+    for (const l of leads) {
+      const crmStatus = String(l.crm_status || "").toLowerCase();
+      const hasSched = !!(l.crm_data_agendamento || crmStatus.includes("agendado"));
+      if (hasSched) {
+        if (crmStatus.includes("noshow")) {
+          noShow++;
+        } else if (
+          crmStatus.includes("fechado") ||
+          crmStatus.includes("ganho") ||
+          crmStatus.includes("followup") ||
+          crmStatus.includes("sinal") ||
+          crmStatus.includes("remarcad")
+        ) {
+          compareceram++;
+        } else {
+          compareceram++;
+        }
+      }
+    }
+    return { compareceram, noShow };
+  }, [leads]);
+
+  // 5. Nível 5: Ações da Primeira Call
+  const firstCallResult = useMemo(() => {
+    let fechadosCall = 0;
+    let naoFecharam = 0;
+    let remarcaram = 0;
+    let sinal = 0;
+    let followup = 0;
+    let descartados = 0;
+
+    for (const l of leads) {
+      const crmStatus = String(l.crm_status || "").toLowerCase();
+      const hasSched = !!(l.crm_data_agendamento || crmStatus.includes("agendado"));
+      if (hasSched) {
+        if (crmStatus.includes("fechado") || crmStatus.includes("ganho")) {
+          fechadosCall++;
+        } else if (crmStatus.includes("remarcad")) {
+          remarcaram++;
+        } else if (crmStatus.includes("sinal")) {
+          sinal++;
+        } else if (crmStatus.includes("followup")) {
+          followup++;
+        } else if (crmStatus.includes("lost") || crmStatus.includes("descartad") || crmStatus.includes("arquivad")) {
+          descartados++;
+        } else {
+          naoFecharam++;
+        }
+      }
+    }
+    return { fechadosCall, naoFecharam, remarcaram, sinal, followup, descartados };
+  }, [leads]);
+
+  // 6. Nível 6: Desfecho do Follow-up / Fechamento Posterior
+  const followupResult = useMemo(() => {
+    let fechadosFollowup = 0;
+    let descartadosFollowup = 0;
+    let fechadosSegundaCall = 0;
+
+    for (const v of periodVendas) {
+      const l = leads.find((lead) => String(lead.id) === String(v.lead_id));
+      if (l) {
+        const crmStatus = String(l.crm_status || "").toLowerCase();
+        if (crmStatus.includes("followup")) {
+          fechadosFollowup++;
+        } else if (crmStatus.includes("remarcad")) {
+          fechadosSegundaCall++;
+        } else {
+          fechadosFollowup++;
+        }
+      }
+    }
+
+    for (const l of leads) {
+      const crmStatus = String(l.crm_status || "").toLowerCase();
+      if (crmStatus.includes("followup") && (crmStatus.includes("lost") || crmStatus.includes("descartad"))) {
+        discarded: descartadosFollowup++;
+      }
+    }
+
+    return { fechadosFollowup, descartadosFollowup, fechadosSegundaCall };
+  }, [leads, periodVendas]);
+
+  // Taxas de conversão
+  const rateSdr = topo.total > 0 ? (sdrAction.ligados / topo.total) * 100 : 0;
+  const rateQual = sdrAction.ligados > 0 ? (qualification.qualificados / sdrAction.ligados) * 100 : 0;
+  const rateComp = qualification.qualificados > 0 ? (attendance.compareceram / qualification.qualificados) * 100 : 0;
+  const rateFech = attendance.compareceram > 0 ? (firstCallResult.fechadosCall / attendance.compareceram) * 100 : 0;
+  const totalCloserFechados = firstCallResult.fechadosCall + followupResult.fechadosFollowup + followupResult.fechadosSegundaCall;
+  const rateFinal = topo.total > 0 ? (totalCloserFechados / topo.total) * 100 : 0;
+
+  const toggleLevel = (idx: number) => {
+    setOpenLevel(openLevel === idx ? null : idx);
+  };
+
+  return (
+    <Card className="border-border/50 bg-gradient-to-br from-card via-card/85 to-card/50 shadow-2xl p-6 md:p-8">
+      <div className="mb-6 text-center">
+        <p className="text-xs uppercase tracking-[0.2em] text-accent font-semibold mb-1">Métricas de Conversão</p>
+        <h3 className="text-lg font-bold">Funil Tridimensional de Vendas</h3>
+        <p className="text-xs text-muted-foreground mt-1">Clique em qualquer camada do funil para ver o detalhamento completo.</p>
+      </div>
+
+      <div className="relative flex flex-col items-center w-full max-w-2xl mx-auto space-y-4 py-4">
+        
+        {/* Nível 1: Topo */}
+        <div className="w-full flex flex-col items-center">
+          <div onClick={() => toggleLevel(1)}
+            className="w-full bg-gradient-to-r from-violet-500/20 via-indigo-500/20 to-purple-500/20 border border-violet-500/30 hover:border-violet-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(139,92,246,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-violet-500/10 border border-violet-500/30 text-xs font-mono font-bold text-violet-400">01</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-violet-300">Entrada de Leads</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Origens dos canais de captação</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-violet-300">{fmtInt(topo.total)} <span className="text-[10px] text-muted-foreground">leads</span></span>
+              <ChevronDown className={`h-4 w-4 text-violet-400 transition-transform ${openLevel === 1 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 1 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-violet-500/20 rounded-b-xl px-6 py-3.5 text-xs grid grid-cols-2 md:grid-cols-3 gap-3 animate-fadeIn">
+              {Object.entries(topo.channels).map(([channel, count]) => (
+                <div key={channel} className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                  <p className="text-muted-foreground text-[10px] uppercase font-bold">{channel}</p>
+                  <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(count)} <span className="text-[9px] text-muted-foreground">({((count / (topo.total || 1)) * 100).toFixed(0)}%)</span></p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Transição 1-2 */}
+        <div className="flex flex-col items-center text-[10px] text-violet-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Tratamento SDR: {rateSdr.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 2: SDR Tratou */}
+        <div className="w-[95%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(2)}
+            className="w-full bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-sky-500/20 border border-blue-500/30 hover:border-blue-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(59,130,246,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs font-mono font-bold text-blue-400">02</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-300">Ação do SDR</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Leads ligados vs não ligados</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-blue-300">{fmtInt(sdrAction.ligados)} <span className="text-[10px] text-muted-foreground">contatados</span></span>
+              <ChevronDown className={`h-4 w-4 text-blue-400 transition-transform ${openLevel === 2 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 2 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-blue-500/20 rounded-b-xl px-6 py-3.5 text-xs flex gap-4 animate-fadeIn">
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Ligados / Contatados</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(sdrAction.ligados)} <span className="text-[10px] text-muted-foreground font-sans">({rateSdr.toFixed(0)}%)</span></p>
+              </div>
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Não Ligados (Novos)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(sdrAction.naoLigados)} <span className="text-[10px] text-muted-foreground font-sans">({(100 - rateSdr).toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 2-3 */}
+        <div className="flex flex-col items-center text-[10px] text-blue-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Qualificação: {rateQual.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 3: Qualificação */}
+        <div className="w-[90%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(3)}
+            className="w-full bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-green-500/20 border border-emerald-500/30 hover:border-emerald-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(16,185,129,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono font-bold text-emerald-400">03</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">Qualificação</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Qualificados para call de vendas</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-emerald-300">{fmtInt(qualification.qualificados)} <span className="text-[10px] text-muted-foreground">qualificados</span></span>
+              <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${openLevel === 3 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 3 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-emerald-500/20 rounded-b-xl px-6 py-3.5 text-xs flex gap-4 animate-fadeIn">
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Qualificados (Caixa &gt; R$ 1k)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(qualification.qualificados)} <span className="text-[10px] text-muted-foreground font-sans">({rateQual.toFixed(0)}%)</span></p>
+              </div>
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Não Qualificados (Caixa Baixo)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(qualification.naoQualificados)} <span className="text-[10px] text-muted-foreground font-sans">({(100 - rateQual).toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 3-4 */}
+        <div className="flex flex-col items-center text-[10px] text-emerald-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Comparecimento: {rateComp.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 4: Comparecimento */}
+        <div className="w-[85%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(4)}
+            className="w-full bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-yellow-500/20 border border-amber-500/30 hover:border-amber-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs font-mono font-bold text-amber-400">04</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">Comparecimento</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Show vs No-Show na reunião</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-amber-300">{fmtInt(attendance.compareceram)} <span className="text-[10px] text-muted-foreground">compareceram</span></span>
+              <ChevronDown className={`h-4 w-4 text-amber-400 transition-transform ${openLevel === 4 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 4 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-amber-500/20 rounded-b-xl px-6 py-3.5 text-xs flex gap-4 animate-fadeIn">
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Compareceram (Show)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(attendance.compareceram)} <span className="text-[10px] text-muted-foreground font-sans">({rateComp.toFixed(0)}%)</span></p>
+              </div>
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Não Compareceram (No-Show)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(attendance.noShow)} <span className="text-[10px] text-muted-foreground font-sans">({(100 - rateComp).toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 4-5 */}
+        <div className="flex flex-col items-center text-[10px] text-amber-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Fechamento Direto: {rateFech.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 5: Ações da Primeira Call */}
+        <div className="w-[80%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(5)}
+            className="w-full bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-red-500/20 border border-rose-500/30 hover:border-rose-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(244,63,94,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs font-mono font-bold text-rose-400">05</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-300">Primeira Call</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Resultados pós-reunião direta</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-rose-300">{fmtInt(firstCallResult.fechadosCall)} <span className="text-[10px] text-muted-foreground">fecharam</span></span>
+              <ChevronDown className={`h-4 w-4 text-rose-400 transition-transform ${openLevel === 5 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 5 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-rose-500/20 rounded-b-xl px-6 py-3.5 text-xs grid grid-cols-2 md:grid-cols-3 gap-3 animate-fadeIn">
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Fechados na Call</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.fechadosCall)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-amber-400 text-[10px] uppercase font-bold">Deram Sinal</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.sinal)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-blue-400 text-[10px] uppercase font-bold">Em Follow-up</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.followup)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-sky-400 text-[10px] uppercase font-bold">Remarcaram</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.remarcaram)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Descartados</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.descartados)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-muted-foreground text-[10px] uppercase font-bold">Não Fecharam/Aberto</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.naoFecharam)}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 5-6 */}
+        <div className="flex flex-col items-center text-[10px] text-rose-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Follow-up &amp; Desfecho</span>
+        </div>
+
+        {/* Nível 6: Desfecho do Follow-up */}
+        <div className="w-[75%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(6)}
+            className="w-full bg-gradient-to-r from-fuchsia-500/20 via-purple-500/20 to-pink-500/20 border border-fuchsia-500/30 hover:border-fuchsia-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(217,70,239,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 text-xs font-mono font-bold text-fuchsia-400">06</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-300">Follow-up &amp; Fechamentos</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Desfecho posterior e segunda call</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-fuchsia-300">{fmtInt(followupResult.fechadosFollowup + followupResult.fechadosSegundaCall)} <span className="text-[10px] text-muted-foreground">fechamentos</span></span>
+              <ChevronDown className={`h-4 w-4 text-fuchsia-400 transition-transform ${openLevel === 6 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 6 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-fuchsia-500/20 rounded-b-xl px-6 py-3.5 text-xs grid grid-cols-1 md:grid-cols-3 gap-3 animate-fadeIn">
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Fechados em Follow-up</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(followupResult.fechadosFollowup)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Descartados pós-followup</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(followupResult.descartadosFollowup)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-sky-400 text-[10px] uppercase font-bold">Fechados na 2ª Call</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(followupResult.fechadosSegundaCall)}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      <div className="mt-8 pt-6 border-t border-border/40 text-center text-xs text-muted-foreground flex flex-col md:flex-row md:justify-around gap-4 font-mono">
+        <div>Total Geral Convertido: <span className="text-emerald-400 font-bold">{fmtInt(totalCloserFechados)}</span></div>
+        <div>Conversão Geral do Funil: <span className="text-accent font-bold">{rateFinal.toFixed(1)}%</span></div>
+      </div>
+    </Card>
+  );
+}
