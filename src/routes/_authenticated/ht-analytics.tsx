@@ -125,6 +125,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
   const [agenda, setAgenda] = useState<any[]>([]);
   const [funilGrupo, setFunilGrupo] = useState<"consultoria" | "grupo" | "minicurso">("consultoria");
   const [tab, setTab] = useState<HTTab>(initialTab);
+  const [lancarVendaOpen, setLancarVendaOpen] = useState(false);
 
   // Filtros da lista de leads
   const [flStatus, setFlStatus] = useState<Set<"finalizado" | "abandono">>(new Set());
@@ -441,6 +442,9 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
                   <SelectItem value="all">Todo período</SelectItem>
                 </SelectContent>
               </Select>
+              <Button onClick={() => setLancarVendaOpen(true)} className="h-10 bg-accent text-accent-foreground hover:bg-accent/90 gap-1.5 font-semibold text-xs uppercase tracking-wider px-4">
+                <Plus className="h-4 w-4" /> Lançar Venda
+              </Button>
               <Button variant="outline" size="icon" className="h-10 w-10 border-border/60"
                 onClick={() => setNonce((n) => n + 1)} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -536,6 +540,14 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           <SectionTitle overline="Bloco 02" title="Funil de Vendas HT" />
           <SalesFunnelView leads={leads} vendas={vendas} period={period} />
         </section>
+
+        {/* Receita por Origem de Tráfego */}
+        {vendas.length > 0 && (
+          <section>
+            <SectionTitle overline="Bloco 02B" title="Receita por Origem de Tráfego" />
+            <ReceitaPorOrigemView leads={leads} vendas={vendas} />
+          </section>
+        )}
 
         {/* KPIs — Funil */}
         <section>
@@ -3161,6 +3173,201 @@ function SalesFunnelView({
                 <h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-300">Follow-up &amp; Fechamentos</h4>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Desfecho posterior e segunda call</p>
               </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-violet-300">{fmtInt(topo.total)} <span className="text-[10px] text-muted-foreground">leads</span></span>
+              <ChevronDown className={`h-4 w-4 text-violet-400 transition-transform ${openLevel === 1 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 1 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-violet-500/20 rounded-b-xl px-6 py-3.5 text-xs grid grid-cols-2 md:grid-cols-3 gap-3 animate-fadeIn">
+              {Object.entries(topo.channels).map(([channel, count]) => (
+                <div key={channel} className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                  <p className="text-muted-foreground text-[10px] uppercase font-bold">{channel}</p>
+                  <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(count)} <span className="text-[9px] text-muted-foreground">({((count / (topo.total || 1)) * 100).toFixed(0)}%)</span></p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Transição 1-2 */}
+        <div className="flex flex-col items-center text-[10px] text-violet-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Tratamento SDR: {rateSdr.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 2: SDR Tratou */}
+        <div className="w-[95%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(2)}
+            className="w-full bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-sky-500/20 border border-blue-500/30 hover:border-blue-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(59,130,246,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs font-mono font-bold text-blue-400">02</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-300">Ação do SDR</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Leads ligados vs não ligados</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-blue-300">{fmtInt(sdrAction.ligados)} <span className="text-[10px] text-muted-foreground">contatados</span></span>
+              <ChevronDown className={`h-4 w-4 text-blue-400 transition-transform ${openLevel === 2 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 2 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-blue-500/20 rounded-b-xl px-6 py-3.5 text-xs flex gap-4 animate-fadeIn">
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Ligados / Contatados</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(sdrAction.ligados)} <span className="text-[10px] text-muted-foreground font-sans">({rateSdr.toFixed(0)}%)</span></p>
+              </div>
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Não Ligados (Novos)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(sdrAction.naoLigados)} <span className="text-[10px] text-muted-foreground font-sans">({(100 - rateSdr).toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 2-3 */}
+        <div className="flex flex-col items-center text-[10px] text-blue-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Qualificação: {rateQual.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 3: Qualificação */}
+        <div className="w-[90%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(3)}
+            className="w-full bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-green-500/20 border border-emerald-500/30 hover:border-emerald-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(16,185,129,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono font-bold text-emerald-400">03</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">Qualificação</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Qualificados para call de vendas</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-emerald-300">{fmtInt(qualification.qualificados)} <span className="text-[10px] text-muted-foreground">qualificados</span></span>
+              <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${openLevel === 3 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 3 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-emerald-500/20 rounded-b-xl px-6 py-3.5 text-xs flex gap-4 animate-fadeIn">
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Qualificados (Caixa &gt; R$ 1k)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(qualification.qualificados)} <span className="text-[10px] text-muted-foreground font-sans">({rateQual.toFixed(0)}%)</span></p>
+              </div>
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Não Qualificados (Caixa Baixo)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(qualification.naoQualificados)} <span className="text-[10px] text-muted-foreground font-sans">({(100 - rateQual).toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 3-4 */}
+        <div className="flex flex-col items-center text-[10px] text-emerald-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Comparecimento: {rateComp.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 4: Comparecimento */}
+        <div className="w-[85%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(4)}
+            className="w-full bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-yellow-500/20 border border-amber-500/30 hover:border-amber-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs font-mono font-bold text-amber-400">04</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">Comparecimento</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Show vs No-Show na reunião</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-amber-300">{fmtInt(attendance.compareceram)} <span className="text-[10px] text-muted-foreground">compareceram</span></span>
+              <ChevronDown className={`h-4 w-4 text-amber-400 transition-transform ${openLevel === 4 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 4 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-amber-500/20 rounded-b-xl px-6 py-3.5 text-xs flex gap-4 animate-fadeIn">
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Compareceram (Show)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(attendance.compareceram)} <span className="text-[10px] text-muted-foreground font-sans">({rateComp.toFixed(0)}%)</span></p>
+              </div>
+              <div className="flex-1 bg-muted/20 border border-border/40 p-3 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Não Compareceram (No-Show)</p>
+                <p className="text-lg font-mono font-bold mt-0.5">{fmtInt(attendance.noShow)} <span className="text-[10px] text-muted-foreground font-sans">({(100 - rateComp).toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 4-5 */}
+        <div className="flex flex-col items-center text-[10px] text-amber-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Fechamento Direto: {rateFech.toFixed(0)}%</span>
+        </div>
+
+        {/* Nível 5: Ações da Primeira Call */}
+        <div className="w-[80%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(5)}
+            className="w-full bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-red-500/20 border border-rose-500/30 hover:border-rose-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(244,63,94,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs font-mono font-bold text-rose-400">05</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-300">Primeira Call</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Resultados pós-reunião direta</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-base font-bold text-rose-300">{fmtInt(firstCallResult.fechadosCall)} <span className="text-[10px] text-muted-foreground">fecharam</span></span>
+              <ChevronDown className={`h-4 w-4 text-rose-400 transition-transform ${openLevel === 5 ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+          {openLevel === 5 && (
+            <div className="w-[98%] bg-card/60 border-x border-b border-rose-500/20 rounded-b-xl px-6 py-3.5 text-xs grid grid-cols-2 md:grid-cols-3 gap-3 animate-fadeIn">
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-emerald-400 text-[10px] uppercase font-bold">Fechados na Call</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.fechadosCall)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-amber-400 text-[10px] uppercase font-bold">Deram Sinal</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.sinal)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-blue-400 text-[10px] uppercase font-bold">Em Follow-up</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.followup)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-sky-400 text-[10px] uppercase font-bold">Remarcaram</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.remarcaram)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-rose-400 text-[10px] uppercase font-bold">Descartados</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.descartados)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border/40 p-2.5 rounded-lg">
+                <p className="text-muted-foreground text-[10px] uppercase font-bold">Não Fecharam/Aberto</p>
+                <p className="text-sm font-semibold font-mono mt-0.5">{fmtInt(firstCallResult.naoFecharam)}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Transição 5-6 */}
+        <div className="flex flex-col items-center text-[10px] text-rose-400 font-mono gap-0.5">
+          <ArrowDown className="h-4 w-4 animate-bounce" />
+          <span>Follow-up &amp; Desfecho</span>
+        </div>
+
+        {/* Nível 6: Desfecho do Follow-up */}
+        <div className="w-[75%] flex flex-col items-center">
+          <div onClick={() => toggleLevel(6)}
+            className="w-full bg-gradient-to-r from-fuchsia-500/20 via-purple-500/20 to-pink-500/20 border border-fuchsia-500/30 hover:border-fuchsia-400/50 rounded-xl px-6 py-4 flex items-center justify-between shadow-[0_4px_20px_-5px_rgba(217,70,239,0.15)] hover:scale-[1.01] transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 text-xs font-mono font-bold text-fuchsia-400">06</span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-300">Follow-up &amp; Fechamentos</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Desfecho posterior e segunda call</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <span className="font-mono text-base font-bold text-fuchsia-300">{fmtInt(followupResult.fechadosFollowup + followupResult.fechadosSegundaCall)} <span className="text-[10px] text-muted-foreground">fechamentos</span></span>
@@ -3185,12 +3392,299 @@ function SalesFunnelView({
           )}
         </div>
 
-      </div>
+        <div className="mt-8 pt-6 border-t border-border/40 text-center text-xs text-muted-foreground flex flex-col md:flex-row md:justify-around gap-4 font-mono">
+          <div>Total Geral Convertido: <span className="text-emerald-400 font-bold">{fmtInt(totalCloserFechados)}</span></div>
+          <div>Conversão Geral do Funil: <span className="text-accent font-bold">{rateFinal.toFixed(1)}%</span></div>
+        </div>
+      </Card>
+  );
+}
 
-      <div className="mt-8 pt-6 border-t border-border/40 text-center text-xs text-muted-foreground flex flex-col md:flex-row md:justify-around gap-4 font-mono">
-        <div>Total Geral Convertido: <span className="text-emerald-400 font-bold">{fmtInt(totalCloserFechados)}</span></div>
-        <div>Conversão Geral do Funil: <span className="text-accent font-bold">{rateFinal.toFixed(1)}%</span></div>
-      </div>
+function ReceitaPorOrigemView({ leads, vendas }: { leads: QLead[]; vendas: any[] }) {
+  const fontes = useMemo(() => {
+    const map = new Map<string, { faturamento: number; vendas: number }>();
+    const init = (k: string) => { if (!map.has(k)) map.set(k, { faturamento: 0, vendas: 0 }); };
+    init("Tráfego Pago"); init("Orgânico (Typebot)"); init("SDR Manual"); init("Direto");
+
+    for (const v of vendas) {
+      const val = Number(v.valor_total || 0);
+      const lead = leads.find((l) =>
+        String(l.id) === String(v.lead_id) ||
+        (l.email && v.cliente && String(l.email).toLowerCase() === String(v.cliente).toLowerCase())
+      );
+      let fonte = "Direto";
+      if (lead) {
+        const src = String(lead.utm_source || "").toLowerCase();
+        const med = String(lead.utm_medium || "").toLowerCase();
+        if (src === "sdr-manual" || med === "sdr-manual") fonte = "SDR Manual";
+        else if (
+          src.includes("fb") || src.includes("ig") || src.includes("facebook") ||
+          src.includes("instagram") || src.includes("meta") || src.includes("ads") ||
+          med.includes("cpc") || med.includes("cpm") || med.includes("paid")
+        ) fonte = "Tráfego Pago";
+        else fonte = "Orgânico (Typebot)";
+      }
+      const e = map.get(fonte)!;
+      e.faturamento += val;
+      e.vendas += 1;
+    }
+
+    const all = Array.from(map.entries()).map(([fonte, s]) => ({ fonte, ...s })).filter(f => f.vendas > 0);
+    const totalFat = all.reduce((a, f) => a + f.faturamento, 0);
+    return all.map(f => ({ ...f, pct: totalFat > 0 ? (f.faturamento / totalFat) * 100 : 0 }))
+      .sort((a, b) => b.faturamento - a.faturamento);
+  }, [leads, vendas]);
+
+  const FONTE_COLORS: Record<string, string> = {
+    "Tráfego Pago": "#8b5cf6",
+    "Orgânico (Typebot)": "#10b981",
+    "SDR Manual": "#f59e0b",
+    "Direto": "#64748b",
+  };
+
+  const totalFat = fontes.reduce((a, f) => a + f.faturamento, 0);
+  const totalVendas = fontes.reduce((a, f) => a + f.vendas, 0);
+
+  if (fontes.length === 0) return (
+    <div className="text-center text-muted-foreground text-sm py-8">Nenhuma venda registrada no período.</div>
+  );
+
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur">
+      <CardContent className="p-6 space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <span className="text-xs text-muted-foreground uppercase tracking-widest">Total</span>
+            <div className="text-2xl font-bold tabular-nums text-foreground">{fmtBRL(totalFat)}</div>
+            <div className="text-xs text-muted-foreground">{totalVendas} vendas fechadas</div>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-end">
+            {fontes.map(f => (
+              <div key={f.fonte} className="flex items-center gap-1.5 text-[11px]">
+                <span className="h-2 w-2 rounded-full" style={{ background: FONTE_COLORS[f.fonte] ?? "#94a3b8" }} />
+                <span className="text-muted-foreground">{f.fonte}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3">
+          {fontes.map(f => (
+            <div key={f.fonte} className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: FONTE_COLORS[f.fonte] ?? "#94a3b8" }} />
+                  <span className="font-medium">{f.fonte}</span>
+                </div>
+                <div className="flex items-center gap-3 text-right">
+                  <span className="text-muted-foreground text-xs">{f.vendas} venda{f.vendas !== 1 ? "s" : ""}</span>
+                  <span className="font-semibold tabular-nums" style={{ color: FONTE_COLORS[f.fonte] ?? "#94a3b8" }}>{fmtBRL(f.faturamento)}</span>
+                  <span className="text-muted-foreground text-xs w-10 text-right">{f.pct.toFixed(1)}%</span>
+                </div>
+              </div>
+              <div className="h-2 w-full rounded-full bg-secondary/40 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${f.pct}%`, background: FONTE_COLORS[f.fonte] ?? "#94a3b8" }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
     </Card>
   );
 }
+
+function LancarVendaDialog({
+  open, onOpenChange, leads, onReload
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  leads: QLead[];
+  onReload: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selectedLead, setSelectedLead] = useState<QLead | null>(null);
+  const [valTotal, setValTotal] = useState("");
+  const [valLiquido, setValLiquido] = useState("");
+  const [closerName, setCloserName] = useState("");
+  const [vendaData, setVendaData] = useState(() => new Date().toISOString().split("T")[0]);
+  const [saving, setSaving] = useState(false);
+
+  const filteredLeads = useMemo(() => {
+    if (!search.trim()) return [];
+    const q = search.toLowerCase();
+    return leads.filter(l =>
+      (l.nome && l.nome.toLowerCase().includes(q)) ||
+      (l.whatsapp && l.whatsapp.includes(q)) ||
+      (l.email && l.email.toLowerCase().includes(q))
+    ).slice(0, 5);
+  }, [search, leads]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedLead) {
+      toast.error("Por favor, selecione um lead.");
+      return;
+    }
+    const total = parseFloat(valTotal.replace(/,/g, ".")) || 0;
+    if (total <= 0) {
+      toast.error("Informe um valor de venda válido.");
+      return;
+    }
+    const liq = parseFloat(valLiquido.replace(/,/g, ".")) || total * 0.9;
+
+    setSaving(true);
+    try {
+      const payload = {
+        lead_id: selectedLead.id,
+        cliente: selectedLead.email || selectedLead.nome || "Lead Manual",
+        valor_total: total,
+        valor_liquido: liq,
+        closer: closerName || "Manual",
+        data: vendaData,
+        status: "aprovado",
+      };
+
+      const { error } = await supabase.from("ht_vendas").insert([payload]);
+      if (error) throw error;
+
+      toast.success("Venda lançada com sucesso!");
+      onOpenChange(false);
+      // Reset form
+      setSelectedLead(null);
+      setSearch("");
+      setValTotal("");
+      setValLiquido("");
+      setCloserName("");
+      onReload();
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Erro ao lançar venda: " + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md bg-card border-border/50 text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold">Lançar Venda Manual (High Ticket)</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* Busca de Lead */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase font-semibold">Pesquisar Lead do Quiz</Label>
+            {selectedLead ? (
+              <div className="flex items-center justify-between rounded-lg bg-accent/20 border border-accent/40 p-2.5 text-sm">
+                <div>
+                  <p className="font-semibold text-foreground">{selectedLead.nome || "Sem Nome"}</p>
+                  <p className="text-xs text-muted-foreground">{selectedLead.whatsapp || selectedLead.email || "Sem contato"}</p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedLead(null)} className="h-7 px-2 text-xs">
+                  Alterar
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  placeholder="Pesquise por nome, e-mail ou whatsapp..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="bg-background border-border/60"
+                />
+                {filteredLeads.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/60 rounded-lg shadow-xl z-50 divide-y divide-border/40 overflow-hidden">
+                    {filteredLeads.map(l => (
+                      <div
+                        key={l.id}
+                        onClick={() => setSelectedLead(l)}
+                        className="p-2.5 text-xs hover:bg-secondary/40 cursor-pointer flex flex-col gap-0.5"
+                      >
+                        <span className="font-semibold text-foreground">{l.nome || "Sem Nome"}</span>
+                        <span className="text-muted-foreground">{l.whatsapp || l.email || "Sem contato"}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Valor Bruto */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase font-semibold">Valor Bruto (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="1000.00"
+                value={valTotal}
+                onChange={(e) => setValTotal(e.target.value)}
+                className="bg-background border-border/60"
+                required
+              />
+            </div>
+            {/* Valor Líquido */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase font-semibold">Valor Líquido (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="900.00"
+                value={valLiquido}
+                onChange={(e) => setValLiquido(e.target.value)}
+                className="bg-background border-border/60"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Nome do Closer */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase font-semibold">Nome do Closer</Label>
+              <Input
+                placeholder="Nome do Closer"
+                value={closerName}
+                onChange={(e) => setCloserName(e.target.value)}
+                className="bg-background border-border/60"
+              />
+            </div>
+            {/* Data da Venda */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase font-semibold">Data da Venda</Label>
+              <Input
+                type="date"
+                value={vendaData}
+                onChange={(e) => setVendaData(e.target.value)}
+                className="bg-background border-border/60"
+                required
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="border-border/60"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving || !selectedLead}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              {saving ? "Registrando..." : "Confirmar Venda"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

@@ -52,6 +52,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { useServerFn } from "@tanstack/react-start";
 import { fetchInstagramProfile, listInstagramLeads } from "@/lib/instagram.functions";
 import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
+import { listAccountAds } from "@/lib/meta-ads-manager.functions";
 import { toast } from "sonner";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession } from "@/lib/ht-team-session";
@@ -130,6 +131,16 @@ const TICKET_TIERS: Record<string, { label: string; cls: string; weight: number 
   F: { label: "R$ 50k–100k",    cls: "bg-orange-500/15 text-orange-300 border-orange-500/30",          weight: 6 },
   G: { label: "R$ 100k+",       cls: "bg-yellow-500/15 text-yellow-300 border-yellow-500/40 shadow-[0_0_20px_-5px_rgba(234,179,8,0.6)]", weight: 7 },
 };
+
+const CAIXA_LETRAS: { letra: string; label: string }[] = [
+  { letra: "A", label: "Menos de R$ 1.000" },
+  { letra: "B", label: "R$ 1.000 – 5.000" },
+  { letra: "C", label: "R$ 5.000 – 10.000" },
+  { letra: "D", label: "R$ 10.000 – 25.000" },
+  { letra: "E", label: "R$ 25.000 – 50.000" },
+  { letra: "F", label: "R$ 50.000 – 100.000" },
+  { letra: "G", label: "Caixa Ilimitado" },
+];
 
 // Caixa = capital disponível que a pessoa declarou ter (não é faturamento desejado)
 function caixaLabel(l: Lead): string {
@@ -573,6 +584,34 @@ function QuizPage() {
     staleTime: 60_000,
   });
 
+  const listAdsFn = useServerFn(listAccountAds);
+  const { data: metaAds = [] } = useQuery({
+    queryKey: ["quiz-meta-ads"],
+    queryFn: () => listAdsFn({ data: { datePreset: "maximum" } }),
+    staleTime: 300_000,
+  });
+
+  const adsMap = useMemo(() => {
+    const map = new Map<string, { thumbnail: string | null; name: string; campaignName: string | null }>();
+    for (const ad of metaAds ?? []) {
+      if (ad.name) {
+        map.set(ad.name.toLowerCase().trim(), {
+          thumbnail: ad.thumbnail ?? null,
+          name: ad.name,
+          campaignName: ad.campaignName ?? null,
+        });
+      }
+      if (ad.id) {
+        map.set(ad.id.toString(), {
+          thumbnail: ad.thumbnail ?? null,
+          name: ad.name,
+          campaignName: ad.campaignName ?? null,
+        });
+      }
+    }
+    return map;
+  }, [metaAds]);
+
   const [igLocalOverrides, setIgLocalOverrides] = useState<Record<string, IgDbRow>>({});
   const igMap = useMemo(() => {
     const m = new Map<string, IgDbRow>();
@@ -748,7 +787,15 @@ function QuizPage() {
                 )}
                 <div className="flex-1 overflow-y-auto scrollbar-fancy p-3 space-y-3">
                   {items.map((l) => (
-                    <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
+                    <LeadCard
+                      key={l.id}
+                      lead={l}
+                      real={leadIsReal(l)}
+                      onToggle={(r) => setLeadReality(l.id, r)}
+                      onOpen={() => setSelectedLead(l)}
+                      adsMap={adsMap}
+                      compact
+                    />
                   ))}
                 </div>
               </div>
@@ -904,13 +951,14 @@ function RealityToggle({ real, onChange }: { real: boolean; onChange: (r: Realit
 
 
 function LeadCard({
-  lead, real, onToggle, onOpen,
+  lead, real, onToggle, onOpen, adsMap,
 }: {
   lead: Lead;
   real: boolean;
   onToggle: (r: Reality | null) => void;
   onOpen?: () => void;
   compact?: boolean;
+  adsMap?: Map<string, { thumbnail: string | null; name: string; campaignName: string | null }>;
 }) {
   const origin = classifyLead(lead);
   const Icon = origin.icon;
@@ -998,13 +1046,42 @@ function LeadCard({
         </div>
       )}
 
-      {/* UTM */}
-      {lead.utm_campaign && (
-        <div className="text-[11px] text-muted-foreground truncate border-t border-border/40 pt-2.5" title={lead.utm_campaign}>
-          <TrendingUp className="inline h-3 w-3 mr-1 opacity-60" />
-          {formatUtm(lead.utm_campaign)}
-        </div>
-      )}
+      {/* UTM e Anúncio */}
+      {(() => {
+        const campaignKey = (lead.utm_campaign ?? "").toLowerCase().trim();
+        const contentKey = (lead.utm_content ?? "").toLowerCase().trim();
+        const adInfo = adsMap?.get(contentKey) || adsMap?.get(campaignKey);
+
+        return (
+          <div className="text-[11px] text-muted-foreground border-t border-border/40 pt-2.5 space-y-1.5">
+            {adInfo?.thumbnail && (
+              <div className="flex items-center gap-2 rounded bg-secondary/30 p-1.5 border border-border/20">
+                <img
+                  src={adInfo.thumbnail}
+                  alt="Anúncio"
+                  className="h-8 w-8 rounded object-cover bg-muted shrink-0 border border-border/40"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <div className="min-w-0">
+                  <span className="block text-[9px] uppercase tracking-wider text-violet-400 font-semibold font-mono">Meta Ads</span>
+                  <p className="font-medium text-foreground truncate text-[10px]" title={adInfo.name}>
+                    {adInfo.name}
+                  </p>
+                </div>
+              </div>
+            )}
+            {lead.utm_campaign && (
+              <div className="flex items-center gap-1 truncate" title={adInfo?.campaignName || lead.utm_campaign}>
+                <TrendingUp className="h-3 w-3 shrink-0 opacity-60 text-violet-400" />
+                <span className="font-semibold text-violet-300">Campanha: </span>
+                <span className="truncate">{adInfo?.campaignName || formatUtm(lead.utm_campaign)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* FOOTER ações */}
       <div className="mt-auto flex items-center justify-between gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
@@ -1114,19 +1191,35 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
               <p className="text-sm text-muted-foreground italic text-center py-8">Nenhuma resposta registrada.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {entries.map(([k, v]) => (
-                  <div
-                    key={k}
-                    className="group rounded-lg border border-border/60 bg-muted/10 hover:bg-muted/20 hover:border-accent/40 transition-colors p-3"
-                  >
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80 group-hover:text-accent/80 transition-colors">
-                      {ANSWER_LABELS[k] ?? k}
+                {entries.map(([k, v]) => {
+                  let displayVal = typeof v === "object" ? JSON.stringify(v) : String(v);
+                  
+                  // Decodificar respostas de letras comuns
+                  if (k === "investir" || k === "caixa_letra" || k === "caixa") {
+                    const l = String(v).toUpperCase().trim();
+                    const found = CAIXA_LETRAS.find(x => x.letra === l);
+                    if (found) displayVal = found.label;
+                  }
+                  if (k === "socio") {
+                    const s = String(v).toLowerCase().trim();
+                    if (s === "sim") displayVal = "Sim, tenho sócio";
+                    if (s === "nao" || s === "não") displayVal = "Não, sou sozinho";
+                  }
+
+                  return (
+                    <div
+                      key={k}
+                      className="group rounded-lg border border-border/60 bg-muted/10 hover:bg-muted/20 hover:border-accent/40 transition-colors p-3"
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80 group-hover:text-accent/80 transition-colors">
+                        {ANSWER_LABELS[k] ?? k}
+                      </div>
+                      <div className="text-sm font-medium mt-1 break-words leading-snug">
+                        {displayVal}
+                      </div>
                     </div>
-                    <div className="text-sm font-medium mt-1 break-words leading-snug">
-                      {typeof v === "object" ? JSON.stringify(v) : String(v)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

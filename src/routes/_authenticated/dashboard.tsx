@@ -168,7 +168,7 @@ function Dashboard() {
                   ) : (
                     <>
                       {experts.map((e) => (
-                        <OperacaoCard key={e.id} expert={e} share={getShare(e.nome)} caioFontes={data?.caioFontes} />
+                        <OperacaoCard key={e.id} expert={e} share={getShare(e.nome)} caioFontes={data?.caioFontes} htFontes={data?.htFontes} />
                       ))}
                       <TotalOperacoesCard
                         faturamento={totalFat}
@@ -326,44 +326,53 @@ function ExpertRow({ expert }: { expert: ExpertStats }) {
   );
 }
 
-function OperacaoCard({ expert, share, caioFontes }: { expert: ExpertStats; share: number; caioFontes?: any[] }) {
-  const dot = EXPERT_ACCENT[expert.nome] ?? "bg-accent";
+function OperacaoCard({ expert, share, caioFontes, htFontes }: { expert: ExpertStats; share: number; caioFontes?: any[]; htFontes?: any[] }) {
+  const isHT = expert.nome === "High Ticket";
+  const dot = isHT ? "bg-violet-400" : (EXPERT_ACCENT[expert.nome] ?? "bg-accent");
   const nossa = expert.faturamento * (share / 100);
+  const fontes = isHT ? htFontes : (expert.nome === "Caio" ? caioFontes : undefined);
   return (
-    <div className="rounded-2xl border border-border bg-card/40 p-5 transition-colors hover:bg-card/60">
+    <div className={`rounded-2xl border p-5 transition-colors ${
+      isHT
+        ? "border-violet-500/40 bg-gradient-to-br from-violet-500/10 to-indigo-500/5 hover:from-violet-500/15"
+        : "border-border bg-card/40 hover:bg-card/60"
+    }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${dot}`} />
           <span className="text-sm font-semibold">{expert.nome}</span>
+          {isHT && <span className="text-[0.5rem] uppercase tracking-[0.18em] text-violet-400 bg-violet-500/20 px-1.5 py-0.5 rounded-full">High Ticket</span>}
         </div>
-        <span className="text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">{share}%</span>
+        {!isHT && <span className="text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">{share}%</span>}
       </div>
       <div className="mt-3 text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">Faturamento</div>
-      <div className={`text-lg ${NUM} text-foreground/80`}>{BRL(expert.faturamento)}</div>
+      <div className={`text-lg ${NUM} ${isHT ? "text-violet-300" : "text-foreground/80"}`}>{BRL(expert.faturamento)}</div>
 
-      <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
-        <div className="flex items-center gap-1.5 text-emerald-400">
-          <Sparkles className="h-3 w-3" />
-          <span className="text-[0.55rem] font-semibold uppercase tracking-[0.22em]">Nossa Parte</span>
+      {!isHT && (
+        <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
+          <div className="flex items-center gap-1.5 text-emerald-400">
+            <Sparkles className="h-3 w-3" />
+            <span className="text-[0.55rem] font-semibold uppercase tracking-[0.22em]">Nossa Parte</span>
+          </div>
+          <div className={`mt-1 text-3xl ${NUM} text-emerald-400`}>{BRL(nossa)}</div>
         </div>
-        <div className={`mt-1 text-3xl ${NUM} text-emerald-400`}>{BRL(nossa)}</div>
-      </div>
+      )}
 
       <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3">
         <Mini label="Vendas" value={String(expert.vendas)} />
-        <Mini label="TM" value={BRL(expert.ticketMedio)} accent="text-sky-400" />
+        <Mini label="TM" value={BRL(expert.ticketMedio)} accent={isHT ? "text-violet-300" : "text-sky-400"} />
         <Mini label="Reemb" value={String(expert.reembolsos)} accent={expert.reembolsos > 0 ? "text-rose-400" : undefined} />
       </div>
 
-      {expert.nome === "Caio" && caioFontes && caioFontes.length > 0 && (
+      {fontes && fontes.length > 0 && (
         <div className="mt-4 border-t border-border pt-3 space-y-2">
           <div className="text-[0.55rem] uppercase tracking-[0.2em] text-muted-foreground font-semibold">Canais de Tráfego</div>
           <div className="space-y-1">
-            {caioFontes.map((f: any) => (
+            {fontes.map((f: any) => (
               <div key={f.fonte} className="flex items-center justify-between rounded-lg bg-secondary/20 p-2 text-xs border border-border/20">
                 <span className="font-medium text-foreground">{f.fonte}</span>
                 <div className="text-right">
-                  <span className="font-semibold text-foreground">{BRL(f.faturamento)}</span>
+                  <span className={`font-semibold ${isHT ? "text-violet-300" : "text-foreground"}`}>{BRL(f.faturamento)}</span>
                   <span className="block text-[9px] text-muted-foreground">{f.vendas} {f.vendas === 1 ? 'venda' : 'vendas'}</span>
                 </div>
               </div>

@@ -93,6 +93,7 @@ export type OperacoesPayload = {
   serieDiaria: SerieDiaria[];
   reembolsos: ReembolsoItem[];
   caioFontes?: { fonte: string; faturamento: number; vendas: number }[];
+  htFontes?: { fonte: string; faturamento: number; vendas: number }[];
 };
 
 export type DateRange = { from?: string | null; to?: string | null; expert?: string | null; includeHighTicket?: boolean };
@@ -197,7 +198,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       ),
       data.includeHighTicket
         ? fetchAll<any>((from, to) =>
-          supabase.from("ht_vendas").select("valor_total, data, status").neq("status", "reembolso").range(from, to)
+          supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").range(from, to)
         )
         : Promise.resolve([]),
     ]);
@@ -447,8 +448,6 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       let quizLeads: any[] = [];
       try {
         let q = quizSb.from("leads").select("email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status");
-        if (fromTs) q = q.gte("data_criacao", new Date(fromTs).toISOString());
-        if (toTs) q = q.lt("data_criacao", new Date(toTs).toISOString());
         const { data: qData } = await q;
         quizLeads = qData ?? [];
       } catch (err) {
@@ -516,6 +515,58 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         .sort((a, b) => b.faturamento - a.faturamento);
     }
 
+    // Origens de tráfego do High Ticket
+    let htFontes: { fonte: string; faturamento: number; vendas: number }[] = [];
+    if (data.includeHighTicket && htVendasPeriodo.length > 0) {
+      let quizLeadsHt: any[] = [];
+      try {
+        const { data: qData } = await quizSb
+          .from("leads")
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign");
+        quizLeadsHt = qData ?? [];
+      } catch (err) {
+        console.warn("Falha ao buscar leads para htFontes", err);
+      }
+
+      const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+      const htFontesMap = new Map<string, { faturamento: number; vendas: number }>();
+      const initF = (name: string) => { if (!htFontesMap.has(name)) htFontesMap.set(name, { faturamento: 0, vendas: 0 }); };
+      initF("Tráfego Pago"); initF("Orgânico (Typebot)"); initF("SDR Manual"); initF("Direto");
+
+      for (const v of htVendasPeriodo) {
+        const value = parseFloat(v.valor_total) || 0;
+        const vEmail = String(v.cliente ?? "").trim().toLowerCase();
+        const lead = quizLeadsHt.find((l: any) => {
+          if (String(v.lead_id) === String(l.id)) return true;
+          if (vEmail && l.email && String(l.email).trim().toLowerCase() === vEmail) return true;
+          return false;
+        });
+
+        let fonte = "Direto";
+        if (lead) {
+          const src = String(lead.utm_source || "").toLowerCase();
+          const med = String(lead.utm_medium || "").toLowerCase();
+          if (src === "sdr-manual" || med === "sdr-manual") fonte = "SDR Manual";
+          else if (
+            src.includes("fb") || src.includes("ig") || src.includes("facebook") ||
+            src.includes("instagram") || src.includes("meta") || src.includes("ads") ||
+            med.includes("cpc") || med.includes("cpm") || med.includes("paid")
+          ) fonte = "Tráfego Pago";
+          else if (lead.id) fonte = "Orgânico (Typebot)";
+        }
+
+        const entry = htFontesMap.get(fonte) ?? { faturamento: 0, vendas: 0 };
+        entry.faturamento += value;
+        entry.vendas += 1;
+        htFontesMap.set(fonte, entry);
+      }
+
+      htFontes = Array.from(htFontesMap.entries())
+        .map(([fonte, stats]) => ({ fonte, ...stats }))
+        .filter((f) => f.vendas > 0)
+        .sort((a, b) => b.faturamento - a.faturamento);
+    }
+
     return {
       experts: expertStats,
       totalFaturamento,
@@ -529,6 +580,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       serieDiaria,
       reembolsos: reembolsosList,
       caioFontes,
+      htFontes,
     };
   });
 
