@@ -206,6 +206,41 @@ export function HtLeadDetailDialog({
         crm_data_pagamento_restante: dataRest,
       })
       .eq("id", lead.id);
+    
+    if (!error) {
+      try {
+        const { data: existingVenda } = (await supabase
+          .from("ht_vendas" as any)
+          .select("id")
+          .eq("lead_id", lead.id)
+          .maybeSingle()) as any;
+
+        const vendaPayload = {
+          lead_id: lead.id,
+          cliente: lead.nome || "",
+          closer: closerEmail || authorName || "",
+          valor_total: total,
+          valor_liquido: total * 0.9,
+          data: new Date().toISOString(),
+          status: saleType === "sinal" ? "sinal" : "completed",
+          produto: "High Ticket"
+        };
+
+        if (existingVenda?.id) {
+          await supabase
+            .from("ht_vendas" as any)
+            .update(vendaPayload)
+            .eq("id", existingVenda.id);
+        } else {
+          await supabase
+            .from("ht_vendas" as any)
+            .insert([vendaPayload]);
+        }
+      } catch (err) {
+        console.error("Erro ao sincronizar com ht_vendas local:", err);
+      }
+    }
+
     setSavingSale(false);
     if (error) { toast.error("Erro ao salvar: " + error.message); return; }
     toast.success(saleType === "direta" ? "Venda registrada 🚀" : "Sinal registrado 💰");

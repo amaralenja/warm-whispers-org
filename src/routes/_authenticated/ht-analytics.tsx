@@ -9,11 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import {
   RefreshCw, DollarSign, TrendingUp, Target, ShoppingBag,
   Users, CheckCircle2, XCircle, Flame, Activity, Plus,
   Search, SlidersHorizontal, X, Mail, Phone, Calendar, TrendingDown, ArrowUpRight, Copy, Trash2,
+  Sparkles, Zap, Megaphone, Loader2, Trophy
 } from "lucide-react";
+import { listCampaigns } from "@/lib/meta-ads-manager.functions";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -39,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
 });
 
-type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics";
+type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics" | "facebook-ads";
 
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
@@ -459,6 +462,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             if (s && s.tipo === "sdr") tabs.push({ id: "sdr-metrics", label: "Métricas SDR" });
             tabs.push({ id: "receber", label: "Contas a Receber" });
             tabs.push({ id: "leads", label: "Lista de Leads" });
+            tabs.push({ id: "facebook-ads", label: "Facebook Ads" });
             return tabs.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative whitespace-nowrap ${
@@ -503,6 +507,9 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       )}
       {tab === "sdr-metrics" && (
         <SdrDashboard leads={leads} notesMap={notesMap} onReload={() => setNonce((n) => n + 1)} />
+      )}
+      {tab === "facebook-ads" && (
+        <FacebookAdsAnalyticsSection leads={leads} vendas={vendas} period={period} />
       )}
 
 
@@ -2485,6 +2492,205 @@ function SdrDashboard({ leads, notesMap, onReload }: SdrDashboardProps) {
           </CardContent>
         </Card>
       </section>
+    </div>
+  );
+}
+
+function FacebookAdsAnalyticsSection({
+  leads,
+  vendas,
+  period,
+}: {
+  leads: QLead[];
+  vendas: any[];
+  period: Period;
+}) {
+  const listCampaignsFn = useServerFn(listCampaigns);
+  const datePreset = useMemo(() => {
+    if (period === "today") return "today";
+    if (period === "yesterday") return "yesterday";
+    if (period === "7d") return "last_7d";
+    if (period === "15d") return "last_14d";
+    if (period === "30d") return "last_30d";
+    if (period === "mtd") return "this_month";
+    return "maximum";
+  }, [period]);
+
+  const { data: campaigns, isLoading: loadingCampaigns } = useQuery({
+    queryKey: ["ht-meta-campaigns", datePreset],
+    queryFn: () => listCampaignsFn({ data: { datePreset } }),
+  });
+
+  const totalSpend = useMemo(() => {
+    return (campaigns || []).reduce((acc: number, c: any) => acc + (c.insights?.spend || 0), 0);
+  }, [campaigns]);
+
+  const { start: pStart, end: pEnd } = useMemo(() => periodRange(period), [period]);
+
+  const salesFromAds = useMemo(() => {
+    const isFromSocialAds = (l: any) => {
+      const src = String(l.utm_source || l.utm_medium || "").toLowerCase();
+      const med = String(l.utm_medium || "").toLowerCase();
+      return (
+        src.includes("facebook") ||
+        src.includes("instagram") ||
+        src.includes("fb") ||
+        src.includes("ig") ||
+        src.includes("meta") ||
+        med.includes("cpc") ||
+        med.includes("cpm") ||
+        src.includes("ads")
+      );
+    };
+
+    return (vendas || []).filter((v: any) => {
+      if (pStart && new Date(v.data) < pStart) return false;
+      if (pEnd && new Date(v.data) >= pEnd) return false;
+
+      const l = leads.find(
+        (lead) =>
+          String(lead.id) === String(v.lead_id) ||
+          String(lead.email).toLowerCase() === String(v.cliente).toLowerCase()
+      );
+      return l ? isFromSocialAds(l) : false;
+    });
+  }, [leads, vendas, period, pStart, pEnd]);
+
+  const adsFaturamento = useMemo(() => {
+    return salesFromAds.reduce((acc: number, v: any) => acc + Number(v.valor_total || 0), 0);
+  }, [salesFromAds]);
+
+  const roas = totalSpend > 0 ? adsFaturamento / totalSpend : 0;
+  const roi = totalSpend > 0 ? ((adsFaturamento - totalSpend) / totalSpend) * 100 : 0;
+
+  const campaignsPerformance = useMemo(() => {
+    return (campaigns || []).map((c: any) => {
+      const salesForCampaign = salesFromAds.filter((v: any) => {
+        const l = leads.find((lead) => String(lead.id) === String(v.lead_id));
+        if (!l?.utm_campaign) return false;
+        const campaignName = String(c.name).toLowerCase();
+        const utmCampaign = String(l.utm_campaign).toLowerCase();
+        return campaignName.includes(utmCampaign) || utmCampaign.includes(campaignName);
+      });
+
+      const faturamento = salesForCampaign.reduce((acc: number, v: any) => acc + Number(v.valor_total || 0), 0);
+      const conversions = salesForCampaign.length;
+      const spend = c.insights?.spend || 0;
+      const campaignRoas = spend > 0 ? faturamento / spend : 0;
+
+      return {
+        id: c.id,
+        name: c.name,
+        spend,
+        faturamento,
+        conversions,
+        roas: campaignRoas,
+        status: c.effectiveStatus,
+      };
+    }).sort((a: any, b: any) => b.spend - a.spend);
+  }, [campaigns, salesFromAds, leads]);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight">Estatísticas de Facebook Ads (High Ticket)</h2>
+        <p className="text-sm text-muted-foreground">ROI, ROAS e faturamento de vendas originadas de anúncios no Meta.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Kpi accent icon={<DollarSign className="h-4 w-4" />} label="Investimento (Ads)" value={fmtBRL(totalSpend)} sub="Gasto no período" />
+        <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Faturamento (High Ticket)" value={fmtBRL(adsFaturamento)} sub={`${salesFromAds.length} vendas de anúncios`} />
+        <Kpi icon={<Sparkles className="h-4 w-4" />} label="ROAS" value={`${roas.toFixed(2)}x`} sub="Retorno sobre o gasto" />
+        <Kpi icon={<Target className="h-4 w-4" />} label="ROI de Anúncios" value={`${roi.toFixed(1)}%`} sub="Retorno do investimento" />
+        <Kpi icon={<Zap className="h-4 w-4" />} label="Custo por Aquisição" value={salesFromAds.length > 0 ? fmtBRL(totalSpend / salesFromAds.length) : "—"} sub="CPA médio de vendas" />
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Tabela de Campanhas */}
+        <Card className="col-span-2 border-border/50 bg-card/40 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Megaphone className="h-4 w-4 text-accent" />
+              Desempenho por Campanha
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loadingCampaigns ? (
+              <div className="p-8 text-center text-sm text-muted-foreground flex justify-center items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                Carregando campanhas do Facebook Ads...
+              </div>
+            ) : campaignsPerformance.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma campanha de Meta Ads encontrada para o período.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-border/40 bg-muted/20 text-muted-foreground font-semibold">
+                      <th className="px-4 py-3">Campanha</th>
+                      <th className="px-4 py-3 text-right">Gasto (Ads)</th>
+                      <th className="px-4 py-3 text-right">Vendas (HT)</th>
+                      <th className="px-4 py-3 text-right">Receita (HT)</th>
+                      <th className="px-4 py-3 text-right">ROAS</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaignsPerformance.map((c) => (
+                      <tr key={c.id} className="border-b border-border/20 hover:bg-muted/10 transition-colors">
+                        <td className="px-4 py-3.5 font-medium min-w-[200px] truncate max-w-[300px]" title={c.name}>{c.name}</td>
+                        <td className="px-4 py-3.5 text-right font-mono font-medium">{fmtBRL(c.spend)}</td>
+                        <td className="px-4 py-3.5 text-right">{c.conversions}</td>
+                        <td className="px-4 py-3.5 text-right font-mono font-medium text-emerald-400">{fmtBRL(c.faturamento)}</td>
+                        <td className="px-4 py-3.5 text-right font-semibold text-accent">{c.roas > 0 ? `${c.roas.toFixed(2)}x` : "—"}</td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`inline-block h-2 w-2 rounded-full ${c.status === "ACTIVE" ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-zinc-500"}`} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Listagem das Vendas */}
+        <Card className="col-span-1 border-border/50 bg-card/40 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-yellow-400" />
+              Últimas Vendas de Ads
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 max-h-[400px] overflow-y-auto">
+            {salesFromAds.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma venda de anúncio no período.</div>
+            ) : (
+              <div className="divide-y divide-border/30">
+                {salesFromAds.map((v) => {
+                  const l = leads.find((lead) => String(lead.id) === String(v.lead_id));
+                  return (
+                    <div key={v.id} className="p-3.5 flex flex-col hover:bg-muted/10 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs font-semibold">{v.cliente || "Cliente HT"}</p>
+                          <p className="text-[10px] text-muted-foreground">Closer: {v.closer || "Closer"}</p>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-emerald-400">{fmtBRL(v.valor_total)}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-[9px] text-muted-foreground">
+                        <span className="font-mono bg-muted/40 px-1.5 py-0.5 rounded uppercase">{l?.utm_source || "ads"}</span>
+                        <span>{new Date(v.data).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
