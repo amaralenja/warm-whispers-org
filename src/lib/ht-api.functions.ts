@@ -86,9 +86,121 @@ export const revokeHtApiToken = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+async function syncQuizLeadsInternal(supabaseLocal: any) {
+  const QUIZ_SUPABASE_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+  const QUIZ_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const extClient = createClient(QUIZ_SUPABASE_URL, QUIZ_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+
+  // Puxa as submissões/leads do Supabase externo (últimos 1000)
+  const { data: extLeads, error: extError } = await extClient
+    .from("leads")
+    .select("*")
+    .order("data_criacao", { ascending: false })
+    .limit(1000);
+
+  if (extError || !extLeads || extLeads.length === 0) {
+    return;
+  }
+
+  // Busca os IDs locais existentes
+  const { data: localIdsData } = await supabaseLocal
+    .from("ht_quiz_submissions")
+    .select("id");
+  const localIdsSet = new Set((localIdsData || []).map((x: any) => String(x.id)));
+
+  // Filtra apenas leads que não estão no local
+  const newLeads = extLeads.filter((l: any) => l.id && !localIdsSet.has(String(l.id)));
+  if (newLeads.length === 0) return;
+
+  const submissionsToInsert = newLeads.map((l: any) => {
+    const respostas = l.respostas_json || {
+      caixa_letra: l.caixa_letra,
+      caixa_label: l.caixa_label,
+      faturamento: l.faturamento,
+      momento: l.momento,
+      investir: l.investir,
+      objetivo: l.objetivo,
+      comprometimento: l.comprometimento,
+      renda: l.renda,
+      situacao: l.situacao,
+      funil: l.funil,
+      porque: l.porque
+    };
+
+    return {
+      id: l.id,
+      nome: l.nome,
+      email: l.email,
+      whatsapp: l.whatsapp,
+      instagram: l.instagram,
+      utm_source: l.utm_source,
+      utm_medium: l.utm_medium,
+      utm_campaign: l.utm_campaign,
+      utm_content: l.utm_content,
+      fbc: l.fbc,
+      fbp: l.fbp,
+      fbclid: l.fbclid,
+      gclid: l.gclid,
+      respostas,
+      received_at: l.data_criacao || new Date().toISOString(),
+      updated_at: l.data_criacao || new Date().toISOString(),
+      status: l.status || "completed"
+    };
+  });
+
+  const { error: insertSubmissionsError } = await supabaseLocal
+    .from("ht_quiz_submissions")
+    .insert(submissionsToInsert);
+
+  if (insertSubmissionsError) {
+    console.error("Erro ao sincronizar submissões locais:", insertSubmissionsError);
+    return;
+  }
+
+  // Sincroniza no Kanban local
+  const kanbanRowsToInsert = newLeads.map((l: any) => {
+    let sdr_stage = "new";
+    let closer_stage = null;
+    const crmStatus = String(l.crm_status || "").toLowerCase();
+
+    if (crmStatus.includes("fechado") || crmStatus.includes("ganho")) {
+      sdr_stage = "won";
+      closer_stage = "fechado";
+    } else if (crmStatus.includes("perdido") || crmStatus.includes("lost")) {
+      sdr_stage = "lost";
+    } else if (l.crm_data_agendamento || crmStatus.includes("agendado")) {
+      sdr_stage = "scheduled";
+    }
+
+    return {
+      lead_id: l.id,
+      scheduled_at: l.crm_data_agendamento || l.data_criacao || new Date().toISOString(),
+      sdr_stage,
+      closer_stage,
+      is_fake: false,
+      updated_at: l.data_criacao || new Date().toISOString()
+    };
+  });
+
+  await supabaseLocal
+    .from("ht_kanban_state")
+    .upsert(kanbanRowsToInsert, { onConflict: "lead_id" });
+}
+
 export const listHtQuizSubmissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    // Sincroniza em background silenciosamente ao listar
+    try {
+      await syncQuizLeadsInternal(context.supabase);
+    } catch (err) {
+      console.error("Falha ao sincronizar leads antigos do Quiz:", err);
+    }
+
     const { data, error } = await context.supabase
       .from("ht_quiz_submissions" as any)
       .select("id, received_at, updated_at, status, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, utm_content, fbc, fbp, fbclid, gclid, respostas")
