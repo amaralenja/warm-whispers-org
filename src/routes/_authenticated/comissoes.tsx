@@ -41,7 +41,11 @@ const fmtDate = (iso: string) => {
 
 function ComissoesPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  useEffect(() => { setIsAdmin(getVendorSession() === null); }, []);
+  useEffect(() => {
+    const session = getVendorSession();
+    const hasPerm = session?.permissoes?.["operacao-x1"]?.["comissoes"] === true;
+    setIsAdmin(session === null || hasPerm);
+  }, []);
 
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(today());
@@ -93,7 +97,7 @@ function ComissoesPage() {
             <ShieldAlert className="h-5 w-5 text-destructive" />
             <div>
               <div className="font-semibold">Acesso restrito</div>
-              <p className="text-sm text-muted-foreground">Somente administradores podem visualizar comissões.</p>
+              <p className="text-sm text-muted-foreground">Somente administradores ou usuários autorizados podem visualizar comissões.</p>
             </div>
           </CardContent>
         </Card>

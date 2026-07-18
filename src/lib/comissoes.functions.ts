@@ -34,7 +34,13 @@ export type ComissoesPayload = {
 export type ComissoesRange = { from?: string | null; to?: string | null };
 
 function assertAdmin(context: any) {
-  if (context?.vendor) throw new Error("Acesso restrito a administradores");
+  if (context?.vendor) {
+    const perm = context.vendor.permissoes;
+    const hasPerm = perm?.["operacao-x1"]?.["comissoes"] === true;
+    if (!hasPerm) {
+      throw new Error("Acesso restrito a administradores");
+    }
+  }
 }
 
 export const getComissoes = createServerFn({ method: "POST" })
