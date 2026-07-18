@@ -818,6 +818,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     refetchInterval: 30_000,
   });
 
+  console.log("DEBUG COMPRADORES - Vendas carregadas:", {
+    vendasCount: localVendas.vendas?.length ?? 0,
+    htVendasCount: localVendas.htVendas?.length ?? 0,
+    debugMatches: (localVendas as any).debugMatches ?? []
+  });
+
   const checkIsComprador = (waId: string | null | undefined): any | null => {
     const d = String(waId ?? "").replace(/\D+/g, "");
     if (!d) return null;
