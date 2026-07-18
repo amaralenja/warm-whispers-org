@@ -191,6 +191,74 @@ async function syncQuizLeadsInternal(supabaseLocal: any) {
     .upsert(kanbanRowsToInsert, { onConflict: "lead_id" });
 }
 
+async function syncCriarSaasLeadsInternal(supabaseLocal: any) {
+  const extUrl = process.env.EXT_QUIZ_SUPABASE_URL;
+  const extKey = process.env.EXT_QUIZ_SUPABASE_ANON_KEY;
+
+  if (!extUrl || !extKey) {
+    return;
+  }
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const extClient = createClient(extUrl, extKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+
+  const { data: extLeads, error: extError } = await extClient
+    .from("leads")
+    .select("*")
+    .order("data_criacao", { ascending: false })
+    .limit(1000);
+
+  if (extError || !extLeads || extLeads.length === 0) {
+    console.error("Erro ao ler leads antigos do Criar SaaS externo:", extError);
+    return;
+  }
+
+  const { data: localIdsData } = await supabaseLocal
+    .from("ht_quiz_submissions")
+    .select("id");
+  const localIdsSet = new Set((localIdsData || []).map((x: any) => String(x.id)));
+
+  const newLeads = extLeads.filter((l: any) => l.id && !localIdsSet.has(String(l.id)));
+  if (newLeads.length === 0) return;
+
+  const submissionsToInsert = newLeads.map((l: any) => {
+    const respostas = l.respostas_json || {
+      ...l,
+      origem: "criar_saas"
+    };
+
+    return {
+      id: l.id,
+      nome: l.nome,
+      email: l.email,
+      whatsapp: l.whatsapp,
+      instagram: l.instagram,
+      utm_source: "criar_saas",
+      utm_medium: l.utm_medium,
+      utm_campaign: l.utm_campaign,
+      utm_content: l.utm_content,
+      fbc: l.fbc,
+      fbp: l.fbp,
+      fbclid: l.fbclid,
+      gclid: l.gclid,
+      respostas,
+      received_at: l.data_criacao || new Date().toISOString(),
+      updated_at: l.data_criacao || new Date().toISOString(),
+      status: l.status || "completed"
+    };
+  });
+
+  const { error: insertSubmissionsError } = await supabaseLocal
+    .from("ht_quiz_submissions")
+    .insert(submissionsToInsert);
+
+  if (insertSubmissionsError) {
+    console.error("Erro ao salvar leads sincronizados do Criar SaaS:", insertSubmissionsError);
+  }
+}
+
 export const listHtQuizSubmissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -199,6 +267,12 @@ export const listHtQuizSubmissions = createServerFn({ method: "GET" })
       await syncQuizLeadsInternal(context.supabase);
     } catch (err) {
       console.error("Falha ao sincronizar leads antigos do Quiz:", err);
+    }
+
+    try {
+      await syncCriarSaasLeadsInternal(context.supabase);
+    } catch (err) {
+      console.error("Falha ao sincronizar leads antigos do Criar SaaS:", err);
     }
 
     const { data, error } = await context.supabase
