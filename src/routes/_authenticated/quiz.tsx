@@ -210,16 +210,21 @@ const ORIGIN_ORDER: OriginKey[] = ["facebook", "instagram", "google", "tiktok", 
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
+  const med = (l.utm_medium ?? "").toLowerCase();
   const isInstagram = src.includes("ig") || src.includes("instagram");
   const isFacebook = src.includes("fb") || src.includes("facebook");
-  const hasFbTracking = !!(l.fbc && l.fbp);
+  
+  // Identifica se é tráfego pago via parâmetros adicionais comuns
+  const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
+  const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src);
+  const hasFbTracking = !!(l.fbc && l.fbp) || !!l.fbclid || isPaidMedium || isAdsSource;
 
-  // Anúncio Meta: SOMENTE com fbc + fbp.
+  // Anúncio Meta:
   // Se a source for IG => Instagram Ads; caso contrário => Facebook Ads.
-  if (hasFbTracking) {
+  if (hasFbTracking && (isInstagram || isFacebook)) {
     if (isInstagram) {
       return {
-        key: "instagram", label: "Instagram", icon: Instagram,
+        key: "instagram", label: "Instagram Ads", icon: Instagram,
         ring: "ring-pink-500/40", bg: "bg-gradient-to-br from-pink-500/10 to-purple-500/10",
         text: "text-pink-300",
         glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
@@ -231,7 +236,7 @@ function classifyLead(l: Lead): LeadOrigin {
       glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
     };
   }
-  // Sem fbc/fbp: IG/FB caem como orgânico, mesmo com utm_source preenchida
+  // Sem indicações de pago: IG/FB caem como orgânico
   if (isInstagram || isFacebook) {
     return {
       key: "organic", label: "Orgânico", icon: Sparkles,
