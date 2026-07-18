@@ -428,6 +428,33 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
   
+  // Query to fetch recent Typebot quiz submissions for live highlights
+  const { data: typebotLeads = [] } = useQuery<any[]>({
+    queryKey: ["typebot-leads-list-for-highlight"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ht_quiz_submissions")
+        .select("whatsapp")
+        .order("received_at", { ascending: false })
+        .limit(300);
+      if (error || !data) return [];
+      return data;
+    },
+    staleTime: 30_000,
+  });
+
+  const typebotPhonesSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of typebotLeads) {
+      const wa = String(l.whatsapp ?? "").replace(/\D+/g, "");
+      if (wa) {
+        s.add(wa);
+        if (wa.length >= 8) s.add(wa.slice(-8));
+      }
+    }
+    return s;
+  }, [typebotLeads]);
+
   const listAllTagsFn = useServerFn(listCrmTags);
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
@@ -1222,9 +1249,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       staleTime: 15_000,
                     });
                   };
-                  const leadForConv = findLeadForConv(contactWaId);
-                  const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
-                  const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
+                  const isTypebotLead = (() => {
+                    const digits = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+                    if (!digits) return false;
+                    if (typebotPhonesSet.has(digits)) return true;
+                    if (digits.length >= 8 && typebotPhonesSet.has(digits.slice(-8))) return true;
+                    return false;
+                  })();
 
                   const isArchived = Boolean((c as any).archived_at);
                   return (
@@ -1243,9 +1274,17 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       onFocus={prefetchMessages}
                       onTouchStart={prefetchMessages}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
-                      style={leadStage ? { borderLeft: `3px solid ${leadStage.cor}` } : undefined}
+                      style={
+                        isActive
+                          ? { borderLeft: `3px solid var(--chat-accent, #3b82f6)` }
+                          : leadStage
+                            ? { borderLeft: `3px solid ${leadStage.cor}` }
+                            : isTypebotLead
+                              ? { borderLeft: "3px solid #f59e0b" } // Borda dourada para indicar Typebot!
+                              : undefined
+                      }
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
-                        isActive ? "bg-chat-soft" : "hover:bg-chat-panel"
+                        isActive ? "bg-chat-soft" : isTypebotLead ? "bg-amber-500/[0.02] hover:bg-chat-panel" : "hover:bg-chat-panel"
                       } ${isArchived ? "opacity-70" : ""}`}
                     >
 
@@ -1281,6 +1320,11 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             <span className="truncate text-[15px] font-semibold tracking-normal">
                               {contactName || contactWaId}
                             </span>
+                            {isTypebotLead && (
+                              <Badge variant="outline" className="shrink-0 h-4 px-1 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/30 flex items-center gap-0.5 font-semibold">
+                                🤖 Quiz
+                              </Badge>
+                            )}
                             {isArchived ? (
                               <span
                                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
