@@ -3064,6 +3064,24 @@ function ConversationMetaControls({
   onSaveTags: (tags: string[]) => Promise<void> | void;
   onSaveNotes: (notes: string) => Promise<void> | void;
 }) {
+  const contactWaId = conv.contact_wa_id;
+  const { data: quizSubmission } = useQuery({
+    queryKey: ["quiz-submission-for-chat-controls", contactWaId],
+    enabled: !!contactWaId,
+    queryFn: async () => {
+      const wa = String(contactWaId ?? "").replace(/\D+/g, "");
+      if (!wa) return null;
+      const { data, error } = await supabase
+        .from("ht_quiz_submissions")
+        .select("*")
+        .or(`whatsapp.eq.${wa},whatsapp.ilike.%${wa.slice(-8)}%`)
+        .order("received_at", { ascending: false })
+        .limit(1);
+      if (error || !data || data.length === 0) return null;
+      return data[0];
+    },
+  });
+
   const initialTags = Array.isArray(conv.tags) ? conv.tags.filter(Boolean) : [];
   const [tags, setTags] = useState<string[]>(initialTags);
   const [tagSearch, setTagSearch] = useState("");
@@ -3202,6 +3220,74 @@ function ConversationMetaControls({
           </div>
         </PopoverContent>
       </Popover>
+
+      {quizSubmission && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 px-2 text-xs md:px-3">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span>Typebot</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-96 border-chat-line bg-chat-panel p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between border-b border-chat-line pb-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-amber-500 flex items-center gap-1">
+                🤖 Respostas do Typebot
+              </span>
+              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">
+                {quizSubmission.status === "completed" ? "Completo" : "Parcial"}
+              </Badge>
+            </div>
+            
+            {/* UTM Attribution */}
+            <div className="mb-4 space-y-1.5 rounded-lg bg-chat-soft p-2.5 text-xs border border-chat-line">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Origem do Lead (Atribuição)</div>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Origem (Source):</span>
+                  <div className="font-semibold text-foreground truncate">{quizSubmission.utm_source || "Orgânico / Direto"}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Meio (Medium):</span>
+                  <div className="font-semibold text-foreground truncate">{quizSubmission.utm_medium || "—"}</div>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground block text-[10px]">Campanha (Campaign):</span>
+                  <div className="font-semibold text-foreground truncate">{quizSubmission.utm_campaign || "—"}</div>
+                </div>
+                {quizSubmission.utm_content && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground block text-[10px]">Conteúdo (Content):</span>
+                    <div className="font-semibold text-foreground truncate">{quizSubmission.utm_content}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quiz Answers */}
+            <div className="space-y-2">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Respostas do Chatbot</div>
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1 scrollbar-fancy">
+                {(() => {
+                  const resp = quizSubmission.respostas as Record<string, any> | null;
+                  if (!resp || Object.keys(resp).length === 0) {
+                    return <div className="text-xs text-muted-foreground py-2 text-center">Nenhuma resposta disponível.</div>;
+                  }
+                  return Object.entries(resp).map(([key, val]) => (
+                    <div key={key} className="border-b border-chat-line/45 pb-1.5 last:border-0">
+                      <div className="text-[10px] text-muted-foreground capitalize font-medium">{key.replace(/_/g, " ")}</div>
+                      <div className="text-xs text-foreground font-semibold mt-0.5">{String(val)}</div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 }
