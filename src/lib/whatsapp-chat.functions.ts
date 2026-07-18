@@ -1585,15 +1585,9 @@ export const getActiveBuyers = createServerFn({ method: "GET" })
         .select("id, valor_total, data, status, cliente, lead_id")
         .neq("status", "reembolso")
     ]);
-    const debugMatches = (vAll ?? []).filter((v: any) => 
-      String(v.Telefone || "").includes("8353") || 
-      String(v.Email || "").includes("8353") ||
-      String(v.Nome || "").includes("8353")
-    );
     return {
       vendas: (vAll ?? []) as any[],
-      htVendas: (htAll ?? []) as any[],
-      debugMatches
+      htVendas: (htAll ?? []) as any[]
     };
   });
 
