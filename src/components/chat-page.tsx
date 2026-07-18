@@ -1361,6 +1361,38 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 🤖 Quiz
                               </Badge>
                             )}
+                            {leadForConv && (() => {
+                              const utmSource = String(leadForConv.utm_source || "").toLowerCase();
+                              const utmMedium = String(leadForConv.utm_medium || "").toLowerCase();
+                              const isInstagram = utmSource.includes("ig") || utmSource.includes("instagram");
+                              const isFacebook = utmSource.includes("fb") || utmSource.includes("facebook");
+                              const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(utmMedium);
+                              const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(utmSource);
+                              const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook;
+
+                              let badgeText = "Orgânico";
+                              let badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+
+                              if (utmSource === "criar_saas" || (leadForConv as any).origem === "criar_saas") {
+                                badgeText = "Criar SaaS";
+                                badgeClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
+                              } else if (hasFbTracking && (utmSource.includes("ads") || utmSource.includes("fb") || utmSource.includes("ig") || utmSource.includes("facebook") || utmSource.includes("instagram") || isPaidMedium)) {
+                                badgeText = "Ads";
+                                badgeClass = "bg-indigo-500/10 text-indigo-400 border-indigo-500/30";
+                              } else if (utmSource.includes("google") || (leadForConv as any).gclid) {
+                                badgeText = "GAds";
+                                badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+                              } else if (utmSource === "sdr-manual") {
+                                badgeText = "SDR";
+                                badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/30";
+                              }
+
+                              return (
+                                <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${badgeClass} font-semibold uppercase`}>
+                                  {badgeText}
+                                </Badge>
+                              );
+                            })()}
                             {isArchived ? (
                               <span
                                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1589,7 +1621,47 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{toText(active.contact_wa_id)}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <span className="text-sm font-mono text-muted-foreground">{toText(active.contact_wa_id)}</span>
+                      {(() => {
+                        const lead = findLeadForConv(active.contact_wa_id);
+                        if (!lead) return null;
+                        
+                        const utmSource = String(lead.utm_source || "").toLowerCase();
+                        const utmMedium = String(lead.utm_medium || "").toLowerCase();
+                        const isInstagram = utmSource.includes("ig") || utmSource.includes("instagram");
+                        const isFacebook = utmSource.includes("fb") || utmSource.includes("facebook");
+                        const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(utmMedium);
+                        const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(utmSource);
+                        const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook;
+
+                        let badgeText = "Orgânico";
+                        let badgeClass = "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+
+                        if (utmSource === "criar_saas" || (lead as any).origem === "criar_saas") {
+                          badgeText = "Criar SaaS";
+                          badgeClass = "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
+                        } else if (hasFbTracking && (utmSource.includes("ads") || utmSource.includes("fb") || utmSource.includes("ig") || utmSource.includes("facebook") || utmSource.includes("instagram") || isPaidMedium)) {
+                          badgeText = "Tráfego Pago";
+                          badgeClass = "bg-indigo-500/15 text-indigo-300 border-indigo-500/30";
+                        } else if (utmSource.includes("google") || (lead as any).gclid) {
+                          badgeText = "Google Ads";
+                          badgeClass = "bg-amber-500/15 text-amber-300 border-amber-500/30";
+                        } else if (utmSource.includes("sdr-manual")) {
+                          badgeText = "Prospecção SDR";
+                          badgeClass = "bg-blue-500/15 text-blue-300 border-blue-500/30";
+                        }
+
+                        const campaign = (lead as any).utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
+                        const adContent = (lead as any).utm_content ? ` · Anúncio: ${(lead as any).utm_content}` : "";
+
+                        return (
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${badgeClass}`} title={`Atribuição: ${badgeText}${campaign}${adContent}`}>
+                            {badgeText}{campaign}{adContent}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     {(() => {
                       const ch = channelById.get(active.channel_id);
                       if (!ch) return null;
