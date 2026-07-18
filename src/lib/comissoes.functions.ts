@@ -67,7 +67,7 @@ export const getComissoes = createServerFn({ method: "POST" })
     const { parseTicket, parseDataField, tierRate } = await import("@/lib/comissoes.server");
     const context = opts?.context;
     assertAdmin(context);
-    const supabase = await getAdminClient();
+    const supabase = context.vendor ? (await getAdminClient().catch(() => context.supabase)) : context.supabase;
     const data = opts?.data ?? {};
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
     const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
@@ -208,7 +208,7 @@ export const setPixChave = createServerFn({ method: "POST" })
   .handler(async (opts) => {
     const context = opts?.context;
     assertAdmin(context);
-    const supabase = await getAdminClient();
+    const supabase = context.vendor ? (await getAdminClient().catch(() => context.supabase)) : context.supabase;
     const { error } = await supabase
       .from("vendedores")
       .update({ pix_chave: opts.data.pix || null })
