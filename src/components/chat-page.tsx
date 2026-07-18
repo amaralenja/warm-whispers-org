@@ -3276,10 +3276,40 @@ function ConversationMetaControls({
                   if (!resp || Object.keys(resp).length === 0) {
                     return <div className="text-xs text-muted-foreground py-2 text-center">Nenhuma resposta disponível.</div>;
                   }
-                  return Object.entries(resp).map(([key, val]) => (
+                  
+                  const IGNORED_KEYS = new Set([
+                    "last_step", "step_atual", "step", "caixa_letra", "received_at", 
+                    "utm_source", "utm_medium", "utm_campaign", "utm_content", 
+                    "fbc", "fbp", "fbclid", "gclid", "referrer", "user_agent", "nome", "email", "whatsapp"
+                  ]);
+
+                  const formatQuizValue = (k: string, v: any): string => {
+                    const vStr = String(v ?? "").trim().toUpperCase();
+                    const keyLower = k.toLowerCase();
+                    if ((keyLower.includes("investir") || keyLower.includes("caixa") || keyLower.includes("faturamento")) && vStr.length === 1 && "ABCDEFG".includes(vStr)) {
+                      const labels: Record<string, string> = {
+                        A: "Menos de R$ 1.000",
+                        B: "R$ 1.000 – R$ 5.000",
+                        C: "R$ 5.000 – R$ 10.000",
+                        D: "R$ 10.000 – R$ 25.000",
+                        E: "R$ 25.000 – R$ 50.000",
+                        F: "R$ 50.000 – R$ 100.000",
+                        G: "Caixa Ilimitado",
+                      };
+                      return labels[vStr] || vStr;
+                    }
+                    return String(v);
+                  };
+
+                  const entries = Object.entries(resp).filter(([key]) => !IGNORED_KEYS.has(key.toLowerCase().trim()));
+                  if (entries.length === 0) {
+                    return <div className="text-xs text-muted-foreground py-2 text-center">Nenhuma resposta relevante encontrada.</div>;
+                  }
+
+                  return entries.map(([key, val]) => (
                     <div key={key} className="border-b border-chat-line/45 pb-1.5 last:border-0">
                       <div className="text-[10px] text-muted-foreground capitalize font-medium">{key.replace(/_/g, " ")}</div>
-                      <div className="text-xs text-foreground font-semibold mt-0.5">{String(val)}</div>
+                      <div className="text-xs text-foreground font-semibold mt-0.5">{formatQuizValue(key, val)}</div>
                     </div>
                   ));
                 })()}
