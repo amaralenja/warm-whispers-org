@@ -63,6 +63,7 @@ const mainItems: Item[] = [
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
+  { title: "Comissões", url: "/comissoes", icon: Percent },
   { title: "SOPs / Processos", url: "/sops", icon: BookOpenText },
 ];
 
@@ -72,7 +73,6 @@ const operacaoX1Items: Item[] = [
   { title: "Analytics X1", url: "/x1-analytics", icon: BarChart3 },
   { title: "CRM Leads X1", url: "/crm", icon: Users },
   { title: "Vendedores", url: "/vendedores", icon: Briefcase },
-  { title: "Comissões", url: "/comissoes", icon: Percent },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
   { title: "Fluxos", url: "/flows", icon: Workflow },

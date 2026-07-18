@@ -12,6 +12,7 @@ export const MENU_TREE: MenuNode[] = [
   { key: "ranking-tv", title: "Ranking TV", url: "/ranking-tv" },
   { key: "financeiro", title: "Financeiro", url: "/financeiro" },
   { key: "tasks", title: "Tarefas", url: "/tasks" },
+  { key: "comissoes", title: "Comissões", url: "/comissoes" },
   { key: "sops", title: "SOPs / Processos", url: "/sops" },
   {
     key: "operacao-x1",
@@ -23,7 +24,6 @@ export const MENU_TREE: MenuNode[] = [
       { key: "chat", title: "Chat ao Vivo", url: "/chat" },
       { key: "flows", title: "Fluxos", url: "/flows" },
       { key: "x1-analytics", title: "Analytics X1", url: "/x1-analytics" },
-      { key: "comissoes", title: "Comissões", url: "/comissoes" },
       { key: "remarketing", title: "Remarketing 24h", url: "/remarketing" },
     ],
   },
@@ -128,6 +128,13 @@ const ADMIN_ONLY_LEAVES = new Set(["pv24h-analytics", "comissoes", "ht-team", "h
 /** Default = true se não setado (admin enxerga tudo), exceto grupos/leaves admin-only. */
 export function canSee(perm: Permissoes | null | undefined, groupKey: string, leafKey?: string): boolean {
   if (!perm || typeof perm !== "object") return true;
+  if (groupKey === "comissoes" && !leafKey) {
+    const opX1 = perm["operacao-x1"];
+    if (opX1 && typeof opX1 === "object") {
+      return (opX1 as any)["comissoes"] === true;
+    }
+    return false;
+  }
   if (ADMIN_ONLY_GROUPS.has(groupKey) && (perm[groupKey] === undefined || perm[groupKey] === null)) return false;
   if (leafKey && ADMIN_ONLY_LEAVES.has(leafKey)) {
     const node = perm[groupKey];
