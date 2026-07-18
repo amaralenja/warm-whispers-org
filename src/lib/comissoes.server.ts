@@ -45,7 +45,25 @@ export const TIERS: { min: number; rate: number }[] = [
   { min: 0, rate: 60 },
 ];
 
+function calcularMilharesAcumulados(acumulado: number): number {
+  if (acumulado < 991) return 0;
+  let N = 1;
+  while (true) {
+    const proximoMinimo = ((N + 1) * 1000) - ((N + 1) * 10 - 1);
+    if (acumulado >= proximoMinimo) {
+      N++;
+    } else {
+      break;
+    }
+  }
+  return N;
+}
+
 export function tierRate(cumulativo: number): number {
-  for (const t of TIERS) if (cumulativo >= t.min) return t.rate;
-  return 0;
+  const miles = calcularMilharesAcumulados(cumulativo);
+  if (miles >= 25) return 250;
+  if (miles >= 20) return 200;
+  if (miles >= 15) return 120;
+  if (miles >= 10) return 80;
+  return 60;
 }
