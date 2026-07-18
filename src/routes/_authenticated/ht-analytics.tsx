@@ -2533,7 +2533,7 @@ function FacebookAdsAnalyticsSection({
 
   const { start: pStart, end: pEnd } = useMemo(() => periodRange(period), [period]);
 
-  const salesFromAds = useMemo(() => {
+  const leadsFromAds = useMemo(() => {
     const isFromSocialAds = (l: any) => {
       const src = String(l.utm_source || l.utm_medium || "").toLowerCase();
       const med = String(l.utm_medium || "").toLowerCase();
@@ -2548,7 +2548,30 @@ function FacebookAdsAnalyticsSection({
         src.includes("ads")
       );
     };
+    return leads.filter((l) => isFromSocialAds(l));
+  }, [leads]);
 
+  const finalizadosFromAds = useMemo(() => {
+    return leadsFromAds.filter((l) => isFinalizado(l));
+  }, [leadsFromAds]);
+
+  const showupsFromAds = useMemo(() => {
+    return leadsFromAds.filter((l) => {
+      const status = String(l.crm_status || "").toLowerCase();
+      return !!l.crm_data_agendamento && (
+        status.includes("followup") ||
+        status.includes("remarcad") ||
+        status.includes("sinal") ||
+        status.includes("fechado") ||
+        status.includes("ganho")
+      );
+    });
+  }, [leadsFromAds]);
+
+  const cplFinalizado = totalSpend > 0 && finalizadosFromAds.length > 0 ? totalSpend / finalizadosFromAds.length : 0;
+  const cpaShowup = totalSpend > 0 && showupsFromAds.length > 0 ? totalSpend / showupsFromAds.length : 0;
+
+  const salesFromAds = useMemo(() => {
     return (vendas || []).filter((v: any) => {
       if (pStart && new Date(v.data) < pStart) return false;
       if (pEnd && new Date(v.data) >= pEnd) return false;
@@ -2558,6 +2581,20 @@ function FacebookAdsAnalyticsSection({
           String(lead.id) === String(v.lead_id) ||
           String(lead.email).toLowerCase() === String(v.cliente).toLowerCase()
       );
+      const isFromSocialAds = (x: any) => {
+        const src = String(x.utm_source || x.utm_medium || "").toLowerCase();
+        const med = String(x.utm_medium || "").toLowerCase();
+        return (
+          src.includes("facebook") ||
+          src.includes("instagram") ||
+          src.includes("fb") ||
+          src.includes("ig") ||
+          src.includes("meta") ||
+          med.includes("cpc") ||
+          med.includes("cpm") ||
+          src.includes("ads")
+        );
+      };
       return l ? isFromSocialAds(l) : false;
     });
   }, [leads, vendas, period, pStart, pEnd]);
@@ -2571,6 +2608,25 @@ function FacebookAdsAnalyticsSection({
 
   const campaignsPerformance = useMemo(() => {
     return (campaigns || []).map((c: any) => {
+      const campaignLeads = leadsFromAds.filter((l) => {
+        if (!l.utm_campaign) return false;
+        const campaignName = String(c.name).toLowerCase();
+        const utmCampaign = String(l.utm_campaign).toLowerCase();
+        return campaignName.includes(utmCampaign) || utmCampaign.includes(campaignName);
+      });
+
+      const campaignFinalizados = campaignLeads.filter((l) => isFinalizado(l)).length;
+      const campaignShowups = campaignLeads.filter((l) => {
+        const status = String(l.crm_status || "").toLowerCase();
+        return !!l.crm_data_agendamento && (
+          status.includes("followup") ||
+          status.includes("remarcad") ||
+          status.includes("sinal") ||
+          status.includes("fechado") ||
+          status.includes("ganho")
+        );
+      }).length;
+
       const salesForCampaign = salesFromAds.filter((v: any) => {
         const l = leads.find((lead) => String(lead.id) === String(v.lead_id));
         if (!l?.utm_campaign) return false;
@@ -2584,17 +2640,24 @@ function FacebookAdsAnalyticsSection({
       const spend = c.insights?.spend || 0;
       const campaignRoas = spend > 0 ? faturamento / spend : 0;
 
+      const campaignCpl = campaignFinalizados > 0 ? spend / campaignFinalizados : 0;
+      const campaignCps = campaignShowups > 0 ? spend / campaignShowups : 0;
+
       return {
         id: c.id,
         name: c.name,
         spend,
+        finalizados: campaignFinalizados,
+        cpl: campaignCpl,
+        showups: campaignShowups,
+        cps: campaignCps,
         faturamento,
         conversions,
         roas: campaignRoas,
         status: c.effectiveStatus,
       };
     }).sort((a: any, b: any) => b.spend - a.spend);
-  }, [campaigns, salesFromAds, leads]);
+}, [campaigns, salesFromAds, leads]);
 
   return (
     <div className="space-y-8">
@@ -2608,7 +2671,14 @@ function FacebookAdsAnalyticsSection({
         <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Faturamento (High Ticket)" value={fmtBRL(adsFaturamento)} sub={`${salesFromAds.length} vendas de anúncios`} />
         <Kpi icon={<Sparkles className="h-4 w-4" />} label="ROAS" value={`${roas.toFixed(2)}x`} sub="Retorno sobre o gasto" />
         <Kpi icon={<Target className="h-4 w-4" />} label="ROI de Anúncios" value={`${roi.toFixed(1)}%`} sub="Retorno do investimento" />
-        <Kpi icon={<Zap className="h-4 w-4" />} label="Custo por Aquisição" value={salesFromAds.length > 0 ? fmtBRL(totalSpend / salesFromAds.length) : "—"} sub="CPA médio de vendas" />
+        <Kpi icon={<Zap className="h-4 w-4" />} label="CPA (Vendas)" value={salesFromAds.length > 0 ? fmtBRL(totalSpend / salesFromAds.length) : "—"} sub="Custo por Venda" />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Kpi icon={<Users className="h-4 w-4 text-violet-400" />} label="Leads Finalizados" value={fmtInt(finalizadosFromAds.length)} sub="Preencheram Typebot" />
+        <Kpi icon={<Zap className="h-4 w-4 text-emerald-400" />} label="CPL Finalizado" value={cplFinalizado > 0 ? fmtBRL(cplFinalizado) : "—"} sub="Custo por Lead completo" />
+        <Kpi icon={<Activity className="h-4 w-4 text-amber-400" />} label="ShowUps (Call)" value={fmtInt(showupsFromAds.length)} sub="Compareceram à reunião" />
+        <Kpi icon={<Target className="h-4 w-4 text-rose-400" />} label="Custo por ShowUp" value={cpaShowup > 0 ? fmtBRL(cpaShowup) : "—"} sub="Custo por Comparecimento" />
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -2634,9 +2704,11 @@ function FacebookAdsAnalyticsSection({
                   <thead>
                     <tr className="border-b border-border/40 bg-muted/20 text-muted-foreground font-semibold">
                       <th className="px-4 py-3">Campanha</th>
-                      <th className="px-4 py-3 text-right">Gasto (Ads)</th>
+                      <th className="px-4 py-3 text-right">Gasto</th>
+                      <th className="px-4 py-3 text-right">Finalizados (CPL)</th>
+                      <th className="px-4 py-3 text-right">ShowUps (CPS)</th>
                       <th className="px-4 py-3 text-right">Vendas (HT)</th>
-                      <th className="px-4 py-3 text-right">Receita (HT)</th>
+                      <th className="px-4 py-3 text-right">Receita</th>
                       <th className="px-4 py-3 text-right">ROAS</th>
                       <th className="px-4 py-3 text-center">Status</th>
                     </tr>
@@ -2644,8 +2716,14 @@ function FacebookAdsAnalyticsSection({
                   <tbody>
                     {campaignsPerformance.map((c) => (
                       <tr key={c.id} className="border-b border-border/20 hover:bg-muted/10 transition-colors">
-                        <td className="px-4 py-3.5 font-medium min-w-[200px] truncate max-w-[300px]" title={c.name}>{c.name}</td>
+                        <td className="px-4 py-3.5 font-medium min-w-[150px] truncate max-w-[220px]" title={c.name}>{c.name}</td>
                         <td className="px-4 py-3.5 text-right font-mono font-medium">{fmtBRL(c.spend)}</td>
+                        <td className="px-4 py-3.5 text-right font-mono">
+                          {c.finalizados} <span className="text-[10px] text-muted-foreground">({c.cpl > 0 ? fmtBRL(c.cpl) : "—"})</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-mono">
+                          {c.showups} <span className="text-[10px] text-muted-foreground">({c.cps > 0 ? fmtBRL(c.cps) : "—"})</span>
+                        </td>
                         <td className="px-4 py-3.5 text-right">{c.conversions}</td>
                         <td className="px-4 py-3.5 text-right font-mono font-medium text-emerald-400">{fmtBRL(c.faturamento)}</td>
                         <td className="px-4 py-3.5 text-right font-semibold text-accent">{c.roas > 0 ? `${c.roas.toFixed(2)}x` : "—"}</td>
