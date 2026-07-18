@@ -155,7 +155,8 @@ export const getComissoes = createServerFn({ method: "POST" })
             const day = daysMap.get(iso) ?? { faturamento: 0, vendas: 0 };
 
             cumulativo += day.faturamento;
-            const rate = tierRate(cumulativo);
+            const isGustavo = String(v.expert ?? "").toLowerCase().trim() === "gustavo";
+            const rate = isGustavo ? 30 : tierRate(cumulativo);
             let milhares = 0;
             if (day.faturamento >= 991) {
               milhares = 1;
@@ -187,6 +188,7 @@ export const getComissoes = createServerFn({ method: "POST" })
             current.setUTCDate(current.getUTCDate() + 1);
           }
         }
+        const isGustavo = String(v.expert ?? "").toLowerCase().trim() === "gustavo";
         return {
           id: Number(v.id),
           utm: key,
@@ -197,7 +199,7 @@ export const getComissoes = createServerFn({ method: "POST" })
           faturamento,
           vendas,
           comissao,
-          tierAtual: tierRate(faturamento),
+          tierAtual: isGustavo ? 30 : tierRate(faturamento),
           dias,
         };
       })

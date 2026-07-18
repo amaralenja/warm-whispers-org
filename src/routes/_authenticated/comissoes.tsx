@@ -206,6 +206,9 @@ function ComissoesPage() {
           <Badge variant="outline" className="text-xs">
             A partir de R$ 24.775 (25k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(250)}</span>
           </Badge>
+          <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
+            Operação Gustavo → Fixo {fmtBRL(30)}/mil (independente de acumulado)
+          </Badge>
         </CardContent>
       </Card>
 
@@ -250,7 +253,14 @@ function ComissoesPage() {
                             <div className="flex items-center gap-2">
                               {r.fotoUrl ? <img src={r.fotoUrl} alt="" className="h-7 w-7 rounded-full object-cover" /> : <div className="h-7 w-7 rounded-full bg-muted" />}
                               <div>
-                                <div className="font-medium">{r.nome}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium">{r.nome}</span>
+                                  {String(r.expert ?? "").toLowerCase().trim() === "gustavo" && (
+                                    <Badge variant="outline" className="h-4 px-1 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/30">
+                                      Op. Gustavo (Fixo)
+                                    </Badge>
+                                  )}
+                                </div>
                                 {r.expert && <div className="text-xs text-muted-foreground">{r.expert}</div>}
                               </div>
                             </div>
@@ -258,7 +268,12 @@ function ComissoesPage() {
                           <td className="px-3 py-2 font-mono text-xs">{r.utm}</td>
                           <td className="px-3 py-2 text-right">{r.vendas}</td>
                           <td className="px-3 py-2 text-right">{fmtBRL(r.faturamento)}</td>
-                          <td className="px-3 py-2 text-right">{fmtBRL(r.tierAtual)}<span className="text-xs text-muted-foreground">/mil</span></td>
+                          <td className="px-3 py-2 text-right">
+                            {fmtBRL(r.tierAtual)}<span className="text-xs text-muted-foreground">/mil</span>
+                            {String(r.expert ?? "").toLowerCase().trim() === "gustavo" && (
+                              <div className="text-[10px] text-amber-500 font-medium">Fixo Gustavo</div>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-right font-semibold text-accent">{fmtBRL(r.comissao)}</td>
                         </tr>
                         {open && (
