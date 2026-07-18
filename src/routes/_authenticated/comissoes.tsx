@@ -52,7 +52,7 @@ function ComissoesPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   useEffect(() => {
     const session = getVendorSession();
-    const hasPerm = session?.permissoes?.["operacao-x1"]?.["comissoes"] === true;
+    const hasPerm = (session?.permissoes as any)?.["operacao-x1"]?.["comissoes"] === true;
     setIsAdmin(session === null || hasPerm);
   }, []);
 

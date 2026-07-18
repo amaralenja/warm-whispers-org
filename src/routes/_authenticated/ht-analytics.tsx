@@ -24,7 +24,7 @@ import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
-import { getKanbanLocalData, listShortLinks, createShortLink, deleteShortLink } from "@/lib/ht-api.functions";
+import { getKanbanLocalData } from "@/lib/ht-api.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { createEvent } from "@/lib/google-calendar.functions";
 import {
@@ -83,6 +83,7 @@ type QLead = {
   comprometimento: string | null; last_step: string | null; funil: string | null;
   utm_source: string | null; utm_medium: string | null; utm_campaign: string | null;
   crm_status: string | null; crm_valor: number | null; crm_data_agendamento: string | null;
+  respostas?: Record<string, any> | null;
 };
 const isFinalizado = (l: QLead) => {
   if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
@@ -150,7 +151,11 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         if (endIso) q = q.lt("data_criacao", endIso);
         const { data, error } = await q;
         if (error || !data) break;
-        all.push(...(data as QLead[]));
+        const mapped = (data as any[]).map(l => ({
+          ...l,
+          respostas: l.respostas_json || l.respostas || null
+        }));
+        all.push(...(mapped as QLead[]));
         if (data.length < pageSize) break;
       }
 
@@ -191,6 +196,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
               crm_status: null,
               crm_valor: null,
               crm_data_agendamento: null,
+              respostas: r,
             } as QLead);
           }
         }

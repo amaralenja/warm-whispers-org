@@ -194,7 +194,7 @@ function periodToRange(
 }
 
 // ---------- Lead Classification ----------
-type OriginKey = "facebook" | "instagram" | "google" | "organic" | "tiktok" | "unknown";
+type OriginKey = "criar_saas" | "facebook" | "instagram" | "google" | "organic" | "tiktok" | "unknown";
 type LeadOrigin = {
   key: OriginKey;
   label: string;
@@ -206,13 +206,21 @@ type LeadOrigin = {
   border: string;
 };
 
-const ORIGIN_ORDER: OriginKey[] = ["facebook", "instagram", "google", "tiktok", "organic", "unknown"];
+const ORIGIN_ORDER: OriginKey[] = ["criar_saas", "facebook", "instagram", "google", "tiktok", "organic", "unknown"];
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
   const med = (l.utm_medium ?? "").toLowerCase();
   const isInstagram = src.includes("ig") || src.includes("instagram");
   const isFacebook = src.includes("fb") || src.includes("facebook");
+  
+  if (src === "criar_saas" || l.origem === "criar_saas" || (l.respostas_json as any)?.origem === "criar_saas") {
+    return {
+      key: "criar_saas", label: "Criar SaaS", icon: Sparkles,
+      ring: "ring-yellow-500/40", bg: "bg-yellow-500/10", text: "text-yellow-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(234,179,8,0.5)]", border: "border-yellow-500/40",
+    };
+  }
   
   // Identifica se é tráfego pago via parâmetros adicionais comuns
   const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
@@ -356,9 +364,24 @@ function apiSubToLead(s: any): Lead {
     }
     return typeof v === "string" || typeof v === "number" ? String(v) : null;
   };
-  const caixaRaw = pick("caixa") ?? pick("caixa_label");
-  const letra = (pick("caixa_letra") ?? (caixaRaw && /^[A-G]$/i.test(caixaRaw) ? caixaRaw : "") ?? "").toUpperCase() || null;
-  const label = caixaRaw && !/^[A-G]$/i.test(caixaRaw) ? caixaRaw : (letra ? TICKET_TIERS[letra]?.label ?? null : null);
+  const caixaRaw = pick("caixa") ?? pick("caixa_label") ?? pick("budget");
+  let letra = (pick("caixa_letra") ?? (caixaRaw && /^[A-G]$/i.test(caixaRaw) ? caixaRaw : "") ?? "").toUpperCase() || null;
+  let label = caixaRaw && !/^[A-G]$/i.test(caixaRaw) ? caixaRaw : (letra ? TICKET_TIERS[letra]?.label ?? null : null);
+
+  if (s.utm_source === "criar_saas" || r.origem === "criar_saas") {
+    const budget = pick("budget");
+    if (budget) {
+      label = `Orçamento: ${budget}`;
+      const bClean = budget.toLowerCase().replace(/\s/g, "");
+      if (bClean.includes("100k")) letra = "G";
+      else if (bClean.includes("50k")) letra = "F";
+      else if (bClean.includes("30k")) letra = "E";
+      else if (bClean.includes("10k") || bClean.includes("5k-10k")) letra = "C";
+      else if (bClean.includes("5k")) letra = "B";
+      else letra = "A";
+    }
+  }
+
   return sanitizeLead({
     id: `api:${s.id}`,
     data_criacao: s.received_at ?? s.updated_at ?? new Date().toISOString(),
@@ -366,13 +389,13 @@ function apiSubToLead(s: any): Lead {
     utm_source: s.utm_source, utm_medium: s.utm_medium, utm_campaign: s.utm_campaign, utm_content: s.utm_content,
     fbc: s.fbc, fbp: s.fbp, fbclid: s.fbclid, gclid: s.gclid,
     caixa_letra: letra, caixa_label: label,
-    faturamento: pick("faturamento"), momento: pick("momento"),
-    objetivo: pick("objetivo"), socio: pick("socio"),
-    investir: pick("investir"), comprometimento: pick("comprometimento"),
+    faturamento: pick("faturamento") ?? pick("revenue_goal"), momento: pick("momento") ?? pick("niche"),
+    objetivo: pick("objetivo") ?? (pick("knows_saas") ? "Já conhece SaaS" : null), socio: pick("socio"),
+    investir: pick("investir") ?? pick("budget"), comprometimento: pick("comprometimento") ?? pick("team_size"),
     minicurso: pick("minicurso"), situacao: pick("situacao"),
     renda: pick("renda"), porque: pick("porque"),
     respostas_json: r as Record<string, unknown>,
-    status: s.status, origem: "api",
+    status: s.status, origem: s.utm_source === "criar_saas" ? "criar_saas" : "api",
   });
 }
 
@@ -501,7 +524,7 @@ function QuizPage() {
 
   const stats = useMemo(() => {
     const total = filteredLeads.length;
-    const byOrigin: Record<OriginKey, number> = { facebook: 0, instagram: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
+    const byOrigin: Record<OriginKey, number> = { criar_saas: 0, facebook: 0, instagram: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
     let high = 0;
     let real = 0;
     let fake = 0;
@@ -526,7 +549,7 @@ function QuizPage() {
   }, [filteredLeads]);
 
   const grouped = useMemo(() => {
-    const g: Record<OriginKey, Lead[]> = { facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
+    const g: Record<OriginKey, Lead[]> = { criar_saas: [], facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
     const fakes: Lead[] = [];
     for (const l of sortedLeads) {
       if (!leadIsReal(l)) { fakes.push(l); continue; }
@@ -692,8 +715,9 @@ function QuizPage() {
       )}
 
       {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-3">
         <StatPill active={originFilter === "all"} onClick={() => setOriginFilter("all")} icon={<Users className="h-4 w-4" />} label="Total" value={stats.total} accent="text-foreground" loading={isLoading} />
+        <StatPill active={originFilter === "criar_saas"} onClick={() => setOriginFilter(originFilter === "criar_saas" ? "all" : "criar_saas")} icon={<Sparkles className="h-4 w-4" />} label="Criar SaaS" value={stats.byOrigin.criar_saas} accent="text-yellow-300" loading={isLoading} />
         <StatPill active={originFilter === "facebook"} onClick={() => setOriginFilter(originFilter === "facebook" ? "all" : "facebook")} icon={<Facebook className="h-4 w-4" />} label="Facebook" value={stats.byOrigin.facebook} accent="text-blue-300" loading={isLoading} />
         <StatPill active={originFilter === "instagram"} onClick={() => setOriginFilter(originFilter === "instagram" ? "all" : "instagram")} icon={<Instagram className="h-4 w-4" />} label="Instagram" value={stats.byOrigin.instagram} accent="text-pink-300" loading={isLoading} />
         <StatPill active={originFilter === "google"} onClick={() => setOriginFilter(originFilter === "google" ? "all" : "google")} icon={<Megaphone className="h-4 w-4" />} label="Google" value={stats.byOrigin.google} accent="text-amber-300" loading={isLoading} />
@@ -726,6 +750,11 @@ function QuizPage() {
                   </div>
                   <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
                 </div>
+                {key === "criar_saas" && (
+                  <div className="mx-3 mt-3 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-[11px] rounded-lg leading-snug font-medium">
+                    ⚠️ Esses leads já compraram e tiveram acesso ao Criar SaaS
+                  </div>
+                )}
                 <div className="flex-1 overflow-y-auto scrollbar-fancy p-3 space-y-3">
                   {items.map((l) => (
                     <LeadCard key={l.id} lead={l} real={leadIsReal(l)} onToggle={(r) => setLeadReality(l.id, r)} onOpen={() => setSelectedLead(l)} compact />
@@ -916,9 +945,16 @@ function LeadCard({
       {/* HEADER: nome + origem */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={`truncate text-base font-bold leading-tight ${lead.nome ? "" : "italic text-muted-foreground"}`}>
-            {lead.nome || "sem nome"}
-          </h3>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <h3 className={`truncate text-base font-bold leading-tight ${lead.nome ? "" : "italic text-muted-foreground"}`}>
+              {lead.nome || "sem nome"}
+            </h3>
+            {lead.origem === "criar_saas" && (
+              <Badge className="bg-yellow-500/25 text-yellow-300 border border-yellow-500/40 text-[9px] px-1 py-0 h-4 font-bold shrink-0">
+                Já comprou
+              </Badge>
+            )}
+          </div>
           <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Icon className={`h-3.5 w-3.5 ${origin.text}`} />
             <span className="font-medium">{origin.label}</span>
@@ -1014,6 +1050,12 @@ const ANSWER_LABELS: Record<string, string> = {
   meta: "Meta",
   caixa: "Caixa",
   caixa_label: "Faixa de ticket",
+  knows_saas: "Já conhece SaaS?",
+  niche: "Nicho de atuação",
+  team_size: "Tamanho da equipe",
+  revenue_goal: "Meta de faturamento",
+  budget: "Orçamento disponível",
+  user_id: "ID do Usuário Criar SaaS",
 };
 
 function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {

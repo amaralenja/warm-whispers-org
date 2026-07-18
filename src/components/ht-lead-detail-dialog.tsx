@@ -50,6 +50,7 @@ export type LeadLike = {
   crm_valor_recebido?: number | null;
   crm_data_pagamento_restante?: string | null;
   crm_data_agendamento?: string | null;
+  respostas?: Record<string, any> | null;
 };
 
 
@@ -308,21 +309,66 @@ export function HtLeadDetailDialog({
     return s;
   };
 
-  const caixaValue = lead
-    ? ([safeStr(lead.caixa_label), letter ? `Faixa ${letter}` : null].filter(Boolean).join(" · ") || null)
-    : null;
-  const answers: { key: string; label: string; value?: string | null }[] = lead
-    ? [
-        { key: "caixa", label: "Caixa disponível", value: caixaValue },
-        { key: "faturamento", label: "Faturamento atual", value: safeStr(lead.faturamento) },
-        { key: "momento", label: "Momento atual", value: safeStr(lead.momento) },
-        { key: "objetivo", label: "Meta / Objetivo", value: safeStr(lead.objetivo) },
-        { key: "investir", label: "Quanto pode investir?", value: translateInvestir(lead.investir) },
-        { key: "minicurso", label: "Tem ideia de SaaS?", value: safeStr(lead.minicurso) },
-        { key: "socio", label: "Sócio / Cônjuge", value: safeStr(lead.socio) },
-        { key: "comprometimento", label: "Comprometimento", value: safeStr(lead.comprometimento) },
-      ].filter((x) => x.value)
-    : [];
+  const friendlyKey = (k: string): string => {
+    const keys: Record<string, string> = {
+      caixa_letra: "Caixa disponível",
+      caixa_label: "Faixa de caixa",
+      faturamento: "Faturamento atual",
+      momento: "Momento atual",
+      objetivo: "Meta / Objetivo",
+      investir: "Quanto pode investir?",
+      minicurso: "Tem ideia de SaaS?",
+      socio: "Sócio / Cônjuge",
+      comprometimento: "Comprometimento",
+      porque: "Por que quer fazer parte?",
+      renda: "Renda extra",
+      situacao: "Situação atual",
+      funil: "Funil de vendas",
+    };
+    return keys[k] || k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const rawCaixaVal = lead?.caixa_label || CAIXA_TIER[letter]?.label || (letter ? `Faixa ${letter}` : null);
+  const caixaValue = safeStr(rawCaixaVal);
+
+  const answers: { key: string; label: string; value?: string | null }[] = [];
+  
+  if (lead) {
+    const knownKeys = [
+      { key: "caixa", label: "Caixa disponível", value: caixaValue },
+      { key: "faturamento", label: "Faturamento atual", value: safeStr(lead.faturamento) },
+      { key: "momento", label: "Momento atual", value: safeStr(lead.momento) },
+      { key: "objetivo", label: "Meta / Objetivo", value: safeStr(lead.objetivo) },
+      { key: "investir", label: "Quanto pode investir?", value: translateInvestir(lead.investir) },
+      { key: "minicurso", label: "Tem ideia de SaaS?", value: safeStr(lead.minicurso) },
+      { key: "socio", label: "Sócio / Cônjuge", value: safeStr(lead.socio) },
+      { key: "comprometimento", label: "Comprometimento", value: safeStr(lead.comprometimento) },
+    ];
+
+    knownKeys.forEach((k) => {
+      if (k.value) answers.push(k);
+    });
+
+    if (lead.respostas && typeof lead.respostas === "object") {
+      const excludedKeys = new Set([
+        "caixa_letra", "caixa_label", "faturamento", "momento", "objetivo", "investir",
+        "minicurso", "socio", "comprometimento", "step_atual", "caixa_letra_calculada",
+        "received_at", "updated_at", "id", "nome", "email", "whatsapp", "instagram",
+        "utm_source", "utm_medium", "utm_campaign", "utm_content", "fbc", "fbp", "fbclid", "gclid"
+      ]);
+
+      Object.entries(lead.respostas).forEach(([key, val]) => {
+        if (excludedKeys.has(key)) return;
+        const sVal = safeStr(val);
+        if (!sVal) return;
+        answers.push({
+          key,
+          label: friendlyKey(key),
+          value: sVal,
+        });
+      });
+    }
+  }
 
   const filteredNotes = filter === "all" ? notes : notes.filter((n) => n.role === filter);
   const sdrCount = notes.filter((n) => n.role === "sdr").length;
