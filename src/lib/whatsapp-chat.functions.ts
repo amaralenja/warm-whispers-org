@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const EVOHUB_BASE = "https://api.evohub.ai";
@@ -1556,14 +1557,30 @@ export const editWhatsappMessage = createServerFn({ method: "POST" })
 
 export const getActiveBuyers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .handler(async (opts) => {
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://wvcwrozwnwdlpandwubp.supabase.co";
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                process.env.SUPASUPABASE_SERVICE_ROLE_KEY || 
+                process.env.SUPABASE_SECRET_KEY || 
+                process.env.SUPABASE_SECRET_KEYS || 
+                process.env.SUPABASE_SERVICE_KEY ||
+                process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+    let supabaseInstance;
+    if (url && key) {
+      supabaseInstance = createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+    } else {
+      supabaseInstance = opts.context.supabase;
+    }
+
     const [{ data: vAll }, { data: htAll }] = await Promise.all([
-      supabaseAdmin
+      supabaseInstance
         .from("vendas")
         .select("Telefone, Email, Ticket, Evento, Produto, Nome")
         .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*'),
-      supabaseAdmin
+      supabaseInstance
         .from("ht_vendas")
         .select("id, valor_total, data, status, cliente, lead_id")
         .neq("status", "reembolso")
