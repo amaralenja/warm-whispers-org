@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -21,6 +22,44 @@ import {
 } from "@/lib/meta-ads-manager.functions";
 import { getMetaAdsConfig, saveMetaAdsConfig } from "@/lib/meta-ads.functions";
 
+
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+const isFinalizado = (l: any) => {
+  if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
+  return !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
+};
+
+const isShowUp = (l: any) => {
+  const status = String(l.crm_status || "").toLowerCase();
+  return !!l.crm_data_agendamento && (
+    status.includes("followup") ||
+    status.includes("remarcad") ||
+    status.includes("sinal") ||
+    status.includes("fechado") ||
+    status.includes("ganho")
+  );
+};
+
+function presetToDateRange(p: string): { start: Date | null; end: Date | null } {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(t); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (p === "maximum") return { start: null, end: null };
+  if (p === "today") return { start: t, end: tomorrow };
+  if (p === "yesterday") {
+    const y = new Date(t); y.setDate(y.getDate() - 1);
+    return { start: y, end: t };
+  }
+  if (p === "this_month") return { start: new Date(t.getFullYear(), t.getMonth(), 1), end: tomorrow };
+  const days = p === "last_7d" ? 7 : p === "last_14d" ? 14 : 30;
+  const s = new Date(t); s.setDate(s.getDate() - days);
+  return { start: s, end: tomorrow };
+}
 
 export const Route = createFileRoute("/_authenticated/meta-ads")({
   component: MetaAdsManagerPage,
@@ -84,12 +123,22 @@ function MetaToggle({
   );
 }
 
-function MetricCells({ i }: { i: AdInsights }) {
+function MetricCells({ item }: { item: any }) {
+  const i = item.insights;
+  const finalizados = item.finalizados ?? 0;
+  const showups = item.showups ?? 0;
+  const cpl = finalizados > 0 ? i.spend / finalizados : 0;
+  const cps = showups > 0 ? i.spend / showups : 0;
+
   return (
     <>
       <td className="px-4 py-4 text-right font-mono text-sm font-semibold">{brl(i.spend)}</td>
-      <td className="px-4 py-4 text-right text-sm">{num(i.results)}</td>
-      <td className="px-4 py-4 text-right text-sm">{i.results ? brl(i.costPerResult) : "—"}</td>
+      <td className="px-4 py-4 text-right text-sm">
+        {finalizados} <span className="text-[10px] text-muted-foreground">({cpl > 0 ? brl(cpl) : "—"})</span>
+      </td>
+      <td className="px-4 py-4 text-right text-sm">
+        {showups} <span className="text-[10px] text-muted-foreground">({cps > 0 ? brl(cps) : "—"})</span>
+      </td>
       <td className="px-4 py-4 text-right text-sm">{num(i.impressions)}</td>
       <td className="px-4 py-4 text-right text-sm">{num(i.clicks)}</td>
       <td className="px-4 py-4 text-right text-sm">{pct(i.ctr)}</td>
@@ -101,7 +150,7 @@ function MetricCells({ i }: { i: AdInsights }) {
 
 type SortKey =
   | "default" | "status" | "name" | "budget"
-  | "spend" | "results" | "costPerResult" | "impressions"
+  | "spend" | "finalizados" | "showups" | "impressions"
   | "clicks" | "ctr" | "cpc" | "cpm";
 type SortDir = "asc" | "desc";
 
@@ -135,8 +184,8 @@ function MetricHeaders({
   return (
     <>
       <SortTh label="Gasto" k="spend" sort={sort} onSort={onSort} />
-      <SortTh label="Resultados" k="results" sort={sort} onSort={onSort} />
-      <SortTh label="Custo/Result." k="costPerResult" sort={sort} onSort={onSort} />
+      <SortTh label="Preenchidos (CPL)" k="finalizados" sort={sort} onSort={onSort} />
+      <SortTh label="ShowUps (CPS)" k="showups" sort={sort} onSort={onSort} />
       <SortTh label="Impressões" k="impressions" sort={sort} onSort={onSort} />
       <SortTh label="Cliques" k="clicks" sort={sort} onSort={onSort} />
       <SortTh label="CTR" k="ctr" sort={sort} onSort={onSort} />
@@ -156,13 +205,14 @@ function sortRows<T extends { status: string; name: string; insights: AdInsights
       case "status": return r.status === "ACTIVE" ? 1 : 0;
       case "name": return r.name?.toLowerCase() ?? "";
       case "budget": return (r.dailyBudget ?? r.lifetimeBudget ?? 0) as number;
+      case "finalizados": return (r as any).finalizados ?? 0;
+      case "showups": return (r as any).showups ?? 0;
       case "default": return 0;
       default: return (r.insights as any)[sort.key] ?? 0;
     }
   };
   arr.sort((a, b) => {
     if (sort.key === "default") {
-      // ACTIVE first, then results desc
       const sa = a.status === "ACTIVE" ? 1 : 0;
       const sb = b.status === "ACTIVE" ? 1 : 0;
       if (sa !== sb) return sb - sa;
@@ -228,25 +278,88 @@ function MetaAdsManagerPage() {
     staleTime: 5 * 60_000,
   });
 
+  const { start: pStart, end: pEnd } = useMemo(() => presetToDateRange(preset), [preset]);
+
+  const { data: leads = [] } = useQuery({
+    queryKey: ["meta-ads-leads", preset],
+    queryFn: async () => {
+      let q = quizSb.from("leads").select("id, data_criacao, whatsapp, caixa_letra, comprometimento, momento, crm_status, crm_data_agendamento, utm_source, utm_campaign, utm_content, utm_term");
+      if (pStart) q = q.gte("data_criacao", pStart.toISOString());
+      if (pEnd) q = q.lt("data_criacao", pEnd.toISOString());
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+
   const campaignsRaw = useMemo(
     () => (Array.isArray(campaignsQ.data) ? campaignsQ.data : []),
     [campaignsQ.data],
   );
-  const campaigns = useMemo(() => sortRows(campaignsRaw, sort), [campaignsRaw, sort]);
+
+  const campaignsRawWithStats = useMemo(() => {
+    return campaignsRaw.map((c: any) => {
+      const campaignLeads = leads.filter((l: any) => {
+        if (!l.utm_campaign) return false;
+        const cName = String(c.name).toLowerCase().trim();
+        const cId = String(c.id).toLowerCase().trim();
+        const utmCampaign = String(l.utm_campaign).toLowerCase().trim();
+        return cName.includes(utmCampaign) || utmCampaign.includes(cName) || cId === utmCampaign;
+      });
+      const finalizados = campaignLeads.filter(isFinalizado).length;
+      const showups = campaignLeads.filter(isShowUp).length;
+      return { ...c, finalizados, showups };
+    });
+  }, [campaignsRaw, leads]);
+
+  const campaigns = useMemo(() => sortRows(campaignsRawWithStats, sort), [campaignsRawWithStats, sort]);
   const adsetsLoading = adsetsQueries.some((q) => q.isLoading);
   const adsetsError = adsetsQueries.find((q) => q.error)?.error as Error | undefined;
   const adsetsRaw = useMemo(
     () => adsetsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as AdSet[],
     [adsetsQueries],
   );
-  const adsets = useMemo(() => sortRows(adsetsRaw, sort), [adsetsRaw, sort]);
+
+  const adsetsRawWithStats = useMemo(() => {
+    return adsetsRaw.map((a: any) => {
+      const adsetLeads = leads.filter((l: any) => {
+        if (!l.utm_term) return false;
+        const aName = String(a.name).toLowerCase().trim();
+        const aId = String(a.id).toLowerCase().trim();
+        const utmTerm = String(l.utm_term).toLowerCase().trim();
+        return aName.includes(utmTerm) || utmTerm.includes(aName) || aId === utmTerm;
+      });
+      const finalizados = adsetLeads.filter(isFinalizado).length;
+      const showups = adsetLeads.filter(isShowUp).length;
+      return { ...a, finalizados, showups };
+    });
+  }, [adsetsRaw, leads]);
+
+  const adsets = useMemo(() => sortRows(adsetsRawWithStats, sort), [adsetsRawWithStats, sort]);
   const adsLoading = adsQueries.some((q) => q.isLoading);
   const adsError = adsQueries.find((q) => q.error)?.error as Error | undefined;
   const adsRaw = useMemo(
     () => adsQueries.flatMap((q) => (Array.isArray(q.data) ? q.data : [])) as Ad[],
     [adsQueries],
   );
-  const ads = useMemo(() => sortRows(adsRaw as any, sort) as Ad[], [adsRaw, sort]);
+
+  const adsRawWithStats = useMemo(() => {
+    return adsRaw.map((ad: any) => {
+      const adLeads = leads.filter((l: any) => {
+        if (!l.utm_content) return false;
+        const adName = String(ad.name).toLowerCase().trim();
+        const adId = String(ad.id).toLowerCase().trim();
+        const utmContent = String(l.utm_content).toLowerCase().trim();
+        return adName.includes(utmContent) || utmContent.includes(adName) || adId === utmContent;
+      });
+      const finalizados = adLeads.filter(isFinalizado).length;
+      const showups = adLeads.filter(isShowUp).length;
+      return { ...ad, finalizados, showups };
+    });
+  }, [adsRaw, leads]);
+
+  const ads = useMemo(() => sortRows(adsRawWithStats as any, sort) as Ad[], [adsRawWithStats, sort]);
 
 
   const toggleStatus = useMutation({
@@ -261,14 +374,16 @@ function MetaAdsManagerPage() {
 
   const totals = useMemo(() => {
     return campaigns.reduce(
-      (acc, c) => {
+      (acc, c: any) => {
         acc.spend += c.insights.spend;
         acc.results += c.insights.results;
         acc.clicks += c.insights.clicks;
         acc.impressions += c.insights.impressions;
+        acc.finalizados += c.finalizados || 0;
+        acc.showups += c.showups || 0;
         return acc;
       },
-      { spend: 0, results: 0, clicks: 0, impressions: 0 },
+      { spend: 0, results: 0, clicks: 0, impressions: 0, finalizados: 0, showups: 0 },
     );
   }, [campaigns]);
 
@@ -375,16 +490,18 @@ function MetaAdsManagerPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {[
           { label: "Gasto total", value: brl(totals.spend) },
-          { label: "Resultados", value: num(totals.results) },
+          { label: "Leads Finalizados", value: num(totals.finalizados) },
+          { label: "CPL Finalizado", value: totals.finalizados > 0 ? brl(totals.spend / totals.finalizados) : "—" },
+          { label: "ShowUps (Call)", value: num(totals.showups) },
+          { label: "Custo por ShowUp", value: totals.showups > 0 ? brl(totals.spend / totals.showups) : "—" },
           { label: "Cliques", value: num(totals.clicks) },
-          { label: "Impressões", value: num(totals.impressions) },
         ].map((k) => (
           <div key={k.label} className="rounded-2xl border border-border bg-gradient-to-br from-card to-card/60 p-5 shadow-sm">
             <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{k.label}</div>
-            <div className="mt-2 text-2xl font-bold tracking-tight">{k.value}</div>
+            <div className="mt-2 text-xl font-bold tracking-tight">{k.value}</div>
           </div>
         ))}
       </div>
@@ -517,7 +634,7 @@ function MetaAdsManagerPage() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <MetricCells i={c.insights} />
+                      <MetricCells item={c} />
                       <td className="px-3 py-3"></td>
                     </tr>
                   ))
@@ -576,7 +693,7 @@ function MetaAdsManagerPage() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <MetricCells i={a.insights} />
+                      <MetricCells item={a} />
                       <td className="px-3 py-3"></td>
                     </tr>
                   ))
@@ -625,7 +742,7 @@ function MetaAdsManagerPage() {
                         </button>
                       </td>
                       <td className="px-3 py-3 text-right text-xs text-muted-foreground">—</td>
-                      <MetricCells i={a.insights} />
+                      <MetricCells item={a} />
                       <td className="px-3 py-3"></td>
                     </tr>
                   ))
