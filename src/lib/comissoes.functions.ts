@@ -1,5 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { createClient } from "@supabase/supabase-js";
+
+async function getAdminClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+              process.env.SUPABASE_SECRET_KEY || 
+              process.env.SUPABASE_SECRET_KEYS || 
+              process.env.SUPABASE_SERVICE_KEY ||
+              process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error("Credenciais do Supabase não configuradas no servidor.");
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
 
 export type DiaComissao = {
   data: string;
@@ -50,7 +67,7 @@ export const getComissoes = createServerFn({ method: "POST" })
     const { parseTicket, parseDataField, tierRate } = await import("@/lib/comissoes.server");
     const context = opts?.context;
     assertAdmin(context);
-    const supabase = context.supabase as any;
+    const supabase = await getAdminClient();
     const data = opts?.data ?? {};
     const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
     const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
@@ -169,7 +186,7 @@ export const setPixChave = createServerFn({ method: "POST" })
   .handler(async (opts) => {
     const context = opts?.context;
     assertAdmin(context);
-    const supabase = context.supabase as any;
+    const supabase = await getAdminClient();
     const { error } = await supabase
       .from("vendedores")
       .update({ pix_chave: opts.data.pix || null })
