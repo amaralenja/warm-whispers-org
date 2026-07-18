@@ -273,6 +273,12 @@ function HtApiPage() {
             <p className="mt-2 text-xs text-muted-foreground">
               Qualquer campo extra vira parte do payload cru (<code>raw</code>) e fica salvo pra análise depois.
             </p>
+            <div className="mt-3 rounded-lg border border-accent/25 bg-accent/5 p-3 text-xs">
+              <span className="font-semibold text-accent">🤖 Integração com o Typebot:</span>
+              <p className="mt-1 text-muted-foreground leading-relaxed">
+                O webhook aceita as UTMs e variáveis de rastreamento tanto em formato padrão de URLs (<code>utm_source</code>, <code>utm_medium</code>, <code>utm_campaign</code>, <code>utm_content</code>) quanto no formato camelCase gerado pelo Typebot (<code>utmSource</code>, <code>utmMedium</code>, <code>utmCampaign</code>, <code>utmContent</code>). O sistema mapeia os dois automaticamente!
+              </p>
+            </div>
           </div>
 
           <div>
