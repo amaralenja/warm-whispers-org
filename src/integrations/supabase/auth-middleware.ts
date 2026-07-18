@@ -76,22 +76,36 @@ async function validateVendorSession(supabase: any, request: Request): Promise<V
     return null;
   }
   console.info('[vendor-session] decoded vendor header', { vendorId: decoded.id, codigo: decoded.codigo });
-  const { data, error } = await supabase.rpc('login_vendedor_by_codigo', { _codigo: decoded.codigo });
+  let { data, error } = await supabase.rpc('login_vendedor_by_codigo', { _codigo: decoded.codigo });
   if (error || !data) {
-    console.warn('[vendor-session] invalid vendor code on server', {
-      vendorId: decoded.id,
-      codigo: decoded.codigo,
-      hasData: Boolean(data),
-      error: error?.message ?? null,
-    });
-    return null;
+    // Tenta validar como membro High Ticket
+    const { data: htData, error: htError } = await supabase.rpc('login_ht_team_by_codigo', { _codigo: decoded.codigo });
+    if (!htError && htData) {
+      data = {
+        id: htData.id,
+        nome: htData.nome,
+        codigo: htData.codigo,
+        ativo: htData.ativo,
+        permissoes: htData.permissoes,
+        expert: "High Ticket",
+        wa_channel_ids: [],
+        workspace_ids: ["High Ticket"]
+      };
+    } else {
+      console.warn('[vendor-session] invalid vendor/ht code on server', {
+        vendorId: decoded.id,
+        codigo: decoded.codigo,
+        error: error?.message ?? htError?.message ?? null,
+      });
+      return null;
+    }
   }
   const vendor = data as VendorContext;
   if (Number(vendor.id) !== decoded.id) {
     console.warn('[vendor-session] vendor id mismatch', { expected: decoded.id, received: Number(vendor.id) });
     return null;
   }
-  console.info('[vendor-session] validated vendor on server', {
+  console.info('[vendor-session] validated vendor/ht on server', {
     vendorId: Number(vendor.id),
     expert: vendor.expert ?? null,
     channelCount: Array.isArray(vendor.wa_channel_ids) ? vendor.wa_channel_ids.length : 0,

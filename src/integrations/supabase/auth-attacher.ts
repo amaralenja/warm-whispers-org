@@ -12,10 +12,22 @@ function appendHeaders(headers: Headers, existing?: HeadersInit | null) {
   }
 }
 
+function getAnySession() {
+  const vendor = getVendorSession();
+  if (vendor) return vendor;
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem("ht_team_session");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+  }
+  return null;
+}
+
 function buildAuthHeaders(existing?: HeadersInit | null): Headers {
   const headers = new Headers()
   appendHeaders(headers, existing)
-  const vendorSession = getVendorSession()
+  const vendorSession = getAnySession()
   const vendorHeader = encodeVendorSessionHeader(vendorSession)
   if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
   return headers
@@ -46,7 +58,7 @@ export async function fetchWithSupabaseAuth(input: RequestInfo | URL, init?: Req
 export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(async ({ next }) => {
   const headers = new Headers()
   try {
-    const vendorSession = getVendorSession()
+    const vendorSession = getAnySession()
     const vendorHeader = encodeVendorSessionHeader(vendorSession)
     if (vendorHeader) headers.set('x-vendor-session', vendorHeader)
   } catch {}
