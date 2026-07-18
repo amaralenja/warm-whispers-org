@@ -140,6 +140,20 @@ export function HtLeadDetailDialog({
   const [dataRestante, setDataRestante] = useState<string>("");
   const [savingSale, setSavingSale] = useState(false);
 
+  const updateDateTime = (date: Date | undefined, timeStr: string) => {
+    if (!date) {
+      setSelectedDate(undefined);
+      setSchedDraft("");
+      return;
+    }
+    const [h, m] = timeStr.split(":");
+    const next = new Date(date);
+    next.setHours(Number(h || 0), Number(m || 0), 0, 0);
+    setSelectedDate(next);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
+  };
+
   useEffect(() => {
     if (scheduledAt) {
       const d = new Date(scheduledAt);
@@ -464,14 +478,7 @@ export function HtLeadDetailDialog({
                       mode="single"
                       selected={selectedDate}
                       onSelect={(d) => {
-                        setSelectedDate(d);
-                        if (d) {
-                          const [h, m] = selectedTime.split(":");
-                          const next = new Date(d);
-                          next.setHours(Number(h), Number(m), 0, 0);
-                          const pad = (n: number) => String(n).padStart(2, "0");
-                          setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
-                        }
+                        updateDateTime(d, selectedTime);
                       }}
                       initialFocus
                     />
@@ -485,12 +492,7 @@ export function HtLeadDetailDialog({
                             const newMin = selectedTime.split(":")[1];
                             const t = `${newHour}:${newMin}`;
                             setSelectedTime(t);
-                            if (selectedDate) {
-                              const next = new Date(selectedDate);
-                              next.setHours(Number(newHour), Number(newMin), 0, 0);
-                              const pad = (n: number) => String(n).padStart(2, "0");
-                              setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
-                            }
+                            updateDateTime(selectedDate, t);
                           }}
                           className="bg-background text-xs border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-accent text-foreground"
                         >
@@ -506,12 +508,7 @@ export function HtLeadDetailDialog({
                             const newMin = e.target.value;
                             const t = `${newHour}:${newMin}`;
                             setSelectedTime(t);
-                            if (selectedDate) {
-                              const next = new Date(selectedDate);
-                              next.setHours(Number(newHour), Number(newMin), 0, 0);
-                              const pad = (n: number) => String(n).padStart(2, "0");
-                              setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
-                            }
+                            updateDateTime(selectedDate, t);
                           }}
                           className="bg-background text-xs border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-accent text-foreground"
                         >
