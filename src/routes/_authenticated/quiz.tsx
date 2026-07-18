@@ -56,6 +56,17 @@ import { toast } from "sonner";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession } from "@/lib/ht-team-session";
 
+export function formatUtm(val: string | null): string {
+  if (!val) return "—";
+  const trimmed = val.trim();
+  if (/^\d+$/.test(trimmed)) {
+    if (trimmed.length > 8) {
+      return `ID: ${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`;
+    }
+    return `ID: ${trimmed}`;
+  }
+  return trimmed;
+}
 
 export const Route = createFileRoute("/_authenticated/quiz")({
   component: QuizPage,
@@ -706,7 +717,7 @@ function QuizPage() {
               <div key={key} className={`shrink-0 w-[360px] flex flex-col rounded-2xl border ${origin.border} ${origin.bg} max-h-[82vh]`}>
                 <div className={`flex items-center justify-between px-4 py-3 border-b ${origin.border}`}>
                   <div className={`flex items-center gap-2 text-sm font-semibold ${origin.text}`}>
-                    <Icon className="h-4 w-4" /> {origin.label}
+                    <Icon className="h-4 w-4" /> {key === "unknown" ? "Outros" : origin.label}
                   </div>
                   <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
                 </div>
@@ -957,9 +968,9 @@ function LeadCard({
 
       {/* UTM */}
       {lead.utm_campaign && (
-        <div className="text-[11px] text-muted-foreground truncate border-t border-border/40 pt-2.5">
+        <div className="text-[11px] text-muted-foreground truncate border-t border-border/40 pt-2.5" title={lead.utm_campaign}>
           <TrendingUp className="inline h-3 w-3 mr-1 opacity-60" />
-          {String(lead.utm_campaign)}
+          {formatUtm(lead.utm_campaign)}
         </div>
       )}
 
@@ -1090,10 +1101,30 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead | null; onClose: () =>
                 <span className="h-px flex-1 bg-border/60" />
               </h4>
               <div className="rounded-lg border border-border/60 bg-muted/10 p-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                {lead.utm_source && <div><span className="text-muted-foreground">source:</span> <span className="font-medium">{lead.utm_source}</span></div>}
-                {lead.utm_medium && <div><span className="text-muted-foreground">medium:</span> <span className="font-medium">{lead.utm_medium}</span></div>}
-                {lead.utm_campaign && <div className="col-span-2"><span className="text-muted-foreground">campaign:</span> <span className="font-medium">{lead.utm_campaign}</span></div>}
-                {lead.utm_content && <div className="col-span-2"><span className="text-muted-foreground">content:</span> <span className="font-medium">{lead.utm_content}</span></div>}
+                {lead.utm_source && (
+                  <div title={lead.utm_source}>
+                    <span className="text-muted-foreground">source:</span>{" "}
+                    <span className="font-medium">{formatUtm(lead.utm_source)}</span>
+                  </div>
+                )}
+                {lead.utm_medium && (
+                  <div title={lead.utm_medium}>
+                    <span className="text-muted-foreground">medium:</span>{" "}
+                    <span className="font-medium">{formatUtm(lead.utm_medium)}</span>
+                  </div>
+                )}
+                {lead.utm_campaign && (
+                  <div className="col-span-2" title={lead.utm_campaign}>
+                    <span className="text-muted-foreground">campaign:</span>{" "}
+                    <span className="font-medium">{formatUtm(lead.utm_campaign)}</span>
+                  </div>
+                )}
+                {lead.utm_content && (
+                  <div className="col-span-2" title={lead.utm_content}>
+                    <span className="text-muted-foreground">content:</span>{" "}
+                    <span className="font-medium">{formatUtm(lead.utm_content)}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
