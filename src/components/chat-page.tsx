@@ -1249,6 +1249,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       staleTime: 15_000,
                     });
                   };
+                  const leadForConv = findLeadForConv(contactWaId);
+                  const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
+                  const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
+
                   const isTypebotLead = (() => {
                     const digits = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
                     if (!digits) return false;
