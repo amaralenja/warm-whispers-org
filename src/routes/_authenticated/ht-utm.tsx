@@ -70,7 +70,8 @@ export function UtmGeneratorPage() {
       else params.delete("utm_term");
 
       parsed.search = params.toString();
-      return parsed.toString();
+      let res = parsed.toString();
+      return res.replace(/%7[Bb]%7[Bb]/g, "{{").replace(/%7[Dd]%7[Dd]/g, "}}");
     } catch {
       return "URL Inválida";
     }
@@ -79,8 +80,8 @@ export function UtmGeneratorPage() {
   const utmParamsString = useMemo(() => {
     try {
       if (finalUrl === "URL Inválida") return "";
-      const parsed = new URL(finalUrl);
-      return parsed.search.replace(/^\?/, "");
+      // Usamos decode manual direto das tags dinâmicas do Facebook na string
+      return finalUrl.split("?")[1]?.replace(/%7[Bb]%7[Bb]/g, "{{").replace(/%7[Dd]%7[Dd]/g, "}}") ?? "";
     } catch {
       return "";
     }
