@@ -447,16 +447,45 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       const caioVds = vendasPeriodo.filter((v: any) => v._expert === "Caio");
       let quizLeads: any[] = [];
       try {
-        const salesDates = caioVds.map((v: any) => parseDataField(v.Data)).filter((t): t is number => t !== null);
-        const minSaleTs = salesDates.length > 0 ? Math.min(...salesDates) : Date.now();
-        const minLeadIso = new Date(minSaleTs - 180 * 24 * 60 * 60 * 1000).toISOString();
+        const emails = caioVds.map((v: any) => String(v.Email ?? "").trim().toLowerCase()).filter(Boolean);
+        const phones = caioVds.map((v: any) => cleanPhone(v.Telefone ?? "")).filter(Boolean);
+        const uniqueEmails = Array.from(new Set(emails));
+        const uniquePhones = Array.from(new Set(phones));
 
-        const { data: qData } = await quizSb
-          .from("leads")
-          .select("email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid")
-          .gte("data_criacao", minLeadIso);
-          
-        quizLeads = qData ?? [];
+        const batchSize = 100;
+        const fetchedLeads = [];
+
+        // Busca e-mails em lotes
+        for (let i = 0; i < uniqueEmails.length; i += batchSize) {
+          const chunk = uniqueEmails.slice(i, i + batchSize);
+          const { data } = await quizSb
+            .from("leads")
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid")
+            .in("email", chunk);
+          if (data) fetchedLeads.push(...data);
+        }
+
+        // Busca telefones em lotes
+        for (let i = 0; i < uniquePhones.length; i += batchSize) {
+          const chunk = uniquePhones.slice(i, i + batchSize);
+          // Adiciona variações com e sem prefixo 55
+          const chunkWithVariations = [...chunk, ...chunk.map(p => p.startsWith("55") ? p.slice(2) : "55" + p)];
+          const { data } = await quizSb
+            .from("leads")
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid")
+            .in("whatsapp", chunkWithVariations);
+          if (data) fetchedLeads.push(...data);
+        }
+
+        // Deduplicar leads pelo id ou email/whatsapp
+        const seenIds = new Set();
+        for (const l of fetchedLeads) {
+          const key = l.id || `${l.email}|${l.whatsapp}`;
+          if (!seenIds.has(key)) {
+            seenIds.add(key);
+            quizLeads.push(l);
+          }
+        }
       } catch (err) {
         console.warn("Falha ao buscar leads externos para fontes do Caio", err);
       }
@@ -527,16 +556,42 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     if (data.includeHighTicket && htVendasPeriodo.length > 0) {
       let quizLeadsHt: any[] = [];
       try {
-        const salesDates = htVendasPeriodo.map((v: any) => parseDataField(v.data)).filter((t): t is number => t !== null);
-        const minSaleTs = salesDates.length > 0 ? Math.min(...salesDates) : Date.now();
-        const minLeadIso = new Date(minSaleTs - 180 * 24 * 60 * 60 * 1000).toISOString();
+        const leadIds = htVendasPeriodo.map((v: any) => v.lead_id).filter(Boolean);
+        const emails = htVendasPeriodo.map((v: any) => String(v.cliente ?? "").trim().toLowerCase()).filter(Boolean);
+        const uniqueIds = Array.from(new Set(leadIds));
+        const uniqueEmails = Array.from(new Set(emails));
 
-        const { data: qData } = await quizSb
-          .from("leads")
-          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign")
-          .gte("data_criacao", minLeadIso);
-          
-        quizLeadsHt = qData ?? [];
+        const batchSize = 100;
+        const fetchedLeads = [];
+
+        // Busca IDs em lotes
+        for (let i = 0; i < uniqueIds.length; i += batchSize) {
+          const chunk = uniqueIds.slice(i, i + batchSize);
+          const { data } = await quizSb
+            .from("leads")
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign")
+            .in("id", chunk);
+          if (data) fetchedLeads.push(...data);
+        }
+
+        // Busca e-mails em lotes
+        for (let i = 0; i < uniqueEmails.length; i += batchSize) {
+          const chunk = uniqueEmails.slice(i, i + batchSize);
+          const { data } = await quizSb
+            .from("leads")
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign")
+            .in("email", chunk);
+          if (data) fetchedLeads.push(...data);
+        }
+
+        // Deduplicar
+        const seenIds = new Set();
+        for (const l of fetchedLeads) {
+          if (!seenIds.has(l.id)) {
+            seenIds.add(l.id);
+            quizLeadsHt.push(l);
+          }
+        }
       } catch (err) {
         console.warn("Falha ao buscar leads para htFontes", err);
       }
