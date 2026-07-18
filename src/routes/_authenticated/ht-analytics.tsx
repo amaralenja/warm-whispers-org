@@ -2610,9 +2610,10 @@ function FacebookAdsAnalyticsSection({
     return (campaigns || []).map((c: any) => {
       const campaignLeads = leadsFromAds.filter((l) => {
         if (!l.utm_campaign) return false;
-        const campaignName = String(c.name).toLowerCase();
-        const utmCampaign = String(l.utm_campaign).toLowerCase();
-        return campaignName.includes(utmCampaign) || utmCampaign.includes(campaignName);
+        const campaignName = String(c.name).toLowerCase().trim();
+        const campaignId = String(c.id).toLowerCase().trim();
+        const utmCampaign = String(l.utm_campaign).toLowerCase().trim();
+        return campaignName.includes(utmCampaign) || utmCampaign.includes(campaignName) || campaignId === utmCampaign;
       });
 
       const campaignFinalizados = campaignLeads.filter((l) => isFinalizado(l)).length;
@@ -2630,9 +2631,10 @@ function FacebookAdsAnalyticsSection({
       const salesForCampaign = salesFromAds.filter((v: any) => {
         const l = leads.find((lead) => String(lead.id) === String(v.lead_id));
         if (!l?.utm_campaign) return false;
-        const campaignName = String(c.name).toLowerCase();
-        const utmCampaign = String(l.utm_campaign).toLowerCase();
-        return campaignName.includes(utmCampaign) || utmCampaign.includes(campaignName);
+        const campaignName = String(c.name).toLowerCase().trim();
+        const campaignId = String(c.id).toLowerCase().trim();
+        const utmCampaign = String(l.utm_campaign).toLowerCase().trim();
+        return campaignName.includes(utmCampaign) || utmCampaign.includes(campaignName) || campaignId === utmCampaign;
       });
 
       const faturamento = salesForCampaign.reduce((acc: number, v: any) => acc + Number(v.valor_total || 0), 0);
