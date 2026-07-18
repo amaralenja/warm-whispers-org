@@ -86,6 +86,7 @@ import {
   reactToWhatsappMessage,
   
   setConversationArchived,
+  getActiveBuyers,
 } from "@/lib/whatsapp-chat.functions";
 import {
   ContextMenu,
@@ -809,24 +810,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return null;
   };
 
+  const getActiveBuyersFn = useServerFn(getActiveBuyers);
   const { data: localVendas = { vendas: [], htVendas: [] } } = useQuery({
     queryKey: ["local-vendas-for-chat"],
-    queryFn: async () => {
-      const [{ data: vAll }, { data: htAll }] = await Promise.all([
-        supabase
-          .from("vendas")
-          .select("Telefone, Email, Ticket, Evento, Produto, Nome")
-          .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*'),
-        supabase
-          .from("ht_vendas")
-          .select("id, valor_total, data, status, cliente, lead_id")
-          .neq("status", "reembolso")
-      ]);
-      return {
-        vendas: (vAll ?? []) as any[],
-        htVendas: (htAll ?? []) as any[]
-      };
-    },
+    queryFn: () => getActiveBuyersFn(),
     staleTime: 60_000,
     refetchInterval: 30_000,
   });

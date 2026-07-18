@@ -1554,6 +1554,26 @@ export const editWhatsappMessage = createServerFn({ method: "POST" })
     };
   });
 
+export const getActiveBuyers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: vAll }, { data: htAll }] = await Promise.all([
+      supabaseAdmin
+        .from("vendas")
+        .select("Telefone, Email, Ticket, Evento, Produto, Nome")
+        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*'),
+      supabaseAdmin
+        .from("ht_vendas")
+        .select("id, valor_total, data, status, cliente, lead_id")
+        .neq("status", "reembolso")
+    ]);
+    return {
+      vendas: (vAll ?? []) as any[],
+      htVendas: (htAll ?? []) as any[]
+    };
+  });
+
 
 
 
