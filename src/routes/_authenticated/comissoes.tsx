@@ -1,18 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, DollarSign, Users, Trophy, ChevronDown, ChevronRight, Copy, CheckSquare, Square, Save, KeyRound } from "lucide-react";
+import {
+  Loader2, ShieldAlert, DollarSign, Users, Trophy, ChevronDown, ChevronRight,
+  Copy, CheckSquare, Square, Save, KeyRound, Settings2, Phone,
+} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
 import { getVendorSession } from "@/lib/vendor-session";
-import { getComissoes, setPixChave } from "@/lib/comissoes.functions";
+import {
+  getComissoes, setPixChave, getHtComissoes, updateComissaoRegra,
+  type HtComissaoMembro,
+} from "@/lib/comissoes.functions";
+
 const TIERS: { min: number; rate: number }[] = [
   { min: 25000, rate: 250 },
   { min: 20000, rate: 200 },
@@ -36,8 +43,10 @@ function today() {
 const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtDate = (iso: string) => {
   const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y.slice(2)}`;
+  return `${d}/${m}/${y?.slice(2)}`;
 };
+
+type Tab = "x1" | "sdr" | "closer";
 
 function ComissoesPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -47,13 +56,17 @@ function ComissoesPage() {
     setIsAdmin(session === null || hasPerm);
   }, []);
 
+  const [tab, setTab] = useState<Tab>("x1");
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(today());
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [selectedDays, setSelectedDays] = useState<Record<number, Record<string, boolean>>>({});
   const [pixDraft, setPixDraft] = useState<Record<number, string>>({});
+  const [editingMembro, setEditingMembro] = useState<HtComissaoMembro | null>(null);
   const qc = useQueryClient();
   const savePix = useServerFn(setPixChave);
+  const saveRegra = useServerFn(updateComissaoRegra);
+
   const handleSavePix = async (id: number) => {
     const pix = (pixDraft[id] ?? "").trim();
     try {
@@ -76,10 +89,18 @@ function ComissoesPage() {
     setSelectedDays((s) => ({ ...s, [id]: on ? Object.fromEntries(isos.map((i) => [i, true])) : {} }));
 
   const fetchComissoes = useServerFn(getComissoes);
+  const fetchHtComissoes = useServerFn(getHtComissoes);
+
   const q = useQuery({
     queryKey: ["comissoes", from, to],
     enabled: isAdmin === true,
     queryFn: () => fetchComissoes({ data: { from, to } }),
+  });
+
+  const htQ = useQuery({
+    queryKey: ["ht-comissoes", from, to],
+    enabled: isAdmin === true,
+    queryFn: () => fetchHtComissoes({ data: { from, to } }),
   });
 
   if (isAdmin === null) {
@@ -109,6 +130,16 @@ function ComissoesPage() {
   const totalFat = q.data?.totalFaturamento ?? 0;
   const totalCom = q.data?.totalComissao ?? 0;
 
+  const htMembros = htQ.data?.membros ?? [];
+  const htSdrs = htMembros.filter((m) => m.tipo === "sdr");
+  const htClosers = htMembros.filter((m) => m.tipo === "closer");
+
+  const TABS: { id: Tab; label: string; count: number }[] = [
+    { id: "x1", label: "Vendedores (X1)", count: rows.length },
+    { id: "sdr", label: "SDRs (HT)", count: htSdrs.length },
+    { id: "closer", label: "Closers (HT)", count: htClosers.length },
+  ];
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
       <div>
@@ -118,6 +149,7 @@ function ComissoesPage() {
         </p>
       </div>
 
+      {/* Date Filters */}
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap gap-2">
@@ -171,8 +203,8 @@ function ComissoesPage() {
               >
                 Só hoje
               </Button>
-              <Button variant="outline" onClick={() => q.refetch()} disabled={q.isFetching}>
-                {q.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <Button variant="outline" onClick={() => { q.refetch(); htQ.refetch(); }} disabled={q.isFetching || htQ.isFetching}>
+                {(q.isFetching || htQ.isFetching) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Atualizar
               </Button>
             </div>
@@ -183,217 +215,465 @@ function ComissoesPage() {
         </CardContent>
       </Card>
 
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-lg border bg-muted/30 p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              tab === t.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {t.count}
+              </Badge>
+            )}
+          </button>
+        ))}
+      </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground">
-            Faixas de comissão (por R$ 1.000 no dia — Margem R$ 991/1k inclusa)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="text-xs">
-            Até R$ 9.909 (0 a 9k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(60)}</span>
-          </Badge>
-          <Badge variant="outline" className="text-xs">
-            A partir de R$ 9.910 (10k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(80)}</span>
-          </Badge>
-          <Badge variant="outline" className="text-xs">
-            A partir de R$ 14.865 (15k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(120)}</span>
-          </Badge>
-          <Badge variant="outline" className="text-xs">
-            A partir de R$ 19.820 (20k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(200)}</span>
-          </Badge>
-          <Badge variant="outline" className="text-xs">
-            A partir de R$ 24.775 (25k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(250)}</span>
-          </Badge>
-          <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
-            Operação Gustavo → Fixo {fmtBRL(30)}/mil (independente de acumulado)
-          </Badge>
-        </CardContent>
-      </Card>
+      {/* ─── TAB: Vendedores X1 ─── */}
+      {tab === "x1" && (
+        <>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">
+                Faixas de comissão (por R$ 1.000 no dia — Margem R$ 991/1k inclusa)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="text-xs">
+                Até R$ 9.909 (0 a 9k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(60)}</span>
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                A partir de R$ 9.910 (10k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(80)}</span>
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                A partir de R$ 14.865 (15k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(120)}</span>
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                A partir de R$ 19.820 (20k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(200)}</span>
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                A partir de R$ 24.775 (25k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(250)}</span>
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
+                Operação Gustavo → Fixo {fmtBRL(30)}/mil (independente de acumulado)
+              </Badge>
+            </CardContent>
+          </Card>
 
+          <div className="grid gap-3 md:grid-cols-3">
+            <Card><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="h-4 w-4" /> Vendedores</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{rows.length}</div></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm text-muted-foreground"><DollarSign className="h-4 w-4" /> Faturamento</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmtBRL(totalFat)}</div></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm text-muted-foreground"><Trophy className="h-4 w-4" /> Total Comissão</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-accent">{fmtBRL(totalCom)}</div></CardContent></Card>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              {q.isLoading ? (
+                <div className="flex h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : rows.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Nenhum vendedor com vendas no período.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="w-8 px-2 py-2"></th>
+                        <th className="px-3 py-2 text-left">Vendedor</th>
+                        <th className="px-3 py-2 text-left">UTM</th>
+                        <th className="px-3 py-2 text-right">Vendas</th>
+                        <th className="px-3 py-2 text-right">Faturamento</th>
+                        <th className="px-3 py-2 text-right">Faixa atual</th>
+                        <th className="px-3 py-2 text-right">Comissão</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => {
+                        const open = !!expanded[r.id];
+                        return (
+                          <>
+                            <tr
+                              key={r.id}
+                              className="cursor-pointer border-b hover:bg-muted/20"
+                              onClick={() => setExpanded((e) => ({ ...e, [r.id]: !open }))}
+                            >
+                              <td className="px-2 py-2 text-muted-foreground">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  {r.fotoUrl ? <img src={r.fotoUrl} alt="" className="h-7 w-7 rounded-full object-cover" /> : <div className="h-7 w-7 rounded-full bg-muted" />}
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium">{r.nome}</span>
+                                      {String(r.expert ?? "").toLowerCase().trim() === "gustavo" && (
+                                        <Badge variant="outline" className="h-4 px-1 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/30">
+                                          Op. Gustavo (Fixo)
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {r.expert && <div className="text-xs text-muted-foreground">{r.expert}</div>}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 font-mono text-xs">{r.utm}</td>
+                              <td className="px-3 py-2 text-right">{r.vendas}</td>
+                              <td className="px-3 py-2 text-right">{fmtBRL(r.faturamento)}</td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtBRL(r.tierAtual)}<span className="text-xs text-muted-foreground">/mil</span>
+                                {String(r.expert ?? "").toLowerCase().trim() === "gustavo" && (
+                                  <div className="text-[10px] text-amber-500 font-medium">Fixo Gustavo</div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold text-accent">{fmtBRL(r.comissao)}</td>
+                            </tr>
+                            {open && (
+                              <tr key={`${r.id}-detail`} className="border-b bg-muted/10">
+                                <td colSpan={7} className="p-3">
+                                  {r.dias.length === 0 ? (
+                                    <div className="text-xs text-muted-foreground">Sem vendas no período.</div>
+                                  ) : (() => {
+                                    const sel = selectedDays[r.id] ?? {};
+                                    const selDias = r.dias.filter((d) => sel[d.data]);
+                                    const allOn = selDias.length === r.dias.length;
+                                    const selFat = selDias.reduce((a, d) => a + d.faturamento, 0);
+                                    const selCom = selDias.reduce((a, d) => a + d.comissao, 0);
+                                    const selVendas = selDias.reduce((a, d) => a + d.vendas, 0);
+                                    const copyReport = async () => {
+                                      const base = selDias.length ? selDias : r.dias;
+                                      const totalFat = base.reduce((a, d) => a + d.faturamento, 0);
+                                      const totalCom = base.reduce((a, d) => a + d.comissao, 0);
+                                      const periodo = base.length === 1
+                                        ? fmtDate(base[0].data)
+                                        : `${fmtDate(base[0].data)} até ${fmtDate(base[base.length - 1].data)}`;
+                                      const pix = r.pixChave?.trim();
+                                      const BR = "\u200B";
+                                      const lines = [
+                                        `💰 *Relatório de Comissão*`,
+                                        BR,
+                                        `👤 *Vendedor:* ${r.nome}`,
+                                        r.expert ? `🏷️ *Expert:* ${r.expert}` : null,
+                                        `📅 *Período:* ${periodo}`,
+                                        BR,
+                                        `📊 *Detalhamento por dia:*`,
+                                        ...base.map((d) => `• ${fmtDate(d.data)} — ${fmtBRL(d.faturamento)}  →  ${d.milhares} × ${fmtBRL(d.rate)} = *${fmtBRL(d.comissao)}*`),
+                                        BR,
+                                        `🧾 *Faturamento total:* ${fmtBRL(totalFat)}`,
+                                        `✅ *Comissão a receber:* *${fmtBRL(totalCom)}*`,
+                                        BR,
+                                        pix ? `🔑 *Chave PIX:* ${pix}` : `⚠️ _Chave PIX não cadastrada_`,
+                                      ].filter(Boolean).join("\n");
+                                      try { await navigator.clipboard.writeText(lines); toast.success("Relatório copiado"); }
+                                      catch { toast.error("Falha ao copiar"); }
+                                    };
+                                    const pixValue = pixDraft[r.id] ?? (r.pixChave ?? "");
+                                    const pixDirty = pixDraft[r.id] !== undefined && pixDraft[r.id] !== (r.pixChave ?? "");
+                                    return (
+                                      <div className="space-y-3">
+                                        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border/50 bg-background/60 p-3">
+                                          <div className="flex-1 space-y-1 min-w-[220px]">
+                                            <Label className="flex items-center gap-1 text-xs"><KeyRound className="h-3 w-3" /> Chave PIX</Label>
+                                            <Input
+                                              placeholder="CPF, e-mail, telefone ou chave aleatória"
+                                              value={pixValue}
+                                              onChange={(e) => setPixDraft((s) => ({ ...s, [r.id]: e.target.value }))}
+                                              className="h-8 text-xs"
+                                              maxLength={200}
+                                            />
+                                          </div>
+                                          <Button size="sm" variant={pixDirty ? "default" : "outline"} disabled={!pixDirty} onClick={() => handleSavePix(r.id)}>
+                                            <Save className="mr-1 h-3.5 w-3.5" /> Salvar PIX
+                                          </Button>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <Button size="sm" variant="outline" onClick={() => setAllDays(r.id, r.dias.map((d) => d.data), !allOn)}>
+                                            {allOn ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>}
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={copyReport}>
+                                            <Copy className="mr-1 h-3.5 w-3.5" /> Copiar relatório
+                                          </Button>
+                                          {selDias.length > 0 && (
+                                            <div className="ml-auto flex flex-wrap items-center gap-3 text-xs">
+                                              <span><span className="text-muted-foreground">Dias:</span> <b>{selDias.length}</b></span>
+                                              <span><span className="text-muted-foreground">Vendas:</span> <b>{selVendas}</b></span>
+                                              <span><span className="text-muted-foreground">Fat:</span> <b>{fmtBRL(selFat)}</b></span>
+                                              <span><span className="text-muted-foreground">Comissão:</span> <b className="text-accent">{fmtBRL(selCom)}</b></span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <table className="w-full text-xs">
+                                          <thead className="text-muted-foreground">
+                                            <tr>
+                                              <th className="w-8 px-2 py-1"></th>
+                                              <th className="px-2 py-1 text-left">Dia</th>
+                                              <th className="px-2 py-1 text-right">Vendas</th>
+                                              <th className="px-2 py-1 text-right">Fat. dia</th>
+                                              <th className="px-2 py-1 text-right">Acumulado mês</th>
+                                              <th className="px-2 py-1 text-right">R$ / mil</th>
+                                              <th className="px-2 py-1 text-right">Milhares</th>
+                                              <th className="px-2 py-1 text-right">Comissão</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {r.dias.map((d) => {
+                                              const checked = !!sel[d.data];
+                                              return (
+                                                <tr
+                                                  key={d.data}
+                                                  className={`cursor-pointer border-t border-border/40 hover:bg-muted/20 ${checked ? "bg-accent/5" : ""}`}
+                                                  onClick={() => toggleDay(r.id, d.data)}
+                                                >
+                                                  <td className="px-2 py-1"><Checkbox checked={checked} onCheckedChange={() => toggleDay(r.id, d.data)} onClick={(e) => e.stopPropagation()} /></td>
+                                                  <td className="px-2 py-1">{fmtDate(d.data)}</td>
+                                                  <td className="px-2 py-1 text-right">{d.vendas}</td>
+                                                  <td className="px-2 py-1 text-right">{fmtBRL(d.faturamento)}</td>
+                                                  <td className="px-2 py-1 text-right">{fmtBRL(d.cumulativo)}</td>
+                                                  <td className="px-2 py-1 text-right">{fmtBRL(d.rate)}</td>
+                                                  <td className="px-2 py-1 text-right">{d.milhares}</td>
+                                                  <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* ─── TAB: SDRs (HT) ─── */}
+      {tab === "sdr" && (
+        <HtMembroSection
+          titulo="SDRs — High Ticket"
+          subtitulo="Comissão por comparecimento + percentual sobre vendas"
+          membros={htSdrs}
+          loading={htQ.isLoading}
+          expanded={expanded}
+          setExpanded={setExpanded}
+          onEditRegra={setEditingMembro}
+          tipoLabel="sdr"
+        />
+      )}
+
+      {/* ─── TAB: Closers (HT) ─── */}
+      {tab === "closer" && (
+        <HtMembroSection
+          titulo="Closers — High Ticket"
+          subtitulo="Comissão percentual sobre vendas fechadas"
+          membros={htClosers}
+          loading={htQ.isLoading}
+          expanded={expanded}
+          setExpanded={setExpanded}
+          onEditRegra={setEditingMembro}
+          tipoLabel="closer"
+        />
+      )}
+
+      {/* ─── Modal: Editar Regra de Comissão ─── */}
+      {editingMembro && (
+        <EditRegraModal
+          membro={editingMembro}
+          onClose={() => setEditingMembro(null)}
+          onSave={async (regra) => {
+            try {
+              await saveRegra({ data: { memberId: editingMembro.id, regra } });
+              toast.success("Regra de comissão salva");
+              setEditingMembro(null);
+              qc.invalidateQueries({ queryKey: ["ht-comissoes"] });
+            } catch (e: any) {
+              toast.error(e?.message ?? "Erro ao salvar regra");
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── HT Member Section (SDR or Closer) ────────────────────────────────
+
+function HtMembroSection({
+  titulo, subtitulo, membros, loading, expanded, setExpanded, onEditRegra, tipoLabel,
+}: {
+  titulo: string;
+  subtitulo: string;
+  membros: HtComissaoMembro[];
+  loading: boolean;
+  expanded: Record<number, boolean>;
+  setExpanded: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
+  onEditRegra: (m: HtComissaoMembro) => void;
+  tipoLabel: "sdr" | "closer";
+}) {
+  const totalComissao = membros.reduce((s, m) => s + m.comissaoTotal, 0);
+  const totalVendas = membros.reduce((s, m) => s + m.vendas, 0);
+  const totalValor = membros.reduce((s, m) => s + m.valorVendas, 0);
+  const totalComparec = membros.reduce((s, m) => s + m.comparecimentos, 0);
+
+  return (
+    <>
       <div className="grid gap-3 md:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="h-4 w-4" /> Vendedores</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{rows.length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm text-muted-foreground"><DollarSign className="h-4 w-4" /> Faturamento</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmtBRL(totalFat)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm text-muted-foreground"><Trophy className="h-4 w-4" /> Total Comissão</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-accent">{fmtBRL(totalCom)}</div></CardContent></Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" /> {tipoLabel === "sdr" ? "SDRs" : "Closers"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent><div className="text-2xl font-bold">{membros.length}</div></CardContent>
+        </Card>
+        {tipoLabel === "sdr" && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Phone className="h-4 w-4" /> Comparecimentos
+              </CardTitle>
+            </CardHeader>
+            <CardContent><div className="text-2xl font-bold">{totalComparec}</div></CardContent>
+          </Card>
+        )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+              <DollarSign className="h-4 w-4" /> Vendas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalVendas}</div>
+            <div className="text-xs text-muted-foreground">{fmtBRL(totalValor)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Trophy className="h-4 w-4" /> Total Comissão
+            </CardTitle>
+          </CardHeader>
+          <CardContent><div className="text-2xl font-bold text-accent">{fmtBRL(totalComissao)}</div></CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardContent className="p-0">
-          {q.isLoading ? (
+          {loading ? (
             <div className="flex h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : rows.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Nenhum vendedor com vendas no período.</div>
+          ) : membros.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Nenhum {tipoLabel === "sdr" ? "SDR" : "Closer"} ativo encontrado.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="w-8 px-2 py-2"></th>
-                    <th className="px-3 py-2 text-left">Vendedor</th>
-                    <th className="px-3 py-2 text-left">UTM</th>
+                    <th className="px-3 py-2 text-left">Nome</th>
+                    {tipoLabel === "sdr" && <th className="px-3 py-2 text-right">Comparec.</th>}
                     <th className="px-3 py-2 text-right">Vendas</th>
-                    <th className="px-3 py-2 text-right">Faturamento</th>
-                    <th className="px-3 py-2 text-right">Faixa atual</th>
-                    <th className="px-3 py-2 text-right">Comissão</th>
+                    <th className="px-3 py-2 text-right">Valor vendas</th>
+                    {tipoLabel === "sdr" && <th className="px-3 py-2 text-right">Fixo</th>}
+                    <th className="px-3 py-2 text-right">% Vendas</th>
+                    <th className="px-3 py-2 text-right">Total</th>
+                    <th className="w-10 px-2 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => {
-                    const open = !!expanded[r.id];
+                  {membros.map((m) => {
+                    const open = !!expanded[m.id];
                     return (
                       <>
                         <tr
-                          key={r.id}
+                          key={m.id}
                           className="cursor-pointer border-b hover:bg-muted/20"
-                          onClick={() => setExpanded((e) => ({ ...e, [r.id]: !open }))}
+                          onClick={() => setExpanded((e) => ({ ...e, [m.id]: !open }))}
                         >
                           <td className="px-2 py-2 text-muted-foreground">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
-                              {r.fotoUrl ? <img src={r.fotoUrl} alt="" className="h-7 w-7 rounded-full object-cover" /> : <div className="h-7 w-7 rounded-full bg-muted" />}
+                              {m.fotoUrl ? <img src={m.fotoUrl} alt="" className="h-7 w-7 rounded-full object-cover" /> : <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold">{(m.nome?.[0] ?? "?").toUpperCase()}</div>}
                               <div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-medium">{r.nome}</span>
-                                  {String(r.expert ?? "").toLowerCase().trim() === "gustavo" && (
-                                    <Badge variant="outline" className="h-4 px-1 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/30">
-                                      Op. Gustavo (Fixo)
-                                    </Badge>
-                                  )}
-                                </div>
-                                {r.expert && <div className="text-xs text-muted-foreground">{r.expert}</div>}
+                                <div className="font-medium">{m.nome}</div>
+                                <div className="text-xs text-muted-foreground">{m.email}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-2 font-mono text-xs">{r.utm}</td>
-                          <td className="px-3 py-2 text-right">{r.vendas}</td>
-                          <td className="px-3 py-2 text-right">{fmtBRL(r.faturamento)}</td>
-                          <td className="px-3 py-2 text-right">
-                            {fmtBRL(r.tierAtual)}<span className="text-xs text-muted-foreground">/mil</span>
-                            {String(r.expert ?? "").toLowerCase().trim() === "gustavo" && (
-                              <div className="text-[10px] text-amber-500 font-medium">Fixo Gustavo</div>
-                            )}
+                          {tipoLabel === "sdr" && <td className="px-3 py-2 text-right">{m.comparecimentos}</td>}
+                          <td className="px-3 py-2 text-right">{m.vendas}</td>
+                          <td className="px-3 py-2 text-right">{fmtBRL(m.valorVendas)}</td>
+                          {tipoLabel === "sdr" && <td className="px-3 py-2 text-right">{fmtBRL(m.comissaoFixa)}</td>}
+                          <td className="px-3 py-2 text-right">{fmtBRL(m.comissaoPercentual)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-accent">{fmtBRL(m.comissaoTotal)}</td>
+                          <td className="px-2 py-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={(e) => { e.stopPropagation(); onEditRegra(m); }}
+                              title="Editar regras de comissão"
+                            >
+                              <Settings2 className="h-4 w-4" />
+                            </Button>
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold text-accent">{fmtBRL(r.comissao)}</td>
                         </tr>
                         {open && (
-                          <tr key={`${r.id}-detail`} className="border-b bg-muted/10">
-                            <td colSpan={7} className="p-3">
-                              {r.dias.length === 0 ? (
-                                <div className="text-xs text-muted-foreground">Sem vendas no período.</div>
-                              ) : (() => {
-                                const sel = selectedDays[r.id] ?? {};
-                                const selDias = r.dias.filter((d) => sel[d.data]);
-                                const allOn = selDias.length === r.dias.length;
-                                const selFat = selDias.reduce((a, d) => a + d.faturamento, 0);
-                                const selCom = selDias.reduce((a, d) => a + d.comissao, 0);
-                                const selVendas = selDias.reduce((a, d) => a + d.vendas, 0);
-                                const copyReport = async () => {
-                                  const base = selDias.length ? selDias : r.dias;
-                                  const totalFat = base.reduce((a, d) => a + d.faturamento, 0);
-                                  const totalCom = base.reduce((a, d) => a + d.comissao, 0);
-                                  const periodo = base.length === 1
-                                    ? fmtDate(base[0].data)
-                                    : `${fmtDate(base[0].data)} até ${fmtDate(base[base.length - 1].data)}`;
-                                  const pix = r.pixChave?.trim();
-                                  const BR = "\u200B"; // zero-width space p/ WhatsApp não colapsar linhas em branco
-                                  const lines = [
-                                    `💰 *Relatório de Comissão*`,
-                                    BR,
-                                    `👤 *Vendedor:* ${r.nome}`,
-                                    r.expert ? `🏷️ *Expert:* ${r.expert}` : null,
-                                    `📅 *Período:* ${periodo}`,
-                                    BR,
-                                    `📊 *Detalhamento por dia:*`,
-                                    ...base.map((d) => `• ${fmtDate(d.data)} — ${fmtBRL(d.faturamento)}  →  ${d.milhares} × ${fmtBRL(d.rate)} = *${fmtBRL(d.comissao)}*`),
-                                    BR,
-                                    `🧾 *Faturamento total:* ${fmtBRL(totalFat)}`,
-                                    `✅ *Comissão a receber:* *${fmtBRL(totalCom)}*`,
-                                    BR,
-                                    pix ? `🔑 *Chave PIX:* ${pix}` : `⚠️ _Chave PIX não cadastrada_`,
-                                  ].filter(Boolean).join("\n");
-
-                                  try { await navigator.clipboard.writeText(lines); toast.success("Relatório copiado"); }
-                                  catch { toast.error("Falha ao copiar"); }
-                                };
-                                const pixValue = pixDraft[r.id] ?? (r.pixChave ?? "");
-                                const pixDirty = pixDraft[r.id] !== undefined && pixDraft[r.id] !== (r.pixChave ?? "");
-                                return (
-                                  <div className="space-y-3">
-                                    <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border/50 bg-background/60 p-3">
-                                      <div className="flex-1 space-y-1 min-w-[220px]">
-                                        <Label className="flex items-center gap-1 text-xs"><KeyRound className="h-3 w-3" /> Chave PIX</Label>
-                                        <Input
-                                          placeholder="CPF, e-mail, telefone ou chave aleatória"
-                                          value={pixValue}
-                                          onChange={(e) => setPixDraft((s) => ({ ...s, [r.id]: e.target.value }))}
-                                          className="h-8 text-xs"
-                                          maxLength={200}
-                                        />
-                                      </div>
-                                      <Button size="sm" variant={pixDirty ? "default" : "outline"} disabled={!pixDirty} onClick={() => handleSavePix(r.id)}>
-                                        <Save className="mr-1 h-3.5 w-3.5" /> Salvar PIX
-                                      </Button>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <Button size="sm" variant="outline" onClick={() => setAllDays(r.id, r.dias.map((d) => d.data), !allOn)}>
-                                        {allOn ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>}
-                                      </Button>
-                                      <Button size="sm" variant="outline" onClick={copyReport}>
-                                        <Copy className="mr-1 h-3.5 w-3.5" /> Copiar relatório
-                                      </Button>
-                                      {selDias.length > 0 && (
-                                        <div className="ml-auto flex flex-wrap items-center gap-3 text-xs">
-                                          <span><span className="text-muted-foreground">Dias:</span> <b>{selDias.length}</b></span>
-                                          <span><span className="text-muted-foreground">Vendas:</span> <b>{selVendas}</b></span>
-                                          <span><span className="text-muted-foreground">Fat:</span> <b>{fmtBRL(selFat)}</b></span>
-                                          <span><span className="text-muted-foreground">Comissão:</span> <b className="text-accent">{fmtBRL(selCom)}</b></span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <table className="w-full text-xs">
-                                      <thead className="text-muted-foreground">
-                                        <tr>
-                                          <th className="w-8 px-2 py-1"></th>
-                                          <th className="px-2 py-1 text-left">Dia</th>
-                                          <th className="px-2 py-1 text-right">Vendas</th>
-                                          <th className="px-2 py-1 text-right">Fat. dia</th>
-                                          <th className="px-2 py-1 text-right">Acumulado mês</th>
-                                          <th className="px-2 py-1 text-right">R$ / mil</th>
-                                          <th className="px-2 py-1 text-right">Milhares</th>
-                                          <th className="px-2 py-1 text-right">Comissão</th>
+                          <tr key={`${m.id}-detail`} className="border-b bg-muted/10">
+                            <td colSpan={tipoLabel === "sdr" ? 9 : 7} className="p-3">
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  <Badge variant="outline">
+                                    Regra: {tipoLabel === "sdr"
+                                      ? `R$ ${m.regra.fixo_comparecimento ?? 30}/comparec. + ${m.regra.percentual_venda ?? 2}% vendas${m.comparecimentos >= (m.regra.meta_comparecimento ?? 50) ? ` → ${m.regra.percentual_venda_meta ?? 4}% (meta atingida!)` : ` (meta: ${m.regra.meta_comparecimento ?? 50} comparec.)`}`
+                                      : `${m.regra.percentual_venda ?? 4}% sobre vendas`}
+                                  </Badge>
+                                </div>
+                                {m.detalhes.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground">Nenhum detalhe no período.</div>
+                                ) : (
+                                  <table className="w-full text-xs">
+                                    <thead className="text-muted-foreground">
+                                      <tr>
+                                        <th className="px-2 py-1 text-left">Lead</th>
+                                        <th className="px-2 py-1 text-left">Tipo</th>
+                                        <th className="px-2 py-1 text-right">Valor</th>
+                                        <th className="px-2 py-1 text-right">Comissão</th>
+                                        <th className="px-2 py-1 text-right">Data</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {m.detalhes.map((d, i) => (
+                                        <tr key={i} className="border-t border-border/40">
+                                          <td className="px-2 py-1">{d.leadNome}</td>
+                                          <td className="px-2 py-1">
+                                            <Badge variant={d.tipo === "venda" ? "default" : "secondary"} className="text-[10px]">
+                                              {d.tipo === "venda" ? "Venda" : "Comparecimento"}
+                                            </Badge>
+                                          </td>
+                                          <td className="px-2 py-1 text-right">{d.valor > 0 ? fmtBRL(d.valor) : "—"}</td>
+                                          <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
+                                          <td className="px-2 py-1 text-right">{d.data ? fmtDate(d.data) : "—"}</td>
                                         </tr>
-                                      </thead>
-                                      <tbody>
-                                        {r.dias.map((d) => {
-                                          const checked = !!sel[d.data];
-                                          return (
-                                            <tr
-                                              key={d.data}
-                                              className={`cursor-pointer border-t border-border/40 hover:bg-muted/20 ${checked ? "bg-accent/5" : ""}`}
-                                              onClick={() => toggleDay(r.id, d.data)}
-                                            >
-                                              <td className="px-2 py-1"><Checkbox checked={checked} onCheckedChange={() => toggleDay(r.id, d.data)} onClick={(e) => e.stopPropagation()} /></td>
-                                              <td className="px-2 py-1">{fmtDate(d.data)}</td>
-                                              <td className="px-2 py-1 text-right">{d.vendas}</td>
-                                              <td className="px-2 py-1 text-right">{fmtBRL(d.faturamento)}</td>
-                                              <td className="px-2 py-1 text-right">{fmtBRL(d.cumulativo)}</td>
-                                              <td className="px-2 py-1 text-right">{fmtBRL(d.rate)}</td>
-                                              <td className="px-2 py-1 text-right">{d.milhares}</td>
-                                              <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
-                                            </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                );
-                              })()}
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )}
-
                       </>
                     );
                   })}
@@ -403,6 +683,113 @@ function ComissoesPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
+  );
+}
+
+// ─── Modal: Edit Commission Rule ────────────────────────────────────
+
+function EditRegraModal({
+  membro,
+  onClose,
+  onSave,
+}: {
+  membro: HtComissaoMembro;
+  onClose: () => void;
+  onSave: (regra: Record<string, any>) => Promise<void>;
+}) {
+  const [regra, setRegra] = useState<Record<string, any>>({ ...membro.regra });
+  const [saving, setSaving] = useState(false);
+
+  const set = (key: string, val: string) => {
+    const num = parseFloat(val);
+    setRegra((r) => ({ ...r, [key]: isNaN(num) ? 0 : num }));
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            Regra de Comissão — {membro.nome}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Badge variant="outline">{membro.tipo === "sdr" ? "SDR" : "Closer"}</Badge>
+
+          {membro.tipo === "sdr" ? (
+            <>
+              <div className="space-y-1">
+                <Label>Valor fixo por comparecimento (R$)</Label>
+                <Input
+                  type="number"
+                  value={regra.fixo_comparecimento ?? 30}
+                  onChange={(e) => set("fixo_comparecimento", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>% por venda (padrão)</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={regra.percentual_venda ?? 2}
+                  onChange={(e) => set("percentual_venda", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Meta de comparecimentos (para subir %)</Label>
+                <Input
+                  type="number"
+                  value={regra.meta_comparecimento ?? 50}
+                  onChange={(e) => set("meta_comparecimento", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>% por venda (acima da meta)</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={regra.percentual_venda_meta ?? 4}
+                  onChange={(e) => set("percentual_venda_meta", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Valor fixo por comparecimento (acima da meta, R$)</Label>
+                <Input
+                  type="number"
+                  value={regra.fixo_comparecimento_meta ?? 30}
+                  onChange={(e) => set("fixo_comparecimento_meta", e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-1">
+              <Label>% por venda</Label>
+              <Input
+                type="number"
+                step="0.5"
+                value={regra.percentual_venda ?? 4}
+                onChange={(e) => set("percentual_venda", e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              await onSave(regra);
+              setSaving(false);
+            }}
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Regra
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

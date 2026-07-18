@@ -229,3 +229,344 @@ export const setPixChave = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+// ─── HT Comissões (SDR / Closer) ────────────────────────────────────
+
+export type HtComissaoDetalhe = {
+  leadNome: string;
+  tipo: "comparecimento" | "venda";
+  valor: number;
+  comissao: number;
+  data: string;
+};
+
+export type HtComissaoMembro = {
+  id: number;
+  nome: string;
+  tipo: "sdr" | "closer";
+  email: string | null;
+  fotoUrl: string | null;
+  regra: Record<string, any>;
+  comparecimentos: number;
+  vendas: number;
+  valorVendas: number;
+  comissaoFixa: number;
+  comissaoPercentual: number;
+  comissaoTotal: number;
+  detalhes: HtComissaoDetalhe[];
+};
+
+export type HtComissoesPayload = {
+  membros: HtComissaoMembro[];
+  totalComissao: number;
+};
+
+export const getHtComissoes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: ComissoesRange | undefined) => input ?? {})
+  .handler(async (opts): Promise<HtComissoesPayload> => {
+    // Constants inside handler to avoid TanStack splitter issues
+    const QUIZ_SB_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+    const QUIZ_ANON =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+    const COMPARECEU_STAGES = ["followup", "remarcada", "sinal", "fechado"];
+    const FECHADO_STAGES = ["fechado"];
+    const FECHADO_CRM = ["fechado", "ganho"];
+    function getDefaultRegra(tipo: string): Record<string, any> {
+      if (tipo === "sdr") {
+        return { fixo_comparecimento: 30, percentual_venda: 2, meta_comparecimento: 50, percentual_venda_meta: 4, fixo_comparecimento_meta: 30 };
+      }
+      return { percentual_venda: 4 };
+    }
+
+    const context = opts?.context;
+    assertAdmin(context);
+    const supabase = context.vendor
+      ? await getAdminClient().catch(() => context.supabase)
+      : context.supabase;
+    const data = opts?.data ?? {};
+
+    // Quiz Supabase (external, read-only)
+    const { createClient: createSbClient } = await import("@supabase/supabase-js");
+    const quizSb = createSbClient(QUIZ_SB_URL, QUIZ_ANON, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Fetch HT team, kanban state, vendas in parallel
+    const [teamRes, kanbanRes, vendasRes] = await Promise.all([
+      supabase
+        .from("ht_team")
+        .select("id, nome, tipo, email, foto_url, ativo, permissoes"),
+      supabase
+        .from("ht_kanban_state")
+        .select(
+          "lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake"
+        ),
+      supabase
+        .from("ht_vendas")
+        .select(
+          "id, cliente, closer, data, valor_total, valor_liquido, lead_id, status"
+        ),
+    ]);
+
+    const team = ((teamRes.data ?? []) as any[]).filter((m: any) => m.ativo !== false);
+    const kanban = (kanbanRes.data ?? []) as any[];
+    const htVendas = (vendasRes.data ?? []) as any[];
+
+    // Fetch quiz leads with date filter
+    const quizLeads: any[] = [];
+    const pageSize = 1000;
+    for (let i = 0; i < 20; i++) {
+      let q = quizSb
+        .from("leads")
+        .select(
+          "id, nome, email, whatsapp, crm_status, crm_valor, crm_data_agendamento, data_criacao, utm_source"
+        )
+        .order("data_criacao", { ascending: false })
+        .range(i * pageSize, i * pageSize + pageSize - 1);
+      if (data.from) q = q.gte("data_criacao", data.from);
+      if (data.to) {
+        const toDate = new Date(data.to);
+        toDate.setDate(toDate.getDate() + 1);
+        q = q.lt("data_criacao", toDate.toISOString().slice(0, 10));
+      }
+      const { data: rows } = await q;
+      if (!rows || rows.length === 0) break;
+      quizLeads.push(...rows);
+      if (rows.length < pageSize) break;
+    }
+
+    // Build kanban lookup: lead_id -> kanban row
+    const kanbanMap = new Map<string, any>();
+    for (const k of kanban) kanbanMap.set(k.lead_id, k);
+
+    // Date range filter helper
+    const fromTs = data.from
+      ? new Date(data.from).getTime()
+      : null;
+    const toTs = data.to
+      ? new Date(data.to).getTime() + 86400000
+      : null;
+    const inRange = (dateStr: string | null) => {
+      if (!dateStr) return false;
+      const t = new Date(dateStr).getTime();
+      if (fromTs != null && t < fromTs) return false;
+      if (toTs != null && t >= toTs) return false;
+      return true;
+    };
+
+    // Build closer email -> team member map
+    const closerByEmail = new Map<string, any>();
+    const closerByName = new Map<string, any>();
+    for (const m of team) {
+      if (m.tipo === "closer") {
+        if (m.email) closerByEmail.set(m.email.toLowerCase(), m);
+        if (m.nome) closerByName.set(m.nome.toLowerCase().trim(), m);
+      }
+    }
+
+    // Process each team member
+    const membros: HtComissaoMembro[] = [];
+
+    for (const m of team) {
+      const regra =
+        (m.permissoes as any)?.comissao_regra ?? getDefaultRegra(m.tipo);
+      const detalhes: HtComissaoDetalhe[] = [];
+      let comparecimentos = 0;
+      let vendas = 0;
+      let valorVendas = 0;
+      let comissaoFixa = 0;
+      let comissaoPercentual = 0;
+
+      if (m.tipo === "sdr") {
+        // SDR: count comparecimentos from quiz leads that have scheduled_at in range
+        for (const lead of quizLeads) {
+          const ks = kanbanMap.get(lead.id);
+          if (!ks) continue;
+          if (ks.is_fake) continue;
+          const schedDate = ks.scheduled_at || lead.crm_data_agendamento;
+          if (!inRange(schedDate) && !inRange(lead.data_criacao)) continue;
+
+          const closerStage = (ks.closer_stage || "").toLowerCase();
+          const crmStatus = (lead.crm_status || "").toLowerCase().trim();
+          const detDate = schedDate || lead.data_criacao || "";
+          const fmtD = detDate.slice(0, 10);
+
+          // Comparecimento check
+          if (COMPARECEU_STAGES.includes(closerStage)) {
+            comparecimentos++;
+            detalhes.push({
+              leadNome: lead.nome || lead.whatsapp || "Sem nome",
+              tipo: "comparecimento",
+              valor: 0,
+              comissao: regra.fixo_comparecimento ?? 30,
+              data: fmtD,
+            });
+          }
+
+          // Venda check
+          if (
+            FECHADO_STAGES.includes(closerStage) ||
+            FECHADO_CRM.includes(crmStatus)
+          ) {
+            const val = Number(lead.crm_valor || 0);
+            if (val > 0) {
+              vendas++;
+              valorVendas += val;
+            }
+          }
+        }
+
+        // Calculate SDR commission
+        const pctVenda =
+          comparecimentos >= (regra.meta_comparecimento ?? 50)
+            ? regra.percentual_venda_meta ?? 4
+            : regra.percentual_venda ?? 2;
+
+        comissaoFixa = comparecimentos * (regra.fixo_comparecimento ?? 30);
+        comissaoPercentual = valorVendas * (pctVenda / 100);
+
+        // Add venda details
+        for (const lead of quizLeads) {
+          const ks = kanbanMap.get(lead.id);
+          if (!ks) continue;
+          if (ks.is_fake) continue;
+          const schedDate = ks.scheduled_at || lead.crm_data_agendamento;
+          if (!inRange(schedDate) && !inRange(lead.data_criacao)) continue;
+          const closerStage = (ks.closer_stage || "").toLowerCase();
+          const crmStatus = (lead.crm_status || "").toLowerCase().trim();
+          if (
+            FECHADO_STAGES.includes(closerStage) ||
+            FECHADO_CRM.includes(crmStatus)
+          ) {
+            const val = Number(lead.crm_valor || 0);
+            if (val > 0) {
+              detalhes.push({
+                leadNome: lead.nome || lead.whatsapp || "Sem nome",
+                tipo: "venda",
+                valor: val,
+                comissao: val * (pctVenda / 100),
+                data: (schedDate || lead.data_criacao || "").slice(0, 10),
+              });
+            }
+          }
+        }
+      } else if (m.tipo === "closer") {
+        const email = (m.email || "").toLowerCase();
+        const nome = (m.nome || "").toLowerCase().trim();
+
+        // From ht_vendas: match by closer name
+        for (const v of htVendas) {
+          if (!inRange(v.data)) continue;
+          const vCloser = (v.closer || "").toLowerCase().trim();
+          if (vCloser !== nome && vCloser !== email) continue;
+          const val = Number(v.valor_total || 0);
+          if (val <= 0) continue;
+          vendas++;
+          valorVendas += val;
+          const pct = regra.percentual_venda ?? 4;
+          const com = val * (pct / 100);
+          comissaoPercentual += com;
+          detalhes.push({
+            leadNome: v.cliente || "Sem nome",
+            tipo: "venda",
+            valor: val,
+            comissao: com,
+            data: (v.data || "").slice(0, 10),
+          });
+        }
+
+        // From quiz leads: match by closer_email in kanban
+        for (const lead of quizLeads) {
+          const ks = kanbanMap.get(lead.id);
+          if (!ks) continue;
+          if (ks.is_fake) continue;
+          const closerStage = (ks.closer_stage || "").toLowerCase();
+          const crmStatus = (lead.crm_status || "").toLowerCase().trim();
+          if (
+            !FECHADO_STAGES.includes(closerStage) &&
+            !FECHADO_CRM.includes(crmStatus)
+          )
+            continue;
+          const closerEmail = (ks.closer_email || "").toLowerCase();
+          if (closerEmail !== email) continue;
+          const schedDate = ks.scheduled_at || lead.crm_data_agendamento;
+          if (!inRange(schedDate) && !inRange(lead.data_criacao)) continue;
+          const val = Number(lead.crm_valor || 0);
+          if (val <= 0) continue;
+          const leadAlreadyCounted = htVendas.some(
+            (hv: any) => hv.lead_id === lead.id
+          );
+          if (leadAlreadyCounted) continue;
+          vendas++;
+          valorVendas += val;
+          const pct = regra.percentual_venda ?? 4;
+          const com = val * (pct / 100);
+          comissaoPercentual += com;
+          detalhes.push({
+            leadNome: lead.nome || lead.whatsapp || "Sem nome",
+            tipo: "venda",
+            valor: val,
+            comissao: com,
+            data: (schedDate || lead.data_criacao || "").slice(0, 10),
+          });
+        }
+      }
+
+      const comissaoTotal = comissaoFixa + comissaoPercentual;
+
+      membros.push({
+        id: m.id,
+        nome: m.nome ?? "Sem nome",
+        tipo: m.tipo as "sdr" | "closer",
+        email: m.email ?? null,
+        fotoUrl: m.foto_url ?? null,
+        regra,
+        comparecimentos,
+        vendas,
+        valorVendas,
+        comissaoFixa,
+        comissaoPercentual,
+        comissaoTotal,
+        detalhes,
+      });
+    }
+
+    membros.sort((a, b) => b.comissaoTotal - a.comissaoTotal);
+    const totalComissao = membros.reduce((s, m) => s + m.comissaoTotal, 0);
+
+    return { membros, totalComissao };
+  });
+
+export const updateComissaoRegra = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { memberId: number; regra: Record<string, any> }) => ({
+    memberId: Number(input.memberId),
+    regra: input.regra,
+  }))
+  .handler(async (opts) => {
+    const context = opts?.context;
+    assertAdmin(context);
+    const supabase = context.vendor
+      ? await getAdminClient().catch(() => context.supabase)
+      : context.supabase;
+
+    const { data: row, error: readErr } = await supabase
+      .from("ht_team")
+      .select("permissoes")
+      .eq("id", opts.data.memberId)
+      .single();
+    if (readErr) throw readErr;
+
+    const currentPerm = (row?.permissoes as Record<string, any>) ?? {};
+    const newPerm = { ...currentPerm, comissao_regra: opts.data.regra };
+
+    const { error } = await supabase
+      .from("ht_team")
+      .update({ permissoes: newPerm })
+      .eq("id", opts.data.memberId);
+    if (error) throw error;
+
+    return { ok: true };
+  });
+
