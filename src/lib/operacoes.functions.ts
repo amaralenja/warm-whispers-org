@@ -1,5 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+const QUIZ_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 function parseTicket(raw: unknown): number {
   if (raw == null) return 0;
@@ -84,6 +92,7 @@ export type OperacoesPayload = {
   vendedores: VendedorStat[];
   serieDiaria: SerieDiaria[];
   reembolsos: ReembolsoItem[];
+  caioFontes?: { fonte: string; faturamento: number; vendas: number }[];
 };
 
 export type DateRange = { from?: string | null; to?: string | null; expert?: string | null; includeHighTicket?: boolean };
@@ -176,7 +185,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       fetchAll<any>((from, to) =>
         supabase
           .from("vendas")
-          .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento"')
+          .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
           .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
           .range(from, to),
       ),
@@ -431,6 +440,82 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
 
     const totalValorReembolsado = reembolsosList.reduce((a, r) => a + r.valor, 0);
 
+    // Origens de tráfego do Caio
+    let caioFontes: { fonte: string; faturamento: number; vendas: number }[] = [];
+    if (vendasPeriodo.some((v: any) => v._expert === "Caio")) {
+      const caioVds = vendasPeriodo.filter((v: any) => v._expert === "Caio");
+      let quizLeads: any[] = [];
+      try {
+        let q = quizSb.from("leads").select("email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status");
+        if (fromTs) q = q.gte("data_criacao", new Date(fromTs).toISOString());
+        if (toTs) q = q.lt("data_criacao", new Date(toTs).toISOString());
+        const { data: qData } = await q;
+        quizLeads = qData ?? [];
+      } catch (err) {
+        console.warn("Falha ao buscar leads externos para fontes do Caio", err);
+      }
+
+      const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+
+      const fontesMap = new Map<string, { faturamento: number; vendas: number }>();
+      const initFonte = (name: string) => {
+        if (!fontesMap.has(name)) fontesMap.set(name, { faturamento: 0, vendas: 0 });
+      };
+      
+      initFonte("Tráfego Pago");
+      initFonte("Criar SaaS");
+      initFonte("Google Ads");
+      initFonte("Prospecção SDR");
+      initFonte("Orgânico (Typebot)");
+      initFonte("Orgânico Direto");
+
+      for (const v of caioVds) {
+        const vEmail = String(v.Email ?? "").trim().toLowerCase();
+        const vTel = cleanPhone(v.Telefone ?? "");
+        const value = parseTicket(v.Ticket);
+
+        const lead = quizLeads.find((l: any) => {
+          if (vEmail && l.email && String(l.email).trim().toLowerCase() === vEmail) return true;
+          const lTel = cleanPhone(l.whatsapp ?? "");
+          if (vTel && lTel && (vTel.endsWith(lTel) || lTel.endsWith(vTel))) return true;
+          return false;
+        });
+
+        let fonte = "Orgânico Direto";
+        if (lead) {
+          const src = String(lead.utm_source || "").toLowerCase();
+          const med = String(lead.utm_medium || "").toLowerCase();
+          const isInstagram = src.includes("ig") || src.includes("instagram");
+          const isFacebook = src.includes("fb") || src.includes("facebook");
+          const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
+          const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src);
+          const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook;
+
+          if (src === "criar_saas" || src === "criar_saas_hub") {
+            fonte = "Criar SaaS";
+          } else if (hasFbTracking && (src.includes("ads") || src.includes("fb") || src.includes("ig") || src.includes("facebook") || src.includes("instagram") || isPaidMedium)) {
+            fonte = "Tráfego Pago";
+          } else if (src.includes("google") || lead.gclid) {
+            fonte = "Google Ads";
+          } else if (src === "sdr-manual") {
+            fonte = "Prospecção SDR";
+          } else {
+            fonte = "Orgânico (Typebot)";
+          }
+        }
+
+        const entry = fontesMap.get(fonte) ?? { faturamento: 0, vendas: 0 };
+        entry.faturamento += value;
+        entry.vendas += 1;
+        fontesMap.set(fonte, entry);
+      }
+
+      caioFontes = Array.from(fontesMap.entries())
+        .map(([fonte, stats]) => ({ fonte, ...stats }))
+        .filter((f) => f.vendas > 0)
+        .sort((a, b) => b.faturamento - a.faturamento);
+    }
+
     return {
       experts: expertStats,
       totalFaturamento,
@@ -443,6 +528,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       vendedores,
       serieDiaria,
       reembolsos: reembolsosList,
+      caioFontes,
     };
   });
 

@@ -168,7 +168,7 @@ function Dashboard() {
                   ) : (
                     <>
                       {experts.map((e) => (
-                        <OperacaoCard key={e.id} expert={e} share={getShare(e.nome)} />
+                        <OperacaoCard key={e.id} expert={e} share={getShare(e.nome)} caioFontes={data?.caioFontes} />
                       ))}
                       <TotalOperacoesCard
                         faturamento={totalFat}
@@ -326,7 +326,7 @@ function ExpertRow({ expert }: { expert: ExpertStats }) {
   );
 }
 
-function OperacaoCard({ expert, share }: { expert: ExpertStats; share: number }) {
+function OperacaoCard({ expert, share, caioFontes }: { expert: ExpertStats; share: number; caioFontes?: any[] }) {
   const dot = EXPERT_ACCENT[expert.nome] ?? "bg-accent";
   const nossa = expert.faturamento * (share / 100);
   return (
@@ -354,6 +354,23 @@ function OperacaoCard({ expert, share }: { expert: ExpertStats; share: number })
         <Mini label="TM" value={BRL(expert.ticketMedio)} accent="text-sky-400" />
         <Mini label="Reemb" value={String(expert.reembolsos)} accent={expert.reembolsos > 0 ? "text-rose-400" : undefined} />
       </div>
+
+      {expert.nome === "Caio" && caioFontes && caioFontes.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3 space-y-2">
+          <div className="text-[0.55rem] uppercase tracking-[0.2em] text-muted-foreground font-semibold">Canais de Tráfego</div>
+          <div className="space-y-1">
+            {caioFontes.map((f: any) => (
+              <div key={f.fonte} className="flex items-center justify-between rounded-lg bg-secondary/20 p-2 text-xs border border-border/20">
+                <span className="font-medium text-foreground">{f.fonte}</span>
+                <div className="text-right">
+                  <span className="font-semibold text-foreground">{BRL(f.faturamento)}</span>
+                  <span className="block text-[9px] text-muted-foreground">{f.vendas} {f.vendas === 1 ? 'venda' : 'vendas'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

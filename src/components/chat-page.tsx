@@ -809,6 +809,62 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return null;
   };
 
+  const { data: localVendas = { vendas: [], htVendas: [] } } = useQuery({
+    queryKey: ["local-vendas-for-chat"],
+    queryFn: async () => {
+      const [{ data: vAll }, { data: htAll }] = await Promise.all([
+        supabase
+          .from("vendas")
+          .select("Telefone, Email, Ticket, Evento, Produto, Nome")
+          .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*'),
+        supabase
+          .from("ht_vendas")
+          .select("id, valor_total, data, status, cliente, lead_id")
+          .neq("status", "reembolso")
+      ]);
+      return {
+        vendas: (vAll ?? []) as any[],
+        htVendas: (htAll ?? []) as any[]
+      };
+    },
+    staleTime: 60_000,
+    refetchInterval: 30_000,
+  });
+
+  const checkIsComprador = (waId: string | null | undefined): any | null => {
+    const d = String(waId ?? "").replace(/\D+/g, "");
+    if (!d) return null;
+    const vList = localVendas.vendas ?? [];
+    const htList = localVendas.htVendas ?? [];
+
+    const vendaPadrao = vList.find((v: any) => {
+      const vTel = String(v.Telefone ?? "").replace(/\D+/g, "");
+      return vTel && (vTel.endsWith(d) || d.endsWith(vTel));
+    });
+    if (vendaPadrao) {
+      return {
+        tipo: "padrao",
+        produto: vendaPadrao.Produto,
+        valor: vendaPadrao.Ticket,
+        nome: vendaPadrao.Nome
+      };
+    }
+
+    const lead = findLeadForConv(waId);
+    if (lead) {
+      const htVenda = htList.find((v: any) => String(v.lead_id) === String(lead.id));
+      if (htVenda) {
+        return {
+          tipo: "high_ticket",
+          produto: "High Ticket",
+          valor: htVenda.valor_total,
+          nome: htVenda.cliente
+        };
+      }
+    }
+    return null;
+  };
+
 
 
 
@@ -1310,14 +1366,22 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       style={
                         isActive
                           ? { borderLeft: `3px solid var(--chat-accent, #3b82f6)` }
-                          : leadStage
-                            ? { borderLeft: `3px solid ${leadStage.cor}` }
-                            : isTypebotLead
-                              ? { borderLeft: "3px solid #f59e0b" } // Borda dourada para indicar Typebot!
-                              : undefined
+                          : checkIsComprador(contactWaId)
+                            ? { borderLeft: "3px solid #10b981" }
+                            : leadStage
+                              ? { borderLeft: `3px solid ${leadStage.cor}` }
+                              : isTypebotLead
+                                ? { borderLeft: "3px solid #f59e0b" } // Borda dourada para indicar Typebot!
+                                : undefined
                       }
                       className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
-                        isActive ? "bg-chat-soft" : isTypebotLead ? "bg-amber-500/[0.02] hover:bg-chat-panel" : "hover:bg-chat-panel"
+                        isActive 
+                          ? "bg-chat-soft" 
+                          : checkIsComprador(contactWaId)
+                            ? "bg-emerald-500/[0.03] hover:bg-chat-panel"
+                            : isTypebotLead 
+                              ? "bg-amber-500/[0.02] hover:bg-chat-panel" 
+                              : "hover:bg-chat-panel"
                       } ${isArchived ? "opacity-70" : ""}`}
                     >
 
@@ -1390,6 +1454,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                               return (
                                 <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${badgeClass} font-semibold uppercase`}>
                                   {badgeText}
+                                </Badge>
+                              );
+                            })()}
+                            {(() => {
+                              const comprador = checkIsComprador(contactWaId);
+                              if (!comprador) return null;
+                              return (
+                                <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 font-bold uppercase animate-pulse">
+                                  💰 Comprador
                                 </Badge>
                               );
                             })()}
@@ -1614,6 +1687,18 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             title={`CRM: ${stage.nome}`}
                           >
                             <Columns3 className="h-3 w-3" /> {stage.nome}
+                          </span>
+                        );
+                      })()}
+                      {(() => {
+                        const comprador = checkIsComprador(active.contact_wa_id);
+                        if (!comprador) return null;
+                        return (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 uppercase tracking-wide animate-pulse"
+                            title={`Produto: ${comprador.produto}`}
+                          >
+                            💰 COMPRADOR: {comprador.produto}
                           </span>
                         );
                       })()}
