@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listAccountAds } from "@/lib/meta-ads-manager.functions";
 import { getVendorSession } from "@/lib/vendor-session";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalPicker } from "@/components/ui/calendar";
@@ -14,7 +17,7 @@ import { format } from "date-fns";
 import {
   MessageSquare, Trash2, Phone, Mail, Instagram, Send,
   Wallet, TrendingUp, Target, Rocket, Lightbulb, Users, Flame,
-  Calendar, X, Crown, DollarSign, Handshake, CheckCircle2,
+  Calendar, X, Crown, DollarSign, Handshake, CheckCircle2, Megaphone, Loader2
 } from "lucide-react";
 
 // Quiz supabase (mesmo que ht-analytics usa) — o lead vive lá, então salvamos lá também.
@@ -154,6 +157,35 @@ export function HtLeadDetailDialog({
     const pad = (n: number) => String(n).padStart(2, "0");
     setSchedDraft(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`);
   };
+
+  const listAccountAdsFn = useServerFn(listAccountAds);
+  
+  const { data: allAds, isLoading: loadingAds } = useQuery({
+    queryKey: ["ht-account-ads-all"],
+    queryFn: () => listAccountAdsFn({ data: { datePreset: "maximum" } }),
+    staleTime: 300000,
+    enabled: !!open && !!lead?.utm_source,
+  });
+
+  const matchedAd = useMemo(() => {
+    if (!allAds || !lead) return null;
+    const utmContent = String((lead as any).utm_content || "").toLowerCase().trim();
+    const utmCampaign = String((lead as any).utm_campaign || "").toLowerCase().trim();
+
+    let found = allAds.find((a: any) => String(a.id) === utmContent);
+    if (found) return found;
+
+    if (utmContent) {
+      found = allAds.find((a: any) => String(a.name).toLowerCase().includes(utmContent) || utmContent.includes(String(a.name).toLowerCase()));
+      if (found) return found;
+    }
+
+    if (utmCampaign) {
+      found = allAds.find((a: any) => String(a.campaignName).toLowerCase().includes(utmCampaign) || utmCampaign.includes(String(a.campaignName).toLowerCase()));
+      if (found) return found;
+    }
+
+  }, [allAds, lead]);
 
   useEffect(() => {
     if (scheduledAt) {
@@ -715,6 +747,57 @@ export function HtLeadDetailDialog({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Informações do Anúncio */}
+              {lead?.utm_source && (
+                <div className="pt-4 border-t border-border/40 mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+                    <Megaphone className="h-3 w-3" />
+                    Origem do Anúncio
+                  </div>
+                  {loadingAds ? (
+                    <div className="text-xs text-muted-foreground flex items-center gap-2 py-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                      Buscando criativo correspondente...
+                    </div>
+                  ) : matchedAd ? (
+                    <div className="rounded-lg border border-border/50 bg-card/30 p-3.5 space-y-3">
+                      {matchedAd.thumbnail && (
+                        <div className="relative aspect-video w-full rounded-md overflow-hidden border border-border/30 bg-muted/40">
+                          <img
+                            src={matchedAd.thumbnail}
+                            alt="Visualização do Anúncio"
+                            className="object-cover w-full h-full"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Campanha</span>
+                          <span className="font-semibold text-foreground">{matchedAd.campaignName || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Conjunto de Anúncios</span>
+                          <span className="font-semibold text-foreground">{matchedAd.adsetName || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Anúncio</span>
+                          <span className="font-semibold text-accent">{matchedAd.name || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-muted/10 border border-border/30 rounded-lg p-3 text-xs space-y-2">
+                      <p className="text-muted-foreground italic">Nenhum criativo associado pôde ser localizado automaticamente no Meta Ads.</p>
+                      <div className="text-[10px] space-y-1 font-mono text-muted-foreground bg-black/20 p-2 rounded">
+                        <div>Source: {lead.utm_source || "—"}</div>
+                        <div>Campaign: {(lead as any).utm_campaign || "—"}</div>
+                        <div>Content: {(lead as any).utm_content || "—"}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

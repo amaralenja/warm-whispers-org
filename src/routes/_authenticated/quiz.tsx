@@ -194,7 +194,7 @@ function periodToRange(
 }
 
 // ---------- Lead Classification ----------
-type OriginKey = "criar_saas" | "facebook" | "instagram" | "google" | "organic" | "tiktok" | "unknown";
+type OriginKey = "criar_saas" | "trafego_pago" | "google" | "organic" | "tiktok" | "unknown";
 type LeadOrigin = {
   key: OriginKey;
   label: string;
@@ -206,7 +206,7 @@ type LeadOrigin = {
   border: string;
 };
 
-const ORIGIN_ORDER: OriginKey[] = ["criar_saas", "facebook", "instagram", "google", "tiktok", "organic", "unknown"];
+const ORIGIN_ORDER: OriginKey[] = ["criar_saas", "trafego_pago", "google", "tiktok", "organic", "unknown"];
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
@@ -227,21 +227,13 @@ function classifyLead(l: Lead): LeadOrigin {
   const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src);
   const hasFbTracking = !!(l.fbc && l.fbp) || !!l.fbclid || isPaidMedium || isAdsSource;
 
-  // Anúncio Meta:
-  // Se a source for IG => Instagram Ads; caso contrário => Facebook Ads.
+  // Anúncio Meta (Facebook ou Instagram) => Tráfego Pago
   if (hasFbTracking && (isInstagram || isFacebook)) {
-    if (isInstagram) {
-      return {
-        key: "instagram", label: "Instagram Ads", icon: Instagram,
-        ring: "ring-pink-500/40", bg: "bg-gradient-to-br from-pink-500/10 to-purple-500/10",
-        text: "text-pink-300",
-        glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
-      };
-    }
     return {
-      key: "facebook", label: "Facebook Ads", icon: Facebook,
-      ring: "ring-blue-500/40", bg: "bg-blue-500/10", text: "text-blue-300",
-      glow: "shadow-[0_0_24px_-8px_rgba(59,130,246,0.5)]", border: "border-blue-500/40",
+      key: "trafego_pago", label: "Tráfego Pago", icon: Megaphone,
+      ring: "ring-indigo-500/40", bg: "bg-gradient-to-br from-indigo-500/10 to-purple-500/10",
+      text: "text-indigo-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(99,102,241,0.5)]", border: "border-indigo-500/40",
     };
   }
   // Sem indicações de pago: IG/FB caem como orgânico
@@ -524,7 +516,7 @@ function QuizPage() {
 
   const stats = useMemo(() => {
     const total = filteredLeads.length;
-    const byOrigin: Record<OriginKey, number> = { criar_saas: 0, facebook: 0, instagram: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
+    const byOrigin: Record<OriginKey, number> = { criar_saas: 0, trafego_pago: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
     let high = 0;
     let real = 0;
     let fake = 0;
@@ -549,7 +541,7 @@ function QuizPage() {
   }, [filteredLeads]);
 
   const grouped = useMemo(() => {
-    const g: Record<OriginKey, Lead[]> = { criar_saas: [], facebook: [], instagram: [], google: [], tiktok: [], organic: [], unknown: [] };
+    const g: Record<OriginKey, Lead[]> = { criar_saas: [], trafego_pago: [], google: [], tiktok: [], organic: [], unknown: [] };
     const fakes: Lead[] = [];
     for (const l of sortedLeads) {
       if (!leadIsReal(l)) { fakes.push(l); continue; }
@@ -718,8 +710,7 @@ function QuizPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-3">
         <StatPill active={originFilter === "all"} onClick={() => setOriginFilter("all")} icon={<Users className="h-4 w-4" />} label="Total" value={stats.total} accent="text-foreground" loading={isLoading} />
         <StatPill active={originFilter === "criar_saas"} onClick={() => setOriginFilter(originFilter === "criar_saas" ? "all" : "criar_saas")} icon={<Sparkles className="h-4 w-4" />} label="Criar SaaS" value={stats.byOrigin.criar_saas} accent="text-yellow-300" loading={isLoading} />
-        <StatPill active={originFilter === "facebook"} onClick={() => setOriginFilter(originFilter === "facebook" ? "all" : "facebook")} icon={<Facebook className="h-4 w-4" />} label="Facebook" value={stats.byOrigin.facebook} accent="text-blue-300" loading={isLoading} />
-        <StatPill active={originFilter === "instagram"} onClick={() => setOriginFilter(originFilter === "instagram" ? "all" : "instagram")} icon={<Instagram className="h-4 w-4" />} label="Instagram" value={stats.byOrigin.instagram} accent="text-pink-300" loading={isLoading} />
+        <StatPill active={originFilter === "trafego_pago"} onClick={() => setOriginFilter(originFilter === "trafego_pago" ? "all" : "trafego_pago")} icon={<Megaphone className="h-4 w-4" />} label="Tráfego Pago" value={stats.byOrigin.trafego_pago} accent="text-indigo-300" loading={isLoading} />
         <StatPill active={originFilter === "google"} onClick={() => setOriginFilter(originFilter === "google" ? "all" : "google")} icon={<Megaphone className="h-4 w-4" />} label="Google" value={stats.byOrigin.google} accent="text-amber-300" loading={isLoading} />
         <StatPill active={originFilter === "tiktok"} onClick={() => setOriginFilter(originFilter === "tiktok" ? "all" : "tiktok")} icon={<Flame className="h-4 w-4" />} label="TikTok" value={stats.byOrigin.tiktok} accent="text-pink-300" loading={isLoading} />
         <StatPill active={originFilter === "organic"} onClick={() => setOriginFilter(originFilter === "organic" ? "all" : "organic")} icon={<Leaf className="h-4 w-4" />} label="Orgânico" value={stats.byOrigin.organic} accent="text-emerald-300" loading={isLoading} />
