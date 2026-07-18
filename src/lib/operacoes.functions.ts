@@ -447,9 +447,24 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       const caioVds = vendasPeriodo.filter((v: any) => v._expert === "Caio");
       let quizLeads: any[] = [];
       try {
-        let q = quizSb.from("leads").select("email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status");
-        const { data: qData } = await q;
-        quizLeads = qData ?? [];
+        const emails = caioVds.map((v: any) => String(v.Email ?? "").trim().toLowerCase()).filter(Boolean);
+        const phones = caioVds.map((v: any) => cleanPhone(v.Telefone ?? "")).filter(Boolean);
+        
+        let q = quizSb.from("leads").select("email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid");
+        
+        const filterParts = [];
+        if (emails.length > 0) filterParts.push(`email.in.(${emails.join(",")})`);
+        if (phones.length > 0) {
+          // Filtra telefones no formato com e sem 55
+          const formattedPhones = [...phones, ...phones.map(p => p.startsWith("55") ? p.slice(2) : "55" + p)];
+          filterParts.push(`whatsapp.in.(${formattedPhones.join(",")})`);
+        }
+        
+        if (filterParts.length > 0) {
+          q = q.or(filterParts.join(","));
+          const { data: qData } = await q;
+          quizLeads = qData ?? [];
+        }
       } catch (err) {
         console.warn("Falha ao buscar leads externos para fontes do Caio", err);
       }
@@ -520,10 +535,20 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     if (data.includeHighTicket && htVendasPeriodo.length > 0) {
       let quizLeadsHt: any[] = [];
       try {
-        const { data: qData } = await quizSb
-          .from("leads")
-          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign");
-        quizLeadsHt = qData ?? [];
+        const leadIds = htVendasPeriodo.map((v: any) => v.lead_id).filter(Boolean);
+        const emails = htVendasPeriodo.map((v: any) => String(v.cliente ?? "").trim().toLowerCase()).filter(Boolean);
+        
+        let q = quizSb.from("leads").select("id, email, whatsapp, utm_source, utm_medium, utm_campaign");
+        
+        const filterParts = [];
+        if (leadIds.length > 0) filterParts.push(`id.in.(${leadIds.join(",")})`);
+        if (emails.length > 0) filterParts.push(`email.in.(${emails.join(",")})`);
+        
+        if (filterParts.length > 0) {
+          q = q.or(filterParts.join(","));
+          const { data: qData } = await q;
+          quizLeadsHt = qData ?? [];
+        }
       } catch (err) {
         console.warn("Falha ao buscar leads para htFontes", err);
       }
