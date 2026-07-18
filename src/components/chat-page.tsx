@@ -837,9 +837,29 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const vList = localVendas.vendas ?? [];
     const htList = localVendas.htVendas ?? [];
 
+    const matchPhonesTolerant = (phoneA: string, phoneB: string): boolean => {
+      const clean = (s: string) => String(s ?? "").replace(/\D+/g, "");
+      let a = clean(phoneA);
+      let b = clean(phoneB);
+      if (!a || !b) return false;
+      if (a.startsWith("55") && a.length > 10) a = a.slice(2);
+      if (b.startsWith("55") && b.length > 10) b = b.slice(2);
+      if (a === b) return true;
+      const norm9 = (num: string) => {
+        if (num.length === 11 && num[2] === "9") {
+          return num.slice(0, 2) + num.slice(3);
+        }
+        return num;
+      };
+      if (norm9(a) === norm9(b)) return true;
+      if (a.length >= 8 && b.length >= 8) {
+        return a.slice(-8) === b.slice(-8);
+      }
+      return false;
+    };
+
     const vendaPadrao = vList.find((v: any) => {
-      const vTel = String(v.Telefone ?? "").replace(/\D+/g, "");
-      return vTel && (vTel.endsWith(d) || d.endsWith(vTel));
+      return v.Telefone && matchPhonesTolerant(v.Telefone, d);
     });
     if (vendaPadrao) {
       return {
