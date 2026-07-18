@@ -192,70 +192,63 @@ async function syncQuizLeadsInternal(supabaseLocal: any) {
 }
 
 async function syncCriarSaasLeadsInternal(supabaseLocal: any) {
-  const extUrl = process.env.EXT_QUIZ_SUPABASE_URL;
-  const extKey = process.env.EXT_QUIZ_SUPABASE_ANON_KEY;
+  try {
+    const url = "https://criarsaashub.vercel.app/api/public/onboarding-leads";
+    const apiKey = "sk_onboarding_9il22601t8jcyri0mrwz6v";
 
-  if (!extUrl || !extKey) {
-    return;
-  }
+    const resp = await fetch(url, {
+      headers: {
+        "X-API-Key": apiKey
+      }
+    });
 
-  const { createClient } = await import("@supabase/supabase-js");
-  const extClient = createClient(extUrl, extKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
+    if (!resp.ok) {
+      console.error(`Erro ao consultar API do Criar SaaS Hub: ${resp.status}`);
+      return;
+    }
 
-  const { data: extLeads, error: extError } = await extClient
-    .from("leads")
-    .select("*")
-    .order("data_criacao", { ascending: false })
-    .limit(1000);
+    const body = await resp.json().catch(() => null);
+    const extLeads = body?.leads;
+    if (!extLeads || !Array.isArray(extLeads) || extLeads.length === 0) {
+      return;
+    }
 
-  if (extError || !extLeads || extLeads.length === 0) {
-    console.error("Erro ao ler leads antigos do Criar SaaS externo:", extError);
-    return;
-  }
+    // Busca os IDs locais existentes para deduplicação
+    const { data: localIdsData } = await supabaseLocal
+      .from("ht_quiz_submissions")
+      .select("id");
+    const localIdsSet = new Set((localIdsData || []).map((x: any) => String(x.id)));
 
-  const { data: localIdsData } = await supabaseLocal
-    .from("ht_quiz_submissions")
-    .select("id");
-  const localIdsSet = new Set((localIdsData || []).map((x: any) => String(x.id)));
+    // Filtra apenas leads que não estão no local
+    const newLeads = extLeads.filter((l: any) => l.user_id && !localIdsSet.has(String(l.user_id)));
+    if (newLeads.length === 0) return;
 
-  const newLeads = extLeads.filter((l: any) => l.id && !localIdsSet.has(String(l.id)));
-  if (newLeads.length === 0) return;
+    const submissionsToInsert = newLeads.map((l: any) => {
+      return {
+        id: l.user_id,
+        nome: l.display_name,
+        email: l.email,
+        whatsapp: l.whatsapp,
+        utm_source: "criar_saas",
+        respostas: {
+          ...l,
+          origem: "criar_saas"
+        },
+        received_at: l.completed_at || new Date().toISOString(),
+        updated_at: l.completed_at || new Date().toISOString(),
+        status: "completed"
+      };
+    });
 
-  const submissionsToInsert = newLeads.map((l: any) => {
-    const respostas = l.respostas_json || {
-      ...l,
-      origem: "criar_saas"
-    };
+    const { error: insertSubmissionsError } = await supabaseLocal
+      .from("ht_quiz_submissions")
+      .insert(submissionsToInsert);
 
-    return {
-      id: l.id,
-      nome: l.nome,
-      email: l.email,
-      whatsapp: l.whatsapp,
-      instagram: l.instagram,
-      utm_source: "criar_saas",
-      utm_medium: l.utm_medium,
-      utm_campaign: l.utm_campaign,
-      utm_content: l.utm_content,
-      fbc: l.fbc,
-      fbp: l.fbp,
-      fbclid: l.fbclid,
-      gclid: l.gclid,
-      respostas,
-      received_at: l.data_criacao || new Date().toISOString(),
-      updated_at: l.data_criacao || new Date().toISOString(),
-      status: l.status || "completed"
-    };
-  });
-
-  const { error: insertSubmissionsError } = await supabaseLocal
-    .from("ht_quiz_submissions")
-    .insert(submissionsToInsert);
-
-  if (insertSubmissionsError) {
-    console.error("Erro ao salvar leads sincronizados do Criar SaaS:", insertSubmissionsError);
+    if (insertSubmissionsError) {
+      console.error("Erro ao salvar leads sincronizados do Criar SaaS:", insertSubmissionsError);
+    }
+  } catch (err) {
+    console.error("Falha geral na sincronização do Criar SaaS Hub:", err);
   }
 }
 
