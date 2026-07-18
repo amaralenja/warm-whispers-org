@@ -134,25 +134,47 @@ export const getComissoes = createServerFn({ method: "POST" })
         let vendas = 0;
         let comissao = 0;
         let cumulativo = 0;
-        const isoDays = Array.from(daysMap.keys()).sort();
-        for (const iso of isoDays) {
-          const day = daysMap.get(iso)!;
-          cumulativo += day.faturamento;
-          const rate = tierRate(cumulativo);
-          const milhares = Math.floor(day.faturamento / 1000);
-          const valor = milhares * rate;
-          dias.push({
-            data: iso,
-            vendas: day.vendas,
-            faturamento: day.faturamento,
-            cumulativo,
-            rate,
-            milhares,
-            comissao: valor,
-          });
-          faturamento += day.faturamento;
-          vendas += day.vendas;
-          comissao += valor;
+        let startStr = data.from;
+        let endStr = data.to;
+        if (!startStr || !endStr) {
+          const sortedKeys = Array.from(daysMap.keys()).sort();
+          if (sortedKeys.length > 0) {
+            startStr = startStr || sortedKeys[0];
+            endStr = endStr || sortedKeys[sortedKeys.length - 1];
+          }
+        }
+
+        if (startStr && endStr) {
+          const [sY, sM, sD] = startStr.split("-").map(Number);
+          const [eY, eM, eD] = endStr.split("-").map(Number);
+          const current = new Date(Date.UTC(sY, sM - 1, sD));
+          const end = new Date(Date.UTC(eY, eM - 1, eD));
+
+          while (current <= end) {
+            const iso = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, "0")}-${String(current.getUTCDate()).padStart(2, "0")}`;
+            const day = daysMap.get(iso) ?? { faturamento: 0, vendas: 0 };
+
+            cumulativo += day.faturamento;
+            const rate = tierRate(cumulativo);
+            const milhares = Math.floor(day.faturamento / 1000);
+            const valor = milhares * rate;
+
+            dias.push({
+              data: iso,
+              vendas: day.vendas,
+              faturamento: day.faturamento,
+              cumulativo,
+              rate,
+              milhares,
+              comissao: valor,
+            });
+
+            faturamento += day.faturamento;
+            vendas += day.vendas;
+            comissao += valor;
+
+            current.setUTCDate(current.getUTCDate() + 1);
+          }
         }
         return {
           id: Number(v.id),
