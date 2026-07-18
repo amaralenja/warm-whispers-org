@@ -46,6 +46,7 @@ function collectSecretCandidates(value: unknown, out: string[] = []): string[] {
 function pickSupabaseAdminKey(): string | null {
   const candidates = collectSecretCandidates([
     process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPASUPABASE_SERVICE_ROLE_KEY,
     process.env.SUPABASE_SECRET_KEY,
     process.env.SUPABASE_SECRET_KEYS,
   ]);

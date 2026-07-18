@@ -290,6 +290,7 @@ export const getKanbanLocalData = createServerFn({ method: "POST" })
   .handler(async ({ data: { startIso, endIso } }) => {
     const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                process.env.SUPASUPABASE_SERVICE_ROLE_KEY || 
                 process.env.SUPABASE_SECRET_KEY || 
                 process.env.SUPABASE_SECRET_KEYS || 
                 process.env.SUPABASE_SERVICE_KEY ||

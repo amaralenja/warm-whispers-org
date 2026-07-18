@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 async function getAdminClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+              process.env.SUPASUPABASE_SERVICE_ROLE_KEY || 
               process.env.SUPABASE_SECRET_KEY || 
               process.env.SUPABASE_SECRET_KEYS || 
               process.env.SUPABASE_SERVICE_KEY ||
