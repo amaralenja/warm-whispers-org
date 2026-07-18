@@ -114,7 +114,7 @@ function ComissoesPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Comissões</h1>
         <p className="text-sm text-muted-foreground">
-          Cálculo automático por faixa: cada R$ 1.000 vendidos no dia paga conforme o acumulado do mês.
+          Cálculo diário com tolerância comercial de R$ 9 por milhar (Ex: R$ 991 já conta como 1k). A taxa é definida pelo acumulado do mês.
         </p>
       </div>
 
@@ -185,13 +185,27 @@ function ComissoesPage() {
 
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Faixas de comissão (por R$ 1.000 no dia)</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground">
+            Faixas de comissão (por R$ 1.000 no dia — Margem R$ 991/1k inclusa)
+          </CardTitle>
+        </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {[...TIERS].reverse().map((t) => (
-            <Badge key={t.min} variant="outline" className="text-xs">
-              {t.min === 0 ? "Até R$ 9.999" : `A partir de ${fmtBRL(t.min)}`} → <span className="ml-1 font-semibold text-accent">{fmtBRL(t.rate)}</span>
-            </Badge>
-          ))}
+          <Badge variant="outline" className="text-xs">
+            Até R$ 9.909 (0 a 9k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(60)}</span>
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            A partir de R$ 9.910 (10k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(80)}</span>
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            A partir de R$ 14.865 (15k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(120)}</span>
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            A partir de R$ 19.820 (20k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(200)}</span>
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            A partir de R$ 24.775 (25k) → <span className="ml-1 font-semibold text-accent">{fmtBRL(250)}</span>
+          </Badge>
         </CardContent>
       </Card>
 
