@@ -293,14 +293,61 @@ function MetaAdsManagerPage() {
   const { start: pStart, end: pEnd } = useMemo(() => presetToDateRange(preset), [preset]);
 
   const { data: leads = [] } = useQuery({
-    queryKey: ["meta-ads-leads", preset],
+    queryKey: ["meta-ads-leads-v2"],
     queryFn: async () => {
-      let q = quizSb.from("leads").select("id, data_criacao, whatsapp, email, caixa_letra, faturamento, comprometimento, momento, crm_status, crm_data_agendamento, utm_source, utm_medium, utm_campaign, utm_content, utm_term");
-      if (pStart) q = q.gte("data_criacao", pStart.toISOString());
-      if (pEnd) q = q.lt("data_criacao", pEnd.toISOString());
-      const { data, error } = await q;
-      if (error) throw error;
-      return data ?? [];
+      // Puxa os 3.000 leads mais recentes do quiz sem truncar por data rígida
+      const pageSize = 1000;
+      const allLeads: any[] = [];
+      for (let page = 0; page < 3; page++) {
+        const { data, error } = await quizSb
+          .from("leads")
+          .select("id, data_criacao, whatsapp, email, caixa_letra, faturamento, comprometimento, momento, crm_status, crm_data_agendamento, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, respostas_json")
+          .order("data_criacao", { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error || !data || data.length === 0) break;
+        allLeads.push(...data);
+        if (data.length < pageSize) break;
+      }
+
+      // Enriquece UTMs se o lead tiver referrer ou respostas_json com parametros de URL
+      return allLeads.map((l) => {
+        let utm_source = l.utm_source;
+        let utm_medium = l.utm_medium;
+        let utm_campaign = l.utm_campaign;
+        let utm_content = l.utm_content;
+        let utm_term = l.utm_term;
+
+        if (l.referrer && typeof l.referrer === "string" && l.referrer.includes("?")) {
+          try {
+            const queryStr = l.referrer.split("?")[1] || "";
+            const params = new URLSearchParams(queryStr);
+            if (!utm_source) utm_source = params.get("utm_source");
+            if (!utm_medium) utm_medium = params.get("utm_medium");
+            if (!utm_campaign) utm_campaign = params.get("utm_campaign");
+            if (!utm_content) utm_content = params.get("utm_content");
+            if (!utm_term) utm_term = params.get("utm_term");
+          } catch {}
+        }
+
+        if (l.respostas_json && typeof l.respostas_json === "object") {
+          const r = l.respostas_json as Record<string, any>;
+          if (!utm_source) utm_source = r.utm_source;
+          if (!utm_medium) utm_medium = r.utm_medium;
+          if (!utm_campaign) utm_campaign = r.utm_campaign;
+          if (!utm_content) utm_content = r.utm_content;
+          if (!utm_term) utm_term = r.utm_term;
+        }
+
+        return {
+          ...l,
+          utm_source: utm_source ?? null,
+          utm_medium: utm_medium ?? null,
+          utm_campaign: utm_campaign ?? null,
+          utm_content: utm_content ?? null,
+          utm_term: utm_term ?? null,
+        };
+      });
     },
     staleTime: 60_000,
   });
