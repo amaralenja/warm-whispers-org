@@ -359,12 +359,48 @@ function MetaAdsManagerPage() {
 
 
 
+  const periodLeads = useMemo(() => {
+    return leads.filter((l: any) => {
+      if (pStart && l.data_criacao) {
+        const d = new Date(l.data_criacao);
+        if (d < pStart) return false;
+      }
+      if (pEnd && l.data_criacao) {
+        const d = new Date(l.data_criacao);
+        if (d >= pEnd) return false;
+      }
+      return true;
+    });
+  }, [leads, pStart, pEnd]);
+
+  // Leads vinculados com a coluna "Tráfego Pago" da Aba Quiz
+  const trafegoPagoLeads = useMemo(() => {
+    return periodLeads.filter((l: any) => {
+      const src = String(l.utm_source || "").toLowerCase();
+      const med = String(l.utm_medium || "").toLowerCase();
+      const cmp = String(l.utm_campaign || "").toLowerCase();
+      const cnt = String(l.utm_content || "").toLowerCase();
+
+      if (src === "criar_saas" || l.origem === "criar_saas") return false;
+      if (src.includes("google") || l.gclid) return false;
+      if (src === "sdr-manual" || med === "sdr-manual") return false;
+
+      const isInstagram = src.includes("ig") || src.includes("instagram");
+      const isFacebook = src.includes("fb") || src.includes("facebook");
+      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
+      const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src) || src.includes("120");
+      const hasFbTracking = !!(l.fbc && l.fbp) || !!l.fbclid || isPaidMedium || isAdsSource || cmp.length > 0 || cnt.length > 0;
+
+      return hasFbTracking || isInstagram || isFacebook;
+    });
+  }, [periodLeads]);
+
   const campaignsRawWithStats = useMemo(() => {
     return campaignsRaw.map((c: any) => {
       const cNameNorm = normStr(c.name);
       const cId = String(c.id || "").trim();
 
-      const campaignLeads = leads.filter((l: any) => {
+      const campaignLeads = trafegoPagoLeads.filter((l: any) => {
         const fields = [
           l.utm_campaign,
           l.utm_source,
@@ -387,7 +423,7 @@ function MetaAdsManagerPage() {
       const showups = campaignLeads.filter(isShowUp).length;
       return { ...c, finalizados, showups };
     });
-  }, [campaignsRaw, leads]);
+  }, [campaignsRaw, trafegoPagoLeads]);
 
   const campaigns = useMemo(() => sortRows(campaignsRawWithStats, sort), [campaignsRawWithStats, sort]);
   const adsetsLoading = adsetsQueries.some((q) => q.isLoading);
@@ -402,7 +438,7 @@ function MetaAdsManagerPage() {
       const aNameNorm = normStr(a.name);
       const aId = String(a.id || "").trim();
 
-      const adsetLeads = leads.filter((l: any) => {
+      const adsetLeads = trafegoPagoLeads.filter((l: any) => {
         const fields = [
           l.utm_term,
           l.utm_medium,
@@ -425,7 +461,7 @@ function MetaAdsManagerPage() {
       const showups = adsetLeads.filter(isShowUp).length;
       return { ...a, finalizados, showups };
     });
-  }, [adsetsRaw, leads]);
+  }, [adsetsRaw, trafegoPagoLeads]);
 
   const adsets = useMemo(() => sortRows(adsetsRawWithStats, sort), [adsetsRawWithStats, sort]);
   const adsLoading = adsQueries.some((q) => q.isLoading);
@@ -440,7 +476,7 @@ function MetaAdsManagerPage() {
       const adNameNorm = normStr(ad.name);
       const adId = String(ad.id || "").trim();
 
-      const adLeads = leads.filter((l: any) => {
+      const adLeads = trafegoPagoLeads.filter((l: any) => {
         const fields = [
           l.utm_content,
           l.utm_campaign,
@@ -463,7 +499,7 @@ function MetaAdsManagerPage() {
       const showups = adLeads.filter(isShowUp).length;
       return { ...ad, finalizados, showups };
     });
-  }, [adsRaw, leads]);
+  }, [adsRaw, trafegoPagoLeads]);
 
   const ads = useMemo(() => sortRows(adsRawWithStats as any, sort) as Ad[], [adsRawWithStats, sort]);
 
