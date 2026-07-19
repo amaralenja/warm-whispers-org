@@ -41,6 +41,34 @@ function normStr(s: string): string {
     .trim();
 }
 
+function getBaseName(s: string): string {
+  if (!s) return "";
+  return normStr(String(s).replace(/@[0-9]+/g, "").replace(/\bv[0-9]+\b/gi, "").replace(/typebot/gi, ""));
+}
+
+function isEntityMatch(name: string, id: string, fields: (string | null | undefined)[]): boolean {
+  const eId = String(id || "").trim();
+  const eNameNorm = normStr(name);
+  const eBase = getBaseName(name);
+
+  for (const raw of fields) {
+    if (!raw) continue;
+    const fStr = String(raw).trim();
+    if (!fStr) continue;
+
+    if (eId && fStr === eId) return true;
+
+    const fNorm = normStr(fStr);
+    if (!fNorm) continue;
+
+    if (eNameNorm && (eNameNorm.includes(fNorm) || fNorm.includes(eNameNorm))) return true;
+
+    const fBase = getBaseName(fStr);
+    if (eBase && fBase && eBase.length >= 4 && (eBase.includes(fBase) || fBase.includes(eBase))) return true;
+  }
+  return false;
+}
+
 const isFinalizado = (l: any) => {
   if (!l) return false;
   if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
@@ -397,26 +425,14 @@ function MetaAdsManagerPage() {
 
   const campaignsRawWithStats = useMemo(() => {
     return campaignsRaw.map((c: any) => {
-      const cNameNorm = normStr(c.name);
-      const cId = String(c.id || "").trim();
-
       const campaignLeads = trafegoPagoLeads.filter((l: any) => {
-        const fields = [
+        return isEntityMatch(c.name, c.id, [
           l.utm_campaign,
           l.utm_source,
           l.utm_medium,
           l.utm_content,
           l.utm_term,
-        ].map((v) => String(v || "").trim()).filter(Boolean);
-
-        if (fields.length === 0) return false;
-
-        return fields.some((f) => {
-          if (cId && f === cId) return true;
-          const fnorm = normStr(f);
-          if (!fnorm || !cNameNorm) return false;
-          return cNameNorm.includes(fnorm) || fnorm.includes(cNameNorm);
-        });
+        ]);
       });
 
       const finalizados = campaignLeads.filter(isFinalizado).length;
@@ -435,26 +451,14 @@ function MetaAdsManagerPage() {
 
   const adsetsRawWithStats = useMemo(() => {
     return adsetsRaw.map((a: any) => {
-      const aNameNorm = normStr(a.name);
-      const aId = String(a.id || "").trim();
-
       const adsetLeads = trafegoPagoLeads.filter((l: any) => {
-        const fields = [
+        return isEntityMatch(a.name, a.id, [
           l.utm_term,
           l.utm_medium,
           l.utm_campaign,
           l.utm_content,
           l.utm_source,
-        ].map((v) => String(v || "").trim()).filter(Boolean);
-
-        if (fields.length === 0) return false;
-
-        return fields.some((f) => {
-          if (aId && f === aId) return true;
-          const fnorm = normStr(f);
-          if (!fnorm || !aNameNorm) return false;
-          return aNameNorm.includes(fnorm) || fnorm.includes(aNameNorm);
-        });
+        ]);
       });
 
       const finalizados = adsetLeads.filter(isFinalizado).length;
@@ -473,26 +477,14 @@ function MetaAdsManagerPage() {
 
   const adsRawWithStats = useMemo(() => {
     return adsRaw.map((ad: any) => {
-      const adNameNorm = normStr(ad.name);
-      const adId = String(ad.id || "").trim();
-
       const adLeads = trafegoPagoLeads.filter((l: any) => {
-        const fields = [
+        return isEntityMatch(ad.name, ad.id, [
           l.utm_content,
           l.utm_campaign,
           l.utm_term,
           l.utm_source,
           l.utm_medium,
-        ].map((v) => String(v || "").trim()).filter(Boolean);
-
-        if (fields.length === 0) return false;
-
-        return fields.some((f) => {
-          if (adId && f === adId) return true;
-          const fnorm = normStr(f);
-          if (!fnorm || !adNameNorm) return false;
-          return adNameNorm.includes(fnorm) || fnorm.includes(adNameNorm);
-        });
+        ]);
       });
 
       const finalizados = adLeads.filter(isFinalizado).length;
