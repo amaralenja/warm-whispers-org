@@ -23,12 +23,39 @@ import {
 import { getMetaAdsConfig, saveMetaAdsConfig } from "@/lib/meta-ads.functions";
 
 
+import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
+
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
 const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+function apiSubToLead(s: any): any {
+  const r = (s?.respostas && typeof s.respostas === "object") ? s.respostas : {};
+  const pick = (k: string): string | null => {
+    const v = (r as any)[k];
+    if (v == null) return null;
+    if (typeof v === "object") {
+      const o: any = v;
+      const s2 = o.label ?? o.value ?? o.text ?? null;
+      return typeof s2 === "string" || typeof s2 === "number" ? String(s2) : null;
+    }
+    return typeof v === "string" || typeof v === "number" ? String(v) : null;
+  };
+
+  return {
+    id: `api:${s.id}`,
+    data_criacao: s.received_at ?? s.updated_at ?? new Date().toISOString(),
+    nome: s.nome, email: s.email, whatsapp: s.whatsapp, instagram: s.instagram,
+    utm_source: s.utm_source, utm_medium: s.utm_medium, utm_campaign: s.utm_campaign, utm_content: s.utm_content,
+    fbc: s.fbc, fbp: s.fbp, fbclid: s.fbclid, gclid: s.gclid,
+    faturamento: pick("faturamento") ?? pick("revenue_goal"),
+    caixa_letra: pick("caixa_letra"),
+    respostas_json: r as Record<string, unknown>,
+  };
+}
 
 function normStr(s: string): string {
   if (!s) return "";
@@ -320,26 +347,53 @@ function MetaAdsManagerPage() {
 
   const { start: pStart, end: pEnd } = useMemo(() => presetToDateRange(preset), [preset]);
 
+  const listSubsFn = useServerFn(listHtQuizSubmissions);
+
   const { data: leads = [] } = useQuery({
-    queryKey: ["meta-ads-leads-v2"],
+    queryKey: ["meta-ads-combined-leads"],
     queryFn: async () => {
-      // Puxa os 3.000 leads mais recentes do quiz sem truncar por data rígida
+      // 1. Submissões recebidas via API interna (novos preenchimentos de hoje)
+      let apiSubs: any[] = [];
+      try {
+        const res: any = await listSubsFn();
+        apiSubs = res?.submissions ?? [];
+      } catch (e) {
+        /* silencioso */
+      }
+      const apiLeads = apiSubs.map(apiSubToLead);
+
+      // 2. Leads legados do banco do Quiz
       const pageSize = 1000;
-      const allLeads: any[] = [];
+      const dbLeads: any[] = [];
       for (let page = 0; page < 3; page++) {
         const { data, error } = await quizSb
           .from("leads")
-          .select("id, data_criacao, whatsapp, email, caixa_letra, faturamento, comprometimento, momento, crm_status, crm_data_agendamento, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, respostas_json")
+          .select("id, data_criacao, whatsapp, email, caixa_letra, faturamento, comprometimento, momento, crm_status, crm_data_agendamento, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, respostas_json, fbc, fbp, fbclid, gclid, origem")
           .order("data_criacao", { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error || !data || data.length === 0) break;
-        allLeads.push(...data);
+        dbLeads.push(...data);
         if (data.length < pageSize) break;
       }
 
-      // Enriquece UTMs se o lead tiver referrer ou respostas_json com parametros de URL
-      return allLeads.map((l) => {
+      // Deduplica por email / whatsapp dando prioridade à API interna
+      const seen = new Set<string>();
+      const keyOf = (l: any) => `${(l.email ?? "").toLowerCase()}|${(l.whatsapp ?? "").replace(/\D/g, "")}`;
+      const combined: any[] = [];
+
+      for (const l of apiLeads) {
+        const k = keyOf(l);
+        if (k !== "|") seen.add(k);
+        combined.push(l);
+      }
+      for (const l of dbLeads) {
+        const k = keyOf(l);
+        if (k === "|" || !seen.has(k)) combined.push(l);
+      }
+
+      // Enriquece UTMs via referrer ou respostas_json
+      return combined.map((l) => {
         let utm_source = l.utm_source;
         let utm_medium = l.utm_medium;
         let utm_campaign = l.utm_campaign;
@@ -377,7 +431,8 @@ function MetaAdsManagerPage() {
         };
       });
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 
   const campaignsRaw = useMemo(
@@ -435,7 +490,7 @@ function MetaAdsManagerPage() {
         ]);
       });
 
-      const finalizados = campaignLeads.filter(isFinalizado).length;
+      const finalizados = campaignLeads.length;
       const showups = campaignLeads.filter(isShowUp).length;
       return { ...c, finalizados, showups };
     });
@@ -461,7 +516,7 @@ function MetaAdsManagerPage() {
         ]);
       });
 
-      const finalizados = adsetLeads.filter(isFinalizado).length;
+      const finalizados = adsetLeads.length;
       const showups = adsetLeads.filter(isShowUp).length;
       return { ...a, finalizados, showups };
     });
@@ -487,7 +542,7 @@ function MetaAdsManagerPage() {
         ]);
       });
 
-      const finalizados = adLeads.filter(isFinalizado).length;
+      const finalizados = adLeads.length;
       const showups = adLeads.filter(isShowUp).length;
       return { ...ad, finalizados, showups };
     });
@@ -569,8 +624,8 @@ function MetaAdsManagerPage() {
     setTab("campaigns");
   }
 
-  const finalizadosTráfegoPagoNoPeriodo = useMemo(() => {
-    return trafegoPagoLeads.filter(isFinalizado).length;
+  const preenchimentosTráfegoPagoNoPeriodo = useMemo(() => {
+    return trafegoPagoLeads.length;
   }, [trafegoPagoLeads]);
 
   const showupsTráfegoPagoNoPeriodo = useMemo(() => {
@@ -635,10 +690,11 @@ function MetaAdsManagerPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {[
           { label: "Gasto total", value: brl(totals.spend) },
-          { label: "Leads Finalizados", value: num(finalizadosTráfegoPagoNoPeriodo) },
-          { label: "CPL Finalizado", value: finalizadosTráfegoPagoNoPeriodo > 0 ? brl(totals.spend / finalizadosTráfegoPagoNoPeriodo) : "—" },
+          { label: "Preenchidos (Quiz)", value: num(preenchimentosTráfegoPagoNoPeriodo) },
+          { label: "CPL Preenchido", value: preenchimentosTráfegoPagoNoPeriodo > 0 ? brl(totals.spend / preenchimentosTráfegoPagoNoPeriodo) : "—" },
           { label: "ShowUps (Call)", value: num(showupsTráfegoPagoNoPeriodo) },
           { label: "Custo por ShowUp", value: showupsTráfegoPagoNoPeriodo > 0 ? brl(totals.spend / showupsTráfegoPagoNoPeriodo) : "—" },
+          { label: "Cliques", value: num(totals.clicks) },
         ].map((k) => (
           <div key={k.label} className="rounded-2xl border border-border bg-gradient-to-br from-card to-card/60 p-5 shadow-sm">
             <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{k.label}</div>
