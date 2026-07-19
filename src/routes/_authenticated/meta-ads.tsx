@@ -30,6 +30,17 @@ const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+function normStr(s: string): string {
+  if (!s) return "";
+  return String(s)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/%2f/gi, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .trim();
+}
+
 const isFinalizado = (l: any) => {
   if (!l) return false;
   if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
@@ -299,33 +310,32 @@ function MetaAdsManagerPage() {
     [campaignsQ.data],
   );
 
+
+
   const campaignsRawWithStats = useMemo(() => {
     return campaignsRaw.map((c: any) => {
+      const cNameNorm = normStr(c.name);
+      const cId = String(c.id || "").trim();
+
       const campaignLeads = leads.filter((l: any) => {
-        const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
-        const cName = String(c.name || "").toLowerCase().trim();
-        const cId = String(c.id || "").toLowerCase().trim();
+        const fields = [
+          l.utm_campaign,
+          l.utm_source,
+          l.utm_medium,
+          l.utm_content,
+          l.utm_term,
+        ].map((v) => String(v || "").trim()).filter(Boolean);
 
-        const utmCampaign = String(l.utm_campaign || "").toLowerCase().trim();
-        const utmSource = String(l.utm_source || "").toLowerCase().trim();
-        const utmMedium = String(l.utm_medium || "").toLowerCase().trim();
-        const utmContent = String(l.utm_content || "").toLowerCase().trim();
+        if (fields.length === 0) return false;
 
-        if (!utmCampaign && !utmSource && !utmMedium && !utmContent) return false;
-
-        const matches = (u: string) => {
-          if (!u) return false;
-          if (cId && cId === u) return true;
-          const nu = normName(u);
-          const nc = normName(cName);
-          if (nu && nc) {
-            return nc.includes(nu) || nu.includes(nc);
-          }
-          return false;
-        };
-
-        return matches(utmCampaign) || matches(utmSource) || matches(utmMedium) || matches(utmContent);
+        return fields.some((f) => {
+          if (cId && f === cId) return true;
+          const fnorm = normStr(f);
+          if (!fnorm || !cNameNorm) return false;
+          return cNameNorm.includes(fnorm) || fnorm.includes(cNameNorm);
+        });
       });
+
       const finalizados = campaignLeads.filter(isFinalizado).length;
       const showups = campaignLeads.filter(isShowUp).length;
       return { ...c, finalizados, showups };
@@ -342,28 +352,28 @@ function MetaAdsManagerPage() {
 
   const adsetsRawWithStats = useMemo(() => {
     return adsetsRaw.map((a: any) => {
+      const aNameNorm = normStr(a.name);
+      const aId = String(a.id || "").trim();
+
       const adsetLeads = leads.filter((l: any) => {
-        const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
-        const aName = String(a.name || "").toLowerCase().trim();
-        const aId = String(a.id || "").toLowerCase().trim();
+        const fields = [
+          l.utm_term,
+          l.utm_medium,
+          l.utm_campaign,
+          l.utm_content,
+          l.utm_source,
+        ].map((v) => String(v || "").trim()).filter(Boolean);
 
-        const utmTerm = String(l.utm_term || "").toLowerCase().trim();
-        const utmMedium = String(l.utm_medium || "").toLowerCase().trim();
-        const utmSource = String(l.utm_source || "").toLowerCase().trim();
+        if (fields.length === 0) return false;
 
-        if (!utmTerm && !utmMedium && !utmSource) return false;
-
-        const matches = (u: string) => {
-          if (!u) return false;
-          if (aId && aId === u) return true;
-          const nu = normName(u);
-          const na = normName(aName);
-          if (nu && na) return na.includes(nu) || nu.includes(na);
-          return false;
-        };
-
-        return matches(utmTerm) || matches(utmMedium) || matches(utmSource);
+        return fields.some((f) => {
+          if (aId && f === aId) return true;
+          const fnorm = normStr(f);
+          if (!fnorm || !aNameNorm) return false;
+          return aNameNorm.includes(fnorm) || fnorm.includes(aNameNorm);
+        });
       });
+
       const finalizados = adsetLeads.filter(isFinalizado).length;
       const showups = adsetLeads.filter(isShowUp).length;
       return { ...a, finalizados, showups };
@@ -380,27 +390,28 @@ function MetaAdsManagerPage() {
 
   const adsRawWithStats = useMemo(() => {
     return adsRaw.map((ad: any) => {
+      const adNameNorm = normStr(ad.name);
+      const adId = String(ad.id || "").trim();
+
       const adLeads = leads.filter((l: any) => {
-        const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
-        const adName = String(ad.name || "").toLowerCase().trim();
-        const adId = String(ad.id || "").toLowerCase().trim();
+        const fields = [
+          l.utm_content,
+          l.utm_campaign,
+          l.utm_term,
+          l.utm_source,
+          l.utm_medium,
+        ].map((v) => String(v || "").trim()).filter(Boolean);
 
-        const utmContent = String(l.utm_content || "").toLowerCase().trim();
-        const utmSource = String(l.utm_source || "").toLowerCase().trim();
+        if (fields.length === 0) return false;
 
-        if (!utmContent && !utmSource) return false;
-
-        const matches = (u: string) => {
-          if (!u) return false;
-          if (adId && adId === u) return true;
-          const nu = normName(u);
-          const nad = normName(adName);
-          if (nu && nad) return nad.includes(nu) || nu.includes(nad);
-          return false;
-        };
-
-        return matches(utmContent) || matches(utmSource);
+        return fields.some((f) => {
+          if (adId && f === adId) return true;
+          const fnorm = normStr(f);
+          if (!fnorm || !adNameNorm) return false;
+          return adNameNorm.includes(fnorm) || fnorm.includes(adNameNorm);
+        });
       });
+
       const finalizados = adLeads.filter(isFinalizado).length;
       const showups = adLeads.filter(isShowUp).length;
       return { ...ad, finalizados, showups };
