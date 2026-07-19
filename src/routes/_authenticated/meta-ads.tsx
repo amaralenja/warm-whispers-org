@@ -64,19 +64,15 @@ function normStr(s: string): string {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .replace(/%2f/gi, "")
-    .replace(/[^a-z0-9]/gi, "")
+    .replace(/[^a-z0-9@]/gi, "")
     .trim();
-}
-
-function getBaseName(s: string): string {
-  if (!s) return "";
-  return normStr(String(s).replace(/@[0-9]+/g, "").replace(/\bv[0-9]+\b/gi, "").replace(/typebot/gi, ""));
 }
 
 function isEntityMatch(name: string, id: string, fields: (string | null | undefined)[]): boolean {
   const eId = String(id || "").trim();
   const eNameNorm = normStr(name);
-  const eBase = getBaseName(name);
+
+  if (!eNameNorm && !eId) return false;
 
   for (const raw of fields) {
     if (!raw) continue;
@@ -88,10 +84,7 @@ function isEntityMatch(name: string, id: string, fields: (string | null | undefi
     const fNorm = normStr(fStr);
     if (!fNorm) continue;
 
-    if (eNameNorm && (eNameNorm.includes(fNorm) || fNorm.includes(eNameNorm))) return true;
-
-    const fBase = getBaseName(fStr);
-    if (eBase && fBase && eBase.length >= 4 && (eBase.includes(fBase) || fBase.includes(eBase))) return true;
+    if (eNameNorm.includes(fNorm) || fNorm.includes(eNameNorm)) return true;
   }
   return false;
 }
@@ -479,7 +472,7 @@ function MetaAdsManagerPage() {
   }, [periodLeads]);
 
   const campaignsRawWithStats = useMemo(() => {
-    return campaignsRaw.map((c: any) => {
+    const list = campaignsRaw.map((c: any) => {
       const campaignLeads = trafegoPagoLeads.filter((l: any) => {
         return isEntityMatch(c.name, c.id, [
           l.utm_campaign,
@@ -492,8 +485,27 @@ function MetaAdsManagerPage() {
 
       const finalizados = campaignLeads.length;
       const showups = campaignLeads.filter(isShowUp).length;
-      return { ...c, finalizados, showups };
+      return { ...c, finalizados, showups, leadsMatched: campaignLeads };
     });
+
+    const matchedLeadIds = new Set(list.flatMap((c: any) => (c.leadsMatched || []).map((l: any) => l.id)));
+    const unmatchedLeads = trafegoPagoLeads.filter((l: any) => !matchedLeadIds.has(l.id));
+
+    if (unmatchedLeads.length > 0) {
+      list.push({
+        id: "other_quiz_paid_leads",
+        name: "Tráfego Pago Instagram / Geral (Quiz)",
+        status: "ACTIVE",
+        objective: "OUTCOME_LEADS",
+        dailyBudget: null,
+        lifetimeBudget: null,
+        insights: { spend: 0, results: unmatchedLeads.length, clicks: 0, impressions: 0, ctr: 0, cpc: 0, cpm: 0 },
+        finalizados: unmatchedLeads.length,
+        showups: unmatchedLeads.filter(isShowUp).length,
+      } as any);
+    }
+
+    return list;
   }, [campaignsRaw, trafegoPagoLeads]);
 
   const campaigns = useMemo(() => sortRows(campaignsRawWithStats, sort), [campaignsRawWithStats, sort]);
