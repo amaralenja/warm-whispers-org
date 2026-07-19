@@ -31,8 +31,9 @@ const quizSb = createClient(QUIZ_URL, QUIZ_KEY, {
 });
 
 const isFinalizado = (l: any) => {
+  if (!l) return false;
   if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
-  return !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
+  return !!(l.whatsapp || l.email || l.caixa_letra || l.faturamento || l.nome);
 };
 
 const isShowUp = (l: any) => {
@@ -301,12 +302,23 @@ function MetaAdsManagerPage() {
   const campaignsRawWithStats = useMemo(() => {
     return campaignsRaw.map((c: any) => {
       const campaignLeads = leads.filter((l: any) => {
-        if (!l.utm_campaign) return false;
         const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
         const cName = String(c.name).toLowerCase().trim();
         const cId = String(c.id).toLowerCase().trim();
-        const utmCampaign = String(l.utm_campaign).toLowerCase().trim();
-        return normName(cName).includes(normName(utmCampaign)) || normName(utmCampaign).includes(normName(cName)) || cId === utmCampaign;
+        
+        const utmCampaign = String(l.utm_campaign || "").toLowerCase().trim();
+        const utmSource = String(l.utm_source || "").toLowerCase().trim();
+        const utmContent = String(l.utm_content || "").toLowerCase().trim();
+
+        if (!utmCampaign && !utmSource && !utmContent) return false;
+
+        const matches = (u: string) => u && (
+          normName(cName).includes(normName(u)) ||
+          normName(u).includes(normName(cName)) ||
+          cId === u
+        );
+
+        return matches(utmCampaign) || matches(utmSource) || matches(utmContent);
       });
       const finalizados = campaignLeads.filter(isFinalizado).length;
       const showups = campaignLeads.filter(isShowUp).length;

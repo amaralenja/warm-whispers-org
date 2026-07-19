@@ -38,6 +38,7 @@ import {
   setScheduledAndCloser as dbSetScheduleAndCloser,
 } from "@/lib/ht-kanban-state";
 
+
 export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
 });
@@ -84,14 +85,17 @@ type QLead = {
   faturamento: string | null; momento: string | null; objetivo: string | null;
   investir: string | null; minicurso: string | null; socio: string | null;
   comprometimento: string | null; last_step: string | null; funil: string | null;
-  utm_source: string | null; utm_medium: string | null; utm_campaign: string | null;
+  utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; utm_content?: string | null;
   crm_status: string | null; crm_valor: number | null; crm_data_agendamento: string | null;
   respostas?: Record<string, any> | null;
 };
+
 const isFinalizado = (l: QLead) => {
+  if (!l) return false;
   if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
-  return !!(l.whatsapp && l.caixa_letra && (l.comprometimento || l.momento));
+  return !!(l.whatsapp || l.email || l.caixa_letra || l.faturamento || l.nome);
 };
+
 const isQuente = (l: QLead) => {
   const c = (l.caixa_letra ?? "").toUpperCase();
   return "DEFG".includes(c) && /(sim|compromet)/i.test(l.comprometimento ?? "");
@@ -120,6 +124,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
   const [leads, setLeads] = useState<QLead[]>([]);
   const [notesMap, setNotesMap] = useState<Record<string, { body: string; author: string | null; role: string }>>({});
   const [vendas, setVendas] = useState<any[]>([]);
+
   const [htLeads, setHtLeads] = useState<any[]>([]);
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
@@ -134,7 +139,6 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
   const [flUtm, setFlUtm] = useState<Set<string>>(new Set());
   const [flSearch, setFlSearch] = useState("");
   const [listLimit, setListLimit] = useState(50);
-
 
   useEffect(() => {
     let cancel = false;
@@ -2621,14 +2625,23 @@ function FacebookAdsAnalyticsSection({
   const campaignsPerformance = useMemo(() => {
     return (campaigns || []).map((c: any) => {
       const campaignLeads = leadsFromAds.filter((l) => {
-        if (!l.utm_campaign) return false;
         const normName = (s: string) => s.toLowerCase().replace(/[\s\-_}{@()]+/g, "").trim();
         const campaignName = String(c.name).toLowerCase().trim();
         const campaignId = String(c.id).toLowerCase().trim();
-        const utmCampaign = String(l.utm_campaign).toLowerCase().trim();
-        const isNameMatch = normName(campaignName).includes(normName(utmCampaign)) || normName(utmCampaign).includes(normName(campaignName));
-        const isIdMatch = campaignId === utmCampaign;
-        return isNameMatch || isIdMatch;
+
+        const utmCampaign = String(l.utm_campaign || "").toLowerCase().trim();
+        const utmSource = String(l.utm_source || "").toLowerCase().trim();
+        const utmContent = String(l.utm_content || "").toLowerCase().trim();
+
+        if (!utmCampaign && !utmSource && !utmContent) return false;
+
+        const matches = (u: string) => u && (
+          normName(campaignName).includes(normName(u)) ||
+          normName(u).includes(normName(campaignName)) ||
+          campaignId === u
+        );
+
+        return matches(utmCampaign) || matches(utmSource) || matches(utmContent);
       });
 
       const campaignFinalizados = campaignLeads.filter((l) => isFinalizado(l)).length;
