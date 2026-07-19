@@ -447,44 +447,18 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       const caioVds = vendasPeriodo.filter((v: any) => v._expert === "Caio");
       let quizLeads: any[] = [];
       try {
-        const emails = caioVds.map((v: any) => String(v.Email ?? "").trim().toLowerCase()).filter(Boolean);
-        const phones = caioVds.map((v: any) => cleanPhone(v.Telefone ?? "")).filter(Boolean);
-        const uniqueEmails = Array.from(new Set(emails));
-        const uniquePhones = Array.from(new Set(phones));
-
-        const batchSize = 100;
-        const fetchedLeads = [];
-
-        // Busca e-mails em lotes
-        for (let i = 0; i < uniqueEmails.length; i += batchSize) {
-          const chunk = uniqueEmails.slice(i, i + batchSize);
-          const { data } = await quizSb
+        // Puxa os 5.000 leads mais recentes do quiz (cobre confortavelmente todo o histórico recente)
+        const pageSize = 1000;
+        for (let page = 0; page < 5; page++) {
+          const { data: qData, error } = await quizSb
             .from("leads")
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid")
-            .in("email", chunk);
-          if (data) fetchedLeads.push(...data);
-        }
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid, data_criacao")
+            .order("data_criacao", { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        // Busca telefones em lotes
-        for (let i = 0; i < uniquePhones.length; i += batchSize) {
-          const chunk = uniquePhones.slice(i, i + batchSize);
-          // Adiciona variações com e sem prefixo 55
-          const chunkWithVariations = [...chunk, ...chunk.map(p => p.startsWith("55") ? p.slice(2) : "55" + p)];
-          const { data } = await quizSb
-            .from("leads")
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid")
-            .in("whatsapp", chunkWithVariations);
-          if (data) fetchedLeads.push(...data);
-        }
-
-        // Deduplicar leads pelo id ou email/whatsapp
-        const seenIds = new Set();
-        for (const l of fetchedLeads) {
-          const key = l.id || `${l.email}|${l.whatsapp}`;
-          if (!seenIds.has(key)) {
-            seenIds.add(key);
-            quizLeads.push(l);
-          }
+          if (error || !qData || qData.length === 0) break;
+          quizLeads.push(...qData);
+          if (qData.length < pageSize) break;
         }
       } catch (err) {
         console.warn("Falha ao buscar leads externos para fontes do Caio", err);
@@ -507,8 +481,10 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       for (const v of caioVds) {
         const vEmail = String(v.Email ?? "").trim().toLowerCase();
         const vTel = cleanPhone(v.Telefone ?? "");
+        const vUtm = String(v.UTM ?? "").trim().toLowerCase();
         const value = parseTicket(v.Ticket);
 
+        // Busca lead no quiz por e-mail ou telefone higienizado (case-insensitive & sem caracteres especiais)
         const lead = quizLeads.find((l: any) => {
           if (vEmail && l.email && String(l.email).trim().toLowerCase() === vEmail) return true;
           const lTel = cleanPhone(l.whatsapp ?? "");
@@ -517,6 +493,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         });
 
         let fonte = "Orgânico Direto";
+
         if (lead) {
           const src = String(lead.utm_source || "").toLowerCase();
           const med = String(lead.utm_medium || "").toLowerCase();
@@ -524,18 +501,33 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
           const isFacebook = src.includes("fb") || src.includes("facebook");
           const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
           const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src);
-          const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook;
+          const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook || src.includes("ads");
 
           if (src === "criar_saas" || src === "criar_saas_hub") {
             fonte = "Criar SaaS";
-          } else if (hasFbTracking && (src.includes("ads") || src.includes("fb") || src.includes("ig") || src.includes("facebook") || src.includes("instagram") || isPaidMedium)) {
+          } else if (hasFbTracking) {
             fonte = "Tráfego Pago";
           } else if (src.includes("google") || lead.gclid) {
             fonte = "Google Ads";
-          } else if (src === "sdr-manual") {
+          } else if (src === "sdr-manual" || med === "sdr-manual") {
             fonte = "Prospecção SDR";
           } else {
             fonte = "Orgânico (Typebot)";
+          }
+        } else if (vUtm) {
+          // Fallback: se o lead não está no quiz mas a própria venda veio com UTM
+          if (vUtm.includes("criar_saas")) {
+            fonte = "Criar SaaS";
+          } else if (
+            vUtm.includes("fb") || vUtm.includes("ig") || vUtm.includes("facebook") ||
+            vUtm.includes("instagram") || vUtm.includes("cpc") || vUtm.includes("cpm") ||
+            vUtm.includes("paid") || vUtm.includes("ads") || vUtm.includes("patrocinado")
+          ) {
+            fonte = "Tráfego Pago";
+          } else if (vUtm.includes("google") || vUtm.includes("gclid")) {
+            fonte = "Google Ads";
+          } else if (vUtm.includes("sdr")) {
+            fonte = "Prospecção SDR";
           }
         }
 
