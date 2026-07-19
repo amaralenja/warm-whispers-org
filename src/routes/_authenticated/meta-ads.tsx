@@ -577,6 +577,14 @@ function MetaAdsManagerPage() {
     setTab("campaigns");
   }
 
+  const finalizadosTráfegoPagoNoPeriodo = useMemo(() => {
+    return trafegoPagoLeads.filter(isFinalizado).length;
+  }, [trafegoPagoLeads]);
+
+  const showupsTráfegoPagoNoPeriodo = useMemo(() => {
+    return trafegoPagoLeads.filter(isShowUp).length;
+  }, [trafegoPagoLeads]);
+
   return (
     <div className="space-y-5 p-5">
       {/* Header */}
@@ -635,11 +643,10 @@ function MetaAdsManagerPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {[
           { label: "Gasto total", value: brl(totals.spend) },
-          { label: "Leads Finalizados", value: num(totals.finalizados) },
-          { label: "CPL Finalizado", value: totals.finalizados > 0 ? brl(totals.spend / totals.finalizados) : "—" },
-          { label: "ShowUps (Call)", value: num(totals.showups) },
-          { label: "Custo por ShowUp", value: totals.showups > 0 ? brl(totals.spend / totals.showups) : "—" },
-          { label: "Cliques", value: num(totals.clicks) },
+          { label: "Leads Finalizados", value: num(finalizadosTráfegoPagoNoPeriodo) },
+          { label: "CPL Finalizado", value: finalizadosTráfegoPagoNoPeriodo > 0 ? brl(totals.spend / finalizadosTráfegoPagoNoPeriodo) : "—" },
+          { label: "ShowUps (Call)", value: num(showupsTráfegoPagoNoPeriodo) },
+          { label: "Custo por ShowUp", value: showupsTráfegoPagoNoPeriodo > 0 ? brl(totals.spend / showupsTráfegoPagoNoPeriodo) : "—" },
         ].map((k) => (
           <div key={k.label} className="rounded-2xl border border-border bg-gradient-to-br from-card to-card/60 p-5 shadow-sm">
             <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{k.label}</div>
