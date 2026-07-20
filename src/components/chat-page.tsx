@@ -856,7 +856,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
 
     const normPhoneKeys = (rawPhone: string | null | undefined): string[] => {
-      const d = digits(rawPhone);
+      const d = digits(rawPhone ?? "");
       if (!d) return [];
       const set = new Set<string>([d]);
       const last8 = d.slice(-8);
@@ -2354,7 +2354,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing, 
 
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={effectiveType} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} vendorId={vendorId} />;
+    return <RenderMedia type={effectiveType} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
@@ -2362,7 +2362,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing, 
       return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={effectiveType} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} vendorId={vendorId} />;
+      return <RenderMedia type={effectiveType} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
     }
     if (mediaState?.loading) {
       return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} loading outgoing={outgoing} />;
