@@ -480,15 +480,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const updateNotesFn = useServerFn(updateConversationNotes);
   const reactFn = useServerFn(reactToWhatsappMessage);
   
-  // Query to fetch recent Typebot quiz submissions for live highlights
+  // Query to fetch recent Typebot quiz submissions for live highlights and attribution
   const { data: typebotLeads = [] } = useQuery<any[]>({
     queryKey: ["typebot-leads-list-for-highlight"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ht_quiz_submissions")
-        .select("whatsapp")
+        .select("id, whatsapp, nome, email, utm_source, utm_medium, utm_campaign, utm_content, origem, status")
         .order("received_at", { ascending: false })
-        .limit(300);
+        .limit(1000);
       if (error || !data) return [];
       return data;
     },
@@ -844,11 +844,22 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const map = new Map<string, any>();
     const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
 
+    const storeInMap = (d: string, item: any) => {
+      if (!d) return;
+      map.set(d, item);
+      const last8 = d.slice(-8);
+      if (last8 && !map.has(last8)) map.set(last8, item);
+      if (d.startsWith("55") && d.length > 10) {
+        const without55 = d.slice(2);
+        if (!map.has(without55)) map.set(without55, item);
+      }
+    };
+
     // 1. Preenche primeiro com submissões do Quiz/Typebot (que têm dados completos de UTM!)
     for (const sub of (typebotLeads as any[])) {
       const d = digits(sub?.whatsapp ?? sub?.telefone);
       if (d) {
-        map.set(d, {
+        const item = {
           id: sub.id,
           nome: sub.nome,
           whatsapp: sub.whatsapp,
@@ -859,8 +870,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           utm_content: sub.utm_content,
           origem: sub.origem,
           status: sub.status,
-          respostas: sub.respostas,
-        });
+        };
+        storeInMap(d, item);
       }
     }
 
@@ -868,26 +879,36 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     for (const l of (crmLeadsForStage as any[])) {
       const d = digits(l?.telefone ?? l?.whatsapp);
       if (d) {
-        const existing = map.get(d);
-        map.set(d, {
+        const last8 = d.slice(-8);
+        const without55 = d.startsWith("55") && d.length > 10 ? d.slice(2) : null;
+        const existing = map.get(d) || (last8 ? map.get(last8) : null) || (without55 ? map.get(without55) : null);
+
+        const item = {
           ...l,
           utm_source: l?.utm_source || existing?.utm_source || null,
           utm_medium: l?.utm_medium || existing?.utm_medium || null,
           utm_campaign: l?.utm_campaign || existing?.utm_campaign || null,
           utm_content: l?.utm_content || existing?.utm_content || null,
-        });
+        };
+        storeInMap(d, item);
       }
     }
 
     return map;
   }, [crmLeadsForStage, typebotLeads]);
+
   const findLeadForConv = (waId: string | null | undefined): any | null => {
     const d = String(waId ?? "").replace(/\D+/g, "");
     if (!d) return null;
     if (leadByPhone.has(d)) return leadByPhone.get(d);
+    const last8 = d.slice(-8);
+    if (last8 && leadByPhone.has(last8)) return leadByPhone.get(last8);
+    if (d.startsWith("55") && d.length > 10 && leadByPhone.has(d.slice(2))) {
+      return leadByPhone.get(d.slice(2));
+    }
     // try suffix match (varying country codes)
     for (const [k, v] of leadByPhone.entries()) {
-      if (k.endsWith(d) || d.endsWith(k)) return v;
+      if (k.endsWith(d) || d.endsWith(k) || (k.length >= 8 && d.length >= 8 && k.slice(-8) === d.slice(-8))) return v;
     }
     return null;
   };
