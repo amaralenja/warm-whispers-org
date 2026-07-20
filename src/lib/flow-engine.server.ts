@@ -266,7 +266,15 @@ function nextFlowCreatedAt(): string {
   return new Date(__flowMsgLastMs + __flowMsgSeq).toISOString();
 }
 
-async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string) {
+function popInitialQuotedMessageId(ctx: Ctx): string | null {
+  if (ctx.variables?.__firstQuotedSent) return null;
+  const initId = ctx.variables?.trigger?.initial_quoted_msg_id;
+  if (!initId) return null;
+  ctx.variables.__firstQuotedSent = true;
+  return String(initId);
+}
+
+async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string, quotedMsgId?: string | null) {
   if (!ctx.conversationId) return;
   const textBody = body?.text?.body ?? body?.interactive?.body?.text ?? null;
   const mediaUrl = body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null;
@@ -274,6 +282,9 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
   const caption = body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null;
   const toNormalized = toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId);
   const preview = type === "text" ? String(textBody ?? "").slice(0, 120) : `[${type}]`;
+
+  const finalQuotedId = quotedMsgId || body?.context?.message_id || null;
+  const rawData = finalQuotedId ? { ...body, context: { message_id: finalQuotedId } } : body;
 
   const rpcArgs = vendorRpcArgs(ctx.vendor);
   if (rpcArgs) {
@@ -291,7 +302,7 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
       _from_wa_id: phoneNumberId,
       _to_wa_id: toNormalized,
       _status: "sent",
-      _raw: body,
+      _raw: rawData,
     });
     if (error) throw new Error(error.message);
     await ctx.db.rpc("vendor_touch_wa_conversation" as any, {
@@ -317,7 +328,8 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     from_wa_id: phoneNumberId,
     to_wa_id: toNormalized,
     status: "sent",
-    raw: body,
+    raw: rawData,
+    quoted_message_id: finalQuotedId,
     created_at: createdAt,
   });
   await ctx.db.from("wa_conversations" as any).update({
@@ -594,11 +606,16 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
     case "send_text": {
       const text = interpolate(String(node.data?.text ?? ""), ctx);
       if (!text) return {};
-      const body = { type: "text", text: { body: text } };
+      const initialQuotedId = popInitialQuotedMessageId(ctx);
+      const body: any = {
+        type: "text",
+        text: { body: text },
+        ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
+      };
       if (await shouldStopFlowRun(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       if (await shouldStopFlowRun(ctx)) return {};
-      await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized);
+      await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
       return { log: { text } };
     }
 
@@ -657,11 +674,16 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         if (mediaType !== "sticker" && caption) inner.caption = caption;
         if (mediaType === "document" && filename) inner.filename = filename;
       }
-      const body: any = { type: mediaType, [mediaType]: inner };
+      const initialQuotedId = popInitialQuotedMessageId(ctx);
+      const body: any = {
+        type: mediaType,
+        [mediaType]: inner,
+        ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
+      };
       if (await shouldStopFlowRun(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       if (await shouldStopFlowRun(ctx)) return {};
-      await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized);
+      await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
       return { log: { url: finalUrl, originalUrl: finalUrl === url ? undefined : url } };
     }
 
@@ -674,9 +696,11 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       const replies = all.filter((b) => (b.type ?? "reply") === "reply").slice(0, 3);
       const urls = all.filter((b) => b.type === "url" && b.url);
 
+      const initialQuotedId = popInitialQuotedMessageId(ctx);
+
       // 1) Reply buttons (grouped, max 3) — single interactive button message.
       if (replies.length > 0) {
-        const body = {
+        const body: any = {
           type: "interactive",
           interactive: {
             type: "button",
@@ -688,11 +712,12 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
               })),
             },
           },
+          ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
         };
         if (await shouldStopFlowRun(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
         if (await shouldStopFlowRun(ctx)) return {};
-        await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
+        await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
       }
 
       // 2) URL buttons — each one a separate cta_url interactive message.

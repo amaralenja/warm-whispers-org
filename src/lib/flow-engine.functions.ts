@@ -781,7 +781,7 @@ export const saveTriggers = createServerFn({ method: "POST" })
 // Run a flow against a specific contact via webhook (admin)
 export const triggerFlowManually = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { flow_id: string; channel_id: string; contact_wa_id: string; conversation_id?: string }) => d)
+  .inputValidator((d: { flow_id: string; channel_id: string; contact_wa_id: string; conversation_id?: string; initial_quoted_msg_id?: string }) => d)
   .handler(async ({ context, data }) => {
     const db = await dbFor(context);
     if ((context as any).vendor) {
@@ -803,7 +803,7 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       vendor: (context as any).vendor
         ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
         : null,
-      triggerContext: { manual: true },
+      triggerContext: { manual: true, initial_quoted_msg_id: data.initial_quoted_msg_id || null },
       queueOnly: true,
     });
   });

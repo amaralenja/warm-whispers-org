@@ -2061,6 +2061,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   conversation={active}
                   listFlowsFn={listFlowsFn}
                   triggerFn={triggerFlowFn}
+                  replyTo={replyTo}
+                  onClearReplyTo={() => setReplyTo(null)}
                 />
               </footer>
             </>
@@ -2220,7 +2222,17 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
       <DropdownMenuContent align={isOut ? "end" : "start"} className="w-56 rounded-2xl border-chat-line bg-popover">
         {onReply && (
           <DropdownMenuItem onClick={() => onReply(msg)}>
-            <Reply className="mr-2 h-4 w-4" /> Responder
+            <Reply className="mr-2 h-4 w-4 text-chat-accent" /> Responder
+          </DropdownMenuItem>
+        )}
+        {onReply && (
+          <DropdownMenuItem
+            onClick={() => {
+              onReply(msg);
+              toast.info("Mensagem selecionada! Escolha o fluxo abaixo para responder.", { duration: 4000 });
+            }}
+          >
+            <Zap className="mr-2 h-4 w-4 text-amber-400" /> Responder com Fluxo...
           </DropdownMenuItem>
         )}
         {(msg.msg_type === "sticker" || msg.msg_type === "image" || (msg.media_url && (msg.media_url.includes("figurinha") || msg.media_url.endsWith(".webp")))) && (
@@ -3020,10 +3032,14 @@ function FlowInlineBar({
   conversation,
   listFlowsFn,
   triggerFn,
+  replyTo,
+  onClearReplyTo,
 }: {
   conversation: Conv;
   listFlowsFn: any;
   triggerFn: any;
+  replyTo?: Msg | null;
+  onClearReplyTo?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [firing, setFiring] = useState<string | null>(null);
@@ -3094,7 +3110,8 @@ function FlowInlineBar({
 
   function fire(flowId: string) {
     setFiring(flowId);
-    toast.success("Fluxo disparado, rodando em segundo plano");
+    const quotedMsgId = replyTo?.wa_message_id ?? undefined;
+    toast.success(quotedMsgId ? "Disparando fluxo em resposta à mensagem selecionada..." : "Fluxo disparado, rodando em segundo plano");
     Promise.resolve(
       triggerFn({
         data: {
@@ -3102,9 +3119,13 @@ function FlowInlineBar({
           channel_id: conversation.channel_id,
           contact_wa_id: conversation.contact_wa_id,
           conversation_id: conversation.id,
+          initial_quoted_msg_id: quotedMsgId,
         },
       }),
     )
+      .then(() => {
+        if (onClearReplyTo) onClearReplyTo();
+      })
       .catch((e: any) => toast.error(errorToText(e, "Erro ao disparar fluxo")))
       .finally(() => setFiring(null));
   }
