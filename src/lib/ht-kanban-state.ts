@@ -1,9 +1,6 @@
-// Estado compartilhado do Kanban HT (SDR + Closer) persistido no Supabase.
-// Antes tudo ficava só no localStorage do SDR, então o Closer não enxergava
-// os agendamentos. Agora esse módulo mantém um cache em memória sincronizado
-// com a tabela `ht_kanban_state` e emite os mesmos eventos do window que os
-// hooks existentes já escutam.
+// Estado compartilhado do Kanban HT (SDR + Closer) persistido no Supabase + localStorage.
 import { supabase } from "@/integrations/supabase/client";
+import { saveKanbanStateServer } from "@/lib/ht-api.functions";
 
 export type HtKanbanRow = {
   lead_id: string;
@@ -20,9 +17,33 @@ const cache: Cache = new Map();
 let initPromise: Promise<void> | null = null;
 let realtimeStarted = false;
 
+const LS_KEY = "multium_ht_kanban_state_v2";
+
 function emit(evt: string) {
   if (typeof window === "undefined") return;
   try { window.dispatchEvent(new Event(evt)); } catch {}
+}
+
+function loadLocalBackup(): Record<string, HtKanbanRow> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalBackup() {
+  if (typeof window === "undefined") return;
+  try {
+    const obj: Record<string, HtKanbanRow> = {};
+    for (const [id, row] of cache.entries()) {
+      obj[id] = row;
+    }
+    localStorage.setItem(LS_KEY, JSON.stringify(obj));
+  } catch {}
 }
 
 function upsertCache(row: HtKanbanRow) {
@@ -39,12 +60,35 @@ function upsertCache(row: HtKanbanRow) {
 export function ensureHtKanbanState(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
+    // 1. Carrega primeiro do backup local (garante que nada do SDR suma se o banco demorar)
+    const localMap = loadLocalBackup();
+    for (const row of Object.values(localMap)) {
+      if (row?.lead_id) upsertCache(row);
+    }
+
+    // 2. Busca do Supabase e mescla
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("ht_kanban_state")
         .select("lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake");
-      for (const r of (data ?? []) as any[]) upsertCache(r);
+      if (!error && data) {
+        for (const r of data as any[]) {
+          const localRow = localMap[r.lead_id];
+          const merged: HtKanbanRow = {
+            lead_id: r.lead_id,
+            scheduled_at: r.scheduled_at ?? localRow?.scheduled_at ?? null,
+            closer_email: r.closer_email ?? localRow?.closer_email ?? null,
+            sdr_stage: r.sdr_stage ?? localRow?.sdr_stage ?? null,
+            closer_stage: r.closer_stage ?? localRow?.closer_stage ?? null,
+            is_fake: r.is_fake ?? localRow?.is_fake ?? false,
+          };
+          upsertCache(merged);
+        }
+      }
     } catch {}
+
+    saveLocalBackup();
+
     if (!realtimeStarted && typeof window !== "undefined") {
       realtimeStarted = true;
       try {
@@ -55,6 +99,7 @@ export function ensureHtKanbanState(): Promise<void> {
             } else if (payload.new) {
               upsertCache(payload.new as HtKanbanRow);
             }
+            saveLocalBackup();
             emit("ht-sdr-updated");
             emit("ht-fake-updated");
             emit("ht-sched-updated");
@@ -105,8 +150,10 @@ async function upsertPatch(leadId: string, patch: Partial<HtKanbanRow>) {
   };
   const next: HtKanbanRow = { ...cur, ...patch, lead_id: leadId };
   upsertCache(next);
+  saveLocalBackup();
+
   try {
-    await supabase.from("ht_kanban_state").upsert({
+    const { error } = await supabase.from("ht_kanban_state").upsert({
       lead_id: leadId,
       scheduled_at: next.scheduled_at,
       closer_email: next.closer_email,
@@ -115,7 +162,19 @@ async function upsertPatch(leadId: string, patch: Partial<HtKanbanRow>) {
       is_fake: next.is_fake,
       updated_at: new Date().toISOString(),
     }, { onConflict: "lead_id" });
-  } catch {}
+
+    if (error) {
+      console.warn("[ht-kanban-state] Client upsert error, using serverFn fallback:", error.message);
+      await saveKanbanStateServer({ data: next }).catch((e) => {
+        console.error("[ht-kanban-state] ServerFn fallback error:", e);
+      });
+    }
+  } catch (err) {
+    console.warn("[ht-kanban-state] Exception during upsert, using serverFn fallback:", err);
+    await saveKanbanStateServer({ data: next }).catch((e) => {
+      console.error("[ht-kanban-state] ServerFn fallback error:", e);
+    });
+  }
 }
 
 export function setSdrStage(leadId: string, stage: string | null) {

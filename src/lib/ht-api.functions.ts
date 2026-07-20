@@ -161,35 +161,82 @@ async function syncQuizLeadsInternal(supabaseLocal: any) {
     return;
   }
 
-  // Sincroniza no Kanban local
-  const kanbanRowsToInsert = newLeads.map((l: any) => {
-    let sdr_stage = "new";
-    let closer_stage = null;
-    const crmStatus = String(l.crm_status || "").toLowerCase();
-
-    if (crmStatus.includes("fechado") || crmStatus.includes("ganho")) {
-      sdr_stage = "won";
-      closer_stage = "fechado";
-    } else if (crmStatus.includes("perdido") || crmStatus.includes("lost")) {
-      sdr_stage = "lost";
-    } else if (l.crm_data_agendamento || crmStatus.includes("agendado")) {
-      sdr_stage = "scheduled";
-    }
-
-    return {
-      lead_id: l.id,
-      scheduled_at: l.crm_data_agendamento || l.data_criacao || new Date().toISOString(),
-      sdr_stage,
-      closer_stage,
-      is_fake: false,
-      updated_at: l.data_criacao || new Date().toISOString()
-    };
-  });
-
-  await supabaseLocal
+  // Sincroniza no Kanban local APENAS novos leads (não sobrescreve posições salvas pelos SDRs/Closers)
+  const { data: existingKanbanRows } = await supabaseLocal
     .from("ht_kanban_state")
-    .upsert(kanbanRowsToInsert, { onConflict: "lead_id" });
+    .select("lead_id");
+  const existingSet = new Set((existingKanbanRows || []).map((x: any) => String(x.lead_id)));
+
+  const kanbanRowsToInsert = newLeads
+    .filter((l: any) => !existingSet.has(String(l.id)))
+    .map((l: any) => {
+      let sdr_stage = "novos";
+      let closer_stage = null;
+      const crmStatus = String(l.crm_status || "").toLowerCase();
+
+      if (crmStatus.includes("fechado") || crmStatus.includes("ganho")) {
+        sdr_stage = "won";
+        closer_stage = "fechado";
+      } else if (crmStatus.includes("perdido") || crmStatus.includes("lost")) {
+        sdr_stage = "lost";
+      } else if (l.crm_data_agendamento || crmStatus.includes("agendado")) {
+        sdr_stage = "scheduled";
+      }
+
+      return {
+        lead_id: l.id,
+        scheduled_at: l.crm_data_agendamento || l.data_criacao || new Date().toISOString(),
+        sdr_stage,
+        closer_stage,
+        is_fake: false,
+        updated_at: l.data_criacao || new Date().toISOString()
+      };
+    });
+
+  if (kanbanRowsToInsert.length > 0) {
+    await supabaseLocal
+      .from("ht_kanban_state")
+      .insert(kanbanRowsToInsert);
+  }
 }
+
+export const saveKanbanStateServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: {
+    lead_id: string;
+    scheduled_at?: string | null;
+    closer_email?: string | null;
+    sdr_stage?: string | null;
+    closer_stage?: string | null;
+    is_fake?: boolean;
+  }) => ({
+    lead_id: String(data?.lead_id ?? ""),
+    scheduled_at: data?.scheduled_at != null ? String(data.scheduled_at) : null,
+    closer_email: data?.closer_email != null ? String(data.closer_email) : null,
+    sdr_stage: data?.sdr_stage != null ? String(data.sdr_stage) : null,
+    closer_stage: data?.closer_stage != null ? String(data.closer_stage) : null,
+    is_fake: Boolean(data?.is_fake),
+  }))
+  .handler(async ({ data }) => {
+    if (!data.lead_id) throw new Error("lead_id obrigatório");
+    const admin = await getAdminClient();
+    const { error } = await admin
+      .from("ht_kanban_state" as any)
+      .upsert({
+        lead_id: data.lead_id,
+        scheduled_at: data.scheduled_at,
+        closer_email: data.closer_email,
+        sdr_stage: data.sdr_stage,
+        closer_stage: data.closer_stage,
+        is_fake: data.is_fake,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "lead_id" });
+    if (error) {
+      console.error("[saveKanbanStateServer] error:", error);
+      throw new Error(error.message);
+    }
+    return { ok: true };
+  });
 
 async function syncCriarSaasLeadsInternal(supabaseLocal: any) {
   try {
