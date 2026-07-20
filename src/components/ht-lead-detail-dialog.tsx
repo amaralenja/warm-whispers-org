@@ -127,6 +127,7 @@ export function HtLeadDetailDialog({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "sdr" | "closer">("all");
+  const [mainTab, setMainTab] = useState<"all" | "notes" | "quiz">("all");
 
   const [schedDraft, setSchedDraft] = useState<string>("");
   const [closerDraft, setCloserDraft] = useState<string>("");
@@ -325,6 +326,9 @@ export function HtLeadDetailDialog({
     if (!error && data) {
       setNotes((prev) => [...prev, data as any as Note]);
       setDraft("");
+      toast.success("Observação salva com sucesso!");
+    } else if (error) {
+      toast.error("Erro ao salvar observação: " + error.message);
     }
   }
 
@@ -332,7 +336,12 @@ export function HtLeadDetailDialog({
     const prev = notes;
     setNotes((n) => n.filter((x) => x.id !== id));
     const { error } = await supabase.from("ht_lead_notes" as any).delete().eq("id", id);
-    if (error) setNotes(prev);
+    if (error) {
+      setNotes(prev);
+      toast.error("Erro ao remover observação: " + error.message);
+    } else {
+      toast.success("Observação removida");
+    }
   }
 
   if (!open || !lead) return null;
@@ -716,195 +725,256 @@ export function HtLeadDetailDialog({
 
 
 
-          <div className="grid md:grid-cols-[1fr_1.1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40">
-
-            {/* QUIZ */}
-            <div className="p-6 space-y-3">
-              <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground mb-3">
-                <span className="h-px w-6 bg-accent/60" />
+          {/* BARRA DE NAVEGAÇÃO DE ABAS */}
+          <div className="flex items-center justify-between border-b border-border/40 px-6 py-2.5 bg-card/40 backdrop-blur">
+            <div className="flex items-center gap-1.5 p-0.5 rounded-lg bg-background/80 border border-border/60">
+              <button
+                type="button"
+                onClick={() => setMainTab("all")}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-all ${
+                  mainTab === "all"
+                    ? "bg-accent text-accent-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Tudo
+              </button>
+              <button
+                type="button"
+                onClick={() => setMainTab("notes")}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                  mainTab === "notes"
+                    ? "bg-sky-500/20 text-sky-300 border border-sky-500/30 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-sky-400" />
+                Observações SDR / Closer
+                {notes.length > 0 && (
+                  <span className="ml-0.5 text-[10px] px-1.5 py-0.2 rounded-full bg-sky-500/30 text-sky-200 font-mono font-bold">
+                    {notes.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMainTab("quiz")}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                  mainTab === "quiz"
+                    ? "bg-accent/20 text-accent border border-accent/30 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Wallet className="h-3.5 w-3.5 text-accent" />
                 Respostas do Quiz
-              </div>
-              {answers.length === 0 ? (
-                <div className="text-xs text-muted-foreground italic py-4">Sem respostas registradas.</div>
-              ) : (
-                <div className="space-y-2">
-                  {answers.map((a) => {
-                    const Icon = QUIZ_ICONS[a.key] || Wallet;
-                    return (
-                      <div key={a.key}
-                        className="group rounded-lg border border-border/50 bg-card/30 hover:bg-card/60 hover:border-accent/40 transition-colors p-3">
-                        <div className="flex items-start gap-2.5">
-                          <div className="h-7 w-7 shrink-0 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-                            <Icon className="h-3.5 w-3.5 text-accent" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-semibold">
-                              {a.label}
-                            </div>
-                            <div className="text-sm font-medium mt-0.5 leading-snug">{a.value}</div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                {answers.length > 0 && (
+                  <span className="ml-0.5 text-[10px] px-1.5 py-0.2 rounded-full bg-accent/30 text-accent font-mono font-bold">
+                    {answers.length}
+                  </span>
+                )}
+              </button>
+            </div>
+            {mainTab === "all" && (
+              <span className="text-[10px] text-muted-foreground hidden sm:inline font-medium">
+                💡 Observações aparecem em destaque no topo
+              </span>
+            )}
+          </div>
 
-              {/* Informações do Anúncio */}
-              {lead?.utm_source && (
-                <div className="pt-4 border-t border-border/40 mt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
-                    <Megaphone className="h-3 w-3" />
-                    Origem do Anúncio
+          <div className={mainTab === "all" ? "grid md:grid-cols-[1.1fr_1fr] gap-0 divide-y md:divide-y-0 md:divide-x divide-border/40" : "p-6"}>
+
+            {/* NOTAS (Primeiro na ordem do DOM para aparecer no topo em telas menores) */}
+            {(mainTab === "all" || mainTab === "notes") && (
+              <div className="p-6 flex flex-col bg-card/20">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-sky-300 font-bold">
+                    <MessageSquare className="h-3.5 w-3.5 text-sky-400" />
+                    Observações SDR ↔ Closer
                   </div>
-                  {loadingAds ? (
-                    <div className="text-xs text-muted-foreground flex items-center gap-2 py-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-                      Buscando criativo correspondente...
-                    </div>
-                  ) : matchedAd ? (
-                    <div className="rounded-lg border border-border/50 bg-card/30 p-3.5 space-y-3">
-                      {matchedAd.thumbnail && (
-                        <div className="relative aspect-video w-full rounded-md overflow-hidden border border-border/30 bg-muted/40">
-                          <img
-                            src={matchedAd.thumbnail}
-                            alt="Visualização do Anúncio"
-                            className="object-cover w-full h-full"
-                          />
-                        </div>
-                      )}
-                      <div className="space-y-2 text-xs">
-                        <div>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Campanha</span>
-                          <span className="font-semibold text-foreground">{matchedAd.campaignName || "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Conjunto de Anúncios</span>
-                          <span className="font-semibold text-foreground">{matchedAd.adsetName || "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Anúncio</span>
-                          <span className="font-semibold text-accent">{matchedAd.name || "—"}</span>
-                        </div>
-                      </div>
+                  <div className="flex items-center gap-1 p-0.5 rounded-md bg-background/60 border border-border/50">
+                    {(["all", "sdr", "closer"] as const).map((f) => (
+                      <button key={f} onClick={() => setFilter(f)}
+                        className={`text-[10px] px-2 py-1 rounded uppercase tracking-wider transition-colors ${
+                          filter === f
+                            ? f === "sdr" ? "bg-sky-500/20 text-sky-300"
+                            : f === "closer" ? "bg-violet-500/20 text-violet-300"
+                            : "bg-accent/20 text-accent"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}>
+                        {f === "all" ? `Todas ${notes.length}` : f === "sdr" ? `SDR ${sdrCount}` : `Closer ${closerCount}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Composer no TOPO das observações para acesso instantâneo */}
+                <div className="mb-4 pb-4 border-b border-border/40 bg-card/40 p-3 rounded-lg border border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      role === "closer" ? "bg-violet-500/20 text-violet-300 border border-violet-500/30" : "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                    }`}>
+                      Você é {role.toUpperCase()}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                  </div>
+                  <div className="relative">
+                    <Textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") addNote();
+                      }}
+                      placeholder={
+                        role === "sdr"
+                          ? "Escreva contexto pro Closer: interesse, timing, objeções…"
+                          : "Escreva notas do Closer: status da call, follow-up, sinal…"
+                      }
+                      rows={3}
+                      className="text-sm resize-none pr-12 bg-background/80 border-border/60 focus:border-accent/60"
+                    />
+                    <Button
+                      size="icon"
+                      onClick={addNote}
+                      disabled={!draft.trim() || saving}
+                      className="absolute bottom-2 right-2 h-8 w-8 bg-sky-500 hover:bg-sky-400 text-black font-bold"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1.5 text-right font-mono">
+                    ⌘ + Enter para enviar
+                  </div>
+                </div>
+
+                {/* Lista de notas */}
+                <div className="flex-1 space-y-2 min-h-[140px] max-h-[340px] overflow-y-auto pr-1">
+                  {loading ? (
+                    <div className="text-xs text-muted-foreground py-4 text-center">Carregando observações…</div>
+                  ) : filteredNotes.length === 0 ? (
+                    <div className="text-xs text-muted-foreground italic py-6 text-center border border-dashed border-border/40 rounded-lg">
+                      Nenhuma observação {filter !== "all" ? `do ${filter.toUpperCase()}` : "registrada ainda"}.
                     </div>
                   ) : (
-                    <div className="bg-muted/10 border border-border/30 rounded-lg p-3 text-xs space-y-2">
-                      <p className="text-muted-foreground italic">Nenhum criativo associado pôde ser localizado automaticamente no Meta Ads.</p>
-                      <div className="text-[10px] space-y-1 font-mono text-muted-foreground bg-black/20 p-2 rounded">
-                        <div>Source: {lead.utm_source || "—"}</div>
-                        <div>Campaign: {(lead as any).utm_campaign || "—"}</div>
-                        <div>Content: {(lead as any).utm_content || "—"}</div>
-                      </div>
-                    </div>
+                    filteredNotes.map((n) => {
+                      const isCloser = n.role === "closer";
+                      return (
+                        <div key={n.id}
+                          className={`group relative rounded-lg border p-3 pl-3.5 ${
+                            isCloser
+                              ? "border-violet-500/30 bg-violet-500/[0.08]"
+                              : "border-sky-500/30 bg-sky-500/[0.08]"
+                          }`}>
+                          <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${isCloser ? "bg-violet-500" : "bg-sky-500"}`} />
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
+                                isCloser ? "bg-violet-500/25 text-violet-200" : "bg-sky-500/25 text-sky-200"
+                              }`}>
+                                {n.role}
+                              </span>
+                              <span className="text-[11px] font-semibold truncate">{n.author || "—"}</span>
+                              <span className="text-[10px] text-muted-foreground shrink-0">· {fmtDate(n.created_at)}</span>
+                            </div>
+                            <button onClick={() => deleteNote(n.id)}
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-opacity shrink-0"
+                              title="Apagar">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <div className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/90 font-sans">{n.body}</div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
-              )}
-            </div>
-
-            {/* NOTAS */}
-            <div className="p-6 flex flex-col bg-card/20">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
-                  <MessageSquare className="h-3 w-3" />
-                  Observações
-                </div>
-                <div className="flex items-center gap-1 p-0.5 rounded-md bg-background/60 border border-border/50">
-                  {(["all", "sdr", "closer"] as const).map((f) => (
-                    <button key={f} onClick={() => setFilter(f)}
-                      className={`text-[10px] px-2 py-1 rounded uppercase tracking-wider transition-colors ${
-                        filter === f
-                          ? f === "sdr" ? "bg-sky-500/20 text-sky-300"
-                          : f === "closer" ? "bg-violet-500/20 text-violet-300"
-                          : "bg-accent/20 text-accent"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}>
-                      {f === "all" ? `Todas ${notes.length}` : f === "sdr" ? `SDR ${sdrCount}` : `Closer ${closerCount}`}
-                    </button>
-                  ))}
-                </div>
               </div>
+            )}
 
-              <div className="flex-1 space-y-2 min-h-[120px] max-h-[280px] overflow-y-auto pr-1">
-                {loading ? (
-                  <div className="text-xs text-muted-foreground py-4 text-center">Carregando…</div>
-                ) : filteredNotes.length === 0 ? (
-                  <div className="text-xs text-muted-foreground italic py-6 text-center border border-dashed border-border/40 rounded-lg">
-                    Nenhuma observação {filter !== "all" ? `do ${filter.toUpperCase()}` : "ainda"}.
-                  </div>
+            {/* QUIZ */}
+            {(mainTab === "all" || mainTab === "quiz") && (
+              <div className="p-6 space-y-3">
+                <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground mb-3">
+                  <span className="h-px w-6 bg-accent/60" />
+                  Respostas do Quiz ({answers.length})
+                </div>
+                {answers.length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic py-4">Sem respostas registradas.</div>
                 ) : (
-                  filteredNotes.map((n) => {
-                    const isCloser = n.role === "closer";
-                    return (
-                      <div key={n.id}
-                        className={`group relative rounded-lg border p-2.5 pl-3 ${
-                          isCloser
-                            ? "border-violet-500/30 bg-violet-500/[0.06]"
-                            : "border-sky-500/30 bg-sky-500/[0.06]"
-                        }`}>
-                        <div className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg ${isCloser ? "bg-violet-500/60" : "bg-sky-500/60"}`} />
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
-                              isCloser ? "bg-violet-500/20 text-violet-300" : "bg-sky-500/20 text-sky-300"
-                            }`}>
-                              {n.role}
-                            </span>
-                            <span className="text-[10px] font-medium truncate">{n.author || "—"}</span>
-                            <span className="text-[10px] text-muted-foreground shrink-0">· {fmtDate(n.created_at)}</span>
+                  <div className="space-y-2">
+                    {answers.map((a) => {
+                      const Icon = QUIZ_ICONS[a.key] || Wallet;
+                      return (
+                        <div key={a.key}
+                          className="group rounded-lg border border-border/50 bg-card/30 hover:bg-card/60 hover:border-accent/40 transition-colors p-3">
+                          <div className="flex items-start gap-2.5">
+                            <div className="h-7 w-7 shrink-0 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                              <Icon className="h-3.5 w-3.5 text-accent" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-semibold">
+                                {a.label}
+                              </div>
+                              <div className="text-sm font-medium mt-0.5 leading-snug">{a.value}</div>
+                            </div>
                           </div>
-                          <button onClick={() => deleteNote(n.id)}
-                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-opacity shrink-0"
-                            title="Apagar">
-                            <Trash2 className="h-3 w-3" />
-                          </button>
                         </div>
-                        <div className="text-sm leading-snug whitespace-pre-wrap">{n.body}</div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Informações do Anúncio */}
+                {lead?.utm_source && (
+                  <div className="pt-4 border-t border-border/40 mt-4 space-y-3">
+                    <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+                      <Megaphone className="h-3 w-3" />
+                      Origem do Anúncio
+                    </div>
+                    {loadingAds ? (
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 py-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                        Buscando criativo correspondente...
                       </div>
-                    );
-                  })
+                    ) : matchedAd ? (
+                      <div className="rounded-lg border border-border/50 bg-card/30 p-3.5 space-y-3">
+                        {matchedAd.thumbnail && (
+                          <div className="relative aspect-video w-full rounded-md overflow-hidden border border-border/30 bg-muted/40">
+                            <img
+                              src={matchedAd.thumbnail}
+                              alt="Visualização do Anúncio"
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block">Campanha</span>
+                            <span className="font-semibold text-foreground">{matchedAd.campaignName || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block">Conjunto de Anúncios</span>
+                            <span className="font-semibold text-foreground">{matchedAd.adsetName || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block">Anúncio</span>
+                            <span className="font-semibold text-accent">{matchedAd.name || "—"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-muted/10 border border-border/30 rounded-lg p-3 text-xs space-y-2">
+                        <p className="text-muted-foreground italic">Nenhum criativo associado pôde ser localizado automaticamente no Meta Ads.</p>
+                        <div className="text-[10px] space-y-1 font-mono text-muted-foreground bg-black/20 p-2 rounded">
+                          <div>Source: {lead.utm_source || "—"}</div>
+                          <div>Campaign: {(lead as any).utm_campaign || "—"}</div>
+                          <div>Content: {(lead as any).utm_content || "—"}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-
-              {/* Composer */}
-              <div className="mt-3 pt-3 border-t border-border/40">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                    role === "closer" ? "bg-violet-500/20 text-violet-300" : "bg-sky-500/20 text-sky-300"
-                  }`}>
-                    Você é {role.toUpperCase()}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">· {authorName}</span>
-                </div>
-                <div className="relative">
-                  <Textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") addNote();
-                    }}
-                    placeholder={
-                      role === "sdr"
-                        ? "Contexto pro Closer: interesse, timing, objeções…"
-                        : "Notas do Closer: status da call, follow-up, sinal…"
-                    }
-                    rows={3}
-                    className="text-sm resize-none pr-12 bg-background/60 border-border/60 focus:border-accent/60"
-                  />
-                  <Button
-                    size="icon"
-                    onClick={addNote}
-                    disabled={!draft.trim() || saving}
-                    className="absolute bottom-2 right-2 h-8 w-8"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-1.5 text-right">
-                  ⌘ + Enter para enviar
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </DialogContent>
