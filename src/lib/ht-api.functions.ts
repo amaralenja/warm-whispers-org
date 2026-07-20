@@ -344,6 +344,19 @@ export const getKanbanLocalData = createServerFn({ method: "POST" })
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
+    // Sincroniza em background silenciosamente ao consultar os dados locais
+    try {
+      await syncQuizLeadsInternal(client);
+    } catch (err) {
+      console.error("Falha ao sincronizar leads antigos do Quiz em getKanbanLocalData:", err);
+    }
+
+    try {
+      await syncCriarSaasLeadsInternal(client);
+    } catch (err) {
+      console.error("Falha ao sincronizar leads antigos do Criar SaaS em getKanbanLocalData:", err);
+    }
+
     let qVendas = client.from("ht_vendas").select("*").limit(5000);
     if (startIso) qVendas = qVendas.gte("data", startIso);
     if (endIso) qVendas = qVendas.lt("data", endIso);
