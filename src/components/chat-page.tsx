@@ -3102,8 +3102,8 @@ function FlowInlineBar({
     return () => { cancelled = true; };
   }, [vendorKey, opKey, remoteKey, getPref]);
 
-  const { data: flows = [] } = useQuery({
-    queryKey: ["flows-for-dispatch"],
+  const { data: flows = [], isError: flowsError, error: flowsQueryError, refetch: refetchFlows, isFetching: flowsFetching } = useQuery({
+    queryKey: ["flows-for-dispatch", vendorKey, conversation.channel_id, conversation.operacao_id ?? "all"],
     queryFn: () => listFlowsFn({ data: undefined }),
     staleTime: 30_000,
   });
@@ -3195,9 +3195,16 @@ function FlowInlineBar({
           Ordenar
         </Button>
       </div>
-      {compatible.length === 0 ? (
+      {flowsError ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-3 text-xs text-destructive">
+          <span className="min-w-0 truncate">{errorToText(flowsQueryError, "Não consegui carregar as mensagens rápidas")}</span>
+          <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 rounded-xl px-2 text-xs" onClick={() => refetchFlows()} disabled={flowsFetching}>
+            {flowsFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Recarregar"}
+          </Button>
+        </div>
+      ) : compatible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-chat-line bg-chat-panel/50 px-3 py-4 text-center text-xs text-muted-foreground">
-          Nenhum fluxo encontrado
+          {flowsFetching ? "Carregando mensagens rápidas…" : "Nenhum fluxo encontrado"}
         </div>
       ) : (
         <div
