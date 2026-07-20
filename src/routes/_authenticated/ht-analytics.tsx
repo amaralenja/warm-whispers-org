@@ -608,11 +608,8 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           </div>
         </section>
 
-        {/* Funil de Vendas High Ticket */}
-        <section>
-          <SectionTitle overline="Bloco 02" title="Funil de Vendas HT" />
-          <SalesFunnelView leads={leads} vendas={vendas} period={period} />
-        </section>
+        {/* Funil de Vendas HT — removido (duplicado do Funil Tridimensional abaixo) */}
+
 
         {/* Receita por Origem de Tráfego */}
         {vendas.length > 0 && (
@@ -2995,6 +2992,8 @@ function SalesFunnelView({
   }, [leads]);
 
   // 6. Nível 6: Desfecho do Follow-up / Fechamento Posterior
+  // Só conta vendas cujo lead está em status de followup ou remarcado
+  // (evita double-count com firstCallResult.fechadosCall).
   const followupResult = useMemo(() => {
     let fechadosFollowup = 0;
     let descartadosFollowup = 0;
@@ -3002,27 +3001,28 @@ function SalesFunnelView({
 
     for (const v of periodVendas) {
       const l = leads.find((lead) => String(lead.id) === String(v.lead_id));
-      if (l) {
-        const crmStatus = String(l.crm_status || "").toLowerCase();
-        if (crmStatus.includes("followup")) {
-          fechadosFollowup++;
-        } else if (crmStatus.includes("remarcad")) {
-          fechadosSegundaCall++;
-        } else {
-          fechadosFollowup++;
-        }
+      if (!l) continue;
+      const crmStatus = String(l.crm_status || "").toLowerCase();
+      if (crmStatus.includes("remarcad")) {
+        fechadosSegundaCall++;
+      } else if (crmStatus.includes("followup")) {
+        fechadosFollowup++;
       }
     }
 
     for (const l of leads) {
       const crmStatus = String(l.crm_status || "").toLowerCase();
-      if (crmStatus.includes("followup") && (crmStatus.includes("lost") || crmStatus.includes("descartad"))) {
-        discarded: descartadosFollowup++;
+      if (
+        crmStatus.includes("followup") &&
+        (crmStatus.includes("lost") || crmStatus.includes("descartad"))
+      ) {
+        descartadosFollowup++;
       }
     }
 
     return { fechadosFollowup, descartadosFollowup, fechadosSegundaCall };
   }, [leads, periodVendas]);
+
 
   // Taxas de conversão
   const rateSdr = topo.total > 0 ? (sdrAction.ligados / topo.total) * 100 : 0;
