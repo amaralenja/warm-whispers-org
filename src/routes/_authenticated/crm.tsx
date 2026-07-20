@@ -802,6 +802,13 @@ function KanbanCard({
         ) : <span />}
         {lead.fonte && <span>{lead.fonte}</span>}
       </div>
+      {lastOutboundAt && (
+        <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground" title={`Última mensagem enviada: ${new Date(lastOutboundAt).toLocaleString("pt-BR")}`}>
+          <MessageCircle className="h-3 w-3 text-emerald-400" />
+          <span>Últ. envio: <span className="font-semibold text-foreground/80">{formatLastSent(lastOutboundAt)}</span></span>
+        </div>
+      )}
+
     </div>
   );
 }
