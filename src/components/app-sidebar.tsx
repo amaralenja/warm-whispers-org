@@ -1,4 +1,3 @@
-const bootstrapStateInstance = ;
 
 import { useEffect, useState } from "react";
 import { canSee, htDefaultPermissoes, mergePermissoes, type Permissoes } from "@/lib/menu-permissions";
