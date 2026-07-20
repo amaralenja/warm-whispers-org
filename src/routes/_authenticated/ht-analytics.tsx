@@ -1686,12 +1686,7 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
     return leads.filter((l) => {
       if (!isSdrQualifiedLead(l)) return false;
       const c = (l.caixa_letra ?? "").toUpperCase().trim();
-      if (!q) {
-        if (!c || !"BCDEFG".includes(c)) return false;
-        if (caixaFilter !== "all" && c !== caixaFilter) return false;
-      } else if (caixaFilter !== "all" && c !== caixaFilter) {
-        return false;
-      }
+      if (caixaFilter !== "all" && c !== caixaFilter) return false;
       if (utmFilter !== "all" && (l.utm_source ?? "") !== utmFilter) return false;
       if (onlyFinalizados && !isFinalizado(l)) return false;
       if (q) {
