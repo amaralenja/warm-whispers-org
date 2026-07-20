@@ -1306,6 +1306,51 @@ export type Database = {
         }
         Relationships: []
       }
+      leads_upsell: {
+        Row: {
+          caixa_investimento: string | null
+          comprometimento: string | null
+          created_at: string
+          email: string
+          faturamento_atual: string | null
+          id: string
+          idade: number | null
+          instagram: string | null
+          meta_faturamento: string | null
+          nome: string
+          profissao: string | null
+          telefone: string
+        }
+        Insert: {
+          caixa_investimento?: string | null
+          comprometimento?: string | null
+          created_at?: string
+          email: string
+          faturamento_atual?: string | null
+          id?: string
+          idade?: number | null
+          instagram?: string | null
+          meta_faturamento?: string | null
+          nome: string
+          profissao?: string | null
+          telefone: string
+        }
+        Update: {
+          caixa_investimento?: string | null
+          comprometimento?: string | null
+          created_at?: string
+          email?: string
+          faturamento_atual?: string | null
+          id?: string
+          idade?: number | null
+          instagram?: string | null
+          meta_faturamento?: string | null
+          nome?: string
+          profissao?: string | null
+          telefone?: string
+        }
+        Relationships: []
+      }
       meta_ads_config: {
         Row: {
           access_token: string
