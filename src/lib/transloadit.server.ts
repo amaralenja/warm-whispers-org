@@ -141,7 +141,7 @@ export async function convertVideoToWhatsappMp4(sourceUrl: string): Promise<stri
         acodec: "aac",
         pix_fmt: "yuv420p",
         movflags: "+faststart",
-        profile:v: "main",
+        "profile:v": "main",
         level: "4.0",
         "b:v": "1800k",
         "maxrate": "2200k",
