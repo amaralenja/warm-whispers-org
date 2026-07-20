@@ -856,7 +856,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
 
     const normPhoneKeys = (rawPhone: string | null | undefined): string[] => {
-      const d = digits(rawPhone);
+      const d = digits(rawPhone ?? "");
       if (!d) return [];
       const set = new Set<string>([d]);
       const last8 = d.slice(-8);
