@@ -93,7 +93,18 @@ type QLead = {
 const isFinalizado = (l: QLead) => {
   if (!l) return false;
   if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
-  return !!(l.whatsapp || l.email || l.caixa_letra || l.faturamento || l.nome);
+  if (l.crm_status && l.crm_status.trim() !== "") return true;
+
+  const step = (l.last_step ?? l.funil ?? "").toLowerCase().trim();
+  if (["finish", "finalizado", "completed", "complete", "sucesso", "obrigado", "done"].includes(step)) {
+    return true;
+  }
+
+  // Se possui caixa definido e respostas das etapas avançadas do quiz
+  const hasCaixa = !!(l.caixa_letra || l.caixa_label);
+  const hasQuizData = !!(l.faturamento || l.comprometimento || l.momento || l.objetivo || l.investir || l.socio || l.minicurso);
+
+  return hasCaixa && hasQuizData;
 };
 
 const isQuente = (l: QLead) => {
