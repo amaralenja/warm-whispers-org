@@ -692,16 +692,18 @@ function Kanban({
 
 
 function KanbanCard({
-  lead, stageColor, tagColors, avatarUrl, onEdit, onOpenChat, onDragStart,
+  lead, stageColor, tagColors, avatarUrl, lastOutboundAt, onEdit, onOpenChat, onDragStart,
 }: {
   lead: Lead;
   stageColor: string;
   tagColors: Map<string, string>;
   avatarUrl?: string | null;
+  lastOutboundAt?: string | null;
   onEdit: () => void;
   onOpenChat: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, lead: Lead) => void;
 }) {
+
   const avatarColor = colorFromName(lead.nome);
   const initials = initialsOf(lead.nome);
   const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
