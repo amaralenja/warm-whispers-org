@@ -449,9 +449,11 @@ async function hasRecentManualCancellation(ctx: Ctx): Promise<boolean> {
   const { data } = await ctx.db
     .from("wa_flow_runs" as any)
     .select("id")
+    .eq("flow_id", ctx.flowId)
     .eq("channel_id", ctx.channelId)
     .in("contact_wa_id", variants.length > 0 ? variants : [ctx.contactWaId])
     .eq("status", "cancelled")
+    .neq("id", ctx.runId)
     .gte("updated_at", since)
     .order("updated_at", { ascending: false })
     .limit(1)
