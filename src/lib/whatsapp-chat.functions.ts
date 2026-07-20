@@ -186,6 +186,30 @@ async function metaProxyForChannel(
   }
 }
 
+function shouldNormalizeWhatsappImage(url: string): boolean {
+  const clean = String(url ?? "").split("?")[0].toLowerCase();
+  return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif");
+}
+
+function shouldNormalizeWhatsappVideo(url: string): boolean {
+  const clean = String(url ?? "").split("?")[0].toLowerCase();
+  return clean.endsWith(".mov") || clean.endsWith(".quicktime") || clean.endsWith(".hevc") || clean.endsWith(".heic") || clean.endsWith(".m4v") || !clean.endsWith(".mp4");
+}
+
+async function withRetry<T>(label: string, attempts: number, fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[whatsapp-chat] ${label} tentativa ${i + 1} falhou`, e);
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 900 * (i + 1)));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? `${label} falhou`));
+}
+
 // --- DB reads ---
 
 async function dbFor(context: any) {
@@ -1101,7 +1125,16 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       }
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
-      body[data.type] = { link: data.mediaUrl, ...(data.caption && data.type !== "sticker" ? { caption: data.caption } : {}) };
+      let mediaUrl = data.mediaUrl;
+      if (data.type === "image" && shouldNormalizeWhatsappImage(mediaUrl)) {
+        const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
+        mediaUrl = await withRetry("converter imagem", 3, () => convertImageToWhatsappJpeg(data.mediaUrl!));
+      }
+      if (data.type === "video" && shouldNormalizeWhatsappVideo(mediaUrl)) {
+        const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
+        mediaUrl = await withRetry("converter vídeo", 3, () => convertVideoToWhatsappMp4(data.mediaUrl!));
+      }
+      body[data.type] = { link: mediaUrl, ...(data.caption && data.type !== "sticker" ? { caption: data.caption } : {}) };
     } else if (data.type === "document") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
       body.document = { link: data.mediaUrl, filename: data.filename || "arquivo", ...(data.caption ? { caption: data.caption } : {}) };

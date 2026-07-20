@@ -96,6 +96,11 @@ function shouldNormalizeWhatsappImage(url: string): boolean {
   return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif");
 }
 
+function shouldNormalizeWhatsappVideo(url: string): boolean {
+  const clean = String(url ?? "").split("?")[0].toLowerCase();
+  return clean.endsWith(".mov") || clean.endsWith(".quicktime") || clean.endsWith(".hevc") || clean.endsWith(".heic") || clean.endsWith(".m4v") || !clean.endsWith(".mp4");
+}
+
 async function resolveStageFromTags(db: any, tags: string[], operation?: unknown) {
   const tagNames = [...new Set(jsonArray<string>(tags).map((t) => String(t ?? "").trim()).filter(Boolean))];
   if (tagNames.length === 0) return null;
@@ -669,6 +674,23 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
           }
           if (shouldNormalizeWhatsappImage(finalUrl)) {
             throw new Error(`Falha ao otimizar imagem pra WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
+          }
+        }
+        if (mediaType === "video" && shouldNormalizeWhatsappVideo(finalUrl)) {
+          const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
+          let lastErr: unknown = null;
+          for (let i = 0; i < 3; i++) {
+            try {
+              finalUrl = await convertVideoToWhatsappMp4(finalUrl);
+              break;
+            } catch (e) {
+              lastErr = e;
+              console.error(`Flow video conversion attempt ${i + 1} failed:`, e);
+              await new Promise((r) => setTimeout(r, 1800 * (i + 1)));
+            }
+          }
+          if (shouldNormalizeWhatsappVideo(finalUrl)) {
+            throw new Error(`Falha ao converter vídeo pra WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
           }
         }
         inner.link = finalUrl;
