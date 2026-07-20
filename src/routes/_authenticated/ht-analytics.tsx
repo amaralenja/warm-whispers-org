@@ -92,7 +92,7 @@ type QLead = {
 
 const isFinalizado = (l: QLead) => {
   if (!l) return false;
-  if (l.id?.startsWith("htq:") || l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
+  if (l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
   if (l.crm_status && l.crm_status.trim() !== "") return true;
 
   const step = (l.last_step ?? l.funil ?? "").toLowerCase().trim();
@@ -1640,9 +1640,9 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
   const eligible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return leads.filter((l) => {
-      const c = (l.caixa_letra ?? "").toUpperCase();
+      const c = (l.caixa_letra ?? "").toUpperCase().trim();
       if (!q) {
-        if (!"BCDEFG".includes(c)) return false;
+        if (!c || !"BCDEFG".includes(c)) return false;
         if (caixaFilter !== "all" && c !== caixaFilter) return false;
       } else if (caixaFilter !== "all" && c !== caixaFilter) {
         return false;
