@@ -3278,8 +3278,10 @@ function SalesFunnelView({
           <div>Total Geral Convertido: <span className="text-emerald-400 font-bold">{fmtInt(totalCloserFechados)}</span></div>
           <div>Conversão Geral do Funil: <span className="text-accent font-bold">{rateFinal.toFixed(1)}%</span></div>
         </div>
+      </div>
       </Card>
   );
+
 }
 
 function ReceitaPorOrigemView({ leads, vendas }: { leads: QLead[]; vendas: any[] }) {
