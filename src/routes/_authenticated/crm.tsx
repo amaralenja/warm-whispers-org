@@ -643,6 +643,8 @@ function Kanban({
                     stageColor={s.cor}
                     tagColors={tagColors}
                     avatarUrl={avatarFor(avatarMap, lead.telefone)}
+                    lastOutboundAt={lastOutboundFor(lastOutMap, lead.telefone)}
+
                     onEdit={() => onEdit(lead)}
                     onOpenChat={() => openChatForLead(lead)}
                     onDragStart={onDragStart}
