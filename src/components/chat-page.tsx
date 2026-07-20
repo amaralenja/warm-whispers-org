@@ -407,7 +407,7 @@ function formatDateLabel(iso: unknown) {
 }
 
 function getLeadAttributionBadge(lead: any) {
-  if (!lead) return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+  if (!lead) return null;
 
   const src = String(lead.utm_source || lead.origem || "").toLowerCase().trim();
   const med = String(lead.utm_medium || "").toLowerCase().trim();
@@ -436,7 +436,7 @@ function getLeadAttributionBadge(lead: any) {
     return { text: "Tráfego Pago", class: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30", textShort: "Tráfego Pago" };
   }
 
-  return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+  return null;
 }
 
 function StatusTick({ status }: { status: string | null }) {
@@ -844,21 +844,36 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const map = new Map<string, any>();
     const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
 
-    const storeInMap = (d: string, item: any) => {
-      if (!d) return;
-      map.set(d, item);
+    const normPhoneKeys = (rawPhone: string | null | undefined): string[] => {
+      const d = digits(rawPhone);
+      if (!d) return [];
+      const set = new Set<string>([d]);
       const last8 = d.slice(-8);
-      if (last8 && !map.has(last8)) map.set(last8, item);
-      if (d.startsWith("55") && d.length > 10) {
-        const without55 = d.slice(2);
-        if (!map.has(without55)) map.set(without55, item);
+      if (last8) set.add(last8);
+      const local = d.startsWith("55") && d.length > 10 ? d.slice(2) : d;
+      set.add(local);
+      set.add("55" + local);
+      if (local.length === 11 && local[2] === "9") {
+        const without9 = local.slice(0, 2) + local.slice(3);
+        set.add(without9);
+        set.add("55" + without9);
+      } else if (local.length === 10) {
+        const with9 = local.slice(0, 2) + "9" + local.slice(2);
+        set.add(with9);
+        set.add("55" + with9);
+      }
+      return Array.from(set);
+    };
+
+    const storeInMap = (rawPhone: string | null | undefined, item: any) => {
+      for (const k of normPhoneKeys(rawPhone)) {
+        if (k && !map.has(k)) map.set(k, item);
       }
     };
 
     // 1. Preenche primeiro com submissões do Quiz/Typebot (que têm dados completos de UTM!)
     for (const sub of (typebotLeads as any[])) {
-      const d = digits(sub?.whatsapp ?? sub?.telefone);
-      if (d) {
+      if (sub?.whatsapp || sub?.telefone) {
         const item = {
           id: sub.id,
           nome: sub.nome,
@@ -871,17 +886,19 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           origem: sub.origem,
           status: sub.status,
         };
-        storeInMap(d, item);
+        storeInMap(sub.whatsapp ?? sub.telefone, item);
       }
     }
 
     // 2. Mescla com crm_leads (preservando UTMs do quiz caso o CRM esteja sem)
     for (const l of (crmLeadsForStage as any[])) {
-      const d = digits(l?.telefone ?? l?.whatsapp);
-      if (d) {
-        const last8 = d.slice(-8);
-        const without55 = d.startsWith("55") && d.length > 10 ? d.slice(2) : null;
-        const existing = map.get(d) || (last8 ? map.get(last8) : null) || (without55 ? map.get(without55) : null);
+      const phone = l?.telefone ?? l?.whatsapp;
+      if (phone) {
+        const keys = normPhoneKeys(phone);
+        let existing: any = null;
+        for (const k of keys) {
+          if (map.has(k)) { existing = map.get(k); break; }
+        }
 
         const item = {
           ...l,
@@ -890,7 +907,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           utm_campaign: l?.utm_campaign || existing?.utm_campaign || null,
           utm_content: l?.utm_content || existing?.utm_content || null,
         };
-        storeInMap(d, item);
+        storeInMap(phone, item);
       }
     }
 
@@ -1542,6 +1559,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             )}
                             {leadForConv && (() => {
                               const attr = getLeadAttributionBadge(leadForConv);
+                              if (!attr) return null;
                               return (
                                 <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${attr.class} font-semibold uppercase`}>
                                   {attr.textShort}
@@ -1802,12 +1820,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       {(() => {
                         const lead = findLeadForConv(active.contact_wa_id);
                         const attr = getLeadAttributionBadge(lead);
+                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
                         const campaign = (lead as any)?.utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
                         const adContent = (lead as any)?.utm_content ? ` · Anúncio: ${(lead as any).utm_content}` : "";
 
                         return (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${attr.class}`} title={`Atribuição: ${attr.text}${campaign}${adContent}`}>
-                            {attr.text}{campaign}{adContent}
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${badgeObj.class}`} title={`Atribuição: ${badgeObj.text}${campaign}${adContent}`}>
+                            {badgeObj.text}{campaign}{adContent}
                           </span>
                         );
                       })()}
