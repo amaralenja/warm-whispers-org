@@ -1,4 +1,5 @@
-
+const bootstrapStateInstance = ;
+const bootstrapStateInstance = ;
 import { useEffect, useState } from "react";
 import { canSee, htDefaultPermissoes, mergePermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
