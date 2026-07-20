@@ -605,7 +605,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           </div>
         </section>
 
-        {/* Funil de Vendas Hight Ticket */}
+        {/* Funil de Vendas High Ticket */}
         <section>
           <SectionTitle overline="Bloco 02" title="Funil de Vendas HT" />
           <SalesFunnelView leads={leads} vendas={vendas} period={period} />
@@ -614,14 +614,14 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         {/* Receita por Origem de Tráfego */}
         {vendas.length > 0 && (
           <section>
-            <SectionTitle overline="Bloco 02B" title="Receita por Origem de Tráfego" />
+            <SectionTitle overline="Bloco 03" title="Receita por Origem de Tráfego" />
             <ReceitaPorOrigemView leads={leads} vendas={vendas} />
           </section>
         )}
 
-        {/* KPIs — Funil */}
+        {/* KPIs — Métricas do Quiz */}
         <section>
-          <SectionTitle overline="Bloco 02" title="Funil do Quiz" />
+          <SectionTitle overline="Bloco 04" title="Resumo do Quiz" />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Kpi icon={<Users className="h-4 w-4" />} label="Iniciados"
               value={fmtInt(kpis.iniciados)} sub="Abriram o formulário" />
