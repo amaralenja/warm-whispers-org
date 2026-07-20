@@ -139,15 +139,18 @@ const isSdrQualifiedLead = (l: QLead): boolean => {
       return false;
     }
 
-    const nums = fatRaw.match(/\d+/g)?.map(Number);
+    // Remove separadores de milhar pt-BR ("R$10.000" → "R$10000") antes de extrair números
+    const cleanFat = fatRaw.replace(/\.(?=\d{3}\b)/g, "");
+    const nums = cleanFat.match(/\d+/g)?.map(Number);
     if (nums && nums.length > 0) {
       const maxVal = Math.max(...nums);
-      const isK = fatRaw.includes("k");
+      const isK = cleanFat.includes("k");
       const realVal = isK && maxVal < 1000 ? maxVal * 1000 : maxVal;
       if (realVal > 0 && realVal < 5000) {
         return false;
       }
     }
+
   }
 
   // 3. Se Caixa é B (1k-5k) e o Faturamento é < 5k ou indisponível/baixo, descarta
