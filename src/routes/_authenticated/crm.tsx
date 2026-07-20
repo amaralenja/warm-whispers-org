@@ -535,6 +535,8 @@ function Kanban({
   }, [leads, stages]);
 
   const avatarMap = useLeadAvatars(useMemo(() => leads.map((l) => l.telefone), [leads]));
+  const lastOutMap = useLastOutboundMap(useMemo(() => leads.map((l) => l.telefone), [leads]));
+
 
 
 
