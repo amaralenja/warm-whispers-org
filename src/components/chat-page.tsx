@@ -403,6 +403,39 @@ function formatDateLabel(iso: unknown) {
   return d.toLocaleDateString("pt-BR");
 }
 
+function getLeadAttributionBadge(lead: any) {
+  if (!lead) return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+
+  const src = String(lead.utm_source || lead.origem || "").toLowerCase().trim();
+  const med = String(lead.utm_medium || "").toLowerCase().trim();
+  const camp = String(lead.utm_campaign || "").toLowerCase().trim();
+
+  // 1. Criar SaaS
+  if (src === "criar_saas" || lead.origem === "criar_saas") {
+    return { text: "Criar SaaS", class: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30", textShort: "Criar SaaS" };
+  }
+
+  // 2. Prospecção SDR
+  if (src === "sdr-manual" || med === "sdr-manual" || src.includes("sdr")) {
+    return { text: "Prospecção SDR", class: "bg-blue-500/15 text-blue-300 border-blue-500/30", textShort: "SDR" };
+  }
+
+  // 3. Google Ads
+  if (src.includes("google") || src.includes("gads") || lead.gclid) {
+    return { text: "Google Ads", class: "bg-amber-500/15 text-amber-300 border-amber-500/30", textShort: "GAds" };
+  }
+
+  // 4. Tráfego Pago / Meta Ads (fb, ig, facebook, instagram, meta, ads, cpc, cpm, paid, etc.)
+  const isPaidSrc = src.includes("fb") || src.includes("ig") || src.includes("facebook") || src.includes("instagram") || src.includes("meta") || src.includes("ads") || src === "fb" || src === "ig";
+  const isPaidMed = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+
+  if (isPaidSrc || isPaidMed || !!camp || !!lead.fbclid || !!lead.fbc) {
+    return { text: "Tráfego Pago", class: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30", textShort: "Tráfego Pago" };
+  }
+
+  return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+}
+
 function StatusTick({ status }: { status: string | null }) {
   if (status === "failed") return <span className="text-[10px] font-bold text-destructive">erro</span>;
   if (status === "pending") return <Clock className="h-3.5 w-3.5 text-white/70 animate-pulse" />;
@@ -807,12 +840,44 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const leadByPhone = useMemo(() => {
     const map = new Map<string, any>();
     const digits = (s: string) => String(s ?? "").replace(/\D+/g, "");
-    for (const l of (crmLeadsForStage as any[])) {
-      const d = digits(l?.telefone);
-      if (d) map.set(d, l);
+
+    // 1. Preenche primeiro com submissões do Quiz/Typebot (que têm dados completos de UTM!)
+    for (const sub of (typebotLeads as any[])) {
+      const d = digits(sub?.whatsapp ?? sub?.telefone);
+      if (d) {
+        map.set(d, {
+          id: sub.id,
+          nome: sub.nome,
+          whatsapp: sub.whatsapp,
+          email: sub.email,
+          utm_source: sub.utm_source,
+          utm_medium: sub.utm_medium,
+          utm_campaign: sub.utm_campaign,
+          utm_content: sub.utm_content,
+          origem: sub.origem,
+          status: sub.status,
+          respostas: sub.respostas,
+        });
+      }
     }
+
+    // 2. Mescla com crm_leads (preservando UTMs do quiz caso o CRM esteja sem)
+    for (const l of (crmLeadsForStage as any[])) {
+      const d = digits(l?.telefone ?? l?.whatsapp);
+      if (d) {
+        const existing = map.get(d);
+        map.set(d, {
+          ...l,
+          utm_source: l?.utm_source || existing?.utm_source || null,
+          utm_medium: l?.utm_medium || existing?.utm_medium || null,
+          utm_campaign: l?.utm_campaign || existing?.utm_campaign || null,
+          utm_content: l?.utm_content || existing?.utm_content || null,
+        });
+      }
+    }
+
     return map;
-  }, [crmLeadsForStage]);
+  }, [crmLeadsForStage, typebotLeads]);
   const findLeadForConv = (waId: string | null | undefined): any | null => {
     const d = String(waId ?? "").replace(/\D+/g, "");
     if (!d) return null;
@@ -1452,34 +1517,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                               </Badge>
                             )}
                             {leadForConv && (() => {
-                              const utmSource = String(leadForConv.utm_source || "").toLowerCase();
-                              const utmMedium = String(leadForConv.utm_medium || "").toLowerCase();
-                              const isInstagram = utmSource.includes("ig") || utmSource.includes("instagram");
-                              const isFacebook = utmSource.includes("fb") || utmSource.includes("facebook");
-                              const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(utmMedium);
-                              const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(utmSource);
-                              const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook;
-
-                              let badgeText = "Orgânico";
-                              let badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
-
-                              if (utmSource === "criar_saas" || (leadForConv as any).origem === "criar_saas") {
-                                badgeText = "Criar SaaS";
-                                badgeClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
-                              } else if (hasFbTracking && (utmSource.includes("ads") || utmSource.includes("fb") || utmSource.includes("ig") || utmSource.includes("facebook") || utmSource.includes("instagram") || isPaidMedium)) {
-                                badgeText = "Ads";
-                                badgeClass = "bg-indigo-500/10 text-indigo-400 border-indigo-500/30";
-                              } else if (utmSource.includes("google") || (leadForConv as any).gclid) {
-                                badgeText = "GAds";
-                                badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
-                              } else if (utmSource === "sdr-manual") {
-                                badgeText = "SDR";
-                                badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/30";
-                              }
-
+                              const attr = getLeadAttributionBadge(leadForConv);
                               return (
-                                <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${badgeClass} font-semibold uppercase`}>
-                                  {badgeText}
+                                <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${attr.class} font-semibold uppercase`}>
+                                  {attr.textShort}
                                 </Badge>
                               );
                             })()}
@@ -1736,39 +1777,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       <span className="text-sm font-mono text-muted-foreground">{toText(active.contact_wa_id)}</span>
                       {(() => {
                         const lead = findLeadForConv(active.contact_wa_id);
-                        if (!lead) return null;
-                        
-                        const utmSource = String(lead.utm_source || "").toLowerCase();
-                        const utmMedium = String(lead.utm_medium || "").toLowerCase();
-                        const isInstagram = utmSource.includes("ig") || utmSource.includes("instagram");
-                        const isFacebook = utmSource.includes("fb") || utmSource.includes("facebook");
-                        const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(utmMedium);
-                        const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(utmSource);
-                        const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook;
-
-                        let badgeText = "Orgânico";
-                        let badgeClass = "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
-
-                        if (utmSource === "criar_saas" || (lead as any).origem === "criar_saas") {
-                          badgeText = "Criar SaaS";
-                          badgeClass = "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
-                        } else if (hasFbTracking && (utmSource.includes("ads") || utmSource.includes("fb") || utmSource.includes("ig") || utmSource.includes("facebook") || utmSource.includes("instagram") || isPaidMedium)) {
-                          badgeText = "Tráfego Pago";
-                          badgeClass = "bg-indigo-500/15 text-indigo-300 border-indigo-500/30";
-                        } else if (utmSource.includes("google") || (lead as any).gclid) {
-                          badgeText = "Google Ads";
-                          badgeClass = "bg-amber-500/15 text-amber-300 border-amber-500/30";
-                        } else if (utmSource.includes("sdr-manual")) {
-                          badgeText = "Prospecção SDR";
-                          badgeClass = "bg-blue-500/15 text-blue-300 border-blue-500/30";
-                        }
-
-                        const campaign = (lead as any).utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
-                        const adContent = (lead as any).utm_content ? ` · Anúncio: ${(lead as any).utm_content}` : "";
+                        const attr = getLeadAttributionBadge(lead);
+                        const campaign = (lead as any)?.utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
+                        const adContent = (lead as any)?.utm_content ? ` · Anúncio: ${(lead as any).utm_content}` : "";
 
                         return (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${badgeClass}`} title={`Atribuição: ${badgeText}${campaign}${adContent}`}>
-                            {badgeText}{campaign}{adContent}
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${attr.class}`} title={`Atribuição: ${attr.text}${campaign}${adContent}`}>
+                            {attr.text}{campaign}{adContent}
                           </span>
                         );
                       })()}
