@@ -295,7 +295,7 @@ function CRMPage() {
     return leads.filter((l) => {
       if (opActive && opActive !== "all") {
         const exp = (l.expert || "").trim();
-        if (exp && !sameWorkspaceStr(exp, opActive)) return false;
+        if (!exp || !sameWorkspaceStr(exp, opActive)) return false;
       }
       if (!term) return true;
       const blob = [l.nome, l.telefone, l.email, l.responsavel_nome, l.fonte, ...(l.tags ?? [])]
