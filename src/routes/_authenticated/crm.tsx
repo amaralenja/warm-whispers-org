@@ -102,6 +102,72 @@ function avatarFor(map: Map<string, string>, phone: string | null | undefined): 
   return null;
 }
 
+function useLastOutboundMap(phones: (string | null | undefined)[]): Map<string, string> {
+  const [map, setMap] = useState<Map<string, string>>(new Map());
+  const key = useMemo(() => {
+    const all = new Set<string>();
+    for (const p of phones) for (const v of phoneVariants(p)) all.add(v);
+    return Array.from(all).sort().join(",");
+  }, [phones]);
+
+  useEffect(() => {
+    if (!key) { setMap(new Map()); return; }
+    let cancelled = false;
+    (async () => {
+      const ids = key.split(",").filter(Boolean);
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 200) chunks.push(ids.slice(i, i + 200));
+      const m = new Map<string, string>();
+      for (const c of chunks) {
+        const { data } = await supabase
+          .from("wa_messages")
+          .select("to_wa_id, created_at")
+          .eq("direction", "out")
+          .in("to_wa_id", c)
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        for (const row of data ?? []) {
+          const digits = String((row as any).to_wa_id ?? "").replace(/\D+/g, "");
+          const ts = String((row as any).created_at ?? "");
+          if (!digits || !ts) continue;
+          const prev = m.get(digits);
+          if (!prev || prev < ts) m.set(digits, ts);
+        }
+      }
+      if (!cancelled) setMap(m);
+    })();
+    return () => { cancelled = true; };
+  }, [key]);
+
+  return map;
+}
+
+function lastOutboundFor(map: Map<string, string>, phone: string | null | undefined): string | null {
+  let best: string | null = null;
+  for (const v of phoneVariants(phone)) {
+    const hit = map.get(v);
+    if (hit && (!best || hit > best)) best = hit;
+  }
+  return best;
+}
+
+function formatLastSent(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (sameDay) return `${hh}:${mm}`;
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 1) return `ontem ${hh}:${mm}`;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mo} ${hh}:${mm}`;
+}
+
+
 
 export const Route = createFileRoute("/_authenticated/crm")({
   component: CRMPage,
