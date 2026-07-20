@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import logoMultium from "@/assets/logo-multium.webp";
 
@@ -10,6 +10,13 @@ export const Route = createFileRoute("/auth")({
       { title: "Entrar — MULTIUM" },
       { name: "description", content: "Acesse sua conta MULTIUM" },
     ],
+    scripts: [
+      {
+        src: "https://rastre-web.vercel.app/loader.js",
+        "data-site": "site_321gli8fici",
+        async: true,
+      },
+    ],
   }),
   component: AuthPage,
 });
@@ -19,6 +26,18 @@ type Role = "admin" | "vendedor" | "ht";
 function AuthPage() {
   const navigate = useNavigate();
   const [role, setRole] = useState<Role>("admin");
+
+  useEffect(() => {
+    const scriptId = "rastre-web-loader";
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://rastre-web.vercel.app/loader.js";
+      script.setAttribute("data-site", "site_321gli8fici");
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
