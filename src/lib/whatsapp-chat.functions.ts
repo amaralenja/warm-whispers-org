@@ -1037,6 +1037,13 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
             .update({ wa_message_id: waMsgId, status: "sent", raw: { request: sendBody, response: resp, ...replyMeta } })
             .eq("id", insertedMessageId);
         }
+
+        // Atualiza o last_message_status da conversa para 'sent'
+        await db
+          .from("wa_conversations" as any)
+          .update({ last_message_status: "sent" })
+          .eq("id", conversationId);
+
         return { waMsgId, messageId: insertedMessageId };
       } catch (e: any) {
         const rawMessage = e?.message ? String(e.message) : "Falha ao enviar no WhatsApp";
@@ -1061,6 +1068,12 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
             .update({ status: "failed", raw: { request: sendBody, error: rawMessage } })
             .eq("id", insertedMessageId);
         }
+
+        await db
+          .from("wa_conversations" as any)
+          .update({ last_message_status: "failed" })
+          .eq("id", conversationId);
+
         throw new Error(friendly);
       }
     }
@@ -1078,9 +1091,14 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
 
     if (data.type === "audio") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
-      const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
-      const voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
-      body.audio = { link: voiceUrl, voice: true };
+      try {
+        const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
+        const voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
+        body.audio = { link: voiceUrl || data.mediaUrl, voice: true };
+      } catch (audioErr: any) {
+        console.warn("[sendWhatsappMessage] Converter áudio falhou/timeout, enviando URL direto:", audioErr?.message);
+        body.audio = { link: data.mediaUrl, voice: true };
+      }
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
       body[data.type] = { link: data.mediaUrl, ...(data.caption && data.type !== "sticker" ? { caption: data.caption } : {}) };

@@ -405,18 +405,19 @@ function formatDateLabel(iso: unknown) {
 
 function StatusTick({ status }: { status: string | null }) {
   if (status === "failed") return <span className="text-[10px] font-bold text-destructive">erro</span>;
-  if (status === "pending") return <Clock className="h-3.5 w-3.5 text-white/70" />;
+  if (status === "pending") return <Clock className="h-3.5 w-3.5 text-white/70 animate-pulse" />;
   if (status === "read") return <CheckCheck className="h-3.5 w-3.5 drop-shadow-sm" style={{ color: "#7ec8ff" }} strokeWidth={3} />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
-  return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+  return <Check className="h-3.5 w-3.5 text-white/80" strokeWidth={2.5} />;
 }
 
 function PreviewStatusTick({ status }: { status: string | null }) {
   if (status === "read") return <CheckCheck className="h-3.5 w-3.5 shrink-0 drop-shadow-sm" style={{ color: "#7ec8ff" }} strokeWidth={3} />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 shrink-0 text-white/85" strokeWidth={2.5} />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 shrink-0 text-white/85" strokeWidth={2.5} />;
-  return <Clock className="h-3.5 w-3.5 shrink-0 text-white/60" />;
+  if (status === "pending") return <Clock className="h-3.5 w-3.5 shrink-0 text-white/60 animate-pulse" />;
+  return <Check className="h-3.5 w-3.5 shrink-0 text-white/60" strokeWidth={2.5} />;
 }
 
 function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}) {
@@ -1086,11 +1087,14 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       return { optimisticId, conversationId: vars.conversationId };
 
     },
-    onSuccess: () => {
-      // NÃO limpar `draft` aqui: essa mesma mutation é usada pra enviar áudio,
-      // imagem, vídeo e documento. Se o vendedor tá digitando e um envio de mídia
-      // termina no meio, o setDraft("") apagava o texto que ele tava escrevendo.
-      // O envio de texto já limpa o draft de forma otimista em handleSendText().
+    onSuccess: (dataRes, _vars, ctx) => {
+      if (ctx?.conversationId && ctx.optimisticId) {
+        qc.setQueryData(["wa-messages", ctx.conversationId], (old: unknown) =>
+          asArray<Msg>(old).map((m) =>
+            m.id === ctx.optimisticId ? { ...m, status: "sent", wa_message_id: dataRes?.waMsgId ?? null } : m,
+          ),
+        );
+      }
       qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
