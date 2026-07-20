@@ -108,13 +108,13 @@ export const listCrmLeads = createServerFn({ method: "GET" })
       if (error) throw new Error(error.message);
       rows = (data ?? []) as any[];
     }
-    // Escopo estrito por vendedor: só mostra leads cujo responsável bate com o
-    // vendedor logado (utm, nome ou código). Leads sem responsável NÃO são
-    // compartilhados — evita vendedor A ver leads do vendedor B via backlog.
+    // Escopo por vendedor: mostra leads vinculados ao vendedor (canal, UTM, nome, código ou ID)
+    // ou leads da operação do vendedor sem responsável exclusivo.
     if (context?.vendor) {
       const vUtm = normalizeText(context.vendor.utm);
       const vNome = normalizeText(context.vendor.nome);
       const vCodigo = normalizeText(context.vendor.codigo);
+      const vId = String(context.vendor.id ?? "");
       const mine = new Set([vUtm, vNome, vCodigo].filter(Boolean));
       
       const vChannels = new Set(
@@ -123,22 +123,43 @@ export const listCrmLeads = createServerFn({ method: "GET" })
           : []
       );
 
-      if (mine.size === 0 && vChannels.size === 0) {
-        rows = [];
-      } else {
-        rows = rows.filter((l: any) => {
-          // 1. Vincular pelo canal do WhatsApp (channel_id nos dados do lead)
-          const channelId = String(l?.dados?.channel_id ?? "").trim().toLowerCase();
-          if (channelId && vChannels.has(channelId)) return true;
+      const allowedWorkspaces = vendorWorkspaceIds(context) ?? [];
 
-          // 2. Vincular pelas informações de responsável (nome, utm, código)
-          const ru = normalizeText(l?.responsavel_utm);
-          const rn = normalizeText(l?.responsavel_nome);
-          const rc = normalizeText((l as any)?.responsavel_codigo);
-          if (!ru && !rn && !rc) return false; // sem responsável e sem canal → não vaza
-          return (ru && mine.has(ru)) || (rn && mine.has(rn)) || (rc && mine.has(rc));
-        });
-      }
+      rows = rows.filter((l: any) => {
+        // 1. Vincular pelo canal do WhatsApp (channel_id nos dados do lead)
+        const channelId = String(l?.dados?.channel_id ?? "").trim().toLowerCase();
+        if (channelId && vChannels.has(channelId)) return true;
+
+        // 2. Vincular pelas informações de responsável (nome, utm, código ou id)
+        const ru = normalizeText(l?.responsavel_utm);
+        const rn = normalizeText(l?.responsavel_nome);
+        const rc = normalizeText((l as any)?.responsavel_codigo);
+        const rVendorId = String(l?.dados?.assigned_vendor_id ?? (l as any)?.vendedor_id ?? "");
+
+        if (rVendorId && rVendorId === vId) return true;
+        if (ru && mine.has(ru)) return true;
+        if (rn && mine.has(rn)) return true;
+        if (rc && mine.has(rc)) return true;
+
+        // Suporte a correspondência parcial de nome ou utm
+        if (rn && vNome && (rn.includes(vNome) || vNome.includes(rn))) return true;
+        if (ru && vUtm && (ru.includes(vUtm) || vUtm.includes(ru))) return true;
+
+        // 3. Leads do mesmo workspace/operação sem responsável exclusivo são visíveis ao vendedor da operação
+        if (!ru && !rn && !rc && !rVendorId) {
+          if (allowedWorkspaces.length === 0) return true;
+          const exp = String(l?.expert ?? "").trim();
+          if (!exp || allowedWorkspaces.some((w) => sameWorkspace(w, exp))) return true;
+        }
+
+        // 4. Se a lead é do workspace do vendedor e não está bloqueada por outro responsável
+        const exp = String(l?.expert ?? "").trim();
+        if (allowedWorkspaces.some((w) => sameWorkspace(w, exp))) {
+          if (!ru && !rn && !rc) return true;
+        }
+
+        return false;
+      });
     }
     return rows;
   });

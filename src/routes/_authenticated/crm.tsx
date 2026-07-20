@@ -280,12 +280,23 @@ function CRMPage() {
 
 
 
+  function sameWorkspaceStr(a: unknown, b: unknown) {
+    if (!a || !b) return true;
+    const normA = String(a).toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normB = String(b).toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!normA || !normB) return true;
+    return normA === normB || normA.includes(normB) || normB.includes(normA);
+  }
+
   // Filters
   const filtered = useMemo(() => {
     const opActive = isGeral ? opFilter : workspace?.nome;
     const term = search.trim().toLowerCase();
     return leads.filter((l) => {
-      if (opActive && opActive !== "all" && (l.expert || "") !== opActive) return false;
+      if (opActive && opActive !== "all") {
+        const exp = (l.expert || "").trim();
+        if (exp && !sameWorkspaceStr(exp, opActive)) return false;
+      }
       if (!term) return true;
       const blob = [l.nome, l.telefone, l.email, l.responsavel_nome, l.fonte, ...(l.tags ?? [])]
         .filter(Boolean).join(" ").toLowerCase();
