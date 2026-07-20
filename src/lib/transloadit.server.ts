@@ -118,3 +118,42 @@ export async function convertImageToWhatsappJpeg(sourceUrl: string): Promise<str
   if (!url) throw new Error("Transloadit não retornou URL da imagem convertida");
   return url;
 }
+
+/**
+ * Converts any remote video to a WhatsApp-friendly MP4 (H.264/AAC).
+ * iPhone videos often arrive as MOV/HEVC and Meta rejects them with generic
+ * "Something went wrong" / 131000 errors, so flows and manual sends normalize
+ * videos before handing the URL to WhatsApp.
+ */
+export async function convertVideoToWhatsappMp4(sourceUrl: string): Promise<string> {
+  const assembly = await runAssembly({
+    imported: {
+      robot: "/http/import",
+      url: sourceUrl,
+    },
+    encoded: {
+      use: "imported",
+      robot: "/video/encode",
+      preset: "iphone-high",
+      ffmpeg_stack: "v6.0.0",
+      ffmpeg: {
+        vcodec: "libx264",
+        acodec: "aac",
+        pix_fmt: "yuv420p",
+        movflags: "+faststart",
+        profile:v: "main",
+        level: "4.0",
+        "b:v": "1800k",
+        "maxrate": "2200k",
+        "bufsize": "4400k",
+        "b:a": "128k",
+      },
+      result: true,
+    },
+  }, 300_000);
+
+  const encoded = assembly?.results?.encoded?.[0];
+  const url: string | undefined = encoded?.ssl_url || encoded?.url;
+  if (!url) throw new Error("Transloadit não retornou URL do vídeo convertido");
+  return url;
+}
