@@ -615,8 +615,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       };
       if (await shouldStopFlowRun(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-      if (await shouldStopFlowRun(ctx)) return {};
       await persistOutMessage(ctx, "text", body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
+      if (await shouldStopFlowRun(ctx)) return {};
       return { log: { text } };
     }
 
@@ -683,8 +683,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       };
       if (await shouldStopFlowRun(ctx)) return {};
       const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-      if (await shouldStopFlowRun(ctx)) return {};
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
+      if (await shouldStopFlowRun(ctx)) return {};
       return { log: { url: finalUrl, originalUrl: finalUrl === url ? undefined : url } };
     }
 
@@ -717,8 +717,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         };
         if (await shouldStopFlowRun(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-        if (await shouldStopFlowRun(ctx)) return {};
         await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
+        if (await shouldStopFlowRun(ctx)) return {};
       }
 
       // 2) URL buttons — each one a separate cta_url interactive message.
@@ -736,8 +736,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         };
         if (await shouldStopFlowRun(ctx)) return {};
         const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-        if (await shouldStopFlowRun(ctx)) return {};
         await persistOutMessage(ctx, "interactive", body, waMsgId, phoneNumberId, toNormalized);
+        if (await shouldStopFlowRun(ctx)) return {};
       }
 
       // Pause waiting for button reply only if there are reply buttons.
