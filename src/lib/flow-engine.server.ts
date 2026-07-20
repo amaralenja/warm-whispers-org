@@ -1067,7 +1067,7 @@ export async function processQueuedFlowRuns(limit = 20) {
         contactWaId: String(run.contact_wa_id),
         conversationId: run.conversation_id ?? null,
         db,
-        variables: { trigger: (run.context && (run.context as any).trigger) ?? {} },
+        variables: run.context && typeof run.context === "object" ? { ...run.context, trigger: (run.context as any).trigger ?? {} } : { trigger: {} },
         vendor: null,
       };
       const startId = run.current_node_id ? String(run.current_node_id) : null;
@@ -1112,7 +1112,7 @@ export async function processExpiredTimerRuns(limit = 20) {
         contactWaId: String(run.contact_wa_id),
         conversationId: run.conversation_id ?? null,
         db,
-        variables: { trigger: (run.context && (run.context as any).trigger) ?? {} },
+        variables: run.context && typeof run.context === "object" ? { ...run.context, trigger: (run.context as any).trigger ?? {} } : { trigger: {} },
         vendor: null,
       };
       if (!nextId) {
