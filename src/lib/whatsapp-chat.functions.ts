@@ -755,13 +755,19 @@ export const uploadWhatsappMedia = createServerFn({ method: "POST" })
     const ext = safeName.split(".").pop() || "bin";
     const path = `${data.channelId}/${data.conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const buffer = Buffer.from(data.base64, "base64");
-    const { error } = await supabaseAdmin.storage.from("wa-media").upload(path, buffer, {
-      contentType: data.contentType,
-      upsert: false,
+    await withRetry("upload da mídia", 3, async () => {
+      const { error } = await supabaseAdmin.storage.from("wa-media").upload(path, buffer, {
+        contentType: data.contentType,
+        upsert: false,
+      });
+      if (error) throw new Error(error.message);
+      return true;
     });
-    if (error) throw new Error("Upload falhou: " + error.message);
-    const signed = await supabaseAdmin.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24);
-    if (signed.error || !signed.data?.signedUrl) throw new Error("Erro ao gerar URL");
+    const signed = await withRetry("gerar URL da mídia", 3, async () => {
+      const res = await supabaseAdmin.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24);
+      if (res.error || !res.data?.signedUrl) throw new Error(res.error?.message ?? "Erro ao gerar URL");
+      return res;
+    });
     return { path, signedUrl: signed.data.signedUrl };
   });
 
