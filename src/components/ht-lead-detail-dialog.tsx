@@ -17,7 +17,7 @@ import { format } from "date-fns";
 import {
   MessageSquare, Trash2, Phone, Mail, Instagram, Send,
   Wallet, TrendingUp, Target, Rocket, Lightbulb, Users, Flame,
-  Calendar, X, Crown, DollarSign, Handshake, CheckCircle2, Megaphone, Loader2
+  Calendar, X, Crown, DollarSign, Handshake, CheckCircle2, Megaphone, Loader2, Video
 } from "lucide-react";
 
 // Quiz supabase (mesmo que ht-analytics usa) — o lead vive lá, então salvamos lá também.
@@ -116,7 +116,7 @@ export function HtLeadDetailDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   scheduledAt?: string | null;
-  onSchedule?: (iso: string | null, closerEmail?: string | null) => void;
+  onSchedule?: (iso: string | null, closerEmail?: string | null, createMeet?: boolean) => void;
   onSaleSaved?: () => void;
   closers?: { id: string | number; nome: string; email: string | null }[];
   closerEmail?: string | null;
@@ -131,6 +131,7 @@ export function HtLeadDetailDialog({
 
   const [schedDraft, setSchedDraft] = useState<string>("");
   const [closerDraft, setCloserDraft] = useState<string>("");
+  const [createMeet, setCreateMeet] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string>("14:00");
 
@@ -658,12 +659,24 @@ export function HtLeadDetailDialog({
                     );
                   })}
                 </select>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none px-2.5 py-1.5 rounded-md bg-background/60 border border-border/60">
+                  <input
+                    type="checkbox"
+                    checked={createMeet}
+                    onChange={(e) => setCreateMeet(e.target.checked)}
+                    className="rounded border-border bg-background text-sky-400 focus:ring-sky-400 h-3.5 w-3.5"
+                  />
+                  <span className="flex items-center gap-1 text-[11px] font-medium">
+                    <Video className="h-3 w-3 text-sky-400" />
+                    Criar Meet
+                  </span>
+                </label>
                 <button
                   type="button"
                   onClick={() => {
                     if (!schedDraft) return;
                     const iso = new Date(schedDraft).toISOString();
-                    onSchedule(iso, closerDraft || null);
+                    onSchedule(iso, closerDraft || null, createMeet);
                   }}
                   className="text-[11px] font-semibold px-3 py-1.5 rounded-md bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors"
                 >
@@ -672,7 +685,7 @@ export function HtLeadDetailDialog({
                 {scheduledAt && (
                   <button
                     type="button"
-                    onClick={() => onSchedule(null, null)}
+                    onClick={() => onSchedule(null, null, false)}
                     className="text-[11px] px-3 py-1.5 rounded-md bg-muted/40 text-muted-foreground border border-border/60 hover:text-foreground transition-colors"
                   >
                     Desmarcar

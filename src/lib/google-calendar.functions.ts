@@ -201,6 +201,7 @@ export const createEvent = createServerFn({ method: "POST" })
       start: string; // ISO
       end: string; // ISO
       attendees?: string[];
+      createMeet?: boolean;
     }) => d,
   )
   .handler(async ({ data }) => {
@@ -208,6 +209,16 @@ export const createEvent = createServerFn({ method: "POST" })
     const descWithGuests = emails.length
       ? `${data.description ? data.description + "\n\n" : ""}Convidados:\n${emails.map((e) => `• ${e}`).join("\n")}`
       : data.description;
+
+    const conferenceData = data.createMeet
+      ? {
+          createRequest: {
+            requestId: `meet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            conferenceSolutionKey: { type: "hangoutsMeet" },
+          },
+        }
+      : undefined;
+
     const buildBody = (withAttendees: boolean) => ({
       summary: data.summary,
       description: withAttendees ? data.description : descWithGuests,
@@ -215,16 +226,20 @@ export const createEvent = createServerFn({ method: "POST" })
       start: { dateTime: data.start, timeZone: "America/Sao_Paulo" },
       end: { dateTime: data.end, timeZone: "America/Sao_Paulo" },
       ...(withAttendees && emails.length ? { attendees: emails.map((email) => ({ email })) } : {}),
+      ...(conferenceData ? { conferenceData } : {}),
     });
+
+    const conferenceParam = data.createMeet ? "conferenceDataVersion=1&" : "";
+
     try {
-      return (await gcal(`/events?sendUpdates=none`, {
+      return (await gcal(`/events?${conferenceParam}sendUpdates=none`, {
         method: "POST",
         body: JSON.stringify(buildBody(true)),
       })) as CalendarEvent;
     } catch (e: any) {
       const msg = String(e?.message || "");
       if (emails.length && /forbiddenForServiceAccounts|Domain-Wide Delegation|without Domain/i.test(msg)) {
-        return (await gcal(`/events?sendUpdates=none`, {
+        return (await gcal(`/events?${conferenceParam}sendUpdates=none`, {
           method: "POST",
           body: JSON.stringify(buildBody(false)),
         })) as CalendarEvent;

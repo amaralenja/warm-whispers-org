@@ -1820,7 +1820,7 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         closers={closersList}
         closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
-        onSchedule={async (iso, email) => {
+        onSchedule={async (iso, email, createMeet) => {
           if (!selectedLead) return;
           if (iso) {
             try {
@@ -1834,10 +1834,11 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
                   description: `Agendado pelo SDR\n\n${closerInfo}`,
                   start: start.toISOString(),
                   end: end.toISOString(),
-                  attendees: email ? [email] : []
+                  attendees: email ? [email] : [],
+                  createMeet: !!createMeet,
                 }
               });
-              toast.success("Call agendada no Google Calendar!");
+              toast.success(createMeet ? "Call agendada com Google Meet! 📹" : "Call agendada no Google Calendar!");
             } catch (err: any) {
               toast.error("Erro GCal: " + err.message);
             }
@@ -2309,7 +2310,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
         scheduledAt={selectedLead ? (schedMap[selectedLead.id] ?? null) : null}
         closers={closersList}
         closerEmail={selectedLead ? (closerEmailMap[selectedLead.id] ?? null) : null}
-        onSchedule={async (iso, email) => {
+        onSchedule={async (iso, email, createMeet) => {
           if (!selectedLead) return;
           if (iso) {
             try {
@@ -2323,10 +2324,11 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                   description: `Agendado pelo Closer\n\n${closerInfo}`,
                   start: start.toISOString(),
                   end: end.toISOString(),
-                  attendees: email ? [email] : []
+                  attendees: email ? [email] : [],
+                  createMeet: !!createMeet,
                 }
               });
-              toast.success("Call agendada no Google Calendar!");
+              toast.success(createMeet ? "Call agendada com Google Meet! 📹" : "Call agendada no Google Calendar!");
             } catch (err: any) {
               toast.error("Erro GCal: " + err.message);
             }
