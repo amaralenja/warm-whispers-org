@@ -1018,10 +1018,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       try {
         let resp: any;
         try {
-          const r = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+          const r = await withRetry("enviar WhatsApp", 3, () => metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
             method: "POST",
             body: JSON.stringify(sendBody),
-          }, db);
+          }, db));
           resp = r.body;
         } catch (firstErr: any) {
           const firstMsg = String(firstErr?.message ?? "").trim().toUpperCase();
@@ -1030,10 +1030,10 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
           if (firstMsg === "INTERNAL" && sendBody?.context?.message_id) {
             const { context: _drop, ...retryBody } = sendBody;
             console.warn("[whatsapp-chat] Meta INTERNAL com context.message_id — tentando sem reply");
-            const r = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+            const r = await withRetry("enviar WhatsApp sem resposta vinculada", 3, () => metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
               method: "POST",
               body: JSON.stringify(retryBody),
-            }, db);
+            }, db));
             resp = r.body;
           } else {
             throw firstErr;

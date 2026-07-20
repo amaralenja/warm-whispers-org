@@ -554,9 +554,9 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
       currentId = nextNodeId(edges, node.id, result.handle);
     } catch (e: any) {
       await logExecution(ctx.db, ctx.runId, node, "error", null, String(e?.message ?? e), started, ctx.vendor);
-      // Envio falhou (Meta 5xx persistente, mídia inválida, etc.): não aborta o fluxo inteiro,
-      // segue pro próximo nó pra que as demais mensagens do funil ainda saiam. Só nós de
-      // controle (delay, condition, etc.) matam o run — envio individual é tolerante.
+      // Envio falhou mesmo após retry/conversão: para o fluxo aqui.
+      // Antes ele seguia para o próximo nó e podia mandar "a primeira e a última"
+      // mensagem do funil, pulando mídias/mensagens do meio.
       const isSendNode =
         node.type === "send_text" ||
         node.type === "send_image" ||
@@ -570,8 +570,10 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
         });
         return;
       }
-      currentId = nextNodeId(edges, node.id);
-      continue;
+      await updateFlowRun(ctx, {
+        status: "failed", error: String(e?.message ?? e),
+      });
+      return;
     }
   }
 
