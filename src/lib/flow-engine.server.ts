@@ -329,7 +329,6 @@ async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: str
     to_wa_id: toNormalized,
     status: "sent",
     raw: rawData,
-    quoted_message_id: finalQuotedId,
     created_at: createdAt,
   });
   await ctx.db.from("wa_conversations" as any).update({

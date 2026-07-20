@@ -499,9 +499,20 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const s = new Set<string>();
     for (const l of typebotLeads) {
       const wa = String(l.whatsapp ?? "").replace(/\D+/g, "");
-      if (wa) {
-        s.add(wa);
-        if (wa.length >= 8) s.add(wa.slice(-8));
+      if (!wa) continue;
+      s.add(wa);
+      if (wa.length >= 8) s.add(wa.slice(-8));
+      const local = wa.startsWith("55") && wa.length > 10 ? wa.slice(2) : wa;
+      s.add(local);
+      s.add("55" + local);
+      if (local.length === 11 && local[2] === "9") {
+        const without9 = local.slice(0, 2) + local.slice(3);
+        s.add(without9);
+        s.add("55" + without9);
+      } else if (local.length === 10) {
+        const with9 = local.slice(0, 2) + "9" + local.slice(2);
+        s.add(with9);
+        s.add("55" + with9);
       }
     }
     return s;
