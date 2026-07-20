@@ -34,7 +34,20 @@ import {
   ArrowLeft,
   ChevronDown,
   Pencil,
+  Star,
+  Plus,
+  Trash2,
 } from "lucide-react";
+
+import {
+  getVendorStickers,
+  saveVendorSticker,
+  toggleFavoriteSticker,
+  removeVendorSticker,
+  recordRecentSticker,
+  convertImageToWhatsappSticker,
+  type VendorSticker,
+} from "@/lib/sticker-utils";
 import {
   DndContext,
   PointerSensor,
@@ -1901,6 +1914,21 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       />
                     </PopoverContent>
                   </Popover>
+                  <StickerPickerPopover
+                    vendorId={vendorSession?.id}
+                    channelId={active.channel_id}
+                    conversationId={active.id}
+                    onSendSticker={async (mediaUrl) => {
+                      if (!active) return;
+                      await sendMut.mutateAsync({
+                        channelId: active.channel_id,
+                        conversationId: active.id,
+                        to: active.contact_wa_id,
+                        type: "sticker",
+                        mediaUrl,
+                      });
+                    }}
+                  />
                   <VendorCheckoutButton
                     enabled={!!vendorSession}
                     disabled={sendMut.isPending || !active}
@@ -2095,7 +2123,7 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom, onQuotedClick }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null; onQuotedClick?: (m: Msg) => void }) {
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom, onQuotedClick, vendorId }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null; onQuotedClick?: (m: Msg) => void; vendorId?: string | number | null }) {
   const isOut = msg.direction === "out";
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
@@ -2152,7 +2180,21 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             <Reply className="mr-2 h-4 w-4" /> Responder
           </DropdownMenuItem>
         )}
-        
+        {(msg.msg_type === "sticker" || msg.msg_type === "image" || (msg.media_url && (msg.media_url.includes("figurinha") || msg.media_url.endsWith(".webp")))) && (
+          <DropdownMenuItem
+            onClick={() => {
+              const url = msg.media_url || mediaState?.url;
+              if (url) {
+                saveVendorSticker(vendorId, { url, isFavorite: true });
+                toast.success("Figurinha salva nas suas favoritas! ⭐");
+              } else {
+                toast.error("Mídia ainda não disponível para salvar");
+              }
+            }}
+          >
+            <Star className="mr-2 h-4 w-4 text-amber-400 fill-amber-400" /> Salvar nas figurinhas
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   ) : null;
@@ -2184,7 +2226,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
                 </div>
               </button>
             )}
-            <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} />
+            <MediaContent msg={msg} mediaState={mediaState} onLoadMedia={onLoadMedia} onMediaSettled={onMediaSettled} outgoing={isOut} vendorId={vendorId} />
             {body && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{body}</p>}
             {caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed opacity-90">{caption}</p>}
             <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
@@ -2211,7 +2253,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
 }
 
 
-function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; outgoing?: boolean }) {
+function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing, vendorId }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; outgoing?: boolean; vendorId?: string | number | null }) {
   if (msg.msg_type === "text") return null;
   if (msg.msg_type === "interactive" || msg.msg_type === "button") {
     return <InteractiveContent msg={msg} outgoing={outgoing} />;
@@ -2227,7 +2269,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
 
   // Preferimos sempre media_url (já baixado pelo webhook e salvo no bucket wa-media).
   if (msg.media_url) {
-    return <RenderMedia type={effectiveType} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
+    return <RenderMedia type={effectiveType} url={msg.media_url} mime={msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} vendorId={vendorId} />;
   }
   // Fallback: mensagens antigas que só têm media_id — baixa sob demanda via Meta proxy.
   if (msg.media_id) {
@@ -2235,7 +2277,7 @@ function MediaContent({ msg, mediaState, onLoadMedia, onMediaSettled, outgoing }
       return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} error={mediaState.error} onRetry={onLoadMedia} outgoing={outgoing} />;
     }
     if (mediaState?.url) {
-      return <RenderMedia type={effectiveType} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} />;
+      return <RenderMedia type={effectiveType} url={mediaState.url} mime={mediaState.mime ?? msg.media_mime} filename={msg.media_filename} outgoing={outgoing} onMediaSettled={onMediaSettled} trackId={String(msg.id)} vendorId={vendorId} />;
     }
     if (mediaState?.loading) {
       return <MediaPlaceholder type={effectiveType} mime={effectiveMime} filename={msg.media_filename} loading outgoing={outgoing} />;
@@ -2428,15 +2470,27 @@ function ClickableImage({
   alt,
   onMediaSettled,
   isSticker,
+  vendorId,
 }: {
   src: string;
   alt: string;
   onMediaSettled?: () => void;
   isSticker?: boolean;
+  vendorId?: string | number | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSaveSticker = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    saveVendorSticker(vendorId, { url: src, isFavorite: true });
+    setSaved(true);
+    toast.success("Figurinha salva nas suas favoritas! ⭐");
+  };
+
   return (
-    <>
+    <div className="relative group/stk inline-block">
       <img
         src={src}
         alt={alt}
@@ -2447,8 +2501,229 @@ function ClickableImage({
         tabIndex={0}
         className={`mb-2 block cursor-zoom-in rounded-2xl border border-chat-line object-contain transition hover:opacity-95 ${isSticker ? "max-h-44 max-w-44 bg-transparent p-2" : "max-h-[420px] max-w-full"}`}
       />
+      {isSticker && (
+        <button
+          type="button"
+          onClick={handleSaveSticker}
+          className="absolute top-1 right-1 opacity-0 group-hover/stk:opacity-100 transition-opacity bg-black/75 hover:bg-black/90 text-amber-400 border border-amber-500/30 rounded-lg px-2 py-1 text-[10px] font-semibold flex items-center gap-1 shadow backdrop-blur cursor-pointer"
+          title="Salvar nas minhas figurinhas"
+        >
+          <Star className={`h-3 w-3 ${saved ? "fill-amber-400" : ""}`} />
+          {saved ? "Salva!" : "Salvar"}
+        </button>
+      )}
       {open && <ImageLightbox src={src} alt={alt} onClose={() => setOpen(false)} />}
-    </>
+    </div>
+  );
+}
+
+function StickerPickerPopover({
+  vendorId,
+  channelId,
+  conversationId,
+  onSendSticker,
+}: {
+  vendorId?: string | number | null;
+  channelId: string;
+  conversationId: string;
+  onSendSticker: (mediaUrl: string) => Promise<void>;
+}) {
+  const uploadFn = useServerFn(uploadWhatsappMedia);
+  const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"recent" | "favorite" | "all">("all");
+  const [stickers, setStickers] = useState<VendorSticker[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const reloadStickers = () => {
+    setStickers(getVendorStickers(vendorId));
+  };
+
+  useEffect(() => {
+    if (open) {
+      reloadStickers();
+    }
+  }, [open, vendorId]);
+
+  const handleUploadSticker = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { base64, filename } = await convertImageToWhatsappSticker(file);
+      const res = await uploadFn({
+        data: {
+          channelId,
+          conversationId,
+          filename,
+          contentType: "image/webp",
+          base64,
+        },
+      });
+      const url = res.signedUrl;
+      const updated = saveVendorSticker(vendorId, { url, name: file.name, isFavorite: false });
+      setStickers(updated);
+      toast.success("Figurinha criada e adicionada à sua galeria! 🎭");
+    } catch (err: any) {
+      toast.error("Erro ao converter/enviar figurinha: " + (err?.message || "erro"));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent, sticker: VendorSticker) => {
+    e.stopPropagation();
+    const updated = toggleFavoriteSticker(vendorId, sticker.id);
+    setStickers(updated);
+    toast.success(sticker.isFavorite ? "Removida das favoritas" : "Adicionada às favoritas! ⭐");
+  };
+
+  const handleRemove = (e: React.MouseEvent, sticker: VendorSticker) => {
+    e.stopPropagation();
+    const updated = removeVendorSticker(vendorId, sticker.id);
+    setStickers(updated);
+    toast.success("Figurinha removida da galeria");
+  };
+
+  const handleSelectSticker = async (sticker: VendorSticker) => {
+    try {
+      recordRecentSticker(vendorId, sticker);
+      await onSendSticker(sticker.url);
+      setOpen(false);
+    } catch (err: any) {
+      toast.error("Erro ao enviar figurinha: " + (err?.message || "erro"));
+    }
+  };
+
+  const filteredStickers = useMemo(() => {
+    if (activeTab === "favorite") {
+      return stickers.filter((s) => s.isFavorite);
+    }
+    if (activeTab === "recent") {
+      return [...stickers]
+        .filter((s) => s.lastUsedAt)
+        .sort((a, b) => new Date(b.lastUsedAt!).getTime() - new Date(a.lastUsedAt!).getTime());
+    }
+    return stickers;
+  }, [stickers, activeTab]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent"
+          title="Figurinhas (Stickers)"
+        >
+          <span className="text-lg md:text-xl">🎭</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="w-80 md:w-96 rounded-2xl border-chat-line bg-popover p-3 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-chat-line pb-2 mb-2">
+          <div className="flex items-center gap-1 bg-chat-panel p-1 rounded-xl border border-chat-line">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                activeTab === "all" ? "bg-chat-accent text-chat-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              🎨 Galeria ({stickers.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("recent")}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                activeTab === "recent" ? "bg-chat-accent text-chat-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              🕒 Recentes
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("favorite")}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                activeTab === "favorite" ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              ⭐ Favoritas ({stickers.filter((s) => s.isFavorite).length})
+            </button>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="h-8 text-xs gap-1 rounded-xl bg-chat-soft border-chat-line"
+          >
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">Criar</span>
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/*"
+            className="hidden"
+            onChange={handleUploadSticker}
+          />
+        </div>
+
+        <div className="max-h-64 overflow-y-auto pr-1 scrollbar-fancy">
+          {uploading && (
+            <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground bg-chat-panel/40 rounded-xl mb-2">
+              <Loader2 className="h-4 w-4 animate-spin text-chat-accent" />
+              <span>Convertendo para figurinha 512x512...</span>
+            </div>
+          )}
+
+          {filteredStickers.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground italic border border-dashed border-chat-line rounded-xl">
+              {activeTab === "favorite"
+                ? "Nenhuma figurinha favoritada ainda."
+                : activeTab === "recent"
+                ? "Nenhuma figurinha usada recentemente."
+                : "Sua galeria está vazia. Clique em '+ Criar' para adicionar fotos!"}
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              {filteredStickers.map((stk) => (
+                <div
+                  key={stk.id}
+                  onClick={() => handleSelectSticker(stk)}
+                  className="group relative flex aspect-square cursor-pointer items-center justify-center rounded-xl border border-chat-line bg-chat-panel p-1.5 transition hover:scale-105 hover:border-chat-accent hover:bg-chat-soft"
+                >
+                  <img
+                    src={stk.url}
+                    alt={stk.name || "Figurinha"}
+                    className="h-full w-full object-contain"
+                  />
+                  <div className="absolute top-1 right-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-0.5 backdrop-blur">
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleFavorite(e, stk)}
+                      className="p-1 hover:text-amber-400 text-muted-foreground transition-colors"
+                      title={stk.isFavorite ? "Remover das favoritas" : "Favoritar"}
+                    >
+                      <Star className={`h-3 w-3 ${stk.isFavorite ? "fill-amber-400 text-amber-400" : ""}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemove(e, stk)}
+                      className="p-1 hover:text-red-400 text-muted-foreground transition-colors"
+                      title="Excluir figurinha"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
