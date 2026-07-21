@@ -589,6 +589,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       {tab === "facebook-ads" && (
         <FacebookAdsAnalyticsSection leads={leads} vendas={vendas} period={period} />
       )}
+      {tab === "topo-funil" && <TopoFunilSection leads={leads} />}
 
 
       {tab === "dashboard" && (
