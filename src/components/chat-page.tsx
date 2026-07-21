@@ -518,6 +518,20 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return s;
   }, [typebotLeads]);
 
+  const typebotByPhone = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const l of typebotLeads as any[]) {
+      const wa = String(l.whatsapp ?? "").replace(/\D+/g, "");
+      if (!wa) continue;
+      const keys = new Set<string>([wa]);
+      if (wa.length >= 8) keys.add(wa.slice(-8));
+      const local = wa.startsWith("55") && wa.length > 10 ? wa.slice(2) : wa;
+      keys.add(local); keys.add("55" + local);
+      for (const k of keys) if (!m.has(k)) m.set(k, l);
+    }
+    return m;
+  }, [typebotLeads]);
+
   const listAllTagsFn = useServerFn(listCrmTags);
   const { data: allCrmTags = [] } = useQuery<any[]>({
     queryKey: ["chat", "crm-tags", "all"],
@@ -1587,6 +1601,27 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmSrc) ||
                                 /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(utmMed) ||
                                 (!!utmCamp && !/organic|organico|whatsapp|direct/.test(utmCamp));
+                              // Se não tiver UTM no crm lead, tenta puxar da submissão do typebot pelo telefone
+                              if (!utmSrc && !utmMed && !utmCamp) {
+                                const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+                                const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+                                if (sub) {
+                                  const s = String(sub.utm_source ?? "").toLowerCase();
+                                  const m = String(sub.utm_medium ?? "").toLowerCase();
+                                  const cp = String(sub.utm_campaign ?? "").toLowerCase();
+                                  const pago = /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(s)
+                                    || /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(m)
+                                    || (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
+                                  if (pago) {
+                                    return (
+                                      <>
+                                        <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">🤖 Typebot</Badge>
+                                        <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">💰 Tráfego Pago</Badge>
+                                      </>
+                                    );
+                                  }
+                                }
+                              }
                               return (
                                 <>
                                   <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
