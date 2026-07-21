@@ -1564,37 +1564,37 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           
                           <div className="flex flex-wrap items-center gap-1 mt-1">
                             {(() => {
-                              const hay = [
-                                (leadForConv as any)?.fonte,
-                                (leadForConv as any)?.origem,
-                                (leadForConv as any)?.utm_source,
-                                (leadForConv as any)?.utm_medium,
-                                (leadForConv as any)?.utm_campaign,
-                                ...(Array.isArray((leadForConv as any)?.tags) ? (leadForConv as any).tags : []),
-                                ...(Array.isArray((c as any).tags) ? (c as any).tags : []),
-                              ].filter(Boolean).join(" ").toLowerCase();
-                              const isTypebot = isTypebotLead || /typebot|quiz|form(ul[aá]rio)?/.test(hay);
-                              const isPago = /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|pago|cpc|cpm|paid|gads|fbclid|gclid)\b/.test(hay) || !!(leadForConv as any)?.fbclid || !!(leadForConv as any)?.gclid;
-                              if (isTypebot) {
-                                return (
+                              // Só classifica origem se veio do Typebot. Sem typebot = sem etiqueta.
+                              if (!isTypebotLead) return null;
+                              const lead: any = leadForConv ?? {};
+                              const utmSrc = String(lead.utm_source ?? "").toLowerCase();
+                              const utmMed = String(lead.utm_medium ?? "").toLowerCase();
+                              const utmCamp = String(lead.utm_campaign ?? "").toLowerCase();
+                              const isPago =
+                                !!lead.fbclid ||
+                                !!lead.gclid ||
+                                !!lead.fbc ||
+                                /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmSrc) ||
+                                /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(utmMed) ||
+                                (!!utmCamp && !/organic|organico|whatsapp|direct/.test(utmCamp));
+                              return (
+                                <>
                                   <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
                                     🤖 Typebot
                                   </Badge>
-                                );
-                              }
-                              if (isPago) {
-                                return (
-                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">
-                                    💰 Tráfego Pago
-                                  </Badge>
-                                );
-                              }
-                              return (
-                                <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/40 font-bold uppercase">
-                                  🌱 Orgânico
-                                </Badge>
+                                  {isPago ? (
+                                    <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">
+                                      💰 Tráfego Pago
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/40 font-bold uppercase">
+                                      🌱 Orgânico
+                                    </Badge>
+                                  )}
+                                </>
                               );
                             })()}
+
                             {leadForConv && (() => {
                               const attr = getLeadAttributionBadge(leadForConv);
                               if (!attr) return null;
