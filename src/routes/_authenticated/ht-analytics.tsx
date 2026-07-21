@@ -43,7 +43,7 @@ export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
 });
 
-type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics" | "facebook-ads";
+type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics" | "facebook-ads" | "topo-funil";
 
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
