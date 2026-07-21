@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useLayoutEffect, type CSSProperties } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -40,6 +40,7 @@ import {
   Sticker,
   Images,
   History,
+  ArrowUp,
 } from "lucide-react";
 
 import {
@@ -657,6 +658,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const scrollRafRef = useRef<number | null>(null);
   const sidebarScrollRef = useRef<HTMLDivElement>(null);
   const sidebarScrollTopRef = useRef<number>(0);
+  const [showSidebarScrollTop, setShowSidebarScrollTop] = useState(false);
 
   // Preserve sidebar scroll position when convs query updates
   useLayoutEffect(() => {
@@ -1113,6 +1115,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
     sidebarScrollTopRef.current = el.scrollTop;
+    setShowSidebarScrollTop(el.scrollTop > 300);
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && visibleCount < filtered.length) {
       setVisibleCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
     }
@@ -1522,313 +1525,332 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
           </div>
 
-          <div ref={sidebarScrollRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy" onScroll={handleListScroll}>
-            {convsError || channelsError ? (
-              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
-                {errorToText(convsError ?? channelsError, "Falha ao carregar conversas do WhatsApp")}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
-              </div>
-            ) : (
-              <div>
-                {visibleFiltered.map((c) => {
-                  const contactWaId = toText(c.contact_wa_id);
-                  const contactName = toText(c.contact_name);
-                  const isActive = String(c.id) === activeId;
-                  const preview = toText(c.last_message_preview);
-                  const hasActiveFlow = activeFlowConvIds.has(String(c.id));
-                  const prefetchMessages = () => {
-                    const cid = String(c.id);
-                    qc.prefetchQuery({
-                      queryKey: ["wa-messages", cid],
-                      queryFn: () => listMsgFn({ data: { conversationId: cid } }),
-                      staleTime: 15_000,
-                    });
-                  };
-                  const leadForConv = findLeadForConv(contactWaId);
-                  const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
-                  const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
+          <div className="relative min-h-0 flex-1 flex flex-col">
+            <div ref={sidebarScrollRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy" onScroll={handleListScroll}>
+              {convsError || channelsError ? (
+                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
+                  {errorToText(convsError ?? channelsError, "Falha ao carregar conversas do WhatsApp")}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                  Nenhuma conversa ainda. Mensagens recebidas no WhatsApp conectado aparecem aqui.
+                </div>
+              ) : (
+                <div>
+                  {visibleFiltered.map((c) => {
+                    const contactWaId = toText(c.contact_wa_id);
+                    const contactName = toText(c.contact_name);
+                    const isActive = String(c.id) === activeId;
+                    const preview = toText(c.last_message_preview);
+                    const hasActiveFlow = activeFlowConvIds.has(String(c.id));
+                    const prefetchMessages = () => {
+                      const cid = String(c.id);
+                      qc.prefetchQuery({
+                        queryKey: ["wa-messages", cid],
+                        queryFn: () => listMsgFn({ data: { conversationId: cid } }),
+                        staleTime: 15_000,
+                      });
+                    };
+                    const leadForConv = findLeadForConv(contactWaId);
+                    const leadStageKey = leadForConv?.status ?? leadForConv?.stage_id;
+                    const leadStage = leadStageKey ? stageById.get(String(leadStageKey)) : null;
 
-                  const isTypebotLead = (() => {
-                    const digits = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
-                    if (digits) {
-                      if (typebotPhonesSet.has(digits)) return true;
-                      if (digits.length >= 8 && typebotPhonesSet.has(digits.slice(-8))) return true;
-                    }
-                    // Fallback: olha origem/tags do lead do CRM
-                    const l: any = leadForConv ?? {};
-                    const hay = [
-                      l.fonte, l.origem, l.utm_source, l.utm_medium, l.utm_campaign,
-                      ...(Array.isArray(l.tags) ? l.tags : []),
-                      ...(Array.isArray((c as any).tags) ? (c as any).tags : []),
-                    ].filter(Boolean).join(" ").toLowerCase();
-                    if (/typebot|quiz|form(ul[aá]rio)?/.test(hay)) return true;
-                    return false;
-                  })();
-
-
-                  const isArchived = Boolean((c as any).archived_at);
-                  const isPinned = pinnedIds.includes(String(c.id));
-                  return (
-                    <ConversationRowContextMenu
-                      key={String(c.id)}
-                      conversationId={String(c.id)}
-                      channelId={toText(c.channel_id)}
-                      currentVendorId={(c as any).assigned_vendor_id ?? null}
-                      archived={isArchived}
-                      isPinned={isPinned}
-                      onTogglePin={() => togglePin(String(c.id))}
-                    >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setActiveId(String(c.id))}
-                      onMouseEnter={prefetchMessages}
-                      onFocus={prefetchMessages}
-                      onTouchStart={prefetchMessages}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
-                      style={
-                        isActive
-                          ? { borderLeft: `3px solid var(--chat-accent, #3b82f6)` }
-                          : checkIsComprador(contactWaId)
-                            ? { borderLeft: "3px solid #10b981" }
-                            : leadStage
-                              ? { borderLeft: `3px solid ${leadStage.cor}` }
-                              : isTypebotLead
-                                ? { borderLeft: "3px solid #f59e0b" } // Borda dourada para indicar Typebot!
-                                : undefined
+                    const isTypebotLead = (() => {
+                      const digits = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+                      if (digits) {
+                        if (typebotPhonesSet.has(digits)) return true;
+                        if (digits.length >= 8 && typebotPhonesSet.has(digits.slice(-8))) return true;
                       }
-                      className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
-                        isActive 
-                          ? "bg-chat-soft" 
-                          : checkIsComprador(contactWaId)
-                            ? "bg-emerald-500/[0.03] hover:bg-chat-panel"
-                            : isTypebotLead 
-                              ? "bg-amber-500/[0.02] hover:bg-chat-panel" 
-                              : "hover:bg-chat-panel"
-                      } ${isArchived ? "opacity-70" : ""}`}
-                    >
+                      // Fallback: olha origem/tags do lead do CRM
+                      const l: any = leadForConv ?? {};
+                      const hay = [
+                        l.fonte, l.origem, l.utm_source, l.utm_medium, l.utm_campaign,
+                        ...(Array.isArray(l.tags) ? l.tags : []),
+                        ...(Array.isArray((c as any).tags) ? (c as any).tags : []),
+                      ].filter(Boolean).join(" ").toLowerCase();
+                      if (/typebot|quiz|form(ul[aá]rio)?/.test(hay)) return true;
+                      return false;
+                    })();
 
-                      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                        <button
-                          type="button"
-                          className={`shrink-0 rounded-full transition ${toText((c as any).contact_avatar_url) ? "cursor-zoom-in hover:scale-105 hover:ring-2 hover:ring-chat-accent/60" : "cursor-default"}`}
-                          title={toText((c as any).contact_avatar_url) ? "Abrir foto do lead" : undefined}
-                          aria-label={toText((c as any).contact_avatar_url) ? `Abrir foto de ${contactName || contactWaId}` : undefined}
-                          onClick={(e) => {
-                            const src = toText((c as any).contact_avatar_url);
-                            if (!src) return;
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setProfilePhotoPreview({ src, alt: contactName || contactWaId || "Foto do lead" });
-                          }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        >
-                          <Avatar className="h-12 w-12 rounded-full border border-chat-line">
-                            {(c as any).contact_avatar_url ? (
-                              <AvatarImage src={(c as any).contact_avatar_url} alt={contactName || contactWaId} className="rounded-full object-cover" />
-                            ) : null}
-                            <AvatarFallback
-                              className="rounded-full"
-                              style={avatarStyle(contactName, contactWaId)}
-                            >
-                              <User className="h-6 w-6 opacity-80" />
-                            </AvatarFallback>
-                          </Avatar>
-                        </button>
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate text-[15px] font-semibold tracking-normal text-foreground">
-                              {contactName || contactWaId}
-                            </span>
-                            {isPinned && (
-                              <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500/20 rotate-45" title="Conversa fixada" />
-                            )}
-                          </div>
-                          
-                          <div className="flex flex-wrap items-center gap-1 mt-1">
-                            {(() => {
-                              // Só classifica origem se veio do Typebot. Sem typebot = sem etiqueta.
-                              if (!isTypebotLead) return null;
-                              const lead: any = leadForConv ?? {};
-                              const utmSrc = String(lead.utm_source ?? "").toLowerCase();
-                              const utmMed = String(lead.utm_medium ?? "").toLowerCase();
-                              const utmCamp = String(lead.utm_campaign ?? "").toLowerCase();
-                              const isPago =
-                                !!lead.fbclid ||
-                                !!lead.gclid ||
-                                !!lead.fbc ||
-                                /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmSrc) ||
-                                /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(utmMed) ||
-                                (!!utmCamp && !/organic|organico|whatsapp|direct/.test(utmCamp));
-                              // Se não tiver UTM no crm lead, tenta puxar da submissão do typebot pelo telefone
-                              if (!utmSrc && !utmMed && !utmCamp) {
-                                const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
-                                const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
-                                if (sub) {
-                                  const s = String(sub.utm_source ?? "").toLowerCase();
-                                  const m = String(sub.utm_medium ?? "").toLowerCase();
-                                  const cp = String(sub.utm_campaign ?? "").toLowerCase();
-                                  const pago = /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(s)
-                                    || /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(m)
-                                    || (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
-                                  if (pago) {
-                                    return (
-                                      <>
-                                        <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">🤖 Typebot</Badge>
-                                        <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">💰 Tráfego Pago</Badge>
-                                      </>
-                                    );
+
+                    const isArchived = Boolean((c as any).archived_at);
+                    const isPinned = pinnedIds.includes(String(c.id));
+                    return (
+                      <ConversationRowContextMenu
+                        key={String(c.id)}
+                        conversationId={String(c.id)}
+                        channelId={toText(c.channel_id)}
+                        currentVendorId={(c as any).assigned_vendor_id ?? null}
+                        archived={isArchived}
+                        isPinned={isPinned}
+                        onTogglePin={() => togglePin(String(c.id))}
+                      >
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveId(String(c.id))}
+                        onMouseEnter={prefetchMessages}
+                        onFocus={prefetchMessages}
+                        onTouchStart={prefetchMessages}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveId(String(c.id)); }}
+                        style={
+                          isActive
+                            ? { borderLeft: `3px solid var(--chat-accent, #3b82f6)` }
+                            : checkIsComprador(contactWaId)
+                              ? { borderLeft: "3px solid #10b981" }
+                              : leadStage
+                                ? { borderLeft: `3px solid ${leadStage.cor}` }
+                                : isTypebotLead
+                                  ? { borderLeft: "3px solid #f59e0b" } // Borda dourada para indicar Typebot!
+                                  : undefined
+                        }
+                        className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
+                          isActive 
+                            ? "bg-chat-soft" 
+                            : checkIsComprador(contactWaId)
+                              ? "bg-emerald-500/[0.03] hover:bg-chat-panel"
+                              : isTypebotLead 
+                                ? "bg-amber-500/[0.02] hover:bg-chat-panel" 
+                                : "hover:bg-chat-panel"
+                        } ${isArchived ? "opacity-70" : ""}`}
+                      >
+
+                        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                          <button
+                            type="button"
+                            className={`shrink-0 rounded-full transition ${toText((c as any).contact_avatar_url) ? "cursor-zoom-in hover:scale-105 hover:ring-2 hover:ring-chat-accent/60" : "cursor-default"}`}
+                            title={toText((c as any).contact_avatar_url) ? "Abrir foto do lead" : undefined}
+                            aria-label={toText((c as any).contact_avatar_url) ? `Abrir foto de ${contactName || contactWaId}` : undefined}
+                            onClick={(e) => {
+                              const src = toText((c as any).contact_avatar_url);
+                              if (!src) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setProfilePhotoPreview({ src, alt: contactName || contactWaId || "Foto do lead" });
+                            }}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            <Avatar className="h-12 w-12 rounded-full border border-chat-line">
+                              {(c as any).contact_avatar_url ? (
+                                <AvatarImage src={(c as any).contact_avatar_url} alt={contactName || contactWaId} className="rounded-full object-cover" />
+                              ) : null}
+                              <AvatarFallback
+                                className="rounded-full"
+                                style={avatarStyle(contactName, contactWaId)}
+                              >
+                                <User className="h-6 w-6 opacity-80" />
+                              </AvatarFallback>
+                            </Avatar>
+                          </button>
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate text-[15px] font-semibold tracking-normal text-foreground">
+                                {contactName || contactWaId}
+                              </span>
+                              {isPinned && (
+                                <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500/20 rotate-45" title="Conversa fixada" />
+                              )}
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {(() => {
+                                // Só classifica origem se veio do Typebot. Sem typebot = sem etiqueta.
+                                if (!isTypebotLead) return null;
+                                const lead: any = leadForConv ?? {};
+                                const utmSrc = String(lead.utm_source ?? "").toLowerCase();
+                                const utmMed = String(lead.utm_medium ?? "").toLowerCase();
+                                const utmCamp = String(lead.utm_campaign ?? "").toLowerCase();
+                                const isPago =
+                                  !!lead.fbclid ||
+                                  !!lead.gclid ||
+                                  !!lead.fbc ||
+                                  /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmSrc) ||
+                                  /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(utmMed) ||
+                                  (!!utmCamp && !/organic|organico|whatsapp|direct/.test(utmCamp));
+                                // Se não tiver UTM no crm lead, tenta puxar da submissão do typebot pelo telefone
+                                if (!utmSrc && !utmMed && !utmCamp) {
+                                  const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+                                  const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+                                  if (sub) {
+                                    const s = String(sub.utm_source ?? "").toLowerCase();
+                                    const m = String(sub.utm_medium ?? "").toLowerCase();
+                                    const cp = String(sub.utm_campaign ?? "").toLowerCase();
+                                    const pago = /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(s)
+                                      || /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(m)
+                                      || (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
+                                    if (pago) {
+                                      return (
+                                        <>
+                                          <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">🤖 Typebot</Badge>
+                                          <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">💰 Tráfego Pago</Badge>
+                                        </>
+                                      );
+                                    }
                                   }
                                 }
-                              }
-                              return (
-                                <>
-                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
-                                    🤖 Typebot
+                                return (
+                                  <>
+                                    <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
+                                      🤖 Typebot
+                                    </Badge>
+                                    {isPago ? (
+                                      <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">
+                                        💰 Tráfego Pago
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/40 font-bold uppercase">
+                                        🌱 Orgânico
+                                      </Badge>
+                                    )}
+                                  </>
+                                );
+                              })()}
+
+                              {leadForConv && (() => {
+                                const attr = getLeadAttributionBadge(leadForConv);
+                                if (!attr) return null;
+                                return (
+                                  <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${attr.class} font-semibold uppercase`}>
+                                    {attr.textShort}
                                   </Badge>
-                                  {isPago ? (
-                                    <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">
-                                      💰 Tráfego Pago
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/40 font-bold uppercase">
-                                      🌱 Orgânico
-                                    </Badge>
-                                  )}
-                                </>
-                              );
-                            })()}
+                                );
+                              })()}
 
-                            {leadForConv && (() => {
-                              const attr = getLeadAttributionBadge(leadForConv);
-                              if (!attr) return null;
-                              return (
-                                <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${attr.class} font-semibold uppercase`}>
-                                  {attr.textShort}
-                                </Badge>
-                              );
-                            })()}
-
-                            {(() => {
-                              const comprador = checkIsComprador(contactWaId);
-                              if (!comprador) return null;
-                              return (
-                                <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 font-bold uppercase animate-pulse">
-                                  💰 Comprador
-                                </Badge>
-                              );
-                            })()}
-                            {isArchived ? (
-                              <span
-                                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
-                                title="Conversa arquivada"
-                              >
-                                <Archive className="h-2.5 w-2.5" /> Arquivada
-                              </span>
-                            ) : null}
-                            {(() => {
-                              const b = opBadgeFor((c as any).operacao_id);
-                              return b ? (
+                              {(() => {
+                                const comprador = checkIsComprador(contactWaId);
+                                if (!comprador) return null;
+                                return (
+                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 font-bold uppercase animate-pulse">
+                                    💰 Comprador
+                                  </Badge>
+                                );
+                              })()}
+                              {isArchived ? (
+                                <span
+                                  className="shrink-0 inline-flex items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                  title="Conversa arquivada"
+                                >
+                                  <Archive className="h-2.5 w-2.5" /> Arquivada
+                                </span>
+                              ) : null}
+                              {(() => {
+                                const b = opBadgeFor((c as any).operacao_id);
+                                return b ? (
+                                  <span
+                                    className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                                    style={{ color: b.hex, borderColor: `${b.hex}55`, backgroundColor: `${b.hex}1a` }}
+                                    title={`Operação: ${b.nome}`}
+                                  >
+                                    {b.nome}
+                                  </span>
+                                ) : null;
+                              })()}
+                              {leadStage ? (
                                 <span
                                   className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
-                                  style={{ color: b.hex, borderColor: `${b.hex}55`, backgroundColor: `${b.hex}1a` }}
-                                  title={`Operação: ${b.nome}`}
+                                  style={{ color: leadStage.cor, borderColor: `${leadStage.cor}66`, backgroundColor: `${leadStage.cor}1a` }}
+                                    title={`Etapa CRM: ${leadStage.nome}`}
                                 >
-                                  {b.nome}
+                                  {leadStage.nome}
                                 </span>
-                              ) : null;
-                            })()}
-                            {leadStage ? (
-                              <span
-                                className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
-                                style={{ color: leadStage.cor, borderColor: `${leadStage.cor}66`, backgroundColor: `${leadStage.cor}1a` }}
-                                  title={`Etapa CRM: ${leadStage.nome}`}
-                              >
-                                {leadStage.nome}
-                              </span>
-                            ) : null}
-                            {hasActiveFlow ? (
-                              <span
-                                title="Fluxo sendo disparado"
-                                className="relative inline-flex h-2.5 w-2.5 shrink-0"
-                              >
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-chat-accent opacity-75" />
-                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-chat-accent" />
-                              </span>
-                            ) : null}
+                              ) : null}
+                              {hasActiveFlow ? (
+                                <span
+                                  title="Fluxo sendo disparado"
+                                  className="relative inline-flex h-2.5 w-2.5 shrink-0"
+                                >
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-chat-accent opacity-75" />
+                                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-chat-accent" />
+                                </span>
+                              ) : null}
 
-                          </div>
+                            </div>
 
-                          {(() => {
-                            const tags = Array.isArray((c as any).tags) ? ((c as any).tags as string[]).filter(Boolean) : [];
-                            if (tags.length === 0) return null;
-                            const shown = tags.slice(0, 3);
-                            const extra = tags.length - shown.length;
-                            return (
-                              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
-                                {shown.map((t) => {
-                                  const cor = tagColorFor(t);
-                                  const style: CSSProperties = cor
-                                    ? { backgroundColor: `${cor}1a`, borderColor: `${cor}66`, color: cor }
-                                    : {};
-                                  return (
-                                    <span key={t} style={style} className={`max-w-[110px] truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${cor ? "" : "border-chat-accent/40 bg-chat-accent/10 text-chat-accent"}`}>
-                                      {t}
+                            {(() => {
+                              const tags = Array.isArray((c as any).tags) ? ((c as any).tags as string[]).filter(Boolean) : [];
+                              if (tags.length === 0) return null;
+                              const shown = tags.slice(0, 3);
+                              const extra = tags.length - shown.length;
+                              return (
+                                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+                                  {shown.map((t) => {
+                                    const cor = tagColorFor(t);
+                                    const style: CSSProperties = cor
+                                      ? { backgroundColor: `${cor}1a`, borderColor: `${cor}66`, color: cor }
+                                      : {};
+                                    return (
+                                      <span key={t} style={style} className={`max-w-[110px] truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${cor ? "" : "border-chat-accent/40 bg-chat-accent/10 text-chat-accent"}`}>
+                                        {t}
+                                      </span>
+                                    );
+                                  })}
+                                  {extra > 0 ? (
+                                    <span className="rounded-full border border-chat-line px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                      +{extra}
                                     </span>
-                                  );
-                                })}
-                                {extra > 0 ? (
-                                  <span className="rounded-full border border-chat-line px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                    +{extra}
-                                  </span>
-                                ) : null}
-                              </div>
-                            );
-                          })()}
+                                  ) : null}
+                                </div>
+                              );
+                            })()}
 
-                          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                            {c.last_message_direction === "out" && (
-                              <PreviewStatusTick status={c.last_message_status} />
-                            )}
-                            <span className="truncate">{preview || "Sem prévia"}</span>
+                            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                              {c.last_message_direction === "out" && (
+                                <PreviewStatusTick status={c.last_message_status} />
+                              )}
+                              <span className="truncate">{preview || "Sem prévia"}</span>
+                            </div>
+
                           </div>
-
-                        </div>
-                        <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
-                          <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-                            {formatListStamp(c.last_message_at)}
-                          </span>
-                          {Number(c.unread_count ?? 0) > 0 ? (
-                            <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">
-                              {Number(c.unread_count ?? 0)}
+                          <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
+                            <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                              {formatListStamp(c.last_message_at)}
                             </span>
-                          ) : (
-                            <span className={`h-2 w-2 rounded-full ${isActive ? "bg-chat-accent" : "bg-transparent"}`} />
-                          )}
+                            {Number(c.unread_count ?? 0) > 0 ? (
+                              <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">
+                                {Number(c.unread_count ?? 0)}
+                              </span>
+                            ) : (
+                              <span className={`h-2 w-2 rounded-full ${isActive ? "bg-chat-accent" : "bg-transparent"}`} />
+                            )}
+                          </div>
+                        </div>
+                        <div
+                          className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <ConversationActionsMenu
+                            conversationId={String(c.id)}
+                            channelId={toText(c.channel_id)}
+                            currentVendorId={(c as any).assigned_vendor_id ?? null}
+                            archived={isArchived}
+                            isPinned={isPinned}
+                            onTogglePin={() => togglePin(String(c.id))}
+                          />
                         </div>
                       </div>
-                      <div
-                        className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        <ConversationActionsMenu
-                          conversationId={String(c.id)}
-                          channelId={toText(c.channel_id)}
-                          currentVendorId={(c as any).assigned_vendor_id ?? null}
-                          archived={isArchived}
-                          isPinned={isPinned}
-                          onTogglePin={() => togglePin(String(c.id))}
-                        />
-                      </div>
-                    </div>
-                    </ConversationRowContextMenu>
-                  );
-                })}
-              </div>
+                      </ConversationRowContextMenu>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Float scroll-to-top button for conversation list */}
+            {showSidebarScrollTop && (
+              <button
+                type="button"
+                onClick={() => {
+                  const el = sidebarScrollRef.current;
+                  if (el) {
+                    el.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+                className="absolute bottom-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-chat-accent text-chat-accent-foreground shadow-lg shadow-chat-accent/20 hover:scale-105 active:scale-95 transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
+                title="Voltar para o topo"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
             )}
           </div>
 
