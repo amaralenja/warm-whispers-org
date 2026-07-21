@@ -43,7 +43,7 @@ export const Route = createFileRoute("/_authenticated/ht-analytics")({
   component: () => <HTAnalytics />,
 });
 
-type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics" | "facebook-ads";
+type HTTab = "dashboard" | "kanban" | "closer" | "receber" | "leads" | "sdr-metrics" | "facebook-ads" | "topo-funil";
 
 const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
 const QUIZ_KEY =
@@ -540,6 +540,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             tabs.push({ id: "receber", label: "Contas a Receber" });
             tabs.push({ id: "leads", label: "Lista de Leads" });
             tabs.push({ id: "facebook-ads", label: "Facebook Ads" });
+            if (!s || s.tipo !== "sdr") tabs.push({ id: "topo-funil", label: "Topo do Funil" });
             return tabs.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative whitespace-nowrap ${
@@ -588,6 +589,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       {tab === "facebook-ads" && (
         <FacebookAdsAnalyticsSection leads={leads} vendas={vendas} period={period} />
       )}
+      {tab === "topo-funil" && <TopoFunilSection leads={leads} />}
 
 
       {tab === "dashboard" && (
@@ -3575,3 +3577,118 @@ function LancarVendaDialog({
   );
 }
 
+
+// ============================================================
+// Topo do Funil — origem dos leads (Tráfego Pago x Typebot x Orgânico)
+// ============================================================
+function classifyOrigin(l: QLead): "pago" | "typebot" | "organico" {
+  const src = String(l.utm_source || "").toLowerCase().trim();
+  const med = String(l.utm_medium || "").toLowerCase().trim();
+  const camp = String(l.utm_campaign || "").toLowerCase().trim();
+  const funil = String(l.funil || "").toLowerCase();
+  const anyL = l as any;
+  const hasClickId = !!(anyL.fbclid || anyL.gclid || anyL.ttclid);
+  const paidSources = ["fb", "facebook", "ig", "instagram", "meta", "google", "tiktok", "tt", "ads", "youtube", "yt"];
+  const paidMediums = ["cpc", "paid", "ads", "ppc", "cpm", "social-paid", "paidsocial"];
+  const isPaid =
+    hasClickId ||
+    paidSources.includes(src) ||
+    paidMediums.includes(med) ||
+    /ads|cpc|paid|trafego|tráfego/.test(camp);
+  const isTypebot =
+    /typebot/.test(src) ||
+    /typebot/.test(med) ||
+    /typebot|quiz/.test(camp) ||
+    /typebot|quiz/.test(funil);
+  if (isPaid) return "pago";
+  if (isTypebot) return "typebot";
+  return "organico";
+}
+
+function TopoFunilSection({ leads }: { leads: QLead[] }) {
+  const stats = useMemo(() => {
+    let pago = 0, typebot = 0, organico = 0;
+    const bySource = new Map<string, number>();
+    const byCampaign = new Map<string, number>();
+    for (const l of leads) {
+      const c = classifyOrigin(l);
+      if (c === "pago") pago++;
+      else if (c === "typebot") typebot++;
+      else organico++;
+      const s = (l.utm_source || "(sem utm)").toLowerCase();
+      bySource.set(s, (bySource.get(s) || 0) + 1);
+      if (l.utm_campaign) {
+        const k = l.utm_campaign;
+        byCampaign.set(k, (byCampaign.get(k) || 0) + 1);
+      }
+    }
+    return {
+      total: leads.length,
+      pago, typebot, organico,
+      bySource: [...bySource.entries()].sort((a, b) => b[1] - a[1]),
+      byCampaign: [...byCampaign.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15),
+    };
+  }, [leads]);
+
+  const pct = (n: number) => stats.total ? ((n / stats.total) * 100).toFixed(1) + "%" : "0%";
+
+  return (
+    <div className="px-6 md:px-10 py-8 space-y-8">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-1">Bloco Topo</div>
+        <h2 className="text-2xl font-light">Origem dos Leads</h2>
+        <p className="text-sm text-muted-foreground">Quantos leads entraram pelo tráfego pago, Typebot ou orgânico.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-border/50 bg-card/40 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total de Leads</div>
+          <div className="text-3xl font-light mt-2">{stats.total.toLocaleString("pt-BR")}</div>
+          <div className="text-xs text-muted-foreground mt-1">no período selecionado</div>
+        </div>
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-blue-400">Tráfego Pago</div>
+          <div className="text-3xl font-light mt-2 text-blue-300">{stats.pago.toLocaleString("pt-BR")}</div>
+          <div className="text-xs text-muted-foreground mt-1">{pct(stats.pago)} do total</div>
+        </div>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-amber-400">Typebot</div>
+          <div className="text-3xl font-light mt-2 text-amber-300">{stats.typebot.toLocaleString("pt-BR")}</div>
+          <div className="text-xs text-muted-foreground mt-1">{pct(stats.typebot)} do total</div>
+        </div>
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">Orgânico</div>
+          <div className="text-3xl font-light mt-2 text-emerald-300">{stats.organico.toLocaleString("pt-BR")}</div>
+          <div className="text-xs text-muted-foreground mt-1">{pct(stats.organico)} do total</div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-xl border border-border/50 bg-card/40 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-4">Por UTM Source</div>
+          <div className="space-y-2">
+            {stats.bySource.map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between text-sm border-b border-border/30 pb-1.5">
+                <span className="font-mono text-xs">{k}</span>
+                <span className="tabular-nums">{v} <span className="text-muted-foreground text-xs">({pct(v)})</span></span>
+              </div>
+            ))}
+            {stats.bySource.length === 0 && <div className="text-xs text-muted-foreground">Sem dados</div>}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border/50 bg-card/40 p-5">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-4">Top Campanhas</div>
+          <div className="space-y-2">
+            {stats.byCampaign.map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between text-sm border-b border-border/30 pb-1.5">
+                <span className="truncate max-w-[70%]" title={k}>{k}</span>
+                <span className="tabular-nums">{v}</span>
+              </div>
+            ))}
+            {stats.byCampaign.length === 0 && <div className="text-xs text-muted-foreground">Sem campanhas registradas</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
