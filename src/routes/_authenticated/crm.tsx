@@ -687,9 +687,12 @@ function Kanban({
 // (chat abre em /chat?phone=... — sem iframe)
 
 
-
-
-
+function classifyLeadOrigin(lead: Lead): { key: "typebot" | "pago" | "organico"; label: string } {
+  const hay = [lead.fonte, ...(lead.tags ?? [])].filter(Boolean).join(" ").toLowerCase();
+  if (/typebot|quiz|form(ul[aá]rio)?/.test(hay)) return { key: "typebot", label: "Typebot" };
+  if (/\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|pago|cpc|cpm|paid)\b/.test(hay)) return { key: "pago", label: "Tráfego Pago" };
+  return { key: "organico", label: "Orgânico" };
+}
 
 function KanbanCard({
   lead, stageColor, tagColors, avatarUrl, lastOutboundAt, onEdit, onOpenChat, onDragStart,
