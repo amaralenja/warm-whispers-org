@@ -707,19 +707,34 @@ function KanbanCard({
   const avatarColor = colorFromName(lead.nome);
   const initials = initialsOf(lead.nome);
   const phoneDigits = (lead.telefone ?? "").replace(/\D+/g, "");
+  const origem = classifyLeadOrigin(lead);
   const handleClick = () => {
     if (phoneDigits) onOpenChat();
     else onEdit();
   };
+  const originStyles: Record<string, { border: string; bg: string; ring: string }> = {
+    typebot:  { border: "#f59e0b", bg: "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.02))", ring: "ring-amber-500/30" },
+    pago:     { border: "#3b82f6", bg: "linear-gradient(135deg, rgba(59,130,246,0.08), transparent)", ring: "ring-blue-500/20" },
+    organico: { border: "#10b981", bg: "transparent", ring: "" },
+  };
+  const os = originStyles[origem.key] ?? originStyles.organico;
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, lead)}
       onClick={handleClick}
-      style={{ borderLeftColor: stageColor }}
-      className="group relative cursor-pointer rounded-lg border border-border border-l-4 bg-background/80 p-3 hover:border-accent/40 hover:shadow-md transition-all"
+      style={{ borderLeftColor: origem.key === "organico" ? stageColor : os.border, background: os.bg }}
+      className={`group relative cursor-pointer rounded-lg border border-border border-l-4 p-3 hover:border-accent/40 hover:shadow-md transition-all ${os.ring ? `ring-1 ${os.ring}` : ""} ${origem.key === "organico" ? "bg-background/80" : ""}`}
       title={phoneDigits ? "Abrir conversa" : "Editar lead"}
     >
+      {origem.key !== "organico" && (
+        <span
+          className="absolute left-2 top-2 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm"
+          style={{ background: os.border, color: "#0b0b0b" }}
+        >
+          {origem.label}
+        </span>
+      )}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onEdit(); }}
