@@ -1,4 +1,3 @@
-const bootstrapStateInstance = ;
 
 
 import { useEffect, useState } from "react";
