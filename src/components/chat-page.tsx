@@ -1027,10 +1027,45 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     [conversationList],
   );
 
-  const archivedTotal = useMemo(
-    () => conversationList.reduce((acc, c) => acc + ((c as any).archived_at ? 1 : 0), 0),
-    [conversationList],
-  );
+  // LocalStorage Pinning system (max 10 conversations)
+  const pinStorageKey = useMemo(() => {
+    return `chat-pinned-convs:${vendorSession?.id ?? "admin"}`;
+  }, [vendorSession?.id]);
+
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(pinStorageKey);
+      if (saved) {
+        setPinnedIds(JSON.parse(saved));
+      } else {
+        setPinnedIds([]);
+      }
+    } catch {
+      setPinnedIds([]);
+    }
+  }, [pinStorageKey]);
+
+  const togglePin = (convId: string) => {
+    const isPinned = pinnedIds.includes(convId);
+    if (!isPinned && pinnedIds.length >= 10) {
+      toast.error("Limite máximo atingido: você só pode fixar até 10 conversas.");
+      return;
+    }
+    let next: string[];
+    if (isPinned) {
+      next = pinnedIds.filter((id) => id !== convId);
+      toast.success("Conversa desafixada");
+    } else {
+      next = [convId, ...pinnedIds];
+      toast.success("Conversa fixada no topo");
+    }
+    setPinnedIds(next);
+    try {
+      window.localStorage.setItem(pinStorageKey, JSON.stringify(next));
+    } catch { /* noop */ }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1043,13 +1078,23 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
       else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
     }
-    if (!q) return list;
-    return list.filter((c) =>
-      toText(c.contact_name).toLowerCase().includes(q) ||
-      toText(c.contact_wa_id).includes(q) ||
-      toText(c.last_message_preview).toLowerCase().includes(q)
-    );
-  }, [conversationList, search, listFilter, activeFlowConvIds]);
+    if (q) {
+      list = list.filter((c) =>
+        toText(c.contact_name).toLowerCase().includes(q) ||
+        toText(c.contact_wa_id).includes(q) ||
+        toText(c.last_message_preview).toLowerCase().includes(q)
+      );
+    }
+    // Sort pinned conversations to the top, maintaining internal order among pinned items, then remaining sorted items
+    return list.slice().sort((a, b) => {
+      const aPinned = pinnedIds.indexOf(String(a.id));
+      const bPinned = pinnedIds.indexOf(String(b.id));
+      if (aPinned >= 0 && bPinned >= 0) return aPinned - bPinned;
+      if (aPinned >= 0) return -1;
+      if (bPinned >= 0) return 1;
+      return 0; // maintain default sorted order
+    });
+  }, [conversationList, search, listFilter, activeFlowConvIds, pinnedIds]);
 
   const PAGE_SIZE = 40;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -1514,6 +1559,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
                   const isArchived = Boolean((c as any).archived_at);
+                  const isPinned = pinnedIds.includes(String(c.id));
                   return (
                     <ConversationRowContextMenu
                       key={String(c.id)}
@@ -1521,6 +1567,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       channelId={toText(c.channel_id)}
                       currentVendorId={(c as any).assigned_vendor_id ?? null}
                       archived={isArchived}
+                      isPinned={isPinned}
+                      onTogglePin={() => togglePin(String(c.id))}
                     >
                     <div
                       role="button"
@@ -1580,10 +1628,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           </Avatar>
                         </button>
                         <div className="min-w-0">
-                          <div className="flex min-w-0 items-center justify-between">
+                          <div className="flex min-w-0 items-center gap-1.5">
                             <span className="truncate text-[15px] font-semibold tracking-normal text-foreground">
                               {contactName || contactWaId}
                             </span>
+                            {isPinned && (
+                              <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500/20 rotate-45" title="Conversa fixada" />
+                            )}
                           </div>
                           
                           <div className="flex flex-wrap items-center gap-1 mt-1">
@@ -1683,7 +1734,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                               <span
                                 className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
                                 style={{ color: leadStage.cor, borderColor: `${leadStage.cor}66`, backgroundColor: `${leadStage.cor}1a` }}
-                                title={`Etapa CRM: ${leadStage.nome}`}
+                                  title={`Etapa CRM: ${leadStage.nome}`}
                               >
                                 {leadStage.nome}
                               </span>
@@ -1758,6 +1809,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           channelId={toText(c.channel_id)}
                           currentVendorId={(c as any).assigned_vendor_id ?? null}
                           archived={isArchived}
+                          isPinned={isPinned}
+                          onTogglePin={() => togglePin(String(c.id))}
                         />
                       </div>
                     </div>
@@ -3630,16 +3683,22 @@ function FlowDispatcher({
   );
 }
 
+import { Pin, PinOff } from "lucide-react";
+
 function ConversationActionsMenu({
   conversationId,
   channelId,
   currentVendorId,
   archived,
+  isPinned,
+  onTogglePin,
 }: {
   conversationId: string;
   channelId: string;
   currentVendorId: number | null;
   archived?: boolean;
+  isPinned: boolean;
+  onTogglePin: () => void;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -3690,6 +3749,21 @@ function ConversationActionsMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 rounded-2xl border-chat-line bg-popover">
+        <DropdownMenuItem
+          onSelect={(e) => { e.preventDefault(); onTogglePin(); setOpen(false); }}
+          className="rounded-xl font-medium"
+        >
+          {isPinned ? (
+            <>
+              <PinOff className="mr-2 h-4 w-4 text-amber-500" /> Desafixar conversa
+            </>
+          ) : (
+            <>
+              <Pin className="mr-2 h-4 w-4" /> Fixar no topo (max 10)
+            </>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-chat-line" />
         <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
           <UserCog className="h-3.5 w-3.5" /> Transferir para
         </div>
@@ -3732,12 +3806,16 @@ function ConversationRowContextMenu({
   channelId,
   currentVendorId,
   archived,
+  isPinned,
+  onTogglePin,
   children,
 }: {
   conversationId: string;
   channelId: string;
   currentVendorId: number | null;
   archived: boolean;
+  isPinned: boolean;
+  onTogglePin: () => void;
   children: React.ReactNode;
 }) {
   const qc = useQueryClient();
@@ -3778,6 +3856,18 @@ function ConversationRowContextMenu({
     <ContextMenu onOpenChange={setOpen}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-60 rounded-2xl border-chat-line bg-popover">
+        <ContextMenuItem onSelect={() => onTogglePin()} className="rounded-xl font-medium">
+          {isPinned ? (
+            <>
+              <PinOff className="mr-2 h-4 w-4 text-amber-500" /> Desafixar conversa
+            </>
+          ) : (
+            <>
+              <Pin className="mr-2 h-4 w-4" /> Fixar no topo (max 10)
+            </>
+          )}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => doArchive()} className="rounded-xl">
           {archived ? (<><ArchiveRestore className="mr-2 h-4 w-4" /> Desarquivar</>) : (<><Archive className="mr-2 h-4 w-4" /> Arquivar</>)}
         </ContextMenuItem>
