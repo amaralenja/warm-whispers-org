@@ -41,6 +41,8 @@ import {
   Images,
   History,
   ArrowUp,
+  Pin,
+  PinOff,
 } from "lucide-react";
 
 import {
@@ -3715,8 +3717,6 @@ function FlowDispatcher({
     </DropdownMenu>
   );
 }
-
-import { Pin, PinOff } from "lucide-react";
 
 function ConversationActionsMenu({
   conversationId,
