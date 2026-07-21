@@ -540,6 +540,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             tabs.push({ id: "receber", label: "Contas a Receber" });
             tabs.push({ id: "leads", label: "Lista de Leads" });
             tabs.push({ id: "facebook-ads", label: "Facebook Ads" });
+            if (!s || s.tipo !== "sdr") tabs.push({ id: "topo-funil", label: "Topo do Funil" });
             return tabs.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-4 py-3 text-xs uppercase tracking-[0.2em] transition-colors relative whitespace-nowrap ${
