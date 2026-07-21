@@ -655,6 +655,16 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const [previewCaption, setPreviewCaption] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const sidebarScrollTopRef = useRef<number>(0);
+
+  // Preserve sidebar scroll position when convs query updates
+  useLayoutEffect(() => {
+    const el = sidebarScrollRef.current;
+    if (el && sidebarScrollTopRef.current > 0) {
+      el.scrollTop = sidebarScrollTopRef.current;
+    }
+  }, [convs]);
 
   const [vendorSessionTick, setVendorSessionTick] = useState(0);
   useEffect(() => {
@@ -1102,6 +1112,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const visibleFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
   const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
+    sidebarScrollTopRef.current = el.scrollTop;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && visibleCount < filtered.length) {
       setVisibleCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
     }
@@ -1511,7 +1522,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy" onScroll={handleListScroll}>
+          <div ref={sidebarScrollRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-fancy" onScroll={handleListScroll}>
             {convsError || channelsError ? (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
                 {errorToText(convsError ?? channelsError, "Falha ao carregar conversas do WhatsApp")}
