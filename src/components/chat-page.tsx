@@ -1563,11 +1563,38 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           </div>
                           
                           <div className="flex flex-wrap items-center gap-1 mt-1">
-                            {isTypebotLead && (
-                              <Badge variant="outline" className="shrink-0 h-4 px-1 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/30 flex items-center gap-0.5 font-semibold">
-                                🤖 Quiz
-                              </Badge>
-                            )}
+                            {(() => {
+                              const hay = [
+                                (leadForConv as any)?.fonte,
+                                (leadForConv as any)?.origem,
+                                (leadForConv as any)?.utm_source,
+                                (leadForConv as any)?.utm_medium,
+                                (leadForConv as any)?.utm_campaign,
+                                ...(Array.isArray((leadForConv as any)?.tags) ? (leadForConv as any).tags : []),
+                                ...(Array.isArray((c as any).tags) ? (c as any).tags : []),
+                              ].filter(Boolean).join(" ").toLowerCase();
+                              const isTypebot = isTypebotLead || /typebot|quiz|form(ul[aá]rio)?/.test(hay);
+                              const isPago = /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|pago|cpc|cpm|paid|gads|fbclid|gclid)\b/.test(hay) || !!(leadForConv as any)?.fbclid || !!(leadForConv as any)?.gclid;
+                              if (isTypebot) {
+                                return (
+                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
+                                    🤖 Typebot
+                                  </Badge>
+                                );
+                              }
+                              if (isPago) {
+                                return (
+                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">
+                                    💰 Tráfego Pago
+                                  </Badge>
+                                );
+                              }
+                              return (
+                                <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/40 font-bold uppercase">
+                                  🌱 Orgânico
+                                </Badge>
+                              );
+                            })()}
                             {leadForConv && (() => {
                               const attr = getLeadAttributionBadge(leadForConv);
                               if (!attr) return null;
@@ -1577,6 +1604,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 </Badge>
                               );
                             })()}
+
                             {(() => {
                               const comprador = checkIsComprador(contactWaId);
                               if (!comprador) return null;
