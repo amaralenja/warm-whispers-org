@@ -1483,11 +1483,21 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
                   const isTypebotLead = (() => {
                     const digits = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
-                    if (!digits) return false;
-                    if (typebotPhonesSet.has(digits)) return true;
-                    if (digits.length >= 8 && typebotPhonesSet.has(digits.slice(-8))) return true;
+                    if (digits) {
+                      if (typebotPhonesSet.has(digits)) return true;
+                      if (digits.length >= 8 && typebotPhonesSet.has(digits.slice(-8))) return true;
+                    }
+                    // Fallback: olha origem/tags do lead do CRM
+                    const l: any = leadForConv ?? {};
+                    const hay = [
+                      l.fonte, l.origem, l.utm_source, l.utm_medium, l.utm_campaign,
+                      ...(Array.isArray(l.tags) ? l.tags : []),
+                      ...(Array.isArray((c as any).tags) ? (c as any).tags : []),
+                    ].filter(Boolean).join(" ").toLowerCase();
+                    if (/typebot|quiz|form(ul[aá]rio)?/.test(hay)) return true;
                     return false;
                   })();
+
 
                   const isArchived = Boolean((c as any).archived_at);
                   return (
