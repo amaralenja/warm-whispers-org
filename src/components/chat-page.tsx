@@ -83,6 +83,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -658,18 +659,6 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const [previewCaption, setPreviewCaption] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
-  const sidebarScrollRef = useRef<HTMLDivElement>(null);
-  const sidebarScrollTopRef = useRef<number>(0);
-  const [showSidebarScrollTop, setShowSidebarScrollTop] = useState(false);
-
-  // Preserve sidebar scroll position when convs query updates
-  useLayoutEffect(() => {
-    const el = sidebarScrollRef.current;
-    if (el && sidebarScrollTopRef.current > 0) {
-      el.scrollTop = sidebarScrollTopRef.current;
-    }
-  }, [convs]);
-
   const [vendorSessionTick, setVendorSessionTick] = useState(0);
   useEffect(() => {
     const refresh = () => setVendorSessionTick((v) => v + 1);
@@ -710,6 +699,18 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   });
 
 
+
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const sidebarScrollTopRef = useRef<number>(0);
+  const [showSidebarScrollTop, setShowSidebarScrollTop] = useState(false);
+
+  // Preserve sidebar scroll position when convs query updates
+  useLayoutEffect(() => {
+    const el = sidebarScrollRef.current;
+    if (el && sidebarScrollTopRef.current > 0) {
+      el.scrollTop = sidebarScrollTopRef.current;
+    }
+  }, [convs]);
 
   // Canais conectados (pra mostrar de qual número está sendo atendido cada lead)
   const { data: channels = [], error: channelsError } = useQuery({
@@ -1038,6 +1039,11 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
   const unreadTotal = useMemo(
     () => conversationList.reduce((acc, c) => acc + (Number((c as any).unread_count ?? 0) > 0 ? 1 : 0), 0),
+    [conversationList],
+  );
+
+  const archivedTotal = useMemo(
+    () => conversationList.reduce((acc, c) => acc + ((c as any).archived_at ? 1 : 0), 0),
     [conversationList],
   );
 
@@ -1650,7 +1656,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 {contactName || contactWaId}
                               </span>
                               {isPinned && (
-                                <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500/20 rotate-45" title="Conversa fixada" />
+                                <span title="Conversa fixada">
+                                  <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500/20 rotate-45" />
+                                </span>
                               )}
                             </div>
                             
