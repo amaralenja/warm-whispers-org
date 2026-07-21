@@ -608,7 +608,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           </div>
         </section>
 
-        {/* Funil de Vendas HT — removido (duplicado do Funil Tridimensional abaixo) */}
+        {/* Funil Tridimensional de Vendas */}
+        <section>
+          <SalesFunnelView leads={leads} vendas={vendas} period={period} />
+        </section>
 
 
         {/* Receita por Origem de Tráfego */}
