@@ -117,6 +117,9 @@ const isSdrQualifiedLead = (l: QLead): boolean => {
   // Leads manuais criados pelo SDR sempre são válidos do SDR
   if (l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
 
+  // Preserva qualquer lead com agendamento ou status relevante no CRM
+  if (l.crm_data_agendamento || (l.crm_status && ["agendado", "fechado", "ganho", "followup", "sinal"].includes(l.crm_status.toLowerCase()))) return true;
+
   const c = (l.caixa_letra ?? "").toUpperCase().trim();
   // 1. Caixa A (Menos de R$ 1.000) ou sem Caixa não é lead do SDR
   if (!c || c === "A" || !"BCDEFG".includes(c)) return false;
@@ -2146,8 +2149,9 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
       const def = sdrToCloser(sdr);
       const cardId = `qlead-${l.id}`;
       const finalizado = isFinalizado(l);
-      const isScheduled = sdr === "agendado";
-      const inPipeline = (finalizado && "DEFG".includes(caixa) && (def || stageMap[cardId])) || isScheduled;
+      const isScheduled = sdr === "agendado" || !!schedMap[l.id] || !!l.crm_data_agendamento;
+      const hasCloser = !!closerEmailMap[l.id] || !!stageMap[cardId];
+      const inPipeline = hasCloser || isScheduled || (finalizado && "BCDEFG".includes(caixa));
       const bySearch = matchesSearch(l);
       if (!inPipeline && !bySearch) continue;
       const closerEmail = closerEmailMap[l.id];
