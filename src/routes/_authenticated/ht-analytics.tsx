@@ -104,7 +104,14 @@ const isFinalizado = (l: QLead) => {
   const hasCaixa = !!(l.caixa_letra || l.caixa_label);
   const hasQuizData = !!(l.faturamento || l.comprometimento || l.momento || l.objetivo || l.investir || l.socio || l.minicurso);
 
-  return hasCaixa && hasQuizData;
+  if (hasCaixa && hasQuizData) return true;
+
+  // Leads Caixa B+ com caixa_letra definida são considerados finalizados para o Kanban SDR.
+  // Mesmo sem todos os campos do quiz preenchidos, chegaram longe o suficiente para serem qualificados.
+  const c = (l.caixa_letra ?? "").toUpperCase().trim();
+  if (c && "BCDEFG".includes(c)) return true;
+
+  return false;
 };
 
 const isQuente = (l: QLead) => {
@@ -2044,7 +2051,13 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
   const [schedMap, setSched] = useSchedMap();
   const [closerEmailMap, setCloserEmail] = useCloserEmailMap();
   const closersList = useClosersList();
+  // State for opening sale dialog from a lead card
+  const [saleLead, setSaleLead] = useState<QLead | null>(null);
+  // Track highlighted cards after a sale is registered
+  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
   const sdrStageMap = useSdrStageMap();
+  const [saleLead, setSaleLead] = useState<QLead | null>(null);
+  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
 
 
 
@@ -2246,7 +2259,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                 </div>
                 <div className="text-[10px] font-mono tabular-nums text-accent mt-1">{fmtBRL(total)}</div>
               </div>
-              <div className="p-2 space-y-2 overflow-y-auto flex-1">
+              <div className="p-2 space-y-2 overflow-y-auto flex-1 relative">
                 {items.length === 0 && (
                   <div className="text-[11px] text-muted-foreground text-center py-6 opacity-60">Vazio</div>
                 )}
@@ -2260,32 +2273,6 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                   };
                   const handle = (c.lead?.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, "");
                   return (
-                    <KanbanLeadCard
-                      key={c.id}
-                      lead={leadObj as any}
-                      ig={handle ? igMap.get(handle) : undefined}
-                      scheduledAt={c.lead ? (schedMap[c.lead.id] ?? null) : null}
-                      lastNote={c.lead ? notesMap[c.lead.id] : null}
-                      dragging={draggingId === c.id}
-
-                      onClick={c.lead ? () => setSelectedLead(c.lead!) : undefined}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("text/x-closer-id", c.id);
-                        setDraggingId(c.id);
-                      }}
-                      onDragEnd={() => setDraggingId(null)}
-                      footer={
-                        <div className="space-y-1.5">
-                          {c.valor > 0 && (
-                            <div className="text-[11px] font-mono tabular-nums text-emerald-400">{fmtBRL(c.valor)}</div>
-                          )}
-                          {c.closer && (
-                            <div className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 truncate inline-block">
-                              {c.closer}
-                            </div>
-                          )}
-                          <select
-                            value={stageMap[c.id] || c.defaultStage}
                             onChange={(e) => moveTo(c.id, e.target.value)}
                             className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
                           >
