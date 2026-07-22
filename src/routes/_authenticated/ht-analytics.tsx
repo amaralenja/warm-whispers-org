@@ -156,6 +156,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<QLead[]>([]);
+  // allKanbanLeads: carrega TODOS os leads qualificados SEM filtro de data,
+  // para que o Kanban SDR/Closer mostre todos os leads independente do período.
+  const [allKanbanLeads, setAllKanbanLeads] = useState<QLead[]>([]);
+  const [loadingKanban, setLoadingKanban] = useState(true);
   const [notesMap, setNotesMap] = useState<Record<string, { body: string; author: string | null; role: string }>>({});
   const [vendas, setVendas] = useState<any[]>([]);
 
@@ -298,6 +302,78 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
     })();
     return () => { cancel = true; };
   }, [period, nonce]);
+
+  // Carga separada dos leads para o Kanban — SEM filtro de período.
+  // Assim todos os leads qualificados (Caixa B+) aparecem no Kanban SDR/Closer
+  // independente de quando se cadastraram.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoadingKanban(true);
+      const allK: QLead[] = [];
+      const pageSize = 1000;
+      // Quiz externo — sem filtro de data
+      for (let i = 0; i < 30; i++) {
+        const { data, error } = await quizSb.from("leads").select("*")
+          .order("data_criacao", { ascending: false })
+          .range(i * pageSize, i * pageSize + pageSize - 1);
+        if (error || !data) break;
+        const mapped = (data as any[]).map(l => ({ ...l, respostas: l.respostas_json || l.respostas || null }));
+        allK.push(...(mapped as QLead[]));
+        if (data.length < pageSize) break;
+      }
+      // ht_quiz_submissions — sem filtro de data
+      try {
+        const { data: qzData } = await supabase
+          .from("ht_quiz_submissions" as any)
+          .select("id, received_at, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas")
+          .order("received_at", { ascending: false })
+          .limit(10000);
+        for (const s of (qzData as any[]) || []) {
+          const r = (s.respostas ?? {}) as Record<string, any>;
+          allK.push({
+            id: `htq:${s.id}`,
+            data_criacao: s.received_at,
+            nome: s.nome ?? null,
+            email: s.email ?? null,
+            whatsapp: s.whatsapp ?? null,
+            instagram: s.instagram ?? null,
+            caixa_letra: r.caixa_letra ?? null,
+            caixa_label: r.caixa_label ?? null,
+            faturamento: r.faturamento ?? null,
+            momento: r.momento ?? null,
+            objetivo: r.objetivo ?? null,
+            investir: r.investir ?? null,
+            minicurso: r.minicurso ?? null,
+            socio: r.socio ?? null,
+            comprometimento: r.comprometimento ?? null,
+            last_step: r.step_atual != null ? String(r.step_atual) : null,
+            funil: r.funil ?? null,
+            utm_source: s.utm_source ?? null,
+            utm_medium: s.utm_medium ?? null,
+            utm_campaign: s.utm_campaign ?? null,
+            crm_status: null,
+            crm_valor: null,
+            crm_data_agendamento: null,
+            respostas: r,
+          } as QLead);
+        }
+      } catch { /* silencioso */ }
+
+      if (cancel) return;
+      allK.sort((a, b) => String(b.data_criacao || "").localeCompare(String(a.data_criacao || "")));
+      const seenWaK = new Set<string>();
+      const mergedK: QLead[] = [];
+      for (const l of allK) {
+        const key = (l.whatsapp || "").replace(/\D+/g, "");
+        if (key) { if (seenWaK.has(key)) continue; seenWaK.add(key); }
+        mergedK.push(l);
+      }
+      setAllKanbanLeads(mergedK);
+      setLoadingKanban(false);
+    })();
+    return () => { cancel = true; };
+  }, [nonce]);
 
   const kpis = useMemo(() => {
     // Receita do quiz (crm_status = fechado/ganho, valor = crm_valor)
@@ -521,10 +597,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         </div>
       </div>
 
-      {tab === "kanban" && <KanbanSDR leads={leads} loading={loading} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />}
+      {tab === "kanban" && <KanbanSDR leads={allKanbanLeads} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />}
       {tab === "closer" && (
         <>
-          <KanbanCloser leads={leads} vendas={vendas} loading={loading} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />
+          <KanbanCloser leads={allKanbanLeads} vendas={vendas} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />
 
           <div className="border-t border-border/50 mt-6">
             <div className="px-6 md:px-10 pt-6 pb-2">
