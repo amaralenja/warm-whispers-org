@@ -121,55 +121,10 @@ const isSdrQualifiedLead = (l: QLead): boolean => {
   if (l.crm_data_agendamento || (l.crm_status && ["agendado", "fechado", "ganho", "followup", "sinal"].includes(l.crm_status.toLowerCase()))) return true;
 
   const c = (l.caixa_letra ?? "").toUpperCase().trim();
-  // 1. Caixa A (Menos de R$ 1.000) ou sem Caixa não é lead do SDR
+  // Caixa A (Menos de R$ 1.000) ou sem Caixa não é lead do SDR
   if (!c || c === "A" || !"BCDEFG".includes(c)) return false;
 
-  const fatRaw = (l.faturamento ?? (l.respostas as any)?.faturamento ?? "").toString().toLowerCase().trim();
-
-  // 2. Faturamento < 5k não é lead do SDR (ex: 'menos de 5.000', '0 a 5k', 'até 5k', etc.)
-  if (fatRaw) {
-    if (
-      fatRaw.includes("menos de 5") ||
-      fatRaw.includes("até 5") ||
-      fatRaw.includes("0 a 5") ||
-      fatRaw.includes("0-5") ||
-      fatRaw.includes("menos de r$ 5") ||
-      fatRaw.includes("< 5k") ||
-      fatRaw.includes("<5k") ||
-      fatRaw.includes("0k") ||
-      fatRaw === "0"
-    ) {
-      return false;
-    }
-
-    // Remove separadores de milhar pt-BR ("R$10.000" → "R$10000") antes de extrair números
-    const cleanFat = fatRaw.replace(/\.(?=\d{3}\b)/g, "");
-    const nums = cleanFat.match(/\d+/g)?.map(Number);
-    if (nums && nums.length > 0) {
-      const maxVal = Math.max(...nums);
-      const isK = cleanFat.includes("k");
-      const realVal = isK && maxVal < 1000 ? maxVal * 1000 : maxVal;
-      if (realVal > 0 && realVal < 5000) {
-        return false;
-      }
-    }
-
-  }
-
-  // 3. Se Caixa é B (1k-5k) e o Faturamento é < 5k ou indisponível/baixo, descarta
-  if (c === "B") {
-    if (
-      !fatRaw ||
-      fatRaw.includes("menos") ||
-      fatRaw.includes("1k") ||
-      fatRaw.includes("2k") ||
-      fatRaw.includes("3k") ||
-      fatRaw.includes("4k")
-    ) {
-      return false;
-    }
-  }
-
+  // Leads Caixa B+ que completaram o quiz (step 11) são leads válidos do SDR
   return true;
 };
 
