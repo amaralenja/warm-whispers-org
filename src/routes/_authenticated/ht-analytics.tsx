@@ -299,7 +299,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       }
 
       if (cancel) return;
-      // Deduplica por whatsapp: leads da API só entram se não vieram do quiz externo.
+      // Ordena por data_criacao decrescente ANTES da deduplicação
+      // para que o teste ou envio mais recente do mesmo WhatsApp prevaleça sobre cadastros antigos.
+      all.sort((a, b) => String(b.data_criacao || "").localeCompare(String(a.data_criacao || "")));
+
       const seenWa = new Set<string>();
       const merged: QLead[] = [];
       for (const l of all) {
@@ -310,7 +313,6 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         }
         merged.push(l);
       }
-      merged.sort((a, b) => String(b.data_criacao).localeCompare(String(a.data_criacao)));
       setLeads(merged);
       setVendas(localData.vendas);
       setHtLeads(localData.leads);
