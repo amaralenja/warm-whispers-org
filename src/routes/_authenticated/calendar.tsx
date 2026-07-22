@@ -176,9 +176,18 @@ export function CalendarPage() {
   const [markerVersion, refreshMarkers] = useState(0);
   const [form, setForm] = useState<FormState>(emptyForm());
 
+  const timeRange = useMemo(() => {
+    const start = startOfMonth(cursor);
+    const end = endOfMonth(cursor);
+    // Extende um pouco a busca (margem de 7 dias antes/depois) para pegar os dias da semana vizinha no grid
+    const timeMin = new Date(start.getTime() - 7 * 86400_000).toISOString();
+    const timeMax = new Date(end.getTime() + 7 * 86400_000).toISOString();
+    return { timeMin, timeMax };
+  }, [cursor]);
+
   const { data, isLoading, refetch, isFetching, error } = useQuery({
-    queryKey: ["gcal-events"],
-    queryFn: () => list({ data: {} }),
+    queryKey: ["gcal-events", timeRange.timeMin, timeRange.timeMax],
+    queryFn: () => list({ data: { timeMin: timeRange.timeMin, timeMax: timeRange.timeMax } }),
     refetchInterval: 60_000,
   });
 
