@@ -1159,6 +1159,8 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       // Alguns provedores marcam a reação como "document" sem media_id nem filename.
       // Nesses casos escondemos a bolha vazia de "Documento".
       if (t === "document" && !(m as any)?.media_id && !(m as any)?.media_url && !(m as any)?.media_filename) return false;
+      // Oculta mensagens do tipo document/file vazias (sem id de mídia, URL e sem texto ou nome de arquivo)
+      if (t === "document" && !(m as any)?.media_id && !(m as any)?.media_url && !m.media_filename && !m.text_body) return false;
       return true;
     });
   }, [messages]);
