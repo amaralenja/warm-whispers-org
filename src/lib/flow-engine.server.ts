@@ -1393,7 +1393,9 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
 }
 
 // Recupera runs travados em nós de envio/ação com status "running" mas sem
-// waiting_for (Worker morreu no meio do loop). Avança pro próximo nó.
+// waiting_for (Worker morreu no meio do loop).
+// Se estava num nó de envio (send_*): marca como failed — envio provavelmente silhou.
+// Se estava em outro tipo de nó: avança pro próximo.
 export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit = 20) {
   const db = await getAdminDb();
   const { data: stale, error } = await db.rpc("claim_stale_running_send_flow_runs" as any, {
@@ -1403,6 +1405,8 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
   if (error) throw new Error(error.message);
   const runs = Array.isArray(stale) ? stale : [];
   if (runs.length === 0) return { recovered: 0, results: [] };
+
+  const SEND_NODE_TYPES = new Set(["send_text", "send_image", "send_video", "send_audio", "send_document", "send_buttons", "send_list"]);
 
   const results = await Promise.allSettled(
     runs.map(async (run: any) => {
@@ -1418,7 +1422,22 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
       };
       try {
         const flow = await loadFlow(ctx.flowId, db);
+        const nodes: Node[] = jsonArray<Node>(flow.nodes);
         const edges: Edge[] = jsonArray<Edge>(flow.edges);
+        const currentNode = nodes.find((n) => n.id === String(run.current_node_id));
+
+        // Se estava num nó de envio e o worker morreu: o envio pode ter falhado.
+        // Marca como failed para parar o fluxo e evitar envios duplicados ao retomar.
+        if (currentNode && SEND_NODE_TYPES.has(currentNode.type)) {
+          await updateFlowRun(ctx, {
+            status: "failed",
+            error: `Envio de ${currentNode.type} travado (worker timeout após ${olderThanSeconds}s)`,
+          });
+          console.warn(`[flow-engine] stale send run ${ctx.runId} marked failed (node: ${currentNode.type})`);
+          return { runId: ctx.runId, failed: true, nodeType: currentNode.type };
+        }
+
+        // Para outros nós (ação, condição, etc.): avança pro próximo nó
         const nextId = nextNodeId(edges, String(run.current_node_id));
         if (!nextId) {
           await updateFlowRun(ctx, { status: "completed", waiting_for: null, expires_at: null });
@@ -1444,6 +1463,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
     results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) })),
   };
 }
+
 
 
 // Clears flows that were waiting for a user reply/button and already expired.
