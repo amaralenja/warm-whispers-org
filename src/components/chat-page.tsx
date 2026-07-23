@@ -107,6 +107,7 @@ import {
   
   setConversationArchived,
   getActiveBuyers,
+  searchChatMessages,
 } from "@/lib/whatsapp-chat.functions";
 import {
   ContextMenu,
@@ -450,6 +451,14 @@ function StatusTick({ status }: { status: string | null }) {
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   if (status === "sent") return <Check className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
   return <Check className="h-3.5 w-3.5 text-white/80" strokeWidth={2.5} />;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function PreviewStatusTick({ status }: { status: string | null }) {
@@ -1272,8 +1281,65 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     } catch { /* noop */ }
   };
 
+  // Busca profunda em histórico de mensagens em wa_messages
+  const searchChatMessagesFn = useServerFn(searchChatMessages);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const { data: messageSearchResults = [] } = useQuery({
+    queryKey: ["search-chat-messages", debouncedSearch, operacaoId],
+    queryFn: async () => {
+      if (!debouncedSearch || debouncedSearch.length < 2) return [];
+      const res = await searchChatMessagesFn({ data: { query: debouncedSearch, operacaoId: operacaoId || null } });
+      return res?.results ?? [];
+    },
+    enabled: debouncedSearch.length >= 2,
+    staleTime: 15_000,
+  });
+
+  const msgMatchesByConvId = useMemo(() => {
+    const map = new Map<string, { snippet: string; message_id: string; direction: string }>();
+    for (const res of (messageSearchResults as any[])) {
+      if (res?.conversation_id && !map.has(String(res.conversation_id))) {
+        map.set(String(res.conversation_id), {
+          snippet: res.snippet,
+          message_id: res.message_id,
+          direction: res.direction,
+        });
+      }
+    }
+    return map;
+  }, [messageSearchResults]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const rawQ = search.trim();
+    const q = normalizeText(rawQ);
+    const qDigits = rawQ.replace(/\D+/g, "");
+
+    const qPhoneVariants = (() => {
+      if (qDigits.length < 4) return [];
+      const set = new Set<string>([qDigits]);
+      if (!qDigits.startsWith("55") && (qDigits.length === 10 || qDigits.length === 11)) set.add(`55${qDigits}`);
+      if (qDigits.startsWith("55")) set.add(qDigits.slice(2));
+      const clean = qDigits.startsWith("55") ? qDigits.slice(2) : qDigits;
+      if (clean.length === 10) {
+        set.add(`${clean.slice(0, 2)}9${clean.slice(2)}`);
+        set.add(`55${clean.slice(0, 2)}9${clean.slice(2)}`);
+      }
+      if (clean.length === 11 && clean[2] === "9") {
+        set.add(`${clean.slice(0, 2)}${clean.slice(3)}`);
+        set.add(`55${clean.slice(0, 2)}${clean.slice(3)}`);
+      }
+      if (qDigits.length >= 8) set.add(qDigits.slice(-8));
+      return Array.from(set);
+    })();
+
     let list = conversationList;
     if (listFilter === "archived") {
       list = list.filter((c) => Boolean((c as any).archived_at));
@@ -1283,23 +1349,61 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
       else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
     }
+
     if (q) {
-      list = list.filter((c) =>
-        toText(c.contact_name).toLowerCase().includes(q) ||
-        toText(c.contact_wa_id).includes(q) ||
-        toText(c.last_message_preview).toLowerCase().includes(q)
-      );
+      list = list.filter((c) => {
+        const cid = String(c.id);
+        // 1. Encontrou mensagem no conteúdo das conversas (busca profunda no banco)
+        if (msgMatchesByConvId.has(cid)) return true;
+
+        const name = normalizeText(c.contact_name);
+        const waId = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+        const preview = normalizeText(c.last_message_preview);
+        const notes = normalizeText(c.notes);
+        const lead = findLeadForConv(c.contact_wa_id);
+        const leadName = normalizeText(lead?.nome);
+        const leadEmail = normalizeText(lead?.email);
+
+        // 2. Busca por nome do contato / lead / e-mail
+        if (name.includes(q) || leadName.includes(q) || leadEmail.includes(q)) return true;
+
+        // 3. Busca inteligente por telefone (formatado ou apenas dígitos)
+        if (qPhoneVariants.length > 0) {
+          if (qPhoneVariants.some((v) => waId.includes(v) || v.includes(waId) || (v.length >= 8 && waId.length >= 8 && v.slice(-8) === waId.slice(-8)))) {
+            return true;
+          }
+        } else if (waId.includes(q)) {
+          return true;
+        }
+
+        // 4. Busca nas anotações do contato
+        if (notes.includes(q)) return true;
+
+        // 5. Busca no preview da última mensagem
+        if (preview.includes(q)) return true;
+
+        return false;
+      });
     }
-    // Sort pinned conversations to the top, maintaining internal order among pinned items, then remaining sorted items
+
+    // Ordenação: Conversas fixadas primeiro, depois resultados com match em mensagem, depois ordem padrão
     return list.slice().sort((a, b) => {
       const aPinned = pinnedIds.indexOf(String(a.id));
       const bPinned = pinnedIds.indexOf(String(b.id));
       if (aPinned >= 0 && bPinned >= 0) return aPinned - bPinned;
       if (aPinned >= 0) return -1;
       if (bPinned >= 0) return 1;
-      return 0; // maintain default sorted order
+
+      if (q) {
+        const aMsgHit = msgMatchesByConvId.has(String(a.id));
+        const bMsgHit = msgMatchesByConvId.has(String(b.id));
+        if (aMsgHit && !bMsgHit) return -1;
+        if (!aMsgHit && bMsgHit) return 1;
+      }
+
+      return 0;
     });
-  }, [conversationList, search, listFilter, activeFlowConvIds, pinnedIds]);
+  }, [conversationList, search, listFilter, activeFlowConvIds, pinnedIds, msgMatchesByConvId, leadByPhone]);
 
   const PAGE_SIZE = 40;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -1995,6 +2099,17 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                               )}
                               <span className="truncate">{preview || "Sem prévia"}</span>
                             </div>
+
+                            {(() => {
+                              const match = msgMatchesByConvId.get(String(c.id));
+                              if (!match) return null;
+                              return (
+                                <div className="mt-1 flex items-center gap-1.5 rounded-lg border border-chat-accent/30 bg-chat-accent/10 px-2 py-0.5 text-[11px] text-chat-accent font-medium leading-tight">
+                                  <Search className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">"{match.snippet}"</span>
+                                </div>
+                              );
+                            })()}
 
                           </div>
                           <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">

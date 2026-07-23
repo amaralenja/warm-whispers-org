@@ -1648,6 +1648,65 @@ export const getActiveBuyers = createServerFn({ method: "GET" })
     };
   });
 
+export const searchChatMessages = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { query: string; operacaoId?: string | null }) => ({
+    query: String(d?.query ?? "").trim(),
+    operacaoId: d?.operacaoId ? String(d.operacaoId) : null,
+  }))
+  .handler(async ({ context, data }) => {
+    const q = data.query;
+    if (!q || q.length < 2) return { ok: true, results: [] };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const rpcArgs = (context as any)?.vendor ? vendorRpcArgs(context) : null;
+
+    let convIds: string[] = [];
+
+    if (rpcArgs) {
+      // Pega IDs das conversas visíveis para este vendedor
+      const { data: convRows } = await supabaseAdmin.rpc("vendor_list_wa_conversations" as any, {
+        ...rpcArgs,
+        _operacao_id: data.operacaoId ?? null,
+      });
+      convIds = Array.isArray(convRows) ? convRows.map((c: any) => String(c.id)).filter(Boolean) : [];
+      if (convIds.length === 0) return { ok: true, results: [] };
+    }
+
+    // Executa a busca em wa_messages por texto, legenda de mídia ou nome de arquivo
+    let queryBuilder = supabaseAdmin
+      .from("wa_messages" as any)
+      .select("id, conversation_id, direction, msg_type, text_body, media_filename, caption, created_at")
+      .or(`text_body.ilike.%${q}%,caption.ilike.%${q}%,media_filename.ilike.%${q}%`)
+      .order("created_at", { ascending: false })
+      .limit(60);
+
+    if (convIds.length > 0) {
+      queryBuilder = queryBuilder.in("conversation_id", convIds);
+    }
+
+    const { data: msgs, error } = await queryBuilder;
+    if (error) throw new Error(error.message);
+
+    // Agrupa por conversa para retornar a mensagem mais recente encontrada em cada conversa
+    const resultsMap = new Map<string, { conversation_id: string; message_id: string; snippet: string; created_at: string; direction: string }>();
+    for (const m of (msgs ?? []) as any[]) {
+      const cid = String(m.conversation_id);
+      if (!resultsMap.has(cid)) {
+        const text = m.text_body || m.caption || m.media_filename || `[${m.msg_type}]`;
+        resultsMap.set(cid, {
+          conversation_id: cid,
+          message_id: String(m.id),
+          snippet: text.length > 120 ? text.slice(0, 120) + "..." : text,
+          created_at: m.created_at,
+          direction: String(m.direction),
+        });
+      }
+    }
+
+    return { ok: true, results: Array.from(resultsMap.values()) };
+  });
+
 
 
 
