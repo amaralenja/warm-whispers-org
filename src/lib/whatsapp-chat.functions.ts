@@ -1241,27 +1241,38 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
         voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
       } catch (audioErr: any) {
-        console.warn("[sendWhatsappMessage] Transloadit indisponível:", audioErr?.message);
-        if (String(audioErr?.message).includes("não estão configuradas")) {
-          throw new Error(`Configuração no Vercel Pendente: ${audioErr.message}`);
-        }
-        throw new Error(`Falha no Transloadit: ${audioErr?.message || "Erro na conversão de áudio"}`);
+        console.warn("[sendWhatsappMessage] Transloadit indisponível/não configurado. Usando mídia direta:", audioErr?.message);
       }
 
-      if (!voiceUrl) {
-        throw new Error("Transloadit não retornou a URL do áudio convertido em formato OGG Opus.");
+      if (voiceUrl) {
+        body.audio = { link: voiceUrl, voice: true };
+      } else {
+        const info = getAudioFileInfo(data.mediaUrl, data.filename);
+        body.audio = {
+          link: data.mediaUrl,
+          ...(info.isOggOpus ? { voice: true } : {}),
+        };
       }
-      body.audio = { link: voiceUrl, voice: true };
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
       let mediaUrl = data.mediaUrl;
       if (data.type === "image" && shouldNormalizeWhatsappImage(mediaUrl)) {
-        const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
-        mediaUrl = await withRetry("converter imagem", 3, () => convertImageToWhatsappJpeg(data.mediaUrl!));
+        try {
+          const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
+          mediaUrl = await convertImageToWhatsappJpeg(data.mediaUrl!);
+        } catch (imgErr: any) {
+          console.warn("[sendWhatsappMessage] Transloadit conversão de imagem falhou/pulada, usando imagem original:", imgErr?.message);
+          mediaUrl = data.mediaUrl!;
+        }
       }
       if (data.type === "video" && shouldNormalizeWhatsappVideo(mediaUrl)) {
-        const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
-        mediaUrl = await withRetry("converter vídeo", 3, () => convertVideoToWhatsappMp4(data.mediaUrl!));
+        try {
+          const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
+          mediaUrl = await convertVideoToWhatsappMp4(data.mediaUrl!);
+        } catch (vidErr: any) {
+          console.warn("[sendWhatsappMessage] Transloadit conversão de vídeo falhou/pulada, usando vídeo original:", vidErr?.message);
+          mediaUrl = data.mediaUrl!;
+        }
       }
       body[data.type] = { link: mediaUrl, ...(data.caption && data.type !== "sticker" ? { caption: data.caption } : {}) };
     } else if (data.type === "document") {
