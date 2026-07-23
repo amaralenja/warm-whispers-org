@@ -3,9 +3,21 @@ import { createHmac, randomUUID } from "crypto";
 const API_BASE = "https://api2.transloadit.com";
 
 function getCreds() {
-  const key = process.env.TRANSLOADIT_AUTH_KEY?.trim();
-  const secret = process.env.TRANSLOADIT_AUTH_SECRET?.trim();
-  if (!key || !secret) throw new Error("Transloadit credentials não configuradas");
+  const key =
+    process.env.TRANSLOADIT_AUTH_KEY?.trim() ||
+    process.env.TRANSLOADIT_KEY?.trim() ||
+    process.env.VITE_TRANSLOADIT_AUTH_KEY?.trim() ||
+    process.env.VITE_TRANSLOADIT_KEY?.trim();
+  const secret =
+    process.env.TRANSLOADIT_AUTH_SECRET?.trim() ||
+    process.env.TRANSLOADIT_SECRET?.trim() ||
+    process.env.VITE_TRANSLOADIT_AUTH_SECRET?.trim() ||
+    process.env.VITE_TRANSLOADIT_SECRET?.trim();
+  if (!key || !secret) {
+    throw new Error(
+      "As chaves TRANSLOADIT_AUTH_KEY e TRANSLOADIT_AUTH_SECRET não estão configuradas nas Variáveis de Ambiente do projeto na Vercel."
+    );
+  }
   return { key, secret };
 }
 

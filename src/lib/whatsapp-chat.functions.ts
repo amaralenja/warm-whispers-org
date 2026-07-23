@@ -1241,12 +1241,15 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
         voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
       } catch (audioErr: any) {
-        console.error("[sendWhatsappMessage] Transloadit audio conversion failed:", audioErr?.message);
+        console.warn("[sendWhatsappMessage] Transloadit indisponível:", audioErr?.message);
+        if (String(audioErr?.message).includes("não estão configuradas")) {
+          throw new Error(`Configuração no Vercel Pendente: ${audioErr.message}`);
+        }
         throw new Error(`Falha no Transloadit: ${audioErr?.message || "Erro na conversão de áudio"}`);
       }
 
       if (!voiceUrl) {
-        throw new Error("Transloadit não retornou a URL do áudio convertido (OGG Opus).");
+        throw new Error("Transloadit não retornou a URL do áudio convertido em formato OGG Opus.");
       }
       body.audio = { link: voiceUrl, voice: true };
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
