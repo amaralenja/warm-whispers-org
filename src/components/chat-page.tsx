@@ -460,6 +460,191 @@ function PreviewStatusTick({ status }: { status: string | null }) {
   return <Check className="h-3.5 w-3.5 shrink-0 text-white/60" strokeWidth={2.5} />;
 }
 
+// Cache de rascunhos por id da conversa para nunca apagar o texto digitado ao trocar de lead
+const globalDraftsCache: Record<string, string> = {};
+
+function ChatFooterInput({
+  active,
+  vendorSession,
+  sendMutPending,
+  sendError,
+  replyTo,
+  onClearReplyTo,
+  onSendText,
+  onSendSticker,
+  onSendCheckout,
+  onSendFile,
+  listFlowsFn,
+  triggerFlowFn,
+  openPreviewOrSend,
+  imageInputRef,
+  videoInputRef,
+  docInputRef,
+  setPendingType,
+}: {
+  active: Conv;
+  vendorSession: any;
+  sendMutPending: boolean;
+  sendError: string | null;
+  replyTo: Msg | null;
+  onClearReplyTo: () => void;
+  onSendText: (text: string) => Promise<void>;
+  onSendSticker: (mediaUrl: string) => Promise<void>;
+  onSendCheckout: (payload: any) => Promise<void>;
+  onSendFile: (file: File, opts?: { type?: "image" | "video" | "document" | "audio"; caption?: string }) => Promise<void>;
+  listFlowsFn: any;
+  triggerFlowFn: any;
+  openPreviewOrSend: (file: File, typeOverride?: "image" | "video" | "document" | "audio") => void;
+  imageInputRef: React.RefObject<HTMLInputElement>;
+  videoInputRef: React.RefObject<HTMLInputElement>;
+  docInputRef: React.RefObject<HTMLInputElement>;
+  setPendingType: (t: "image" | "video" | "document" | "audio") => void;
+}) {
+  const convId = String(active.id);
+  const [draft, setDraftState] = useState(() => globalDraftsCache[convId] ?? "");
+
+  // Preserva e restaura rascunho de mensagens ao alternar de conversa
+  useEffect(() => {
+    setDraftState(globalDraftsCache[convId] ?? "");
+  }, [convId]);
+
+  const updateDraft = (val: string) => {
+    setDraftState(val);
+    globalDraftsCache[convId] = val;
+  };
+
+  const handleSend = async () => {
+    const textToSend = draft.trim();
+    if (!textToSend || sendMutPending) return;
+    updateDraft("");
+    await onSendText(textToSend);
+  };
+
+  return (
+    <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-1.5 py-1.5 md:px-5 md:py-4">
+      {replyTo && (
+        <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
+          <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold text-chat-accent">
+              Respondendo a {replyTo.direction === "out" ? "você" : "cliente"}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">{msgQuotePreview(replyTo)}</div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:bg-chat-soft" onClick={onClearReplyTo} aria-label="Cancelar resposta">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+      <div className="mx-auto flex max-w-5xl items-end gap-1 md:gap-3 rounded-2xl border border-chat-line bg-chat-thread p-1 md:p-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="hidden md:grid h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
+              <Smile className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+
+          <PopoverContent align="start" side="top" className="w-auto border-0 bg-transparent p-0 shadow-xl">
+            <EmojiPicker
+              onEmojiClick={(emoji) => updateDraft(draft + emoji.emoji)}
+              theme={Theme.AUTO}
+              emojiStyle={EmojiStyle.NATIVE}
+              searchPlaceholder="Buscar emoji"
+              skinTonesDisabled
+              previewConfig={{ showPreview: false }}
+              height={400}
+              width={340}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <StickerPickerPopover
+          vendorId={vendorSession?.id}
+          channelId={active.channel_id}
+          conversationId={active.id}
+          onSendSticker={onSendSticker}
+        />
+
+        <VendorCheckoutButton
+          enabled={!!vendorSession}
+          disabled={sendMutPending || !active}
+          onSend={onSendCheckout}
+        />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
+              <Paperclip className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52 rounded-2xl border-chat-line bg-popover">
+            <DropdownMenuItem onClick={() => { setPendingType("image"); imageInputRef.current?.click(); }}>
+              <ImageIcon className="mr-2 h-4 w-4" /> Imagem
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setPendingType("video"); videoInputRef.current?.click(); }}>
+              <Video className="mr-2 h-4 w-4" /> Vídeo
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setPendingType("document"); docInputRef.current?.click(); }}>
+              <FileText className="mr-2 h-4 w-4" /> Documento
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <input ref={imageInputRef} type="file" className="hidden" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/*"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "image"); } e.target.value = ""; }} />
+        <input ref={videoInputRef} type="file" className="hidden" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/*"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "video"); } e.target.value = ""; }} />
+        <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "document"); } e.target.value = ""; }} />
+
+        <Textarea
+          value={draft}
+          onChange={(e) => updateDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // Ignora Enter enquanto IME/autocomplete tá compondo
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (e as any).keyCode !== 229) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="Digite uma mensagem"
+          rows={1}
+          className="max-h-36 min-h-10 md:min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-2 md:py-3 text-base md:text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+        />
+
+        {sendError && (
+          <div className="max-w-72 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+            {toText(sendError)}
+          </div>
+        )}
+
+        {draft.trim() ? (
+          <Button
+            size="icon"
+            className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
+            onClick={handleSend}
+            disabled={sendMutPending}
+          >
+            {sendMutPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+          </Button>
+        ) : (
+          <WhatsappRecorder
+            disabled={sendMutPending}
+            onSend={(file: File) => onSendFile(file, { type: "audio" })}
+          />
+        )}
+      </div>
+      <FlowInlineBar
+        conversation={active}
+        listFlowsFn={listFlowsFn}
+        triggerFn={triggerFlowFn}
+        replyTo={replyTo}
+        onClearReplyTo={onClearReplyTo}
+      />
+    </footer>
+  );
+}
+
 function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}) {
   const qc = useQueryClient();
   const { workspace, workspaces } = useWorkspace();
@@ -1329,11 +1514,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     }
   }
 
-  async function handleSendText() {
-    if (!active || !draft.trim()) return;
-    const text = draft.trim();
+  async function handleSendText(textToSend: string) {
+    if (!active || !textToSend.trim()) return;
+    const text = textToSend.trim();
     const reply = replyTo;
-    setDraft("");
     setReplyTo(null);
     await sendMut.mutateAsync({
       channelId: active.channel_id,
@@ -2121,151 +2305,54 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
 
 
-              <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-1.5 py-1.5 md:px-5 md:py-4">
-                {replyTo && (
-                  <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
-                    <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-chat-accent">
-                        Respondendo a {replyTo.direction === "out" ? "você" : "cliente"}
-                      </div>
-                      <div className="truncate text-xs text-muted-foreground">{msgQuotePreview(replyTo)}</div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:bg-chat-soft" onClick={() => setReplyTo(null)} aria-label="Cancelar resposta">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                <div className="mx-auto flex max-w-5xl items-end gap-1 md:gap-3 rounded-2xl border border-chat-line bg-chat-thread p-1 md:p-2">
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="hidden md:grid h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
-                        <Smile className="h-5 w-5" />
-                      </Button>
-                    </PopoverTrigger>
-
-                    <PopoverContent align="start" side="top" className="w-auto border-0 bg-transparent p-0 shadow-xl">
-                      <EmojiPicker
-                        onEmojiClick={(emoji) => setDraft((d) => d + emoji.emoji)}
-                        theme={Theme.AUTO}
-                        emojiStyle={EmojiStyle.NATIVE}
-                        searchPlaceholder="Buscar emoji"
-                        skinTonesDisabled
-                        previewConfig={{ showPreview: false }}
-                        height={400}
-                        width={340}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <StickerPickerPopover
-                    vendorId={vendorSession?.id}
-                    channelId={active.channel_id}
-                    conversationId={active.id}
-                    onSendSticker={async (mediaUrl) => {
-                      if (!active) return;
-                      await sendMut.mutateAsync({
-                        channelId: active.channel_id,
-                        conversationId: active.id,
-                        to: active.contact_wa_id,
-                        type: "sticker",
-                        mediaUrl,
-                      });
-                    }}
-                  />
-                  <VendorCheckoutButton
-                    enabled={!!vendorSession}
-                    disabled={sendMut.isPending || !active}
-                    onSend={async (payload) => {
-                      if (!active) return;
-                      if (payload.kind === "image") {
-                        await sendMut.mutateAsync({
-                          channelId: active.channel_id,
-                          conversationId: active.id,
-                          to: active.contact_wa_id,
-                          type: "image",
-                          mediaUrl: payload.imageUrl,
-                          caption: payload.caption,
-                        });
-                      } else {
-                        await sendMut.mutateAsync({
-                          channelId: active.channel_id,
-                          conversationId: active.id,
-                          to: active.contact_wa_id,
-                          type: "text",
-                          text: payload.text,
-                        });
-                      }
-                    }}
-                  />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent">
-                        <Paperclip className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-52 rounded-2xl border-chat-line bg-popover">
-                      <DropdownMenuItem onClick={() => { setPendingType("image"); imageInputRef.current?.click(); }}>
-                        <ImageIcon className="mr-2 h-4 w-4" /> Imagem
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("video"); videoInputRef.current?.click(); }}>
-                        <Video className="mr-2 h-4 w-4" /> Vídeo
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setPendingType("document"); docInputRef.current?.click(); }}>
-                        <FileText className="mr-2 h-4 w-4" /> Documento
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <input ref={imageInputRef} type="file" className="hidden" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/*"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "image"); } e.target.value = ""; }} />
-                  <input ref={videoInputRef} type="file" className="hidden" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/*"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "video"); } e.target.value = ""; }} />
-                  <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { openPreviewOrSend(f, "document"); } e.target.value = ""; }} />
-                  <Textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      // Ignora Enter enquanto IME/autocomplete tá compondo (senão envia texto pela metade)
-                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (e as any).keyCode !== 229) {
-                        e.preventDefault();
-                        handleSendText();
-                      }
-                    }}
-                    placeholder="Digite uma mensagem"
-                    rows={1}
-                    className="max-h-36 min-h-10 md:min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-2 md:py-3 text-base md:text-[15px] shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
-                  />
-                  {sendError && (
-                    <div className="max-w-72 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
-                      {toText(sendError)}
-                    </div>
-                  )}
-                  {draft.trim() ? (
-                    <Button
-                      size="icon"
-                      className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
-                      onClick={handleSendText}
-                      disabled={sendMut.isPending}
-                    >
-                      {sendMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                    </Button>
-
-                  ) : (
-                    <WhatsappRecorder
-                      disabled={sendMut.isPending}
-                      onSend={(file: File) => handleFileUpload(file, { type: "audio" })}
-                    />
-                  )}
-                </div>
-                <FlowInlineBar
-                  conversation={active}
-                  listFlowsFn={listFlowsFn}
-                  triggerFn={triggerFlowFn}
-                  replyTo={replyTo}
-                  onClearReplyTo={() => setReplyTo(null)}
-                />
-              </footer>
+              <ChatFooterInput
+                active={active}
+                vendorSession={vendorSession}
+                sendMutPending={sendMut.isPending}
+                sendError={sendError}
+                replyTo={replyTo}
+                onClearReplyTo={() => setReplyTo(null)}
+                onSendText={handleSendText}
+                onSendSticker={async (mediaUrl) => {
+                  if (!active) return;
+                  await sendMut.mutateAsync({
+                    channelId: active.channel_id,
+                    conversationId: active.id,
+                    to: active.contact_wa_id,
+                    type: "sticker",
+                    mediaUrl,
+                  });
+                }}
+                onSendCheckout={async (payload) => {
+                  if (!active) return;
+                  if (payload.kind === "image") {
+                    await sendMut.mutateAsync({
+                      channelId: active.channel_id,
+                      conversationId: active.id,
+                      to: active.contact_wa_id,
+                      type: "image",
+                      mediaUrl: payload.imageUrl,
+                      caption: payload.caption,
+                    });
+                  } else {
+                    await sendMut.mutateAsync({
+                      channelId: active.channel_id,
+                      conversationId: active.id,
+                      to: active.contact_wa_id,
+                      type: "text",
+                      text: payload.text,
+                    });
+                  }
+                }}
+                onSendFile={handleFileUpload}
+                listFlowsFn={listFlowsFn}
+                triggerFlowFn={triggerFlowFn}
+                openPreviewOrSend={openPreviewOrSend}
+                imageInputRef={imageInputRef}
+                videoInputRef={videoInputRef}
+                docInputRef={docInputRef}
+                setPendingType={setPendingType}
+              />
             </>
           )}
         </main>
