@@ -792,9 +792,9 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       });
       if (conv?.id) data.conversation_id = String(conv.id);
     }
-    const { runFlowAdmin } = await import("@/lib/flow-engine.server");
-    // Enqueue only — worker (pg_cron -> /api/public/hooks/dispatch-worker) executes in background.
-    return runFlowAdmin({
+    const { runFlowAdmin, processQueuedFlowRuns } = await import("@/lib/flow-engine.server");
+    // Dispara a execução imediatamente para que o lead receba a mensagem na hora
+    const res = await runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
       contactWaId: data.contact_wa_id,
@@ -804,8 +804,12 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
         ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
         : null,
       triggerContext: { manual: true, initial_quoted_msg_id: data.initial_quoted_msg_id || null },
-      queueOnly: true,
+      queueOnly: false,
     });
+
+    // Limpa qualquer outra execução pendente na fila em background
+    void processQueuedFlowRuns(20).catch(() => undefined);
+    return res;
   });
 
 export const triggerFlowBulk = createServerFn({ method: "POST" })
