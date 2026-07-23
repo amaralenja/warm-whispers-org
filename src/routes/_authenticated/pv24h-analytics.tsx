@@ -5,7 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   BarChart3, Loader2, RefreshCw, Save, KeyRound, Check, Settings,
   ChevronRight, TrendingUp, DollarSign, ShoppingCart, Percent, Wallet, Layers, Megaphone, ImageIcon,
-  ShieldAlert, Copy, Webhook, Link, Tag, Globe, Search, Zap, CheckCircle2, ArrowUpRight, Filter
+  ShieldAlert, Copy, Webhook, Link, Tag, Globe, Search, Zap, CheckCircle2, ArrowUpRight, Filter,
+  RotateCcw, CreditCard, AlertTriangle, FileJson, User, Mail, Phone, Code2, Eye
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -161,8 +165,10 @@ function PV24HAnalyticsPage() {
 
   // Webhook e Vendas da Cakto
   const [salesFilter, setSalesFilter] = useState<"todos" | "pago" | "organico">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "approved" | "refunded" | "chargeback" | "pix" | "abandon" | "refused">("todos");
   const [salesSearch, setSalesSearch] = useState("");
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [selectedSalePayload, setSelectedSalePayload] = useState<Pv24hSale | null>(null);
 
   const salesQ = useQuery({
     queryKey: ["pv24h", "sales"],
@@ -175,35 +181,106 @@ function PV24HAnalyticsPage() {
   const salesStats = useMemo(() => {
     let totalRevenue = 0;
     let totalCount = salesList.length;
-    let pagoRevenue = 0;
-    let pagoCount = 0;
-    let organicoRevenue = 0;
-    let organicoCount = 0;
+
+    let approvedRevenue = 0;
+    let approvedCount = 0;
+    let pagoApprovedRevenue = 0;
+    let pagoApprovedCount = 0;
+    let organicoApprovedRevenue = 0;
+    let organicoApprovedCount = 0;
+
+    let refundRevenue = 0;
+    let refundCount = 0;
+    let pagoRefundRevenue = 0;
+    let pagoRefundCount = 0;
+    let organicoRefundRevenue = 0;
+    let organicoRefundCount = 0;
+
+    let chargebackRevenue = 0;
+    let chargebackCount = 0;
+
+    let pixRevenue = 0;
+    let pixCount = 0;
+
+    let abandonRevenue = 0;
+    let abandonCount = 0;
 
     for (const sale of salesList) {
+      const st = (sale.status || sale.event || "").toLowerCase();
+      const isApproved = st === "approved" || st.includes("paid") || st.includes("renew");
+      const isRefund = st === "refunded" || st.includes("refund");
+      const isChargeback = st === "chargeback" || st.includes("chargeback");
+      const isPix = st === "pix_generated" || st.includes("pix");
+      const isAbandon = st === "cart_abandonment" || st.includes("abandon");
+
       totalRevenue += sale.valor;
-      if (sale.origem === "pago") {
-        pagoRevenue += sale.valor;
-        pagoCount++;
-      } else {
-        organicoRevenue += sale.valor;
-        organicoCount++;
+
+      if (isApproved) {
+        approvedRevenue += sale.valor;
+        approvedCount++;
+        if (sale.origem === "pago") {
+          pagoApprovedRevenue += sale.valor;
+          pagoApprovedCount++;
+        } else {
+          organicoApprovedRevenue += sale.valor;
+          organicoApprovedCount++;
+        }
+      } else if (isRefund) {
+        refundRevenue += sale.valor;
+        refundCount++;
+        if (sale.origem === "pago") {
+          pagoRefundRevenue += sale.valor;
+          pagoRefundCount++;
+        } else {
+          organicoRefundRevenue += sale.valor;
+          organicoRefundCount++;
+        }
+      } else if (isChargeback) {
+        chargebackRevenue += sale.valor;
+        chargebackCount++;
+        if (sale.origem === "pago") {
+          pagoRefundRevenue += sale.valor;
+          pagoRefundCount++;
+        } else {
+          organicoRefundRevenue += sale.valor;
+          organicoRefundCount++;
+        }
+      } else if (isPix) {
+        pixRevenue += sale.valor;
+        pixCount++;
+      } else if (isAbandon) {
+        abandonRevenue += sale.valor;
+        abandonCount++;
       }
     }
 
-    const ticketMedio = totalCount > 0 ? totalRevenue / totalCount : 0;
-    const pagoPct = totalCount > 0 ? (pagoCount / totalCount) * 100 : 0;
-    const organicoPct = totalCount > 0 ? (organicoCount / totalCount) * 100 : 0;
+    const ticketMedio = approvedCount > 0 ? approvedRevenue / approvedCount : 0;
+    const pagoPct = approvedCount > 0 ? (pagoApprovedCount / approvedCount) * 100 : 0;
+    const organicoPct = approvedCount > 0 ? (organicoApprovedCount / approvedCount) * 100 : 0;
 
     return {
       totalRevenue,
       totalCount,
-      pagoRevenue,
-      pagoCount,
+      approvedRevenue,
+      approvedCount,
+      pagoApprovedRevenue,
+      pagoApprovedCount,
       pagoPct,
-      organicoRevenue,
-      organicoCount,
+      organicoApprovedRevenue,
+      organicoApprovedCount,
       organicoPct,
+      refundRevenue,
+      refundCount,
+      pagoRefundRevenue,
+      pagoRefundCount,
+      organicoRefundRevenue,
+      organicoRefundCount,
+      chargebackRevenue,
+      chargebackCount,
+      pixRevenue,
+      pixCount,
+      abandonRevenue,
+      abandonCount,
       ticketMedio,
     };
   }, [salesList]);
@@ -211,14 +288,23 @@ function PV24HAnalyticsPage() {
   const filteredSales = useMemo(() => {
     return salesList.filter((sale) => {
       if (salesFilter !== "todos" && sale.origem !== salesFilter) return false;
+
+      const st = (sale.status || sale.event || "").toLowerCase();
+      if (statusFilter === "approved" && !(st === "approved" || st.includes("paid") || st.includes("renew"))) return false;
+      if (statusFilter === "refunded" && !(st === "refunded" || st.includes("refund"))) return false;
+      if (statusFilter === "chargeback" && !(st === "chargeback" || st.includes("chargeback"))) return false;
+      if (statusFilter === "pix" && !(st === "pix_generated" || st.includes("pix"))) return false;
+      if (statusFilter === "abandon" && !(st === "cart_abandonment" || st.includes("abandon"))) return false;
+      if (statusFilter === "refused" && !(st === "refused" || st.includes("cancel") || st.includes("refus"))) return false;
+
       if (salesSearch.trim()) {
         const q = salesSearch.toLowerCase();
-        const haystack = `${sale.cliente_nome ?? ""} ${sale.cliente_email ?? ""} ${sale.cliente_telefone ?? ""} ${sale.transaction_id ?? ""} ${sale.utm_source ?? ""} ${sale.utm_campaign ?? ""}`.toLowerCase();
+        const haystack = `${sale.cliente_nome ?? ""} ${sale.cliente_email ?? ""} ${sale.cliente_telefone ?? ""} ${sale.transaction_id ?? ""} ${sale.utm_source ?? ""} ${sale.utm_campaign ?? ""} ${sale.status ?? ""} ${sale.event ?? ""} ${sale.produto_nome ?? ""}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [salesList, salesFilter, salesSearch]);
+  }, [salesList, salesFilter, statusFilter, salesSearch]);
 
   const webhookUrl = typeof window !== "undefined"
     ? `${window.location.origin}/api/public/hooks/pv24h-cakto`
@@ -387,18 +473,18 @@ function PV24HAnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* KPIs de Vendas Cakto (Orgânico vs Pago) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPIs de Vendas e Eventos Cakto */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <Card className="border-border/50 bg-card/60 backdrop-blur">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-emerald-400" /> Receita Total (Cakto)
+                <DollarSign className="h-4 w-4 text-emerald-400" /> Aprovadas
               </span>
-              <Badge variant="secondary" className="text-[10px]">{salesStats.totalCount} vendas</Badge>
+              <Badge variant="secondary" className="text-[10px]">{salesStats.approvedCount} vendas</Badge>
             </div>
             <div className="text-2xl font-bold mt-2 font-mono text-emerald-400">
-              {brl(salesStats.totalRevenue)}
+              {brl(salesStats.approvedRevenue)}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">
               Ticket Médio: <strong className="text-foreground">{brl(salesStats.ticketMedio)}</strong>
@@ -413,14 +499,14 @@ function PV24HAnalyticsPage() {
                 <Megaphone className="h-4 w-4 text-violet-400" /> Tráfego Pago
               </span>
               <Badge className="bg-violet-500/20 text-violet-300 border-violet-500/30 text-[10px]">
-                {salesStats.pagoPct.toFixed(0)}% das vendas
+                {salesStats.pagoPct.toFixed(0)}%
               </Badge>
             </div>
             <div className="text-2xl font-bold mt-2 font-mono text-violet-300">
-              {brl(salesStats.pagoRevenue)}
+              {brl(salesStats.pagoApprovedRevenue)}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">
-              <strong className="text-violet-200">{salesStats.pagoCount}</strong> vendas com UTMs
+              <strong className="text-violet-200">{salesStats.pagoApprovedCount}</strong> vendas com UTMs
             </div>
           </CardContent>
         </Card>
@@ -429,33 +515,58 @@ function PV24HAnalyticsPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="h-4 w-4 text-emerald-400" /> Vendas Orgânicas
+                <Globe className="h-4 w-4 text-emerald-400" /> Orgânico
               </span>
               <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
-                {salesStats.organicoPct.toFixed(0)}% das vendas
+                {salesStats.organicoPct.toFixed(0)}%
               </Badge>
             </div>
             <div className="text-2xl font-bold mt-2 font-mono text-emerald-300">
-              {brl(salesStats.organicoRevenue)}
+              {brl(salesStats.organicoApprovedRevenue)}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">
-              <strong className="text-emerald-200">{salesStats.organicoCount}</strong> vendas diretas/sem UTM
+              <strong className="text-emerald-200">{salesStats.organicoApprovedCount}</strong> vendas diretas
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 bg-card/60 backdrop-blur">
+        {/* Card Reembolso & Chargeback */}
+        <Card className="border-rose-500/30 bg-rose-500/5 backdrop-blur">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <ShoppingCart className="h-4 w-4 text-accent" /> Total de Pedidos
+              <span className="text-xs font-medium text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                <RotateCcw className="h-4 w-4 text-rose-400" /> Reembolso / Chargeback
               </span>
+              <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/30 text-[10px]">
+                {salesStats.refundCount + salesStats.chargebackCount} estornos
+              </Badge>
             </div>
-            <div className="text-2xl font-bold mt-2 font-mono">
-              {salesStats.totalCount}
+            <div className="text-2xl font-bold mt-2 font-mono text-rose-400">
+              {brl(salesStats.refundRevenue + salesStats.chargebackRevenue)}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1 flex justify-between">
+              <span>Pago: <strong className="text-rose-300">{brl(salesStats.pagoRefundRevenue)}</strong></span>
+              <span>Org: <strong className="text-rose-300">{brl(salesStats.organicoRefundRevenue)}</strong></span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card PIX & Abandono */}
+        <Card className="border-amber-500/30 bg-amber-500/5 backdrop-blur">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-amber-400" /> PIX & Abandonos
+              </span>
+              <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]">
+                {salesStats.pixCount + salesStats.abandonCount} potenciais
+              </Badge>
+            </div>
+            <div className="text-2xl font-bold mt-2 font-mono text-amber-300">
+              {brl(salesStats.pixRevenue + salesStats.abandonRevenue)}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">
-              Pago: <strong>{salesStats.pagoCount}</strong> · Orgânico: <strong>{salesStats.organicoCount}</strong>
+              PIX: <strong>{salesStats.pixCount}</strong> · Abandonos: <strong>{salesStats.abandonCount}</strong>
             </div>
           </CardContent>
         </Card>
@@ -539,7 +650,7 @@ function PV24HAnalyticsPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
           <div className="flex items-center gap-1 overflow-x-auto">
             <TabBtn active={tab === "sales"} onClick={() => setTab("sales")} icon={<ShoppingCart className="h-4 w-4" />}>
-              Vendas Cakto ({salesList.length})
+              Eventos & Vendas Cakto ({salesList.length})
             </TabBtn>
             {isConfigured && (
               <>
@@ -564,33 +675,50 @@ function PV24HAnalyticsPage() {
                   placeholder="Buscar cliente, email, UTM..."
                   value={salesSearch}
                   onChange={(e) => setSalesSearch(e.target.value)}
-                  className="h-8 pl-8 text-xs w-48 bg-background/80"
+                  className="h-8 pl-8 text-xs w-44 bg-background/80"
                 />
               </div>
 
+              {/* Filtro por Origem */}
               <div className="flex items-center rounded-lg border border-border bg-card p-0.5">
                 <button
                   type="button"
                   onClick={() => setSalesFilter("todos")}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${salesFilter === "todos" ? "bg-accent text-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`px-2 py-0.5 text-[11px] font-medium rounded transition ${salesFilter === "todos" ? "bg-accent text-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  Todos ({salesList.length})
+                  Todos
                 </button>
                 <button
                   type="button"
                   onClick={() => setSalesFilter("pago")}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${salesFilter === "pago" ? "bg-violet-500/20 text-violet-300 border border-violet-500/30" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`px-2 py-0.5 text-[11px] font-medium rounded transition ${salesFilter === "pago" ? "bg-violet-500/20 text-violet-300 border border-violet-500/30" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  Tráfego Pago ({salesStats.pagoCount})
+                  Pago ({salesStats.pagoApprovedCount})
                 </button>
                 <button
                   type="button"
                   onClick={() => setSalesFilter("organico")}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${salesFilter === "organico" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`px-2 py-0.5 text-[11px] font-medium rounded transition ${salesFilter === "organico" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  Orgânico ({salesStats.organicoCount})
+                  Orgânico ({salesStats.organicoApprovedCount})
                 </button>
               </div>
+
+              {/* Filtro por Evento/Status */}
+              <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                <SelectTrigger className="h-8 text-xs w-36 bg-background/80">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Eventos</SelectItem>
+                  <SelectItem value="approved">Aprovados</SelectItem>
+                  <SelectItem value="refunded">Reembolsos ({salesStats.refundCount})</SelectItem>
+                  <SelectItem value="chargeback">Chargebacks ({salesStats.chargebackCount})</SelectItem>
+                  <SelectItem value="pix">PIX Gerado ({salesStats.pixCount})</SelectItem>
+                  <SelectItem value="abandon">Abandonos ({salesStats.abandonCount})</SelectItem>
+                  <SelectItem value="refused">Recusados/Cancelados</SelectItem>
+                </SelectContent>
+              </Select>
 
               <Button
                 variant="outline"
@@ -612,15 +740,16 @@ function PV24HAnalyticsPage() {
               loading={salesQ.isLoading}
               error={salesQ.error as Error | undefined}
               rows={filteredSales}
-              empty="Nenhuma venda registrada até o momento. Cole o Webhook na Cakto para receber as vendas!"
+              empty="Nenhum evento/venda encontrado com os filtros selecionados."
               headers={
                 <>
                   <th className="px-3 py-2 text-left">Data & ID</th>
+                  <th className="px-3 py-2 text-left">Evento / Status</th>
                   <th className="px-3 py-2 text-left">Cliente</th>
                   <th className="px-3 py-2 text-left">Origem</th>
                   <th className="px-3 py-2 text-left">Parâmetros (UTMs)</th>
                   <th className="px-3 py-2 text-right">Valor</th>
-                  <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2 text-center">Payload</th>
                 </>
               }
               renderRow={(sale: Pv24hSale) => {
@@ -634,13 +763,77 @@ function PV24HAnalyticsPage() {
                     })
                   : "—";
 
+                const st = (sale.status || sale.event || "").toLowerCase();
+                let statusBadge = (
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] uppercase">
+                    Aprovada
+                  </Badge>
+                );
+
+                if (st.includes("refund")) {
+                  statusBadge = (
+                    <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/30 text-[10px] uppercase flex items-center gap-1">
+                      <RotateCcw className="h-3 w-3 text-rose-400" /> Reembolso
+                    </Badge>
+                  );
+                } else if (st.includes("chargeback")) {
+                  statusBadge = (
+                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] uppercase flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3 text-amber-400" /> Chargeback
+                    </Badge>
+                  );
+                } else if (st.includes("pix")) {
+                  statusBadge = (
+                    <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/30 text-[10px] uppercase flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-sky-400" /> PIX Gerado
+                    </Badge>
+                  );
+                } else if (st.includes("abandon")) {
+                  statusBadge = (
+                    <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-[10px] uppercase">
+                      Carrinho Abandonado
+                    </Badge>
+                  );
+                } else if (st.includes("renew")) {
+                  statusBadge = (
+                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] uppercase">
+                      Assinatura Renovada
+                    </Badge>
+                  );
+                } else if (st.includes("cancel")) {
+                  statusBadge = (
+                    <Badge className="bg-zinc-500/20 text-zinc-400 border-zinc-500/30 text-[10px] uppercase">
+                      Cancelada
+                    </Badge>
+                  );
+                } else if (st.includes("refus")) {
+                  statusBadge = (
+                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] uppercase">
+                      Cartão Recusado
+                    </Badge>
+                  );
+                }
+
                 return (
-                  <tr key={sale.id} className="border-t border-border/50 hover:bg-muted/20">
+                  <tr
+                    key={sale.id}
+                    className="border-t border-border/50 hover:bg-muted/20 cursor-pointer transition"
+                    onClick={() => setSelectedSalePayload(sale)}
+                  >
                     <td className="px-3 py-3">
                       <div className="font-mono text-xs font-semibold">{dateStr}</div>
                       <div className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]" title={sale.transaction_id || sale.id}>
                         {sale.transaction_id || sale.id}
                       </div>
+                    </td>
+
+                    <td className="px-3 py-3">
+                      {statusBadge}
+                      {sale.produto_nome && (
+                        <div className="text-[11px] text-muted-foreground mt-1 truncate max-w-[150px]">
+                          {sale.produto_nome}
+                        </div>
+                      )}
                     </td>
 
                     <td className="px-3 py-3">
@@ -696,10 +889,16 @@ function PV24HAnalyticsPage() {
                       {brl(sale.valor)}
                     </td>
 
-                    <td className="px-3 py-3 text-center">
-                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] uppercase">
-                        {sale.status}
-                      </Badge>
+                    <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        onClick={() => setSelectedSalePayload(sale)}
+                        title="Inspecionar Payload JSON"
+                      >
+                        <FileJson className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -824,7 +1023,104 @@ function PV24HAnalyticsPage() {
             )}
           </CardContent>
         </Card>
+      {/* Dialog Inspetor de Payload JSON */}
+      <Dialog open={!!selectedSalePayload} onOpenChange={(open) => !open && setSelectedSalePayload(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <FileJson className="h-5 w-5 text-accent" /> Inspetor de Evento / Payload Cakto
+            </DialogTitle>
+            <DialogDescription>
+              Detalhes completos da transação e o payload bruto enviado pelo Webhook.
+            </DialogDescription>
+          </DialogHeader>
 
+          {selectedSalePayload && (
+            <div className="space-y-4 pt-2">
+              {/* Resumo do Evento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 text-xs">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] uppercase">Evento / Status</span>
+                  <span className="font-semibold text-foreground capitalize">{selectedSalePayload.event || selectedSalePayload.status}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] uppercase">Origem</span>
+                  <span className={`font-semibold ${selectedSalePayload.origem === "pago" ? "text-violet-400" : "text-emerald-400"}`}>
+                    {selectedSalePayload.origem === "pago" ? "Tráfego Pago" : "Orgânico"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] uppercase">Valor</span>
+                  <span className="font-mono font-bold text-emerald-400">{brl(selectedSalePayload.valor)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] uppercase">ID Transação</span>
+                  <span className="font-mono truncate block">{selectedSalePayload.transaction_id || selectedSalePayload.id}</span>
+                </div>
+              </div>
+
+              {/* Informações do Cliente & Produto */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-lg border border-border/50 bg-card space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-muted-foreground">
+                    <User className="h-3.5 w-3.5" /> Cliente
+                  </div>
+                  <div><strong>Nome:</strong> {selectedSalePayload.cliente_nome || "—"}</div>
+                  <div><strong>E-mail:</strong> {selectedSalePayload.cliente_email || "—"}</div>
+                  <div><strong>Telefone:</strong> {selectedSalePayload.cliente_telefone || "—"}</div>
+                </div>
+
+                <div className="p-3 rounded-lg border border-border/50 bg-card space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-muted-foreground">
+                    <ShoppingCart className="h-3.5 w-3.5" /> Produto & Pagamento
+                  </div>
+                  <div><strong>Produto:</strong> {selectedSalePayload.produto_nome || "—"}</div>
+                  <div><strong>Método:</strong> {selectedSalePayload.payment_method || "—"}</div>
+                  {selectedSalePayload.refund_reason && (
+                    <div className="text-rose-400"><strong>Motivo Reembolso:</strong> {selectedSalePayload.refund_reason}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* UTM Parameters */}
+              <div className="p-3 rounded-lg border border-border/50 bg-card space-y-1 text-xs">
+                <div className="font-bold flex items-center gap-1 text-muted-foreground">
+                  <Tag className="h-3.5 w-3.5" /> Parâmetros de Rastreamento (UTMs)
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px] pt-1">
+                  <div><span className="text-muted-foreground">Source:</span> {selectedSalePayload.utm_source || "—"}</div>
+                  <div><span className="text-muted-foreground">Medium:</span> {selectedSalePayload.utm_medium || "—"}</div>
+                  <div><span className="text-muted-foreground">Campaign:</span> {selectedSalePayload.utm_campaign || "—"}</div>
+                  <div><span className="text-muted-foreground">Content:</span> {selectedSalePayload.utm_content || "—"}</div>
+                </div>
+              </div>
+
+              {/* JSON Payload Inspector */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold flex items-center gap-1 text-muted-foreground">
+                    <Code2 className="h-3.5 w-3.5" /> Payload JSON Bruto
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(selectedSalePayload.payload, null, 2));
+                      toast.success("Payload JSON copiado!");
+                    }}
+                  >
+                    <Copy className="h-3 w-3" /> Copiar JSON
+                  </Button>
+                </div>
+                <pre className="p-3 rounded-lg bg-zinc-950 text-zinc-100 font-mono text-[11px] overflow-x-auto max-h-60 border border-zinc-800">
+                  {JSON.stringify(selectedSalePayload.payload || selectedSalePayload, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

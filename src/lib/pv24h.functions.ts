@@ -323,13 +323,84 @@ export type Pv24hSale = {
   utm_campaign: string | null;
   utm_content: string | null;
   utm_term: string | null;
+  event: string;
+  produto_nome: string | null;
+  payment_method: string | null;
+  refund_reason: string | null;
+  payload: any;
   created_at: string;
 };
 
 export const listPv24hSales = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<Pv24hSale[]> => {
-    const salesMap = new Map<string, Pv24hSale>();
+    const salesList: Pv24hSale[] = [];
+    const seenIds = new Set<string>();
+
+    // Helper to extract fields from raw payload
+    const parsePayload = (s: any) => {
+      const p = s.payload || {};
+      const d = (p.data && typeof p.data === "object" ? p.data : p) as Record<string, any>;
+      const rawEvent = (p.event || p.event_type || s.status || d.status || "approved").toString().toLowerCase();
+
+      // Identificadores e Cliente
+      const transaction_id = s.transaction_id || d.id || s.id;
+      const cliente_nome = s.cliente_nome || d.customer?.name || d.customer?.full_name || d.name || "Cliente Cakto";
+      const cliente_email = s.cliente_email || d.customer?.email || d.email || null;
+      const cliente_telefone = s.cliente_telefone || d.customer?.phone || d.phone || null;
+
+      // Valor
+      const valor = Number(s.valor || d.amount || d.baseAmount || d.price || 0);
+
+      // Status
+      let status = s.status || rawEvent;
+      if (rawEvent.includes("refund")) status = "refunded";
+      else if (rawEvent.includes("chargeback")) status = "chargeback";
+      else if (rawEvent.includes("approved") || rawEvent.includes("paid")) status = "approved";
+      else if (rawEvent.includes("pix")) status = "pix_generated";
+      else if (rawEvent.includes("abandon")) status = "cart_abandonment";
+      else if (rawEvent.includes("renew")) status = "subscription_renewed";
+      else if (rawEvent.includes("cancel")) status = "subscription_canceled";
+      else if (rawEvent.includes("refus")) status = "refused";
+
+      // UTMs
+      const tracking = (d.tracking_parameters || d.tracking_params || d.utm || p.tracking_parameters || {}) as Record<string, any>;
+      const utm_source = s.utm_source || d.utm_source || tracking.utm_source || d.src || d.sck || null;
+      const utm_medium = s.utm_medium || d.utm_medium || tracking.utm_medium || null;
+      const utm_campaign = s.utm_campaign || d.utm_campaign || tracking.utm_campaign || null;
+      const utm_content = s.utm_content || d.utm_content || tracking.utm_content || null;
+      const utm_term = s.utm_term || d.utm_term || tracking.utm_term || null;
+
+      const isValidUtm = (v: string | null) => !!v && v.toLowerCase() !== "null" && v.toLowerCase() !== "undefined" && String(v).trim().length > 0;
+      const hasUtm = isValidUtm(utm_source) || isValidUtm(utm_medium) || isValidUtm(utm_campaign) || isValidUtm(utm_content) || isValidUtm(utm_term);
+      const origem: "pago" | "organico" = (s.origem === "pago" || hasUtm) ? "pago" : "organico";
+
+      const produto_nome = d.product?.name || d.offer?.name || null;
+      const payment_method = d.paymentMethodName || d.paymentMethod || null;
+      const refund_reason = d.refund_reason || d.reason || null;
+
+      return {
+        id: s.id,
+        transaction_id,
+        cliente_nome,
+        cliente_email,
+        cliente_telefone,
+        valor,
+        status,
+        origem,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        event: rawEvent,
+        produto_nome,
+        payment_method,
+        refund_reason,
+        payload: p,
+        created_at: s.created_at || s.received_at || new Date().toISOString(),
+      };
+    };
 
     // 1. Puxa da tabela principal `pv24h_vendas`
     try {
@@ -340,30 +411,17 @@ export const listPv24hSales = createServerFn({ method: "POST" })
 
       if (!error && Array.isArray(pvSales)) {
         for (const s of pvSales as any[]) {
-          const key = s.transaction_id || s.id;
-          salesMap.set(key, {
-            id: s.id,
-            transaction_id: s.transaction_id ?? null,
-            cliente_nome: s.cliente_nome ?? null,
-            cliente_email: s.cliente_email ?? null,
-            cliente_telefone: s.cliente_telefone ?? null,
-            valor: Number(s.valor || 0),
-            status: s.status ?? "approved",
-            origem: s.origem === "pago" ? "pago" : "organico",
-            utm_source: s.utm_source ?? null,
-            utm_medium: s.utm_medium ?? null,
-            utm_campaign: s.utm_campaign ?? null,
-            utm_content: s.utm_content ?? null,
-            utm_term: s.utm_term ?? null,
-            created_at: s.created_at || new Date().toISOString(),
-          });
+          const item = parsePayload(s);
+          salesList.push(item);
+          seenIds.add(item.id);
+          if (item.transaction_id) seenIds.add(item.transaction_id);
         }
       }
     } catch (err) {
       console.warn("[listPv24hSales] aviso pv24h_vendas:", err);
     }
 
-    // 2. Puxa do fallback `ht_quiz_submissions` (vendas vindas do webhook da Cakto)
+    // 2. Puxa do fallback `ht_quiz_submissions`
     try {
       const { data: qzSales } = await (context.supabase.from("ht_quiz_submissions" as any) as any)
         .select("*")
@@ -375,24 +433,23 @@ export const listPv24hSales = createServerFn({ method: "POST" })
           const r = (q.respostas ?? {}) as Record<string, any>;
           if (r.tipo === "pv24h_venda" || r.origem === "pv24h" || r.cakto_payload) {
             const key = r.transaction_id || `qz_${q.id}`;
-            if (!salesMap.has(key)) {
-              const hasUtm = !!(q.utm_source || q.utm_medium || q.utm_campaign || r.utm_source || r.src);
-              salesMap.set(key, {
+            if (!seenIds.has(key) && !seenIds.has(`qz_${q.id}`)) {
+              const item = parsePayload({
                 id: `qz_${q.id}`,
                 transaction_id: r.transaction_id ?? q.id,
-                cliente_nome: q.nome ?? null,
-                cliente_email: q.email ?? null,
-                cliente_telefone: q.whatsapp ?? null,
-                valor: Number(r.valor || 0),
-                status: r.status ?? "approved",
-                origem: r.origem === "pago" || hasUtm ? "pago" : "organico",
-                utm_source: q.utm_source ?? r.utm_source ?? null,
-                utm_medium: q.utm_medium ?? r.utm_medium ?? null,
-                utm_campaign: q.utm_campaign ?? r.utm_campaign ?? null,
-                utm_content: q.utm_content ?? r.utm_content ?? null,
-                utm_term: r.utm_term ?? null,
-                created_at: q.received_at || new Date().toISOString(),
+                cliente_nome: q.nome,
+                cliente_email: q.email,
+                cliente_telefone: q.whatsapp,
+                valor: r.valor,
+                status: r.status,
+                origem: r.origem,
+                utm_source: q.utm_source,
+                utm_medium: q.utm_medium,
+                utm_campaign: q.utm_campaign,
+                payload: r.cakto_payload || r,
+                created_at: q.received_at,
               });
+              salesList.push(item);
             }
           }
         }
@@ -401,8 +458,7 @@ export const listPv24hSales = createServerFn({ method: "POST" })
       console.warn("[listPv24hSales] aviso ht_quiz_submissions fallback:", err);
     }
 
-    const list = Array.from(salesMap.values());
-    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return list;
+    salesList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return salesList;
   });
 

@@ -41,46 +41,61 @@ export const Route = createFileRoute("/api/public/hooks/pv24h-cakto")({
           }
 
           const b = body as Record<string, any>;
-          console.log("[Webhook Cakto PV24H] Payload recebido:", JSON.stringify(b));
+          // Cakto envia os dados dentro do objeto `data`
+          const d = (b.data && typeof b.data === "object" ? b.data : b) as Record<string, any>;
 
-          // 1. Extração de Identificadores e Cliente
+          console.log("[Webhook Cakto PV24H] Evento:", b.event, "| ID:", d.id);
+
+          // 1. Extração do Tipo de Evento
+          const rawEvent = pickStr(b.event ?? b.event_type ?? d.event ?? d.event_type ?? d.status) || "purchase_approved";
+          const event = rawEvent.toLowerCase();
+
+          // 2. Extração de Identificadores e Cliente
           const transaction_id =
-            pickStr(b.transaction_id ?? b.transaction ?? b.order_id ?? b.code ?? b.id ?? b.order?.id) ||
+            pickStr(d.id ?? d.transaction_id ?? d.order_id ?? d.code ?? b.transaction_id ?? b.id) ||
             `cakto_${Date.now()}`;
 
-          const customer = (b.customer || b.buyer || b.client || {}) as Record<string, any>;
-          const cliente_nome =
-            pickStr(customer.name ?? customer.full_name ?? b.nome ?? b.name) || "Cliente Cakto";
-          const cliente_email = pickStr(customer.email ?? b.email);
+          const customer = (d.customer || b.customer || d.buyer || b.buyer || {}) as Record<string, any>;
+          const cliente_nome = pickStr(customer.name ?? customer.full_name ?? d.nome ?? b.nome ?? d.name) || "Cliente Cakto";
+          const cliente_email = pickStr(customer.email ?? d.email ?? b.email);
           const cliente_telefone = pickStr(
-            customer.phone ?? customer.mobile ?? customer.cellphone ?? customer.telephone ?? b.telefone ?? b.phone ?? b.whatsapp
+            customer.phone ?? customer.mobile ?? customer.cellphone ?? customer.telephone ?? d.telefone ?? b.phone
           );
 
-          // 2. Extração de Valor e Status
-          const rawValor = b.paid_amount ?? b.amount ?? b.price ?? b.value ?? b.total ?? b.order?.total ?? 0;
+          // 3. Extração de Valor e Status
+          const rawValor = d.amount ?? d.baseAmount ?? d.price ?? d.value ?? d.total ?? b.amount ?? b.price ?? 0;
           const valor = Number(rawValor) || 0;
 
-          const rawStatus = pickStr(b.event ?? b.event_type ?? b.status ?? b.current_status) || "approved";
-          const status = rawStatus.toLowerCase();
+          // Define o status normalizado (approved, refunded, chargeback, pix_generated, cart_abandonment, etc)
+          let status = event;
+          if (event.includes("refund")) status = "refunded";
+          else if (event.includes("chargeback")) status = "chargeback";
+          else if (event.includes("approved") || event.includes("paid")) status = "approved";
+          else if (event.includes("pix")) status = "pix_generated";
+          else if (event.includes("abandon")) status = "cart_abandonment";
+          else if (event.includes("renew")) status = "subscription_renewed";
+          else if (event.includes("cancel")) status = "subscription_canceled";
+          else if (event.includes("refus")) status = "refused";
 
-          // 3. Extração de UTMs e Parâmetros de Rastreio (Cakto)
-          const tracking = (b.tracking_parameters || b.tracking_params || b.utm || b.params || b.metadata || {}) as Record<string, any>;
+          // 4. Extração de UTMs e Parâmetros de Rastreio (Cakto)
+          const tracking = (d.tracking_parameters || d.tracking_params || d.utm || b.tracking_parameters || b.utm || {}) as Record<string, any>;
 
-          const utm_source = pickStr(b.utm_source ?? tracking.utm_source ?? tracking.source ?? b.src);
-          const utm_medium = pickStr(b.utm_medium ?? tracking.utm_medium ?? tracking.medium);
-          const utm_campaign = pickStr(b.utm_campaign ?? tracking.utm_campaign ?? tracking.campaign);
-          const utm_content = pickStr(b.utm_content ?? tracking.utm_content ?? tracking.content);
-          const utm_term = pickStr(b.utm_term ?? tracking.utm_term ?? tracking.term ?? b.sck);
+          const utm_source = pickStr(d.utm_source ?? tracking.utm_source ?? tracking.source ?? d.src ?? d.sck ?? b.utm_source);
+          const utm_medium = pickStr(d.utm_medium ?? tracking.utm_medium ?? tracking.medium ?? b.utm_medium);
+          const utm_campaign = pickStr(d.utm_campaign ?? tracking.utm_campaign ?? tracking.campaign ?? b.utm_campaign);
+          const utm_content = pickStr(d.utm_content ?? tracking.utm_content ?? tracking.content ?? b.utm_content);
+          const utm_term = pickStr(d.utm_term ?? tracking.utm_term ?? tracking.term ?? b.utm_term);
 
-          // 4. Classificação: Tráfego Pago (com UTM) vs. Orgânico (sem UTM)
-          const hasUtm = !!(utm_source || utm_medium || utm_campaign || utm_content || utm_term);
+          // 5. Classificação: Tráfego Pago (com UTM válida) vs. Orgânico
+          const isValidUtm = (v: string | null) => !!v && v.toLowerCase() !== "null" && v.toLowerCase() !== "undefined" && v.trim().length > 0;
+          const hasUtm = isValidUtm(utm_source) || isValidUtm(utm_medium) || isValidUtm(utm_campaign) || isValidUtm(utm_content) || isValidUtm(utm_term);
           const origem: "pago" | "organico" = hasUtm ? "pago" : "organico";
 
           const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
           });
 
-          // 5. Salvar na tabela `pv24h_vendas`
+          // 6. Registro na tabela `pv24h_vendas`
           const saleRecord = {
             transaction_id,
             cliente_nome,
@@ -108,7 +123,7 @@ export const Route = createFileRoute("/api/public/hooks/pv24h-cakto")({
             console.warn("[Webhook Cakto PV24H] Warning pv24h_vendas insert:", errPv.message);
           }
 
-          // 6. Também salva como fallback em `ht_quiz_submissions` para garantir redundância total
+          // 7. Salva no fallback `ht_quiz_submissions` para redundância
           try {
             await supabase.from("ht_quiz_submissions" as any).insert([{
               nome: cliente_nome,
@@ -120,6 +135,7 @@ export const Route = createFileRoute("/api/public/hooks/pv24h-cakto")({
               utm_content,
               respostas: {
                 tipo: "pv24h_venda",
+                evento: event,
                 origem,
                 valor,
                 status,
@@ -136,9 +152,11 @@ export const Route = createFileRoute("/api/public/hooks/pv24h-cakto")({
           return json(200, {
             ok: true,
             origem,
+            status,
+            event,
             transaction_id,
             saved_id: savedPv?.id || transaction_id,
-            message: `Venda ${origem === "pago" ? "Tráfego Pago" : "Orgânica"} registrada com sucesso!`,
+            message: `Evento '${event}' (${origem}) processado com sucesso!`,
           });
         } catch (e: any) {
           console.error("[Webhook Cakto PV24H] Error:", e);
