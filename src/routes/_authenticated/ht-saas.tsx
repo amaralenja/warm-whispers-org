@@ -874,7 +874,7 @@ function SaasProjectCardItem({
 
   return (
     <Card
-      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b ${cfg.cardBg} backdrop-blur transition-all duration-300 hover:border-accent/80 hover:shadow-2xl`}
+      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b ${cfg.cardBg} backdrop-blur transition-all duration-300 hover:border-accent hover:shadow-2xl`}
     >
       <div>
         {/* CARD HEADER */}
@@ -885,12 +885,12 @@ function SaasProjectCardItem({
                 <FaseIcon className="h-3.5 w-3.5" />
                 {cfg.label}
               </Badge>
-              <h2 className="text-xl font-bold tracking-tight mt-2.5 text-foreground">
+              <h2 className="text-2xl font-black tracking-tight mt-2.5 text-foreground">
                 {p.nome}
               </h2>
             </div>
 
-            <div className="flex items-center gap-1 bg-background/60 p-1 rounded-xl border border-border/40">
+            <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/50 shadow-sm">
               <Button
                 variant="ghost"
                 size="icon"
@@ -918,7 +918,7 @@ function SaasProjectCardItem({
               <span className="text-[11px] font-semibold text-muted-foreground">Progresso da Construção</span>
               <span className="font-mono font-bold text-accent text-sm">{p.progressoPct ?? 0}%</span>
             </div>
-            <div className="h-2.5 w-full bg-border/40 rounded-full overflow-hidden p-0.5">
+            <div className="h-3 w-full bg-border/40 rounded-full overflow-hidden p-0.5">
               <div
                 className="h-full bg-gradient-to-r from-accent via-blue-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]"
                 style={{ width: `${Math.min(100, Math.max(0, p.progressoPct ?? 0))}%` }}
@@ -928,39 +928,36 @@ function SaasProjectCardItem({
 
           {/* DESCRIPTION */}
           {p.descricao && (
-            <p className="text-xs text-muted-foreground/90 mt-3 line-clamp-2 leading-relaxed">
-              {p.descricao}
-            </p>
+            <div className="mt-3 bg-background/50 p-3 rounded-xl border border-border/40">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-0.5">Visão Geral / Status:</div>
+              <p className="text-xs text-foreground/90 leading-relaxed font-medium">
+                {p.descricao}
+              </p>
+            </div>
           )}
         </div>
 
-        {/* INFO GRID */}
-        <div className="px-6 py-3 bg-muted/20 border-y border-border/40 grid grid-cols-2 gap-3 text-xs">
+        {/* INFO STRIP (DEV & GRUPO) */}
+        <div className="px-6 py-3 bg-muted/30 border-y border-border/40 grid grid-cols-2 gap-3 text-xs">
           {/* DEV RESPONSÁVEL */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-7 w-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0 text-accent font-bold">
-              <Code className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-xl bg-accent/20 flex items-center justify-center shrink-0 text-accent font-bold">
+              <Code className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">DEV / Responsável</div>
-              <div className="font-medium text-foreground truncate">{p.devResponsavel || "Não atribuído"}</div>
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">DEV Responsável</div>
+              <div className="font-bold text-foreground truncate">{p.devResponsavel || "Não atribuído"}</div>
             </div>
           </div>
 
-          {/* GRUPO */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-7 w-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 font-bold">
-              <MessageCircle className="h-3.5 w-3.5" />
+          {/* GRUPO NOME */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400 font-bold">
+              <MessageCircle className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Grupo do Projeto</div>
-              {p.linkGrupo ? (
-                <a href={p.linkGrupo} target="_blank" rel="noreferrer" className="font-medium text-emerald-400 hover:underline truncate block">
-                  {p.nomeGrupo || "Acessar Grupo"} ↗
-                </a>
-              ) : (
-                <div className="font-medium text-foreground truncate">{p.nomeGrupo || "Sem grupo cadastrado"}</div>
-              )}
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">Grupo no WhatsApp</div>
+              <div className="font-bold text-emerald-300 truncate">{p.nomeGrupo || "Sem grupo informado"}</div>
             </div>
           </div>
         </div>
@@ -969,21 +966,21 @@ function SaasProjectCardItem({
         <div className="p-4 px-6 bg-zinc-950/70 border-b border-border/40 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
-              <StickyNote className="h-3 w-3" />
-              Diário de Bordo & Anotações DEV ({notes.length})
+              <StickyNote className="h-3.5 w-3.5" />
+              Diário de Bordo & Anotações ({notes.length})
             </span>
             <button
               type="button"
               onClick={() => onOpenNotes(p)}
               className="text-[10px] font-bold text-accent hover:underline flex items-center gap-1"
             >
-              + Escrever
+              + Nova Anotação
             </button>
           </div>
 
           {notes.length === 0 ? (
             <div className="text-[11px] text-muted-foreground/60 italic py-1">
-              Nenhuma anotação registrada ainda. Clique em "+ Escrever" para adicionar a primeira.
+              Nenhuma anotação registrada ainda. Clique em "+ Nova Anotação" para registrar o progresso.
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -1006,7 +1003,7 @@ function SaasProjectCardItem({
                   onClick={() => onOpenNotes(p)}
                   className="text-[10px] text-accent hover:underline font-semibold block text-right w-full pt-1"
                 >
-                  Ver todas as {notes.length} anotações do diário ↗
+                  Ver todas as {notes.length} anotações ↗
                 </button>
               )}
             </div>
@@ -1014,30 +1011,52 @@ function SaasProjectCardItem({
         </div>
       </div>
 
-      {/* CARD FOOTER */}
-      <div className="p-4 px-6 bg-card/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {p.linkSaas ? (
-          <a
-            href={p.linkSaas}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline truncate"
-          >
-            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{p.linkSaas}</span>
-          </a>
-        ) : (
-          <span className="text-xs text-muted-foreground italic">Sem URL de teste cadastrada</span>
-        )}
+      {/* BOTÕES DE AÇÃO RÁPIDA (SAAS LINK + GRUPO LINK + GERENCIAR) */}
+      <div className="p-4 px-6 bg-card/80 space-y-2">
+        <div className="flex flex-col sm:flex-row items-stretch gap-2">
+          {/* BOTÃO ABRIR SAAS */}
+          {p.linkSaas ? (
+            <a
+              href={p.linkSaas}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-gradient-to-r from-accent to-blue-500 text-white font-bold text-xs shadow-md shadow-accent/20 hover:scale-[1.02] transition-all"
+            >
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Acessar SaaS</span>
+            </a>
+          ) : (
+            <div className="flex-1 h-10 px-3 rounded-xl bg-muted/20 border border-border/40 flex items-center justify-center text-xs text-muted-foreground italic">
+              Sem URL do SaaS
+            </div>
+          )}
+
+          {/* BOTÃO ABRIR GRUPO */}
+          {p.linkGrupo ? (
+            <a
+              href={p.linkGrupo}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 hover:scale-[1.02] transition-all"
+            >
+              <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Acessar Grupo ↗</span>
+            </a>
+          ) : (
+            <div className="flex-1 h-10 px-3 rounded-xl bg-muted/20 border border-border/40 flex items-center justify-center text-xs text-muted-foreground italic">
+              Sem Link do Grupo
+            </div>
+          )}
+        </div>
 
         <Button
           variant="outline"
           size="sm"
           onClick={() => onOpenNotes(p)}
-          className="gap-2 h-9 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:text-accent font-semibold shrink-0"
+          className="w-full gap-2 h-9 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 font-bold text-xs"
         >
           <StickyNote className="h-3.5 w-3.5" />
-          Gerenciar Diário ({notes.length})
+          Gerenciar Diário de Bordo ({notes.length})
         </Button>
       </div>
     </Card>
