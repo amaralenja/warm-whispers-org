@@ -1292,11 +1292,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return () => clearTimeout(timer);
   }, [search]);
 
+  const currentOperacaoId = workspace?.id !== "all" ? workspace?.id ?? null : null;
+
   const { data: messageSearchResults = [] } = useQuery({
-    queryKey: ["search-chat-messages", debouncedSearch, operacaoId],
+    queryKey: ["search-chat-messages", debouncedSearch, currentOperacaoId],
     queryFn: async () => {
       if (!debouncedSearch || debouncedSearch.length < 2) return [];
-      const res = await searchChatMessagesFn({ data: { query: debouncedSearch, operacaoId: operacaoId || null } });
+      const res = await searchChatMessagesFn({ data: { query: debouncedSearch, operacaoId: currentOperacaoId } });
       return res?.results ?? [];
     },
     enabled: debouncedSearch.length >= 2,
