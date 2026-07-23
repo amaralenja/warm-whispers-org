@@ -793,7 +793,8 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       if (conv?.id) data.conversation_id = String(conv.id);
     }
     const { runFlowAdmin, processQueuedFlowRuns } = await import("@/lib/flow-engine.server");
-    // Dispara a execução imediatamente para que o lead receba a mensagem na hora
+    // Enfileira o run e imediatamente dispara o worker em background.
+    // Usar queueOnly:true evita timeout da Vercel quando o fluxo tem mídia pesada ou delays.
     const res = await runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
@@ -804,10 +805,11 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
         ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
         : null,
       triggerContext: { manual: true, initial_quoted_msg_id: data.initial_quoted_msg_id || null },
-      queueOnly: false,
+      queueOnly: true,
     });
 
-    // Limpa qualquer outra execução pendente na fila em background
+    // Executa imediatamente em background — se a função da Vercel ainda tiver tempo,
+    // o run será processado agora; caso contrário, o pg_cron pega em ~10s.
     void processQueuedFlowRuns(20).catch(() => undefined);
     return res;
   });
