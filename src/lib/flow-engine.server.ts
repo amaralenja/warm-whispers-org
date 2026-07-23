@@ -640,59 +640,64 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       let finalUrl = url;
       const inner: any = {};
       if (mediaType === "audio") {
-        const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
-        let lastErr: unknown = null;
-        finalUrl = "";
-        for (let i = 0; i < 3; i++) {
+        const isAlreadyOgg = /\.(ogg|opus)($|\?)/i.test(url);
+        if (isAlreadyOgg) {
+          finalUrl = url;
+        } else {
           try {
-            finalUrl = await convertAudioToWhatsappVoice(url);
-            break;
+            const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
+            let converted = "";
+            for (let i = 0; i < 2; i++) {
+              try {
+                converted = await convertAudioToWhatsappVoice(url);
+                if (converted) break;
+              } catch (e) {
+                console.warn(`[flow-engine] audio conversion attempt ${i + 1} failed:`, e);
+                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+              }
+            }
+            if (converted) finalUrl = converted;
           } catch (e) {
-            lastErr = e;
-            console.error(`Flow voice conversion attempt ${i + 1} failed:`, e);
-            await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+            console.warn("[flow-engine] audio conversion failed, falling back to original URL:", e);
           }
-        }
-        if (!finalUrl) {
-          // Não envia áudio "cru" (mp3/m4a) pro WhatsApp — fica travado no relógio.
-          // Melhor falhar o node pra ficar visível e o vendedor reenviar.
-          throw new Error(`Falha ao converter áudio pra formato WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
         }
         inner.link = finalUrl;
         inner.voice = true;
       } else {
         if (mediaType === "image" && shouldNormalizeWhatsappImage(finalUrl)) {
-          const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
-          let lastErr: unknown = null;
-          for (let i = 0; i < 3; i++) {
-            try {
-              finalUrl = await convertImageToWhatsappJpeg(finalUrl);
-              break;
-            } catch (e) {
-              lastErr = e;
-              console.error(`Flow image conversion attempt ${i + 1} failed:`, e);
-              await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+          try {
+            const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
+            let converted = "";
+            for (let i = 0; i < 2; i++) {
+              try {
+                converted = await convertImageToWhatsappJpeg(finalUrl);
+                if (converted) break;
+              } catch (e) {
+                console.warn(`[flow-engine] image conversion attempt ${i + 1} failed:`, e);
+                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+              }
             }
-          }
-          if (shouldNormalizeWhatsappImage(finalUrl)) {
-            throw new Error(`Falha ao otimizar imagem pra WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
+            if (converted) finalUrl = converted;
+          } catch (e) {
+            console.warn("[flow-engine] image conversion failed, falling back to original URL:", e);
           }
         }
         if (mediaType === "video" && shouldNormalizeWhatsappVideo(finalUrl)) {
-          const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
-          let lastErr: unknown = null;
-          for (let i = 0; i < 3; i++) {
-            try {
-              finalUrl = await convertVideoToWhatsappMp4(finalUrl);
-              break;
-            } catch (e) {
-              lastErr = e;
-              console.error(`Flow video conversion attempt ${i + 1} failed:`, e);
-              await new Promise((r) => setTimeout(r, 1800 * (i + 1)));
+          try {
+            const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
+            let converted = "";
+            for (let i = 0; i < 2; i++) {
+              try {
+                converted = await convertVideoToWhatsappMp4(finalUrl);
+                if (converted) break;
+              } catch (e) {
+                console.warn(`[flow-engine] video conversion attempt ${i + 1} failed:`, e);
+                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+              }
             }
-          }
-          if (shouldNormalizeWhatsappVideo(finalUrl)) {
-            throw new Error(`Falha ao converter vídeo pra WhatsApp: ${String((lastErr as any)?.message ?? lastErr ?? "timeout")}`);
+            if (converted) finalUrl = converted;
+          } catch (e) {
+            console.warn("[flow-engine] video conversion failed, falling back to original URL:", e);
           }
         }
         inner.link = finalUrl;

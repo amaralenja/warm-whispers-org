@@ -1044,3 +1044,66 @@ export const cancelFlowRun = createServerFn({ method: "POST" })
       targetFound: Boolean(target),
     };
   });
+
+export const inspectFlowExecutionLogs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { phone: string }) => ({ phone: String(d?.phone ?? "") }))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const digits = data.phone.replace(/\D+/g, "");
+    if (!digits) return { ok: false, error: "Telefone inválido" };
+
+    // 1. Acha conversa
+    const { data: convs } = await supabaseAdmin
+      .from("wa_conversations" as any)
+      .select("*")
+      .or(`contact_wa_id.ilike.%${digits}%,contact_wa_id.ilike.%${digits.slice(-8)}%`);
+
+    const conv = Array.isArray(convs) && convs.length > 0 ? convs[0] : null;
+    if (!conv) return { ok: false, error: "Conversa não encontrada para este telefone" };
+
+    // 2. Busca execuções de fluxo (runs)
+    const { data: runs, error: errRuns } = await supabaseAdmin
+      .from("wa_flow_runs" as any)
+      .select("*")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: false });
+
+    // 3. Para cada run, busca os nós executados (executions)
+    const runDetails = [];
+    for (const r of (runs ?? []) as any[]) {
+      const { data: execs } = await supabaseAdmin
+        .from("wa_flow_executions" as any)
+        .select("*")
+        .eq("run_id", r.id)
+        .order("created_at", { ascending: true });
+
+      // Busca dados do fluxo
+      const { data: flow } = await supabaseAdmin
+        .from("wa_flows" as any)
+        .select("id, nome, nodes, edges")
+        .eq("id", r.flow_id)
+        .maybeSingle();
+
+      runDetails.push({
+        run: r,
+        flow,
+        executions: execs ?? [],
+      });
+    }
+
+    // 4. Busca as últimas mensagens da conversa
+    const { data: msgs } = await supabaseAdmin
+      .from("wa_messages" as any)
+      .select("id, direction, msg_type, text_body, media_url, caption, status, created_at, raw")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: true })
+      .limit(50);
+
+    return {
+      ok: true,
+      conv,
+      runDetails,
+      messages: msgs ?? [],
+    };
+  });
