@@ -40,6 +40,7 @@ export const MENU_TREE: MenuNode[] = [
       { key: "ht-customer-success", title: "Sucesso do Cliente", url: "/ht-customer-success" },
       { key: "quiz", title: "Quiz", url: "/quiz" },
       { key: "meta-ads", title: "Facebook Ads", url: "/meta-ads" },
+      { key: "ht-saas", title: "SaaS em Construção", url: "/ht-saas" },
       { key: "ht-api", title: "API", url: "/ht-api" },
     ],
   },

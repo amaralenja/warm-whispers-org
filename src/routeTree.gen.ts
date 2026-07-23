@@ -24,6 +24,7 @@ import { Route as AuthenticatedHtApiRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedHtCustomerSuccessRouteImport } from './routes/_authenticated/ht-customer-success'
 import { Route as AuthenticatedHtKanbanCloserRouteImport } from './routes/_authenticated/ht-kanban-closer'
 import { Route as AuthenticatedHtKanbanSdrRouteImport } from './routes/_authenticated/ht-kanban-sdr'
+import { Route as AuthenticatedHtSaasRouteImport } from './routes/_authenticated/ht-saas'
 import { Route as AuthenticatedHtSdrMetricsRouteImport } from './routes/_authenticated/ht-sdr-metrics'
 import { Route as AuthenticatedHtTeamRouteImport } from './routes/_authenticated/ht-team'
 import { Route as AuthenticatedHtUtmRouteImport } from './routes/_authenticated/ht-utm'
@@ -135,6 +136,11 @@ const AuthenticatedHtKanbanSdrRoute =
     path: '/ht-kanban-sdr',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedHtSaasRoute = AuthenticatedHtSaasRouteImport.update({
+  id: '/ht-saas',
+  path: '/ht-saas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedHtSdrMetricsRoute =
   AuthenticatedHtSdrMetricsRouteImport.update({
     id: '/ht-sdr-metrics',
@@ -327,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/ht-customer-success': typeof AuthenticatedHtCustomerSuccessRoute
   '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
+  '/ht-saas': typeof AuthenticatedHtSaasRoute
   '/ht-sdr-metrics': typeof AuthenticatedHtSdrMetricsRoute
   '/ht-team': typeof AuthenticatedHtTeamRoute
   '/ht-utm': typeof AuthenticatedHtUtmRoute
@@ -375,6 +382,7 @@ export interface FileRoutesByTo {
   '/ht-customer-success': typeof AuthenticatedHtCustomerSuccessRoute
   '/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
+  '/ht-saas': typeof AuthenticatedHtSaasRoute
   '/ht-sdr-metrics': typeof AuthenticatedHtSdrMetricsRoute
   '/ht-team': typeof AuthenticatedHtTeamRoute
   '/ht-utm': typeof AuthenticatedHtUtmRoute
@@ -425,6 +433,7 @@ export interface FileRoutesById {
   '/_authenticated/ht-customer-success': typeof AuthenticatedHtCustomerSuccessRoute
   '/_authenticated/ht-kanban-closer': typeof AuthenticatedHtKanbanCloserRoute
   '/_authenticated/ht-kanban-sdr': typeof AuthenticatedHtKanbanSdrRoute
+  '/_authenticated/ht-saas': typeof AuthenticatedHtSaasRoute
   '/_authenticated/ht-sdr-metrics': typeof AuthenticatedHtSdrMetricsRoute
   '/_authenticated/ht-team': typeof AuthenticatedHtTeamRoute
   '/_authenticated/ht-utm': typeof AuthenticatedHtUtmRoute
@@ -475,6 +484,7 @@ export interface FileRouteTypes {
     | '/ht-customer-success'
     | '/ht-kanban-closer'
     | '/ht-kanban-sdr'
+    | '/ht-saas'
     | '/ht-sdr-metrics'
     | '/ht-team'
     | '/ht-utm'
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/ht-customer-success'
     | '/ht-kanban-closer'
     | '/ht-kanban-sdr'
+    | '/ht-saas'
     | '/ht-sdr-metrics'
     | '/ht-team'
     | '/ht-utm'
@@ -572,6 +583,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ht-customer-success'
     | '/_authenticated/ht-kanban-closer'
     | '/_authenticated/ht-kanban-sdr'
+    | '/_authenticated/ht-saas'
     | '/_authenticated/ht-sdr-metrics'
     | '/_authenticated/ht-team'
     | '/_authenticated/ht-utm'
@@ -732,6 +744,13 @@ declare module '@tanstack/react-router' {
       path: '/ht-kanban-sdr'
       fullPath: '/ht-kanban-sdr'
       preLoaderRoute: typeof AuthenticatedHtKanbanSdrRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ht-saas': {
+      id: '/_authenticated/ht-saas'
+      path: '/ht-saas'
+      fullPath: '/ht-saas'
+      preLoaderRoute: typeof AuthenticatedHtSaasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ht-sdr-metrics': {
@@ -973,6 +992,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHtCustomerSuccessRoute: typeof AuthenticatedHtCustomerSuccessRoute
   AuthenticatedHtKanbanCloserRoute: typeof AuthenticatedHtKanbanCloserRoute
   AuthenticatedHtKanbanSdrRoute: typeof AuthenticatedHtKanbanSdrRoute
+  AuthenticatedHtSaasRoute: typeof AuthenticatedHtSaasRoute
   AuthenticatedHtSdrMetricsRoute: typeof AuthenticatedHtSdrMetricsRoute
   AuthenticatedHtTeamRoute: typeof AuthenticatedHtTeamRoute
   AuthenticatedHtUtmRoute: typeof AuthenticatedHtUtmRoute
@@ -1005,6 +1025,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHtCustomerSuccessRoute: AuthenticatedHtCustomerSuccessRoute,
   AuthenticatedHtKanbanCloserRoute: AuthenticatedHtKanbanCloserRoute,
   AuthenticatedHtKanbanSdrRoute: AuthenticatedHtKanbanSdrRoute,
+  AuthenticatedHtSaasRoute: AuthenticatedHtSaasRoute,
   AuthenticatedHtSdrMetricsRoute: AuthenticatedHtSdrMetricsRoute,
   AuthenticatedHtTeamRoute: AuthenticatedHtTeamRoute,
   AuthenticatedHtUtmRoute: AuthenticatedHtUtmRoute,

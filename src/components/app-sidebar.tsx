@@ -92,7 +92,7 @@ const highTicketItems: Item[] = [
   { title: "Sucesso do Cliente", url: "/ht-customer-success", icon: HeartHandshake },
   { title: "Quiz", url: "/quiz", icon: HelpCircle },
   { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
-  
+  { title: "SaaS em Construção", url: "/ht-saas", icon: Rocket },
   { title: "API", url: "/ht-api", icon: KeyRound },
 ];
 
