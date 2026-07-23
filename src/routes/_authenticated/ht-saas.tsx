@@ -38,36 +38,41 @@ export const Route = createFileRoute("/_authenticated/ht-saas")({
   component: () => <SaasProjectsPage />,
 });
 
-const FASE_CONFIG: Record<SaasFase, { label: string; badge: string; icon: any; border: string }> = {
+const FASE_CONFIG: Record<SaasFase, { label: string; badge: string; icon: any; border: string; cardBg: string }> = {
   planejamento: {
-    label: "Planejamento",
-    badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    label: "📝 PLANEJAMENTO",
+    badge: "bg-amber-500/25 text-amber-200 border-amber-400 font-extrabold shadow-[0_0_15px_-3px_rgba(245,158,11,0.5)]",
     icon: Clock,
-    border: "border-amber-500/30",
+    border: "border-amber-500/60 shadow-[0_0_20px_-5px_rgba(245,158,11,0.25)]",
+    cardBg: "from-amber-950/30 to-card/60",
   },
   desenvolvimento: {
-    label: "Em Desenvolvimento",
-    badge: "bg-sky-500/15 text-sky-300 border-sky-500/30 shadow-[0_0_15px_-4px_rgba(56,189,248,0.4)]",
+    label: "🛠️ EM DESENVOLVIMENTO",
+    badge: "bg-sky-500/25 text-sky-200 border-sky-400 font-extrabold shadow-[0_0_15px_-3px_rgba(56,189,248,0.6)] animate-pulse",
     icon: Code,
-    border: "border-sky-500/40",
+    border: "border-sky-500/70 shadow-[0_0_25px_-5px_rgba(56,189,248,0.3)]",
+    cardBg: "from-sky-950/40 to-card/60",
   },
   testes: {
-    label: "Em Testes / QA",
-    badge: "bg-violet-500/15 text-violet-300 border-violet-500/30 shadow-[0_0_15px_-4px_rgba(167,139,250,0.4)]",
+    label: "🧪 EM TESTES / QA",
+    badge: "bg-purple-500/25 text-purple-200 border-purple-400 font-extrabold shadow-[0_0_15px_-3px_rgba(168,85,247,0.6)]",
     icon: Layers,
-    border: "border-violet-500/40",
+    border: "border-purple-500/70 shadow-[0_0_25px_-5px_rgba(168,85,247,0.3)]",
+    cardBg: "from-purple-950/30 to-card/60",
   },
   lancado: {
-    label: "Lançado / Pronto",
-    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-[0_0_15px_-4px_rgba(16,185,129,0.4)]",
+    label: "✅ PRONTO / LANÇADO",
+    badge: "bg-emerald-500/25 text-emerald-200 border-emerald-400 font-extrabold shadow-[0_0_15px_-3px_rgba(16,185,129,0.7)]",
     icon: CheckCircle2,
-    border: "border-emerald-500/40",
+    border: "border-emerald-500/70 shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)]",
+    cardBg: "from-emerald-950/30 to-card/60",
   },
   pausado: {
-    label: "Pausado",
-    badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+    label: "⏸️ PAUSADO",
+    badge: "bg-zinc-500/25 text-zinc-300 border-zinc-500 font-bold",
     icon: AlertTriangle,
-    border: "border-zinc-500/30",
+    border: "border-zinc-700",
+    cardBg: "from-zinc-950/40 to-card/40",
   },
 };
 
@@ -770,15 +775,15 @@ function SaasProjectCardItem({
 
   return (
     <Card
-      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b from-card/80 to-card/40 backdrop-blur transition-all duration-300 hover:border-accent/50 hover:shadow-xl`}
+      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b ${cfg.cardBg} backdrop-blur transition-all duration-300 hover:border-accent/80 hover:shadow-2xl`}
     >
       <div>
         {/* CARD HEADER */}
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <Badge variant="outline" className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.badge} flex items-center gap-1.5 w-fit`}>
-                <FaseIcon className="h-3 w-3" />
+              <Badge variant="outline" className={`px-3 py-1 text-[10px] uppercase tracking-wider ${cfg.badge} flex items-center gap-1.5 w-fit`}>
+                <FaseIcon className="h-3.5 w-3.5" />
                 {cfg.label}
               </Badge>
               <h2 className="text-xl font-bold tracking-tight mt-2.5 text-foreground">
@@ -786,7 +791,7 @@ function SaasProjectCardItem({
               </h2>
             </div>
 
-            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-xl border border-border/40">
+            <div className="flex items-center gap-1 bg-background/60 p-1 rounded-xl border border-border/40">
               <Button
                 variant="ghost"
                 size="icon"
@@ -811,12 +816,12 @@ function SaasProjectCardItem({
           {/* PROGRESS BAR */}
           <div className="mt-4 space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[11px] font-medium text-muted-foreground">Progresso da Construção</span>
-              <span className="font-mono font-bold text-accent">{p.progressoPct ?? 0}%</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">Progresso da Construção</span>
+              <span className="font-mono font-bold text-accent text-sm">{p.progressoPct ?? 0}%</span>
             </div>
-            <div className="h-2 w-full bg-border/40 rounded-full overflow-hidden">
+            <div className="h-2.5 w-full bg-border/40 rounded-full overflow-hidden p-0.5">
               <div
-                className="h-full bg-gradient-to-r from-accent to-blue-400 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-accent via-blue-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]"
                 style={{ width: `${Math.min(100, Math.max(0, p.progressoPct ?? 0))}%` }}
               />
             </div>
@@ -860,6 +865,54 @@ function SaasProjectCardItem({
             </div>
           </div>
         </div>
+
+        {/* DIÁRIO DE BORDO EXPOSTO DIRETAMENTE NO CARD */}
+        <div className="p-4 px-6 bg-zinc-950/70 border-b border-border/40 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
+              <StickyNote className="h-3 w-3" />
+              Diário de Bordo & Anotações DEV ({notes.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => onOpenNotes(p)}
+              className="text-[10px] font-bold text-accent hover:underline flex items-center gap-1"
+            >
+              + Escrever
+            </button>
+          </div>
+
+          {notes.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground/60 italic py-1">
+              Nenhuma anotação registrada ainda. Clique em "+ Escrever" para adicionar a primeira.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {notes.slice(0, 2).map((n) => (
+                <div key={n.id} className="text-xs bg-background/60 p-2.5 rounded-xl border border-border/40 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-bold text-foreground">{n.autor}</span>
+                    <span className="text-muted-foreground font-mono">
+                      {new Date(n.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-foreground/90 line-clamp-2 leading-tight whitespace-pre-wrap">
+                    {n.conteudo}
+                  </p>
+                </div>
+              ))}
+              {notes.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => onOpenNotes(p)}
+                  className="text-[10px] text-accent hover:underline font-semibold block text-right w-full pt-1"
+                >
+                  Ver todas as {notes.length} anotações do diário ↗
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* CARD FOOTER */}
@@ -885,7 +938,7 @@ function SaasProjectCardItem({
           className="gap-2 h-9 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:text-accent font-semibold shrink-0"
         >
           <StickyNote className="h-3.5 w-3.5" />
-          Diário & Anotações ({notes.length})
+          Gerenciar Diário ({notes.length})
         </Button>
       </div>
     </Card>
