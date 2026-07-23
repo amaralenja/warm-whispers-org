@@ -255,6 +255,22 @@ function errorToText(error: unknown, fallback = "Erro inesperado"): string {
   return direct || fallback;
 }
 
+export function msgQuotePreview(m: Msg | null | undefined): string {
+  if (!m) return "";
+  const text = toText(m.text_body);
+  if (text) return text.slice(0, 140);
+  const caption = toText(m.caption);
+  if (caption) return caption.slice(0, 140);
+  switch (m.msg_type) {
+    case "image": return "📷 Imagem";
+    case "audio": return "🎤 Áudio";
+    case "video": return "🎬 Vídeo";
+    case "document": return `📄 ${m.media_filename || "Documento"}`;
+    case "sticker": return "🎭 Figurinha";
+    default: return "Mensagem";
+  }
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1622,21 +1638,6 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
   });
-
-  function msgQuotePreview(m: Msg): string {
-    const text = toText(m.text_body);
-    if (text) return text.slice(0, 140);
-    const caption = toText(m.caption);
-    if (caption) return caption.slice(0, 140);
-    switch (m.msg_type) {
-      case "image": return "📷 Imagem";
-      case "audio": return "🎤 Áudio";
-      case "video": return "🎬 Vídeo";
-      case "document": return `📄 ${m.media_filename || "Documento"}`;
-      case "sticker": return "🎭 Figurinha";
-      default: return "Mensagem";
-    }
-  }
 
   async function handleSendText(textToSend: string) {
     if (!active || !textToSend.trim()) return;
