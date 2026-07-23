@@ -2840,20 +2840,47 @@ function MessageErrorLogModal({
 }) {
   if (!msg) return null;
   const raw: any = msg.raw ?? {};
-  const errorDetail = raw.error || raw.response?.error?.message || raw.response?.message || "Sem detalhes adicionais do servidor";
-  const requestBody = raw.request ? JSON.stringify(raw.request, null, 2) : "—";
-  const responseBody = raw.response ? JSON.stringify(raw.response, null, 2) : "—";
+
+  // For Meta-rejected messages: error comes via status webhook into raw.last_status_error and raw.statuses
+  const metaErrors: any[] = raw.last_status_error ?? [];
+  const statusHistory: any[] = raw.statuses ?? [];
+  const lastStatus = statusHistory[statusHistory.length - 1];
+
+  // Extract the most useful error description
+  const metaErrCode = metaErrors[0]?.code ?? null;
+  const metaErrMsg = metaErrors[0]?.message ?? metaErrors[0]?.title ?? null;
+  const metaErrDetails = metaErrors[0]?.error_data?.details ?? null;
+  const errorDetail = metaErrMsg || raw.error || raw.response?.error?.message || "Sem detalhes adicionais do servidor";
+
+  // For flow messages: body is stored directly in raw (type, audio/video/image keys, etc.)
+  // For manual sends: raw may have request/response keys
+  const apiPayload = raw.request
+    ? JSON.stringify(raw.request, null, 2)
+    : (raw.type ? JSON.stringify({ type: raw.type, [raw.type]: raw[raw.type] }, null, 2) : "—");
+  const apiResponse = raw.response
+    ? JSON.stringify(raw.response, null, 2)
+    : metaErrors.length > 0
+    ? JSON.stringify(metaErrors, null, 2)
+    : "—";
 
   const handleCopyLog = () => {
     const fullLog = `--- DIAGNÓSTICO DE ERRO DE MENSAGEM WHATSAPP ---
-ID da Mensagem: ${msg.id}
+ID: ${msg.id}
+wa_message_id: ${(msg as any).wa_message_id ?? "N/A"}
 Tipo: ${msg.msg_type}
 Status: ${msg.status}
-Destino: ${msg.to_wa_id || "N/A"}
+Destino: ${(msg as any).to_wa_id || "N/A"}
 Criado em: ${msg.created_at}
-Erro: ${errorDetail}
-Requisição: ${JSON.stringify(raw.request ?? {})}
-Resposta: ${JSON.stringify(raw.response ?? {})}`;
+URL da mídia: ${msg.media_url ?? "N/A"}
+
+ERRO META:
+  Código: ${metaErrCode ?? "N/A"}
+  Mensagem: ${metaErrMsg ?? "N/A"}
+  Detalhes: ${metaErrDetails ?? "N/A"}
+
+Histórico de Status: ${JSON.stringify(statusHistory)}
+Payload enviado: ${apiPayload}
+Resposta da API: ${apiResponse}`;
     navigator.clipboard.writeText(fullLog);
     toast.success("Diagnóstico completo copiado! 📋");
   };
@@ -2872,6 +2899,12 @@ Resposta: ${JSON.stringify(raw.response ?? {})}`;
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 space-y-1">
             <div className="font-bold text-red-300 text-sm">Erro Detectado:</div>
             <div className="text-foreground font-mono leading-relaxed">{toText(errorDetail)}</div>
+            {metaErrDetails && (
+              <div className="text-red-200/80 text-[11px] mt-1">Detalhes: {metaErrDetails}</div>
+            )}
+            {metaErrCode && (
+              <div className="text-muted-foreground text-[10px]">Código Meta: {metaErrCode}</div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -2880,8 +2913,8 @@ Resposta: ${JSON.stringify(raw.response ?? {})}`;
               <span className="font-bold text-foreground uppercase">{msg.msg_type}</span>
             </div>
             <div className="bg-chat-soft p-2.5 rounded-xl border border-chat-line">
-              <span className="text-muted-foreground block text-[10px]">Destino:</span>
-              <span className="font-mono font-bold text-foreground">{toText(msg.to_wa_id)}</span>
+              <span className="text-muted-foreground block text-[10px]">Último Status:</span>
+              <span className="font-mono font-bold text-foreground">{lastStatus?.status ?? msg.status}</span>
             </div>
           </div>
 
@@ -2893,18 +2926,27 @@ Resposta: ${JSON.stringify(raw.response ?? {})}`;
           )}
 
           <div className="space-y-1">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Payload de Requisição:</Label>
+            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Payload Enviado à Meta:</Label>
             <pre className="max-h-32 overflow-y-auto rounded-xl bg-background/80 p-2.5 font-mono text-[10px] text-foreground border border-chat-line scrollbar-fancy">
-              {requestBody}
+              {apiPayload}
             </pre>
           </div>
 
           <div className="space-y-1">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Resposta da API / Proxy:</Label>
+            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Erros da API Meta:</Label>
             <pre className="max-h-32 overflow-y-auto rounded-xl bg-background/80 p-2.5 font-mono text-[10px] text-foreground border border-chat-line scrollbar-fancy">
-              {responseBody}
+              {apiResponse}
             </pre>
           </div>
+
+          {statusHistory.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Histórico de Status (Meta):</Label>
+              <pre className="max-h-24 overflow-y-auto rounded-xl bg-background/80 p-2.5 font-mono text-[10px] text-foreground border border-chat-line scrollbar-fancy">
+                {JSON.stringify(statusHistory, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
