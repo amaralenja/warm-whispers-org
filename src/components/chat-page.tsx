@@ -47,6 +47,8 @@ import {
   Link,
   Copy,
   SendHorizontal,
+  Terminal,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -1552,10 +1554,21 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, unreadForActive]);
 
+  const [showLogConsole, setShowLogConsole] = useState(false);
+  const [inspectingErrorMsg, setInspectingErrorMsg] = useState<Msg | null>(null);
+
   const sendMut = useMutation({
     mutationFn: (vars: SendVars) => sendFn({ data: vars }),
     onMutate: async (vars) => {
       setSendError(null);
+      addSendLog(
+        `📌 Iniciando disparo (${vars.type.toUpperCase()}) para ${vars.to}`,
+        vars.mediaUrl ? `URL: ${vars.mediaUrl}` : vars.text ? `Texto: "${vars.text.slice(0, 60)}..."` : undefined,
+        "info"
+      );
+      if (vars.type === "audio") {
+        addSendLog("🎤 Solicitando conversão no Transloadit (OGG Opus mono 32k)...", undefined, "info");
+      }
       await qc.cancelQueries({ queryKey: ["wa-messages", vars.conversationId] });
       const optimisticId = `optimistic-${Date.now()}`;
       const optimistic: Msg = {
@@ -1613,7 +1626,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       return { optimisticId, conversationId: vars.conversationId };
 
     },
-    onSuccess: (dataRes, _vars, ctx) => {
+    onSuccess: (dataRes, vars, ctx) => {
+      addSendLog(
+        `✅ Mensagem (${vars.type.toUpperCase()}) enviada com sucesso!`,
+        `ID WhatsApp: ${dataRes?.waMsgId ?? "Entregue"}`,
+        "success"
+      );
       if (ctx?.conversationId && ctx.optimisticId) {
         qc.setQueryData(["wa-messages", ctx.conversationId], (old: unknown) =>
           asArray<Msg>(old).map((m) =>
@@ -1624,10 +1642,20 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       qc.invalidateQueries({ queryKey: ["wa-messages", activeId] });
       qc.invalidateQueries({ queryKey: ["wa-conversations"] });
     },
-    onError: (e: any, _vars, ctx) => {
+    onError: (e: any, vars, ctx) => {
       const msg = errorToText(e, "Erro ao enviar");
+      addSendLog(
+        `❌ Falha no envio (${vars.type.toUpperCase()}) para ${vars.to}`,
+        msg,
+        "error"
+      );
       setSendError(msg);
-      toast.error(msg);
+      toast.error(msg, {
+        action: {
+          label: "Ver Logs 🖥️",
+          onClick: () => setShowLogConsole(true),
+        },
+      });
       if (ctx?.conversationId && ctx.optimisticId) {
         qc.setQueryData(["wa-messages", ctx.conversationId], (old: unknown) =>
           asArray<Msg>(old).map((m) =>
@@ -1661,8 +1689,14 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     if (!active) return;
     const type = opts?.type ?? pendingType;
     const caption = opts?.caption ?? "";
+    addSendLog(
+      `📤 Preparando arquivo local: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+      `Tipo detectado: ${file.type || "octet-stream"} | Destino: ${type}`,
+      "info"
+    );
     toast.loading("Enviando mídia…", { id: "wa-media-upload" });
     try {
+      addSendLog("☁️ Enviando bytes para o bucket wa-media (Supabase Storage)...", undefined, "info");
       const uploaded = await uploadMediaFn({ data: {
         channelId: active.channel_id,
         conversationId: active.id,
@@ -1670,6 +1704,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         contentType: file.type || "application/octet-stream",
         base64: await fileToBase64(file),
       }});
+      addSendLog("✅ Upload concluído no Supabase Storage!", `URL gerada: ${uploaded.signedUrl}`, "info");
       sendMut.mutate({
         channelId: active.channel_id,
         conversationId: active.id,
@@ -1680,7 +1715,14 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         caption: caption.trim() || undefined,
       });
     } catch (e: any) {
-      toast.error(errorToText(e, "Upload falhou"));
+      const errText = errorToText(e, "Upload falhou");
+      addSendLog(`❌ Erro durante upload no servidor`, errText, "error");
+      toast.error(errText, {
+        action: {
+          label: "Ver Logs 🖥️",
+          onClick: () => setShowLogConsole(true),
+        },
+      });
     } finally {
       toast.dismiss("wa-media-upload");
     }
@@ -2347,28 +2389,41 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                     })()}
                   </div>
                 </div>
-                <ConversationMetaControls
-                  key={active.id}
-                  conv={active}
-                  onSaveTags={async (tags) => {
-                    try {
-                      await updateTagsFn({ data: { conversationId: active.id, tags } });
-                      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-                      toast.success("Etiquetas atualizadas");
-                    } catch (e) {
-                      toast.error(errorToText(e, "Falha ao salvar etiquetas"));
-                    }
-                  }}
-                  onSaveNotes={async (notes) => {
-                    try {
-                      await updateNotesFn({ data: { conversationId: active.id, notes } });
-                      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
-                      toast.success("Nota salva");
-                    } catch (e) {
-                      toast.error(errorToText(e, "Falha ao salvar nota"));
-                    }
-                  }}
-                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowLogConsole(true)}
+                    className="h-10 gap-1.5 rounded-full border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-bold px-3 shrink-0"
+                    title="Abrir Console de Logs de Envio em Tempo Real"
+                  >
+                    <Terminal className="h-4 w-4 text-amber-400" />
+                    <span className="hidden sm:inline">Logs na Tela</span>
+                  </Button>
+
+                  <ConversationMetaControls
+                    key={active.id}
+                    conv={active}
+                    onSaveTags={async (tags) => {
+                      try {
+                        await updateTagsFn({ data: { conversationId: active.id, tags } });
+                        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+                        toast.success("Etiquetas atualizadas");
+                      } catch (e) {
+                        toast.error(errorToText(e, "Falha ao salvar etiquetas"));
+                      }
+                    }}
+                    onSaveNotes={async (notes) => {
+                      try {
+                        await updateNotesFn({ data: { conversationId: active.id, notes } });
+                        qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+                        toast.success("Nota salva");
+                      } catch (e) {
+                        toast.error(errorToText(e, "Falha ao salvar nota"));
+                      }
+                    }}
+                  />
+                </div>
               </header>
 
               <VendorQuickLinksBar
@@ -2614,6 +2669,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           onClose={() => setProfilePhotoPreview(null)}
         />
       ) : null}
+
+      <LiveSendLogConsoleModal open={showLogConsole} onClose={() => setShowLogConsole(false)} />
+      <MessageErrorLogModal msg={inspectingErrorMsg} onClose={() => setInspectingErrorMsg(null)} />
     </div>
   );
 }
@@ -2622,7 +2680,247 @@ type MediaState = { url?: string; mime?: string; loading?: boolean; error?: stri
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, quotedFrom, onQuotedClick, vendorId }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; quotedFrom?: Msg | null; onQuotedClick?: (m: Msg) => void; vendorId?: string | number | null }) {
+export type SendLogItem = {
+  id: string;
+  timestamp: string;
+  level: "info" | "success" | "error" | "warn";
+  title: string;
+  details?: string;
+};
+
+export const globalSendLogs: SendLogItem[] = [];
+export const logSubscribers = new Set<() => void>();
+
+export function addSendLog(title: string, details?: string, level: "info" | "success" | "error" | "warn" = "info") {
+  const timestamp = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  globalSendLogs.unshift({
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp,
+    level,
+    title,
+    details,
+  });
+  if (globalSendLogs.length > 100) globalSendLogs.pop();
+  logSubscribers.forEach((fn) => fn());
+}
+
+function LiveSendLogConsoleModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [logs, setLogs] = useState<SendLogItem[]>(() => [...globalSendLogs]);
+  const [filter, setFilter] = useState<"all" | "error" | "info">("all");
+
+  useEffect(() => {
+    const update = () => setLogs([...globalSendLogs]);
+    logSubscribers.add(update);
+    return () => { logSubscribers.delete(update); };
+  }, []);
+
+  const filtered = logs.filter((l) => {
+    if (filter === "error") return l.level === "error";
+    if (filter === "info") return l.level === "info" || l.level === "success";
+    return true;
+  });
+
+  const handleCopy = () => {
+    const text = logs.map((l) => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.title} ${l.details ? `\n  Detalhes: ${l.details}` : ""}`).join("\n");
+    navigator.clipboard.writeText(text);
+    toast.success("Todos os logs foram copiados! 📋");
+  };
+
+  const handleClear = () => {
+    globalSendLogs.length = 0;
+    setLogs([]);
+    toast.success("Logs limpos");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl border-chat-line bg-chat-panel text-foreground">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between text-base font-bold text-amber-400">
+            <div className="flex items-center gap-2">
+              <Terminal className="h-5 w-5" />
+              Console de Logs de Envio em Tempo Real
+            </div>
+            <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs">
+              {logs.length} eventos
+            </Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-1">
+          <div className="flex items-center justify-between gap-2 border-b border-chat-line pb-2">
+            <div className="flex items-center gap-1.5 text-xs">
+              <Button
+                variant={filter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilter("all")}
+                className="h-7 px-2.5 text-xs rounded-lg"
+              >
+                Todos ({logs.length})
+              </Button>
+              <Button
+                variant={filter === "error" ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => setFilter("error")}
+                className="h-7 px-2.5 text-xs rounded-lg gap-1"
+              >
+                <AlertTriangle className="h-3 w-3" /> Erros ({logs.filter((l) => l.level === "error").length})
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="sm" onClick={handleCopy} className="h-7 px-2.5 text-xs rounded-lg gap-1">
+                <Copy className="h-3.5 w-3.5" /> Copiar
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleClear} className="h-7 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground">
+                Limpar
+              </Button>
+            </div>
+          </div>
+
+          <div className="max-h-[400px] overflow-y-auto rounded-xl bg-black/50 p-3 font-mono text-xs space-y-2 border border-chat-line scrollbar-fancy">
+            {filtered.length === 0 ? (
+              <div className="text-muted-foreground text-center py-8 italic">
+                Nenhum evento registrado no console ainda. Faça um disparo de texto, imagem ou áudio para ver o fluxo em tempo real!
+              </div>
+            ) : (
+              filtered.map((l) => (
+                <div
+                  key={l.id}
+                  className={`p-2.5 rounded-lg border text-xs leading-relaxed ${
+                    l.level === "error"
+                      ? "border-red-500/40 bg-red-500/10 text-red-300"
+                      : l.level === "success"
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                      : "border-chat-line bg-chat-soft text-foreground/90"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <span className="opacity-60 text-[10px]">[{l.timestamp}]</span>
+                      {l.title}
+                    </span>
+                    <span className="uppercase text-[9px] px-1.5 py-0.2 rounded font-mono border opacity-80">
+                      {l.level}
+                    </span>
+                  </div>
+                  {l.details && (
+                    <div className="mt-1 text-[11px] opacity-90 break-all bg-background/40 p-1.5 rounded border border-white/5 font-mono whitespace-pre-wrap">
+                      {l.details}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button onClick={onClose} size="sm" className="bg-chat-soft text-foreground hover:bg-chat-line">
+            Fechar Console
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MessageErrorLogModal({
+  msg,
+  onClose,
+}: {
+  msg: Msg | null;
+  onClose: () => void;
+}) {
+  if (!msg) return null;
+  const raw: any = msg.raw ?? {};
+  const errorDetail = raw.error || raw.response?.error?.message || raw.response?.message || "Sem detalhes adicionais do servidor";
+  const requestBody = raw.request ? JSON.stringify(raw.request, null, 2) : "—";
+  const responseBody = raw.response ? JSON.stringify(raw.response, null, 2) : "—";
+
+  const handleCopyLog = () => {
+    const fullLog = `--- DIAGNÓSTICO DE ERRO DE MENSAGEM WHATSAPP ---
+ID da Mensagem: ${msg.id}
+Tipo: ${msg.msg_type}
+Status: ${msg.status}
+Destino: ${msg.to_wa_id || "N/A"}
+Criado em: ${msg.created_at}
+Erro: ${errorDetail}
+Requisição: ${JSON.stringify(raw.request ?? {})}
+Resposta: ${JSON.stringify(raw.response ?? {})}`;
+    navigator.clipboard.writeText(fullLog);
+    toast.success("Diagnóstico completo copiado! 📋");
+  };
+
+  return (
+    <Dialog open={!!msg} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl border-red-500/40 bg-chat-panel text-foreground">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-bold text-red-400">
+            <AlertTriangle className="h-5 w-5" />
+            Log Técnico da Falha de Envio
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2 text-xs">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 space-y-1">
+            <div className="font-bold text-red-300 text-sm">Erro Detectado:</div>
+            <div className="text-foreground font-mono leading-relaxed">{toText(errorDetail)}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="bg-chat-soft p-2.5 rounded-xl border border-chat-line">
+              <span className="text-muted-foreground block text-[10px]">Tipo de Mídia:</span>
+              <span className="font-bold text-foreground uppercase">{msg.msg_type}</span>
+            </div>
+            <div className="bg-chat-soft p-2.5 rounded-xl border border-chat-line">
+              <span className="text-muted-foreground block text-[10px]">Destino:</span>
+              <span className="font-mono font-bold text-foreground">{toText(msg.to_wa_id)}</span>
+            </div>
+          </div>
+
+          {msg.media_url && (
+            <div className="bg-chat-soft p-2.5 rounded-xl border border-chat-line">
+              <span className="text-muted-foreground block text-[10px]">URL do Arquivo:</span>
+              <span className="font-mono text-foreground break-all text-[10px]">{msg.media_url}</span>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Payload de Requisição:</Label>
+            <pre className="max-h-32 overflow-y-auto rounded-xl bg-background/80 p-2.5 font-mono text-[10px] text-foreground border border-chat-line scrollbar-fancy">
+              {requestBody}
+            </pre>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Resposta da API / Proxy:</Label>
+            <pre className="max-h-32 overflow-y-auto rounded-xl bg-background/80 p-2.5 font-mono text-[10px] text-foreground border border-chat-line scrollbar-fancy">
+              {responseBody}
+            </pre>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" size="sm" onClick={handleCopyLog} className="gap-1.5">
+            <Copy className="h-3.5 w-3.5" /> Copiar Diagnóstico Completo
+          </Button>
+          <Button size="sm" onClick={onClose} className="bg-chat-soft text-foreground hover:bg-chat-line">
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, onReact, onEdit, onInspectError, quotedFrom, onQuotedClick, vendorId }: { msg: Msg; mediaState?: MediaState; onLoadMedia: () => void; onMediaSettled?: () => void; onReply?: (m: Msg) => void; onReact?: (m: Msg, emoji: string) => void; onEdit?: (m: Msg) => void; onInspectError?: (m: Msg) => void; quotedFrom?: Msg | null; onQuotedClick?: (m: Msg) => void; vendorId?: string | number | null }) {
   const isOut = msg.direction === "out";
   const isInteractive = msg.msg_type === "interactive" || msg.msg_type === "button";
   const body = isInteractive ? "" : toText(msg.text_body);
@@ -2677,6 +2975,11 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
         {onReply && (
           <DropdownMenuItem onClick={() => onReply(msg)}>
             <Reply className="mr-2 h-4 w-4 text-chat-accent" /> Responder
+          </DropdownMenuItem>
+        )}
+        {canEdit && onEdit && (
+          <DropdownMenuItem onClick={() => onEdit(msg)}>
+            <Pencil className="mr-2 h-4 w-4 text-chat-accent" /> Editar mensagem
           </DropdownMenuItem>
         )}
         {onReply && (
@@ -2741,8 +3044,18 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
             <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] font-medium tabular-nums ${isOut ? "opacity-75" : "text-muted-foreground"}`}>
               {editedAt && <span className="italic opacity-70">editada</span>}
               <span>{formatTime(msg.created_at)}</span>
-              {isOut && <StatusTick status={msg.status} />}
+              {isOut && <StatusTick status={msg.status} onClickFailed={() => onInspectError?.(msg)} />}
             </div>
+            {isOut && (msg.status === "failed" || msg.status === "error") && (
+              <button
+                type="button"
+                onClick={() => onInspectError?.(msg)}
+                className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-red-500/20 px-2.5 py-1 text-[11px] font-bold text-red-300 border border-red-500/40 hover:bg-red-500/30 transition-colors w-full justify-center"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                <span>Ver Log de Diagnóstico</span>
+              </button>
+            )}
           </div>
           {(myReaction || theirReaction) && (
             <div className={`absolute -bottom-3 ${isOut ? "right-3" : "left-3"} flex gap-1`}>

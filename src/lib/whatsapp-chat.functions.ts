@@ -1241,18 +1241,14 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
         const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
         voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
       } catch (audioErr: any) {
-        console.warn("[sendWhatsappMessage] Converter áudio falhou/timeout, utilizando URL direto:", audioErr?.message);
+        console.error("[sendWhatsappMessage] Transloadit audio conversion failed:", audioErr?.message);
+        throw new Error(`Falha no Transloadit: ${audioErr?.message || "Erro na conversão de áudio"}`);
       }
 
-      if (voiceUrl) {
-        body.audio = { link: voiceUrl, voice: true };
-      } else {
-        const info = getAudioFileInfo(data.mediaUrl, data.filename);
-        body.audio = {
-          link: data.mediaUrl,
-          ...(info.isOggOpus ? { voice: true } : {}),
-        };
+      if (!voiceUrl) {
+        throw new Error("Transloadit não retornou a URL do áudio convertido (OGG Opus).");
       }
+      body.audio = { link: voiceUrl, voice: true };
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
       let mediaUrl = data.mediaUrl;
