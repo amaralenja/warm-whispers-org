@@ -35,6 +35,7 @@ import {
   Percent,
   Mic,
   HeartHandshake,
+  Rocket,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { saveVendorSession } from "@/lib/vendor-session";
