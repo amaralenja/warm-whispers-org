@@ -26,7 +26,7 @@ import {
 import {
   getPv24hConfig, savePv24hToken, listPv24hAdAccounts, selectPv24hAdAccount,
   listPv24hCampaigns, listPv24hAdSets, listPv24hAds, getPv24hAccountSummary,
-  togglePv24hStatus, listPv24hSales,
+  togglePv24hStatus, listPv24hSales, clearTestPv24hSales,
   type Pv24hCampaign, type Pv24hAdSet, type Pv24hAd, type Pv24hInsights, type Pv24hSale
 } from "@/lib/pv24h.functions";
 import { getVendorSession } from "@/lib/vendor-session";
@@ -153,8 +153,16 @@ function PV24HAnalyticsPage() {
   const listAdSetsFn = useServerFn(listPv24hAdSets);
   const listAdsFn = useServerFn(listPv24hAds);
   const getSummary = useServerFn(getPv24hAccountSummary);
-  const toggleStatus = useServerFn(togglePv24hStatus);
   const listSalesFn = useServerFn(listPv24hSales);
+  const clearTestFn = useServerFn(clearTestPv24hSales);
+
+  const clearTestMut = useMutation({
+    mutationFn: () => clearTestFn({}),
+    onSuccess: () => {
+      toast.success("Eventos de teste removidos do banco de dados!");
+      salesQ.refetch();
+    },
+  });
 
   const [tokenInput, setTokenInput] = useState("");
   const [preset, setPreset] = useState<Preset>("last_7d");
@@ -719,6 +727,18 @@ function PV24HAnalyticsPage() {
                   <SelectItem value="refused">Recusados/Cancelados</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 text-rose-400 hover:text-rose-300 border-rose-500/30 hover:bg-rose-500/10"
+                onClick={() => clearTestMut.mutate()}
+                disabled={clearTestMut.isPending}
+                title="Limpar todos os registros de teste (john.doe@example.com)"
+              >
+                {clearTestMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                Limpar Testes
+              </Button>
 
               <Button
                 variant="outline"

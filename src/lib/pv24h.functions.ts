@@ -379,6 +379,14 @@ export const listPv24hSales = createServerFn({ method: "POST" })
       const payment_method = d.paymentMethodName || d.paymentMethod || null;
       const refund_reason = d.refund_reason || d.reason || null;
 
+      const isTest =
+        String(cliente_email || "").toLowerCase().includes("john.doe") ||
+        String(cliente_nome || "").toLowerCase().includes("john doe") ||
+        String(cliente_email || "").toLowerCase().includes("teste@teste") ||
+        String(produto_nome || "").toLowerCase().includes("produto teste");
+
+      if (isTest) return null;
+
       return {
         id: s.id,
         transaction_id,
@@ -412,9 +420,11 @@ export const listPv24hSales = createServerFn({ method: "POST" })
       if (!error && Array.isArray(pvSales)) {
         for (const s of pvSales as any[]) {
           const item = parsePayload(s);
-          salesList.push(item);
-          seenIds.add(item.id);
-          if (item.transaction_id) seenIds.add(item.transaction_id);
+          if (item) {
+            salesList.push(item);
+            seenIds.add(item.id);
+            if (item.transaction_id) seenIds.add(item.transaction_id);
+          }
         }
       }
     } catch (err) {
@@ -449,7 +459,7 @@ export const listPv24hSales = createServerFn({ method: "POST" })
                 payload: r.cakto_payload || r,
                 created_at: q.received_at,
               });
-              salesList.push(item);
+              if (item) salesList.push(item);
             }
           }
         }
@@ -460,5 +470,25 @@ export const listPv24hSales = createServerFn({ method: "POST" })
 
     salesList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return salesList;
+  });
+
+export const clearTestPv24hSales = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    try {
+      // Deleta das tabelas do Supabase via context (bypassing RLS ou com service role)
+      await (context.supabase.from("pv24h_vendas" as any) as any)
+        .delete()
+        .or("cliente_email.ilike.%john.doe%,cliente_email.ilike.%teste@teste%,cliente_nome.ilike.%john doe%");
+
+      await (context.supabase.from("ht_quiz_submissions" as any) as any)
+        .delete()
+        .or("email.ilike.%john.doe%,email.ilike.%teste@teste%,nome.ilike.%john doe%");
+
+      return { ok: true };
+    } catch (err: any) {
+      console.error("[clearTestPv24hSales] Erro ao limpar vendas de teste:", err);
+      return { ok: false, error: err?.message };
+    }
   });
 
