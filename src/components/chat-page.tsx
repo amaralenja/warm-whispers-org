@@ -24,6 +24,7 @@ import {
   MoreVertical,
   UserCog,
   User,
+  UserCheck,
   Reply,
   X,
   Tag,
@@ -108,6 +109,7 @@ import {
   setConversationArchived,
   getActiveBuyers,
   searchChatMessages,
+  checkDuplicateLeadVendor,
 } from "@/lib/whatsapp-chat.functions";
 import {
   ContextMenu,
@@ -1305,6 +1307,19 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     staleTime: 15_000,
   });
 
+  const checkDuplicateLeadVendorFn = useServerFn(checkDuplicateLeadVendor);
+  const { data: duplicateLeadInfo } = useQuery({
+    queryKey: ["check-duplicate-lead-vendor", active?.id, active?.contact_wa_id],
+    queryFn: async () => {
+      if (!active?.id || !active?.contact_wa_id) return null;
+      return checkDuplicateLeadVendorFn({
+        data: { conversationId: String(active.id), contactWaId: String(active.contact_wa_id) },
+      });
+    },
+    enabled: Boolean(active?.id && active?.contact_wa_id),
+    staleTime: 30_000,
+  });
+
   const msgMatchesByConvId = useMemo(() => {
     const map = new Map<string, { snippet: string; message_id: string; direction: string }>();
     for (const res of (messageSearchResults as any[])) {
@@ -2356,6 +2371,29 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               <WindowCountdown lastInboundAt={
                 [...messageList].reverse().find((m) => m.direction === "in")?.created_at ?? null
               } />
+
+              {duplicateLeadInfo?.hasOtherVendor && duplicateLeadInfo.primaryOther && (
+                <div className="mx-3 mt-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 rounded-2xl border border-amber-500/50 bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-amber-500/5 p-4 text-amber-100 shadow-md animate-in fade-in slide-in-from-top-2 duration-300 md:mx-6">
+                  <div className="flex items-start md:items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/25 text-amber-400 border border-amber-500/40 shadow-inner">
+                      <UserCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300 border border-amber-500/40">
+                          ⚠️ Lead Atendido por Outro Vendedor
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm font-semibold text-amber-100 leading-snug">
+                        Atenção: este lead já foi atendido por <strong className="text-white font-bold underline decoration-amber-400">{duplicateLeadInfo.primaryOther.vendorName}</strong> no canal <strong className="text-white font-semibold">{duplicateLeadInfo.primaryOther.channelName}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-xs font-semibold text-amber-300/90 bg-amber-500/20 px-3 py-1.5 rounded-xl border border-amber-500/30">
+                    Último atendimento: {formatDateLabel(duplicateLeadInfo.primaryOther.lastMessageAt)}
+                  </div>
+                </div>
+              )}
 
 
 

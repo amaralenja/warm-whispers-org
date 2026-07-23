@@ -1707,6 +1707,81 @@ export const searchChatMessages = createServerFn({ method: "POST" })
     return { ok: true, results: Array.from(resultsMap.values()) };
   });
 
+export const checkDuplicateLeadVendor = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string; contactWaId: string }) => ({
+    conversationId: String(d?.conversationId ?? ""),
+    contactWaId: String(d?.contactWaId ?? "").trim(),
+  }))
+  .handler(async ({ context, data }) => {
+    const { conversationId, contactWaId } = data;
+    if (!contactWaId) return { hasOtherVendor: false, otherConvs: [] };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const digits = contactWaId.replace(/\D+/g, "");
+    if (!digits || digits.length < 8) return { hasOtherVendor: false, otherConvs: [] };
+
+    const last8 = digits.slice(-8);
+
+    // 1. Busca todas as conversas do sistema com o mesmo número (diferentes da conversa atual)
+    const { data: convs, error } = await supabaseAdmin
+      .from("wa_conversations" as any)
+      .select("id, channel_id, assigned_vendor_id, contact_name, last_message_at, created_at")
+      .neq("id", conversationId)
+      .or(`contact_wa_id.ilike.%${last8}%,contact_wa_id.ilike.%${digits}%`)
+      .order("last_message_at", { ascending: false });
+
+    if (error || !Array.isArray(convs) || convs.length === 0) {
+      return { hasOtherVendor: false, otherConvs: [] };
+    }
+
+    // 2. Busca lista de vendedores para mapear id -> nome
+    const { data: vendors } = await supabaseAdmin
+      .from("vendedores" as any)
+      .select("id, nome");
+
+    const vendorMap = new Map<number, string>();
+    for (const v of (vendors ?? []) as any[]) {
+      if (v?.id) vendorMap.set(Number(v.id), String(v.nome ?? `Vendedor ${v.id}`));
+    }
+
+    // 3. Mapeia canais para nome do canal
+    const { data: channels } = await supabaseAdmin
+      .from("wa_channels" as any)
+      .select("id, name, display_phone_number");
+
+    const channelMap = new Map<string, string>();
+    for (const ch of (channels ?? []) as any[]) {
+      if (ch?.id) channelMap.set(String(ch.id), String(ch.name || ch.display_phone_number || "WhatsApp"));
+    }
+
+    const currentVendorId = (context as any)?.vendor ? Number((context as any).vendor.id) : null;
+
+    const otherConvs = convs
+      .filter((c: any) => c.assigned_vendor_id != null)
+      .map((c: any) => {
+        const vId = Number(c.assigned_vendor_id);
+        const vName = vendorMap.get(vId) || `Vendedor ${vId}`;
+        const cName = channelMap.get(String(c.channel_id)) || "WhatsApp";
+        return {
+          id: String(c.id),
+          vendorId: vId,
+          vendorName: vName,
+          channelName: cName,
+          lastMessageAt: c.last_message_at || c.created_at,
+          isDifferentVendor: currentVendorId != null ? vId !== currentVendorId : true,
+        };
+      });
+
+    const differentVendors = otherConvs.filter((o) => o.isDifferentVendor);
+
+    return {
+      hasOtherVendor: differentVendors.length > 0,
+      otherConvs,
+      primaryOther: differentVendors[0] ?? otherConvs[0] ?? null,
+    };
+  });
+
 
 
 
