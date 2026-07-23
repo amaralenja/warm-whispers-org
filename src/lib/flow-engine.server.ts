@@ -93,7 +93,8 @@ function jsonArray<T = any>(value: unknown): T[] {
 
 function shouldNormalizeWhatsappImage(url: string): boolean {
   const clean = String(url ?? "").split("?")[0].toLowerCase();
-  return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif");
+  if (!clean) return false;
+  return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif") || clean.endsWith(".svg") || clean.endsWith(".gif") || !/\.(jpg|jpeg)$/i.test(clean);
 }
 
 function shouldNormalizeWhatsappVideo(url: string): boolean {
@@ -253,6 +254,67 @@ export async function sendWA(channelId: string, to: string, body: any, db: any) 
   }
   void workingToken;
   return { waMsgId: attempt.json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
+}
+
+async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl: string, mimeType: string, filename = "file"): Promise<string> {
+  const fetchRes = await fetchWithTimeout(mediaUrl, {}, 35_000);
+  if (!fetchRes.ok) throw new Error(`Falha ao baixar mídia para upload direto no Meta (HTTP ${fetchRes.status})`);
+  const arrayBuffer = await fetchRes.arrayBuffer();
+  const blob = new Blob([arrayBuffer], { type: mimeType });
+
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("file", blob, filename);
+  form.append("type", mimeType);
+
+  const res = await fetchWithTimeout(`${EVOHUB_BASE}/meta/${phoneNumberId}/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  }, 45_000);
+
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+
+  if (!res.ok || !json?.id) {
+    const errText = json?.error?.message || json?.message || text || `HTTP ${res.status}`;
+    throw new Error(`Upload de mídia no Meta falhou: ${errText}`);
+  }
+
+  return String(json.id);
+}
+
+async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaType: string): Promise<string> {
+  try {
+    if (!sourceUrl || typeof sourceUrl !== "string") return sourceUrl;
+    if (sourceUrl.includes("/storage/v1/object/public/wa-media/")) return sourceUrl;
+
+    const res = await fetchWithTimeout(sourceUrl, {}, 25_000);
+    if (!res.ok) return sourceUrl;
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    let ext = mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : mediaType === "audio" ? "ogg" : "bin";
+    let contentType = mediaType === "image" ? "image/jpeg" : mediaType === "video" ? "video/mp4" : mediaType === "audio" ? "audio/ogg" : "application/octet-stream";
+
+    const path = `flow-media/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadErr } = await db.storage.from("wa-media").upload(path, buffer, {
+      contentType,
+      upsert: true,
+    });
+
+    if (uploadErr) {
+      console.warn("[flow-engine] Upload no bucket wa-media falhou:", uploadErr.message);
+      return sourceUrl;
+    }
+
+    const { data: publicData } = db.storage.from("wa-media").getPublicUrl(path);
+    return publicData?.publicUrl || sourceUrl;
+  } catch (e: any) {
+    console.warn("[flow-engine] mirrorMediaToSupabaseStorage exceção:", e?.message || e);
+    return sourceUrl;
+  }
 }
 
 // Monotonic counter so consecutive flow inserts always have strictly increasing created_at,
@@ -631,90 +693,109 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
     case "send_video":
     case "send_audio":
     case "send_document": {
-      const url = String(node.data?.mediaUrl ?? "");
+      const url = String(node.data?.mediaUrl ?? "").trim();
       if (!url) throw new Error("URL de mídia ausente");
       const mediaType = node.type.replace("send_", "");
       const caption = node.data?.caption ? interpolate(String(node.data.caption), ctx) : undefined;
       const filename = node.data?.filename || undefined;
 
       let finalUrl = url;
-      const inner: any = {};
+
+      // 1) Conversão prévia de formato (áudio OGG, imagem JPG, vídeo MP4)
       if (mediaType === "audio") {
         const isAlreadyOgg = /\.(ogg|opus)($|\?)/i.test(url);
-        if (isAlreadyOgg) {
-          finalUrl = url;
-        } else {
+        if (!isAlreadyOgg) {
           try {
             const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
-            let converted = "";
-            for (let i = 0; i < 2; i++) {
-              try {
-                converted = await convertAudioToWhatsappVoice(url);
-                if (converted) break;
-              } catch (e) {
-                console.warn(`[flow-engine] audio conversion attempt ${i + 1} failed:`, e);
-                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
-              }
-            }
+            const converted = await convertAudioToWhatsappVoice(url);
             if (converted) finalUrl = converted;
           } catch (e) {
-            console.warn("[flow-engine] audio conversion failed, falling back to original URL:", e);
+            console.warn("[flow-engine] conversão de áudio falhou:", e);
           }
         }
-        inner.link = finalUrl;
-        inner.voice = true;
       } else {
         if (mediaType === "image" && shouldNormalizeWhatsappImage(finalUrl)) {
           try {
             const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
-            let converted = "";
-            for (let i = 0; i < 2; i++) {
-              try {
-                converted = await convertImageToWhatsappJpeg(finalUrl);
-                if (converted) break;
-              } catch (e) {
-                console.warn(`[flow-engine] image conversion attempt ${i + 1} failed:`, e);
-                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
-              }
-            }
+            const converted = await convertImageToWhatsappJpeg(finalUrl);
             if (converted) finalUrl = converted;
           } catch (e) {
-            console.warn("[flow-engine] image conversion failed, falling back to original URL:", e);
+            console.warn("[flow-engine] conversão de imagem falhou:", e);
           }
         }
         if (mediaType === "video" && shouldNormalizeWhatsappVideo(finalUrl)) {
           try {
             const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
-            let converted = "";
-            for (let i = 0; i < 2; i++) {
-              try {
-                converted = await convertVideoToWhatsappMp4(finalUrl);
-                if (converted) break;
-              } catch (e) {
-                console.warn(`[flow-engine] video conversion attempt ${i + 1} failed:`, e);
-                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
-              }
-            }
+            const converted = await convertVideoToWhatsappMp4(finalUrl);
             if (converted) finalUrl = converted;
           } catch (e) {
-            console.warn("[flow-engine] video conversion failed, falling back to original URL:", e);
+            console.warn("[flow-engine] conversão de vídeo falhou:", e);
           }
         }
-        inner.link = finalUrl;
-        if (mediaType !== "sticker" && caption) inner.caption = caption;
-        if (mediaType === "document" && filename) inner.filename = filename;
       }
+
+      // 2) TENTATIVA 1 & ESPELHAMENTO: Garantir que a URL esteja no nosso bucket público `wa-media`
+      // Isso impede falhas quando o host original tem Cloudflare/403/Redirects/Timeouts para o robô da Meta.
+      let mirroredUrl = finalUrl;
+      try {
+        mirroredUrl = await mirrorMediaToSupabaseStorage(ctx.db, finalUrl, mediaType);
+      } catch (e) {
+        console.warn("[flow-engine] mirrorMediaToSupabaseStorage falhou:", e);
+      }
+
+      const inner: any = { link: mirroredUrl };
+      if (mediaType === "audio") inner.voice = true;
+      if (mediaType !== "sticker" && caption) inner.caption = caption;
+      if (mediaType === "document" && filename) inner.filename = filename;
+
       const initialQuotedId = popInitialQuotedMessageId(ctx);
-      const body: any = {
+      let body: any = {
         type: mediaType,
         [mediaType]: inner,
         ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
       };
+
       if (await shouldStopFlowRun(ctx)) return {};
-      const { waMsgId, phoneNumberId, toNormalized } = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+
+      let sendResult: { waMsgId: string | null; phoneNumberId: string; toNormalized: string };
+
+      try {
+        // Envia com a URL espelhada/otimizada
+        sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+      } catch (firstSendErr: any) {
+        console.warn(`[flow-engine] Envio de ${mediaType} por URL falhou (${firstSendErr?.message}). Executando FALLBACK: Upload Direto do Binário no Meta (media_id)...`);
+
+        // 3) TENTATIVA 2 (FALLBACK): Upload direto do binário para a API de Mídia da Meta (retorna media_id)
+        try {
+          const { token, phoneNumberId } = await fetchChannelToken(ctx.channelId, ctx.db);
+          const mime = mediaType === "image" ? "image/jpeg" : mediaType === "video" ? "video/mp4" : mediaType === "audio" ? "audio/ogg" : "application/pdf";
+          const safeFilename = filename || `arquivo.${mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : mediaType === "audio" ? "ogg" : "pdf"}`;
+
+          const mediaId = await uploadMediaToMeta(token, phoneNumberId, mirroredUrl, mime, safeFilename);
+
+          const mediaIdInner: any = { id: mediaId };
+          if (mediaType === "audio") mediaIdInner.voice = true;
+          if (mediaType !== "sticker" && caption) mediaIdInner.caption = caption;
+          if (mediaType === "document" && filename) mediaIdInner.filename = filename;
+
+          body = {
+            type: mediaType,
+            [mediaType]: mediaIdInner,
+            ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
+          };
+
+          sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+          console.log(`[flow-engine] SUCESSO no envio de ${mediaType} usando media_id (${mediaId})!`);
+        } catch (secondSendErr: any) {
+          console.error(`[flow-engine] Fallback de mídia via media_id também falhou:`, secondSendErr);
+          throw firstSendErr;
+        }
+      }
+
+      const { waMsgId, phoneNumberId, toNormalized } = sendResult;
       await persistOutMessage(ctx, mediaType, body, waMsgId, phoneNumberId, toNormalized, initialQuotedId);
       if (await shouldStopFlowRun(ctx)) return {};
-      return { log: { url: finalUrl, originalUrl: finalUrl === url ? undefined : url } };
+      return { log: { url: mirroredUrl, originalUrl: url } };
     }
 
 
