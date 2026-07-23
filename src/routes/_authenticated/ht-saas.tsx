@@ -505,10 +505,11 @@ function SaasProjectsPage() {
               </div>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-                {projects.map((p) => (
+                {projects.map((p, idx) => (
                   <SaasProjectCardItem
                     key={p.id}
                     project={p}
+                    index={idx}
                     onEdit={(proj) => {
                       setEditingProject(proj);
                       setProjectModalOpen(true);
@@ -631,10 +632,11 @@ function SaasProjectsPage() {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-              {filteredProjects.map((p) => (
+              {filteredProjects.map((p, idx) => (
                 <SaasProjectCardItem
                   key={p.id}
                   project={p}
+                  index={idx}
                   onEdit={(proj) => {
                     setEditingProject(proj);
                     setProjectModalOpen(true);
@@ -856,14 +858,73 @@ function SaasProjectsPage() {
   );
 }
 
-// COMPONENTE DE CARD SAAS PROJECT
+function getSaasCardTheme(name: string, index: number) {
+  const THEMES = [
+    {
+      border: "border-sky-500/70 hover:border-sky-400 shadow-[0_0_25px_-4px_rgba(56,189,248,0.25)]",
+      cardBg: "from-sky-950/40 via-card/90 to-card/70",
+      avatarBg: "bg-sky-500/20 text-sky-300 border-sky-500/40",
+      progressGradient: "from-sky-500 via-cyan-400 to-blue-500 shadow-[0_0_12px_rgba(56,189,248,0.5)]",
+      saasBtn: "bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-sky-500/30",
+      notesHeader: "text-sky-400",
+      accentText: "text-sky-300",
+    },
+    {
+      border: "border-rose-500/70 hover:border-rose-400 shadow-[0_0_25px_-4px_rgba(244,63,94,0.25)]",
+      cardBg: "from-rose-950/40 via-card/90 to-card/70",
+      avatarBg: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+      progressGradient: "from-rose-500 via-pink-400 to-red-500 shadow-[0_0_12px_rgba(244,63,94,0.5)]",
+      saasBtn: "bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 text-white shadow-rose-500/30",
+      notesHeader: "text-rose-400",
+      accentText: "text-rose-300",
+    },
+    {
+      border: "border-purple-500/70 hover:border-purple-400 shadow-[0_0_25px_-4px_rgba(168,85,247,0.25)]",
+      cardBg: "from-purple-950/40 via-card/90 to-card/70",
+      avatarBg: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+      progressGradient: "from-purple-500 via-violet-400 to-indigo-500 shadow-[0_0_12px_rgba(168,85,247,0.5)]",
+      saasBtn: "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white shadow-purple-500/30",
+      notesHeader: "text-purple-400",
+      accentText: "text-purple-300",
+    },
+    {
+      border: "border-emerald-500/70 hover:border-emerald-400 shadow-[0_0_25px_-4px_rgba(16,185,129,0.25)]",
+      cardBg: "from-emerald-950/40 via-card/90 to-card/70",
+      avatarBg: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+      progressGradient: "from-emerald-500 via-teal-400 to-green-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]",
+      saasBtn: "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/30",
+      notesHeader: "text-emerald-400",
+      accentText: "text-emerald-300",
+    },
+    {
+      border: "border-amber-500/70 hover:border-amber-400 shadow-[0_0_25px_-4px_rgba(245,158,11,0.25)]",
+      cardBg: "from-amber-950/40 via-card/90 to-card/70",
+      avatarBg: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+      progressGradient: "from-amber-500 via-yellow-400 to-orange-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]",
+      saasBtn: "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white shadow-amber-500/30",
+      notesHeader: "text-amber-400",
+      accentText: "text-amber-300",
+    },
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const themeIndex = Math.abs(hash + index) % THEMES.length;
+  return THEMES[themeIndex];
+}
+
+// COMPONENTE DE CARD SAAS PROJECT COM DESIGN ÚNICO E DINÂMICO
 function SaasProjectCardItem({
   project: p,
+  index = 0,
   onEdit,
   onDelete,
   onOpenNotes,
 }: {
   project: SaasProject;
+  index?: number;
   onEdit: (p: SaasProject) => void;
   onDelete: (id: string, nome: string) => void;
   onOpenNotes: (p: SaasProject) => void;
@@ -871,23 +932,39 @@ function SaasProjectCardItem({
   const cfg = FASE_CONFIG[p.fase] || FASE_CONFIG.planejamento;
   const FaseIcon = cfg.icon;
   const notes = loadLocalSaasNotes(p.id);
+  const theme = getSaasCardTheme(p.nome, index);
+
+  const initials = p.nome
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "SA";
 
   return (
     <Card
-      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b ${cfg.cardBg} backdrop-blur transition-all duration-300 hover:border-accent hover:shadow-2xl`}
+      className={`relative flex flex-col justify-between overflow-hidden rounded-3xl border ${theme.border} bg-gradient-to-b ${theme.cardBg} backdrop-blur transition-all duration-300 hover:scale-[1.01] hover:shadow-2xl`}
     >
       <div>
         {/* CARD HEADER */}
-        <div className="p-6 pb-4">
+        <div className="p-6 pb-4 space-y-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <Badge variant="outline" className={`px-3 py-1 text-[10px] uppercase tracking-wider ${cfg.badge} flex items-center gap-1.5 w-fit`}>
-                <FaseIcon className="h-3.5 w-3.5" />
-                {cfg.label}
-              </Badge>
-              <h2 className="text-2xl font-black tracking-tight mt-2.5 text-foreground">
-                {p.nome}
-              </h2>
+            <div className="flex items-center gap-3">
+              {/* AVATAR COM INICIAIS E COR DO SAAS */}
+              <div className={`h-11 w-11 rounded-2xl ${theme.avatarBg} border flex items-center justify-center shrink-0 font-extrabold text-sm shadow-md`}>
+                {initials}
+              </div>
+
+              <div>
+                <Badge variant="outline" className={`px-2.5 py-0.5 text-[9px] uppercase tracking-wider ${cfg.badge} flex items-center gap-1 w-fit`}>
+                  <FaseIcon className="h-3 w-3" />
+                  {cfg.label}
+                </Badge>
+                <h2 className="text-xl font-black tracking-tight mt-1 text-foreground">
+                  {p.nome}
+                </h2>
+              </div>
             </div>
 
             <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/50 shadow-sm">
@@ -913,14 +990,14 @@ function SaasProjectCardItem({
           </div>
 
           {/* PROGRESS BAR */}
-          <div className="mt-4 space-y-1.5">
+          <div className="space-y-1.5 bg-background/40 p-3 rounded-2xl border border-border/40">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[11px] font-semibold text-muted-foreground">Progresso da Construção</span>
-              <span className="font-mono font-bold text-accent text-sm">{p.progressoPct ?? 0}%</span>
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Progresso da Construção</span>
+              <span className={`font-mono font-black text-sm ${theme.accentText}`}>{p.progressoPct ?? 0}%</span>
             </div>
             <div className="h-3 w-full bg-border/40 rounded-full overflow-hidden p-0.5">
               <div
-                className="h-full bg-gradient-to-r from-accent via-blue-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]"
+                className={`h-full bg-gradient-to-r ${theme.progressGradient} rounded-full transition-all duration-500`}
                 style={{ width: `${Math.min(100, Math.max(0, p.progressoPct ?? 0))}%` }}
               />
             </div>
@@ -928,9 +1005,9 @@ function SaasProjectCardItem({
 
           {/* DESCRIPTION */}
           {p.descricao && (
-            <div className="mt-3 bg-background/50 p-3 rounded-xl border border-border/40">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-0.5">Visão Geral / Status:</div>
-              <p className="text-xs text-foreground/90 leading-relaxed font-medium">
+            <div className="bg-background/60 p-3.5 rounded-2xl border border-border/40">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Visão Geral / Status:</div>
+              <p className="text-xs text-foreground/95 leading-relaxed font-medium">
                 {p.descricao}
               </p>
             </div>
@@ -938,10 +1015,10 @@ function SaasProjectCardItem({
         </div>
 
         {/* INFO STRIP (DEV & GRUPO) */}
-        <div className="px-6 py-3 bg-muted/30 border-y border-border/40 grid grid-cols-2 gap-3 text-xs">
+        <div className="px-6 py-3.5 bg-zinc-950/60 border-y border-border/40 grid grid-cols-2 gap-3 text-xs">
           {/* DEV RESPONSÁVEL */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-xl bg-accent/20 flex items-center justify-center shrink-0 text-accent font-bold">
+            <div className="h-8 w-8 rounded-xl bg-sky-500/20 flex items-center justify-center shrink-0 text-sky-400 font-bold border border-sky-500/30">
               <Code className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -952,40 +1029,40 @@ function SaasProjectCardItem({
 
           {/* GRUPO NOME */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400 font-bold">
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400 font-bold border border-emerald-500/30">
               <MessageCircle className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">Grupo no WhatsApp</div>
-              <div className="font-bold text-emerald-300 truncate">{p.nomeGrupo || "Sem grupo informado"}</div>
+              <div className="font-bold text-emerald-300 truncate">{p.nomeGrupo || "Sem grupo cadastrado"}</div>
             </div>
           </div>
         </div>
 
         {/* DIÁRIO DE BORDO EXPOSTO DIRETAMENTE NO CARD */}
-        <div className="p-4 px-6 bg-zinc-950/70 border-b border-border/40 space-y-2">
+        <div className="p-4 px-6 bg-background/50 border-b border-border/40 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
+            <span className={`text-[10px] font-extrabold uppercase tracking-wider ${theme.notesHeader} flex items-center gap-1.5`}>
               <StickyNote className="h-3.5 w-3.5" />
-              Diário de Bordo & Anotações ({notes.length})
+              Diário de Bordo ({notes.length})
             </span>
             <button
               type="button"
               onClick={() => onOpenNotes(p)}
-              className="text-[10px] font-bold text-accent hover:underline flex items-center gap-1"
+              className={`text-[10px] font-bold ${theme.accentText} hover:underline flex items-center gap-1`}
             >
-              + Nova Anotação
+              + Escrever Nota
             </button>
           </div>
 
           {notes.length === 0 ? (
             <div className="text-[11px] text-muted-foreground/60 italic py-1">
-              Nenhuma anotação registrada ainda. Clique em "+ Nova Anotação" para registrar o progresso.
+              Nenhuma anotação registrada ainda neste SaaS.
             </div>
           ) : (
             <div className="space-y-1.5">
               {notes.slice(0, 2).map((n) => (
-                <div key={n.id} className="text-xs bg-background/60 p-2.5 rounded-xl border border-border/40 space-y-1">
+                <div key={n.id} className="text-xs bg-zinc-950/80 p-2.5 rounded-xl border border-border/40 space-y-1">
                   <div className="flex items-center justify-between text-[10px]">
                     <span className="font-bold text-foreground">{n.autor}</span>
                     <span className="text-muted-foreground font-mono">
@@ -997,41 +1074,37 @@ function SaasProjectCardItem({
                   </p>
                 </div>
               ))}
-              {notes.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => onOpenNotes(p)}
-                  className="text-[10px] text-accent hover:underline font-semibold block text-right w-full pt-1"
-                >
-                  Ver todas as {notes.length} anotações ↗
-                </button>
-              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* BOTÕES DE AÇÃO RÁPIDA (SAAS LINK + GRUPO LINK + GERENCIAR) */}
-      <div className="p-4 px-6 bg-card/80 space-y-2">
+      {/* BOTÕES DE AÇÃO CONTEXTUAIS DINÂMICOS */}
+      <div className="p-4 px-6 bg-card/90 space-y-2">
         <div className="flex flex-col sm:flex-row items-stretch gap-2">
-          {/* BOTÃO ABRIR SAAS */}
+          {/* BOTÃO ABRIR SAAS OU CADASTRAR URL */}
           {p.linkSaas ? (
             <a
               href={p.linkSaas}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-gradient-to-r from-accent to-blue-500 text-white font-bold text-xs shadow-md shadow-accent/20 hover:scale-[1.02] transition-all"
+              className={`flex-1 inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl ${theme.saasBtn} font-bold text-xs hover:scale-[1.02] transition-all`}
             >
               <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Acessar SaaS</span>
+              <span className="truncate">🚀 Testar Plataforma</span>
             </a>
           ) : (
-            <div className="flex-1 h-10 px-3 rounded-xl bg-muted/20 border border-border/40 flex items-center justify-center text-xs text-muted-foreground italic">
-              Sem URL do SaaS
-            </div>
+            <button
+              type="button"
+              onClick={() => onEdit(p)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-dashed border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 font-bold text-xs transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              + Cadastrar URL do SaaS
+            </button>
           )}
 
-          {/* BOTÃO ABRIR GRUPO */}
+          {/* BOTÃO ABRIR GRUPO OU ADICIONAR GRUPO */}
           {p.linkGrupo ? (
             <a
               href={p.linkGrupo}
@@ -1040,24 +1113,19 @@ function SaasProjectCardItem({
               className="flex-1 inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 hover:scale-[1.02] transition-all"
             >
               <MessageCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Acessar Grupo ↗</span>
+              <span className="truncate">💬 Entrar no WhatsApp ↗</span>
             </a>
           ) : (
-            <div className="flex-1 h-10 px-3 rounded-xl bg-muted/20 border border-border/40 flex items-center justify-center text-xs text-muted-foreground italic">
-              Sem Link do Grupo
-            </div>
+            <button
+              type="button"
+              onClick={() => onEdit(p)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 font-bold text-xs transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              + Adicionar Grupo
+            </button>
           )}
         </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onOpenNotes(p)}
-          className="w-full gap-2 h-9 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 font-bold text-xs"
-        >
-          <StickyNote className="h-3.5 w-3.5" />
-          Gerenciar Diário de Bordo ({notes.length})
-        </Button>
       </div>
     </Card>
   );
