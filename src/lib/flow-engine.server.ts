@@ -531,7 +531,12 @@ async function hasRecentManualCancellation(ctx: Ctx): Promise<boolean> {
 }
 
 async function shouldStopFlowRun(ctx: Ctx): Promise<boolean> {
-  return (await isFlowRunCancelled(ctx)) || (await hasRecentManualCancellation(ctx));
+  const isCancelled = await isFlowRunCancelled(ctx);
+  if (isCancelled) return true;
+  // Se o disparo foi feito manualmente pelo vendedor, ignora cancelamentos anteriores
+  const isManual = Boolean(ctx.variables?.trigger?.manual);
+  if (isManual) return false;
+  return await hasRecentManualCancellation(ctx);
 }
 
 function nextNodeId(edges: Edge[], fromNodeId: string, handle?: string | null): string | null {
@@ -1120,27 +1125,48 @@ export async function runFlowAdmin(args: {
   }
 
   // Idempotency guard: se já existe uma run ativa (queued/running/waiting)
-  // pra mesma combinação flow + canal + contato, NÃO cria outra. Impede
-  // duplicação de disparos por triggers concorrentes (auto + manual,
-  // webhooks duplicados, retries do worker, etc.)
+  // pra mesma combinação flow + canal + contato.
+  // Se for disparo MANUAL pelo vendedor, encerra a run ativa anterior para que o novo fluxo rode na hora!
   {
     const contactCandidates = whatsappNumberVariants(String(args.contactWaId ?? ""));
-    const { data: existingActive } = await db
-      .from("wa_flow_runs" as any)
-      .select("id, status, current_node_id, contact_wa_id")
-      .eq("flow_id", args.flowId)
-      .eq("channel_id", args.channelId)
-      .in("contact_wa_id", contactCandidates)
-      .in("status", ["queued", "running", "waiting"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existingActive) {
-      console.log("[flow-engine] duplicate dispatch skipped", {
-        flowId: args.flowId, channelId: args.channelId, contactWaId: args.contactWaId,
-        existingRunId: (existingActive as any).id, status: (existingActive as any).status,
-      });
-      return { runId: (existingActive as any).id, deduped: true };
+    const isManual = (args.triggerContext as any)?.manual === true;
+
+    if (isManual) {
+      const { data: activeRuns } = await db
+        .from("wa_flow_runs" as any)
+        .select("id")
+        .eq("channel_id", args.channelId)
+        .in("contact_wa_id", contactCandidates.length > 0 ? contactCandidates : [String(args.contactWaId ?? "")])
+        .in("status", ["queued", "running", "waiting"]);
+
+      if (activeRuns && activeRuns.length > 0) {
+        const idsToCancel = activeRuns.map((r: any) => String(r.id));
+        await db.from("wa_flow_runs" as any).update({
+          status: "cancelled",
+          waiting_for: null,
+          expires_at: null,
+          error: "Substituído por novo disparo manual",
+          updated_at: new Date().toISOString(),
+        }).in("id", idsToCancel);
+      }
+    } else {
+      const { data: existingActive } = await db
+        .from("wa_flow_runs" as any)
+        .select("id, status, current_node_id, contact_wa_id")
+        .eq("flow_id", args.flowId)
+        .eq("channel_id", args.channelId)
+        .in("contact_wa_id", contactCandidates)
+        .in("status", ["queued", "running", "waiting"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingActive) {
+        console.log("[flow-engine] duplicate dispatch skipped", {
+          flowId: args.flowId, channelId: args.channelId, contactWaId: args.contactWaId,
+          existingRunId: (existingActive as any).id, status: (existingActive as any).status,
+        });
+        return { runId: (existingActive as any).id, deduped: true };
+      }
     }
   }
 
