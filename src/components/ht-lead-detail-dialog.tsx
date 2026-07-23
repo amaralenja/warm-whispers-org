@@ -220,6 +220,7 @@ export function HtLeadDetailDialog({
 
   async function saveSale() {
     if (!lead?.id) return;
+    const cleanId = String(lead.id).replace(/^qlead-/, "").replace(/^venda-/, "");
     const total = Number(String(valorTotal).replace(/\./g, "").replace(",", ".")) || 0;
     if (total <= 0) { toast.error("Informa o valor da venda"); return; }
     let recebido = total;
@@ -239,18 +240,18 @@ export function HtLeadDetailDialog({
         crm_valor_recebido: recebido,
         crm_data_pagamento_restante: dataRest,
       })
-      .eq("id", lead.id);
+      .eq("id", cleanId);
     
     if (!error) {
       try {
         const { data: existingVenda } = (await supabase
           .from("ht_vendas" as any)
           .select("id")
-          .eq("lead_id", lead.id)
+          .eq("lead_id", cleanId)
           .maybeSingle()) as any;
 
         const vendaPayload = {
-          lead_id: lead.id,
+          lead_id: cleanId,
           cliente: lead.nome || "",
           closer: closerEmail || authorName || "",
           valor_total: total,
@@ -283,8 +284,6 @@ export function HtLeadDetailDialog({
     onOpenChange(false);
   }
 
-
-
   const authorName = useMemo(() => {
     try {
       const s = typeof window !== "undefined"
@@ -300,13 +299,14 @@ export function HtLeadDetailDialog({
 
   useEffect(() => {
     if (!open || !lead?.id) return;
+    const cleanId = String(lead.id).replace(/^qlead-/, "").replace(/^venda-/, "");
     let cancelled = false;
     setLoading(true);
     (async () => {
       const { data } = await supabase
         .from("ht_lead_notes" as any)
         .select("*")
-        .eq("lead_id", lead.id)
+        .eq("lead_id", cleanId)
         .order("created_at", { ascending: true });
       if (cancelled) return;
       setNotes(((data as any[]) ?? []) as Note[]);
@@ -317,10 +317,11 @@ export function HtLeadDetailDialog({
 
   async function addNote() {
     if (!draft.trim() || !lead?.id) return;
+    const cleanId = String(lead.id).replace(/^qlead-/, "").replace(/^venda-/, "");
     setSaving(true);
     const { data, error } = await supabase
       .from("ht_lead_notes" as any)
-      .insert({ lead_id: lead.id, role, author: authorName, body: draft.trim() })
+      .insert({ lead_id: cleanId, role, author: authorName, body: draft.trim() })
       .select("*")
       .single();
     setSaving(false);

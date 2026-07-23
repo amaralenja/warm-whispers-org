@@ -2354,7 +2354,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                       scheduledAt={(c as any).scheduledAt ?? schedMap[c.id] ?? null}
                       lastNote={notesMap[c.id]}
                       dragging={draggingId === c.id}
-                      onClick={() => setSelectedLead(c.lead ?? null)}
+                      onClick={() => setSelectedLead(leadObj as any)}
                       onDragStart={(e) => {
                         e.dataTransfer.setData("text/x-closer-id", c.id);
                         setDraggingId(c.id);
