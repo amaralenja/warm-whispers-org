@@ -15,7 +15,7 @@ import {
   Rocket, Plus, ExternalLink, MessageCircle, User, Code, CheckCircle2,
   Clock, AlertTriangle, Search, Filter, Trash2, Pencil, StickyNote,
   Bug, Zap, Flag, Layers, ShieldAlert, ChevronRight, Lock, Flame,
-  Check, ArrowRight, Calendar, UserCheck, AlertCircle, Wrench
+  Check, ArrowRight, Calendar, UserCheck, AlertCircle, Wrench, Eye, LayoutGrid
 } from "lucide-react";
 import {
   loadLocalSaasProjects,
@@ -117,7 +117,7 @@ function SaasProjectsPage() {
   const navigate = useNavigate();
   const isAdmin = !vendorSession;
 
-  const [activeTab, setActiveTab] = useState<"projects" | "ajustes">("projects");
+  const [activeTab, setActiveTab] = useState<"both" | "projects" | "ajustes">("both");
 
   const [projects, setProjects] = useState<SaasProject[]>([]);
   const [ajustes, setAjustes] = useState<AjusteUrgente[]>([]);
@@ -192,7 +192,8 @@ function SaasProjectsPage() {
     const pendentes = ajustes.filter((a) => a.status === "pendente").length;
     const emAndamento = ajustes.filter((a) => a.status === "em_andamento").length;
     const resolvidos = ajustes.filter((a) => a.status === "resolvido").length;
-    return { total, urgentes, pendentes, emAndamento, resolvidos };
+    const abertos = pendentes + emAndamento;
+    return { total, urgentes, pendentes, emAndamento, resolvidos, abertos };
   }, [ajustes]);
 
   if (!isAdmin) {
@@ -251,7 +252,7 @@ function SaasProjectsPage() {
         <div>
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent font-bold">
             <Rocket className="h-4 w-4 text-accent" />
-            High Ticket · Central de Desenvolvimento SaaS
+            High Ticket · Central de Desenvolvimento & Hotfixes
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight mt-1 text-foreground">
             SaaS em Construção & Ajustes Urgentes 🛠️
@@ -261,45 +262,214 @@ function SaasProjectsPage() {
           </p>
         </div>
 
-        {activeTab === "projects" ? (
-          <Button
-            onClick={() => {
-              setEditingProject(null);
-              setProjectModalOpen(true);
-            }}
-            className="bg-gradient-to-r from-accent to-blue-500 text-white font-bold h-11 px-5 shadow-lg shadow-accent/20 hover:scale-105 transition-all gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Novo SaaS em Construção
-          </Button>
-        ) : (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={() => {
               setEditingAjuste(null);
               setAjusteModalOpen(true);
             }}
-            className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-bold h-11 px-5 shadow-lg shadow-red-500/20 hover:scale-105 transition-all gap-2"
+            className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-bold h-11 px-4 shadow-lg shadow-red-500/20 hover:scale-105 transition-all gap-2"
           >
             <Flame className="h-4 w-4" />
-            Novo Ajuste Urgente / Por Fora
+            + Ajuste Urgente / Por Fora
           </Button>
-        )}
+
+          <Button
+            onClick={() => {
+              setEditingProject(null);
+              setProjectModalOpen(true);
+            }}
+            className="bg-gradient-to-r from-accent to-blue-500 text-white font-bold h-11 px-4 shadow-lg shadow-accent/20 hover:scale-105 transition-all gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            + Novo SaaS
+          </Button>
+        </div>
       </div>
 
-      {/* SUB-TABS PRINCIPAIS */}
+      {/* BANNER DESTACADO DE AJUSTES URGENTES (SEMPRE VISÍVEL NO TOPO) */}
+      {statsAjustes.abertos > 0 && (
+        <Card className="relative overflow-hidden border-red-500/40 bg-gradient-to-r from-red-500/15 via-amber-500/10 to-transparent backdrop-blur shadow-xl">
+          <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="h-12 w-12 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_20px_-4px_rgba(239,68,68,0.6)]">
+                <Flame className="h-6 w-6 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/40 font-bold uppercase text-[10px] tracking-wider animate-pulse">
+                    🚨 Atenção Requerida
+                  </Badge>
+                  <span className="text-xs font-mono font-bold text-red-300">
+                    {statsAjustes.abertos} {statsAjustes.abertos === 1 ? "ajuste pendente" : "ajustes pendentes / em andamento"}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-foreground mt-0.5">
+                  Existem ajustes urgentes precisando de acompanhamento!
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("ajustes")}
+                className="bg-red-500/20 text-red-200 border-red-500/40 hover:bg-red-500/30 font-bold h-9 px-4 text-xs gap-1.5"
+              >
+                <Flame className="h-3.5 w-3.5 text-red-400" />
+                Focar nos Ajustes ({statsAjustes.abertos})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("both")}
+                className="bg-background/60 text-foreground border-border/60 hover:bg-card font-semibold h-9 px-3 text-xs gap-1.5"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Visão Unificada
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* SELETOR DE MODO DE VISÃO / ABAS */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="grid grid-cols-2 w-full max-w-md h-12 bg-card/60 p-1 border border-border/50 rounded-2xl backdrop-blur">
+        <TabsList className="grid grid-cols-3 w-full max-w-xl h-12 bg-card/60 p-1 border border-border/50 rounded-2xl backdrop-blur">
+          <TabsTrigger value="both" className="gap-2 text-xs font-bold rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-accent data-[state=active]:to-red-500 data-[state=active]:text-white">
+            <LayoutGrid className="h-4 w-4" />
+            ⚡ Visão Unificada (Tudo)
+          </TabsTrigger>
+          <TabsTrigger value="ajustes" className="gap-2 text-xs font-bold rounded-xl data-[state=active]:bg-red-500 data-[state=active]:text-white relative">
+            <Flame className="h-4 w-4" />
+            🚨 Ajustes Urgentes ({statsAjustes.abertos})
+          </TabsTrigger>
           <TabsTrigger value="projects" className="gap-2 text-xs font-bold rounded-xl data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Rocket className="h-4 w-4" />
             Projetos SaaS ({projects.length})
           </TabsTrigger>
-          <TabsTrigger value="ajustes" className="gap-2 text-xs font-bold rounded-xl data-[state=active]:bg-red-500 data-[state=active]:text-white">
-            <Flame className="h-4 w-4" />
-            Ajustes Urgentes ({statsAjustes.urgentes > 0 ? `🚨 ${statsAjustes.urgentes}` : ajustes.length})
-          </TabsTrigger>
         </TabsList>
 
-        {/* TAB 1: PROJETOS SAAS */}
+        {/* ============================================================== */}
+        {/* MODO UNIFICADO ("both") */}
+        {/* ============================================================== */}
+        <TabsContent value="both" className="space-y-10 mt-6">
+          {/* BLOCO 1: AJUSTES URGENTES */}
+          <div className="space-y-4 rounded-3xl border border-red-500/30 bg-red-500/[0.03] p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-red-500/20 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-red-500/20 flex items-center justify-center text-red-400 font-bold">
+                  <Flame className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                    Ajustes Urgentes & Por Fora
+                    <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/40 text-[10px] font-bold">
+                      {statsAjustes.abertos} ativos
+                    </Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">Emergências, chamados rápidos e tarefas fora do escopo.</p>
+                </div>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingAjuste(null);
+                  setAjusteModalOpen(true);
+                }}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold h-9 gap-1.5 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Cadastrar Ajuste
+              </Button>
+            </div>
+
+            {/* GRID DE AJUSTES */}
+            {ajustes.length === 0 ? (
+              <div className="text-center py-8 text-xs text-muted-foreground italic border border-dashed border-red-500/20 rounded-2xl">
+                Nenhum ajuste urgente cadastrado no momento.
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {ajustes.map((a) => (
+                  <AjusteCardItem
+                    key={a.id}
+                    ajuste={a}
+                    onCycleStatus={handleCycleAjusteStatus}
+                    onEdit={(item) => {
+                      setEditingAjuste(item);
+                      setAjusteModalOpen(true);
+                    }}
+                    onDelete={handleDeleteAjuste}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* BLOCO 2: PROJETOS SAAS */}
+          <div className="space-y-4 rounded-3xl border border-accent/30 bg-accent/[0.03] p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-accent/20 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-accent/20 flex items-center justify-center text-accent font-bold">
+                  <Rocket className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                    Projetos SaaS em Construção
+                    <Badge variant="outline" className="bg-accent/20 text-accent border-accent/40 text-[10px] font-bold">
+                      {projects.length} projetos
+                    </Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">Catálogo de plataformas SaaS, links, equipes DEV e diário de bordo.</p>
+                </div>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingProject(null);
+                  setProjectModalOpen(true);
+                }}
+                className="bg-accent text-accent-foreground font-bold h-9 gap-1.5 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Cadastrar SaaS
+              </Button>
+            </div>
+
+            {/* GRID DE PROJETOS SAAS */}
+            {projects.length === 0 ? (
+              <div className="text-center py-8 text-xs text-muted-foreground italic border border-dashed border-accent/20 rounded-2xl">
+                Nenhum projeto SaaS em construção cadastrado.
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+                {projects.map((p) => (
+                  <SaasProjectCardItem
+                    key={p.id}
+                    project={p}
+                    onEdit={(proj) => {
+                      setEditingProject(proj);
+                      setProjectModalOpen(true);
+                    }}
+                    onDelete={handleDeleteProject}
+                    onOpenNotes={(proj) => {
+                      setActiveProjectForNotes(proj);
+                      setNotesDialogOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ============================================================== */}
+        {/* TAB 1: APENAS PROJETOS SAAS */}
+        {/* ============================================================== */}
         <TabsContent value="projects" className="space-y-6 mt-6">
           {/* METRICS KPIS */}
           <div className="grid gap-4 md:grid-cols-4">
@@ -403,146 +573,28 @@ function SaasProjectsPage() {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-              {filteredProjects.map((p) => {
-                const cfg = FASE_CONFIG[p.fase] || FASE_CONFIG.planejamento;
-                const FaseIcon = cfg.icon;
-                const notes = loadLocalSaasNotes(p.id);
-
-                return (
-                  <Card
-                    key={p.id}
-                    className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b from-card/80 to-card/40 backdrop-blur transition-all duration-300 hover:border-accent/50 hover:shadow-xl`}
-                  >
-                    <div>
-                      {/* CARD HEADER */}
-                      <div className="p-6 pb-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <Badge variant="outline" className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.badge} flex items-center gap-1.5 w-fit`}>
-                              <FaseIcon className="h-3 w-3" />
-                              {cfg.label}
-                            </Badge>
-                            <h2 className="text-xl font-bold tracking-tight mt-2.5 text-foreground">
-                              {p.nome}
-                            </h2>
-                          </div>
-
-                          <div className="flex items-center gap-1 bg-background/50 p-1 rounded-xl border border-border/40">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-accent"
-                              title="Editar SaaS"
-                              onClick={() => {
-                                setEditingProject(p);
-                                setProjectModalOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              title="Excluir"
-                              onClick={() => handleDeleteProject(p.id, p.nome)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* PROGRESS BAR */}
-                        <div className="mt-4 space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-[11px] font-medium text-muted-foreground">Progresso da Construção</span>
-                            <span className="font-mono font-bold text-accent">{p.progressoPct ?? 0}%</span>
-                          </div>
-                          <div className="h-2 w-full bg-border/40 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-accent to-blue-400 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(100, Math.max(0, p.progressoPct ?? 0))}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* DESCRIPTION */}
-                        {p.descricao && (
-                          <p className="text-xs text-muted-foreground/90 mt-3 line-clamp-2 leading-relaxed">
-                            {p.descricao}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* INFO GRID */}
-                      <div className="px-6 py-3 bg-muted/20 border-y border-border/40 grid grid-cols-2 gap-3 text-xs">
-                        {/* DEV RESPONSÁVEL */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="h-7 w-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0 text-accent font-bold">
-                            <Code className="h-3.5 w-3.5" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">DEV / Responsável</div>
-                            <div className="font-medium text-foreground truncate">{p.devResponsavel || "Não atribuído"}</div>
-                          </div>
-                        </div>
-
-                        {/* GRUPO */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="h-7 w-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 font-bold">
-                            <MessageCircle className="h-3.5 w-3.5" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Grupo do Projeto</div>
-                            {p.linkGrupo ? (
-                              <a href={p.linkGrupo} target="_blank" rel="noreferrer" className="font-medium text-emerald-400 hover:underline truncate block">
-                                {p.nomeGrupo || "Acessar Grupo"} ↗
-                              </a>
-                            ) : (
-                              <div className="font-medium text-foreground truncate">{p.nomeGrupo || "Sem grupo cadastrado"}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CARD FOOTER */}
-                    <div className="p-4 px-6 bg-card/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                      {p.linkSaas ? (
-                        <a
-                          href={p.linkSaas}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline truncate"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{p.linkSaas}</span>
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Sem URL de teste cadastrada</span>
-                      )}
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setActiveProjectForNotes(p);
-                          setNotesDialogOpen(true);
-                        }}
-                        className="gap-2 h-9 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:text-accent font-semibold shrink-0"
-                      >
-                        <StickyNote className="h-3.5 w-3.5" />
-                        Diário & Anotações ({notes.length})
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
+              {filteredProjects.map((p) => (
+                <SaasProjectCardItem
+                  key={p.id}
+                  project={p}
+                  onEdit={(proj) => {
+                    setEditingProject(proj);
+                    setProjectModalOpen(true);
+                  }}
+                  onDelete={handleDeleteProject}
+                  onOpenNotes={(proj) => {
+                    setActiveProjectForNotes(proj);
+                    setNotesDialogOpen(true);
+                  }}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
 
-        {/* TAB 2: AJUSTES URGENTES & POR FORA */}
+        {/* ============================================================== */}
+        {/* TAB 2: APENAS AJUSTES URGENTES */}
+        {/* ============================================================== */}
         <TabsContent value="ajustes" className="space-y-6 mt-6">
           {/* METRICS KPIS AJUSTES */}
           <div className="grid gap-4 md:grid-cols-4">
@@ -648,112 +700,18 @@ function SaasProjectsPage() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredAjustes.map((a) => {
-                const pConfig = PRIORIDADE_CONFIG[a.prioridade] || PRIORIDADE_CONFIG.media;
-                const stConfig = STATUS_CONFIG[a.status] || STATUS_CONFIG.pendente;
-                const PrioIcon = pConfig.icon;
-                const StatusIcon = stConfig.icon;
-
-                return (
-                  <Card
-                    key={a.id}
-                    className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${
-                      a.prioridade === "urgente" && a.status !== "resolvido"
-                        ? "border-red-500/50 bg-gradient-to-b from-red-500/[0.08] to-card/40"
-                        : "border-border/50 bg-card/40"
-                    } backdrop-blur transition-all duration-300 hover:border-accent/50 hover:shadow-lg`}
-                  >
-                    <div className="p-5 space-y-3">
-                      {/* BADGES ROW */}
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge variant="outline" className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${pConfig.badge} flex items-center gap-1`}>
-                          <PrioIcon className="h-3 w-3" />
-                          {pConfig.label}
-                        </Badge>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCycleAjusteStatus(a.id)}
-                          className={`h-7 px-2.5 text-[10px] font-bold rounded-lg ${stConfig.badge} hover:scale-105 transition-all gap-1`}
-                          title="Clique para alternar status (Pendente -> Em Andamento -> Resolvido)"
-                        >
-                          <StatusIcon className="h-3 w-3" />
-                          {stConfig.label}
-                        </Button>
-                      </div>
-
-                      {/* TÍTULO */}
-                      <h3 className="text-base font-bold text-foreground leading-snug">
-                        {a.titulo}
-                      </h3>
-
-                      {/* SAAS TAG */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30">
-                          {a.saasNome || "Ajuste Geral / Plataforma"}
-                        </span>
-                        {a.prazo && (
-                          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 bg-background/50 px-2 py-0.5 rounded border border-border/40">
-                            <Calendar className="h-3 w-3 text-amber-400" />
-                            Prazo: {a.prazo}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* DESCRIÇÃO */}
-                      {a.descricao && (
-                        <p className="text-xs text-muted-foreground/90 line-clamp-3 leading-relaxed bg-background/40 p-2.5 rounded-lg border border-border/30">
-                          {a.descricao}
-                        </p>
-                      )}
-
-                      {/* METADATA (SOLICITANTE & DEV) */}
-                      <div className="pt-2 border-t border-border/40 grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="truncate">
-                          <span className="text-muted-foreground font-semibold">Solicitante: </span>
-                          <span className="text-foreground font-medium">{a.solicitante || "Não informado"}</span>
-                        </div>
-                        <div className="truncate text-right">
-                          <span className="text-muted-foreground font-semibold">DEV: </span>
-                          <span className="text-sky-300 font-medium">{a.devResponsavel || "Antigravity"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CARD FOOTER */}
-                    <div className="p-3 px-5 bg-card/60 border-t border-border/40 flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {new Date(a.created_at).toLocaleDateString("pt-BR")}
-                      </span>
-
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-accent"
-                          title="Editar Ajuste"
-                          onClick={() => {
-                            setEditingAjuste(a);
-                            setAjusteModalOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          title="Excluir"
-                          onClick={() => handleDeleteAjuste(a.id, a.titulo)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+              {filteredAjustes.map((a) => (
+                <AjusteCardItem
+                  key={a.id}
+                  ajuste={a}
+                  onCycleStatus={handleCycleAjusteStatus}
+                  onEdit={(item) => {
+                    setEditingAjuste(item);
+                    setAjusteModalOpen(true);
+                  }}
+                  onDelete={handleDeleteAjuste}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
@@ -791,6 +749,260 @@ function SaasProjectsPage() {
         />
       )}
     </div>
+  );
+}
+
+// COMPONENTE DE CARD SAAS PROJECT
+function SaasProjectCardItem({
+  project: p,
+  onEdit,
+  onDelete,
+  onOpenNotes,
+}: {
+  project: SaasProject;
+  onEdit: (p: SaasProject) => void;
+  onDelete: (id: string, nome: string) => void;
+  onOpenNotes: (p: SaasProject) => void;
+}) {
+  const cfg = FASE_CONFIG[p.fase] || FASE_CONFIG.planejamento;
+  const FaseIcon = cfg.icon;
+  const notes = loadLocalSaasNotes(p.id);
+
+  return (
+    <Card
+      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${cfg.border} bg-gradient-to-b from-card/80 to-card/40 backdrop-blur transition-all duration-300 hover:border-accent/50 hover:shadow-xl`}
+    >
+      <div>
+        {/* CARD HEADER */}
+        <div className="p-6 pb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Badge variant="outline" className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.badge} flex items-center gap-1.5 w-fit`}>
+                <FaseIcon className="h-3 w-3" />
+                {cfg.label}
+              </Badge>
+              <h2 className="text-xl font-bold tracking-tight mt-2.5 text-foreground">
+                {p.nome}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-xl border border-border/40">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-accent"
+                title="Editar SaaS"
+                onClick={() => onEdit(p)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                title="Excluir"
+                onClick={() => onDelete(p.id, p.nome)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* PROGRESS BAR */}
+          <div className="mt-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[11px] font-medium text-muted-foreground">Progresso da Construção</span>
+              <span className="font-mono font-bold text-accent">{p.progressoPct ?? 0}%</span>
+            </div>
+            <div className="h-2 w-full bg-border/40 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-accent to-blue-400 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(0, p.progressoPct ?? 0))}%` }}
+              />
+            </div>
+          </div>
+
+          {/* DESCRIPTION */}
+          {p.descricao && (
+            <p className="text-xs text-muted-foreground/90 mt-3 line-clamp-2 leading-relaxed">
+              {p.descricao}
+            </p>
+          )}
+        </div>
+
+        {/* INFO GRID */}
+        <div className="px-6 py-3 bg-muted/20 border-y border-border/40 grid grid-cols-2 gap-3 text-xs">
+          {/* DEV RESPONSÁVEL */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-7 w-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0 text-accent font-bold">
+              <Code className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">DEV / Responsável</div>
+              <div className="font-medium text-foreground truncate">{p.devResponsavel || "Não atribuído"}</div>
+            </div>
+          </div>
+
+          {/* GRUPO */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-7 w-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 font-bold">
+              <MessageCircle className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Grupo do Projeto</div>
+              {p.linkGrupo ? (
+                <a href={p.linkGrupo} target="_blank" rel="noreferrer" className="font-medium text-emerald-400 hover:underline truncate block">
+                  {p.nomeGrupo || "Acessar Grupo"} ↗
+                </a>
+              ) : (
+                <div className="font-medium text-foreground truncate">{p.nomeGrupo || "Sem grupo cadastrado"}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CARD FOOTER */}
+      <div className="p-4 px-6 bg-card/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {p.linkSaas ? (
+          <a
+            href={p.linkSaas}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline truncate"
+          >
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{p.linkSaas}</span>
+          </a>
+        ) : (
+          <span className="text-xs text-muted-foreground italic">Sem URL de teste cadastrada</span>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onOpenNotes(p)}
+          className="gap-2 h-9 border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 hover:text-accent font-semibold shrink-0"
+        >
+          <StickyNote className="h-3.5 w-3.5" />
+          Diário & Anotações ({notes.length})
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// COMPONENTE DE CARD AJUSTE URGENTE
+function AjusteCardItem({
+  ajuste: a,
+  onCycleStatus,
+  onEdit,
+  onDelete,
+}: {
+  ajuste: AjusteUrgente;
+  onCycleStatus: (id: string) => void;
+  onEdit: (a: AjusteUrgente) => void;
+  onDelete: (id: string, titulo: string) => void;
+}) {
+  const pConfig = PRIORIDADE_CONFIG[a.prioridade] || PRIORIDADE_CONFIG.media;
+  const stConfig = STATUS_CONFIG[a.status] || STATUS_CONFIG.pendente;
+  const PrioIcon = pConfig.icon;
+  const StatusIcon = stConfig.icon;
+
+  return (
+    <Card
+      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${
+        a.prioridade === "urgente" && a.status !== "resolvido"
+          ? "border-red-500/50 bg-gradient-to-b from-red-500/[0.08] to-card/40"
+          : "border-border/50 bg-card/40"
+      } backdrop-blur transition-all duration-300 hover:border-accent/50 hover:shadow-lg`}
+    >
+      <div className="p-5 space-y-3">
+        {/* BADGES ROW */}
+        <div className="flex items-center justify-between gap-2">
+          <Badge variant="outline" className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${pConfig.badge} flex items-center gap-1`}>
+            <PrioIcon className="h-3 w-3" />
+            {pConfig.label}
+          </Badge>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onCycleStatus(a.id)}
+            className={`h-7 px-2.5 text-[10px] font-bold rounded-lg ${stConfig.badge} hover:scale-105 transition-all gap-1`}
+            title="Clique para alternar status (Pendente -> Em Andamento -> Resolvido)"
+          >
+            <StatusIcon className="h-3 w-3" />
+            {stConfig.label}
+          </Button>
+        </div>
+
+        {/* TÍTULO */}
+        <h3 className="text-base font-bold text-foreground leading-snug">
+          {a.titulo}
+        </h3>
+
+        {/* SAAS TAG */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30">
+            {a.saasNome || "Ajuste Geral / Plataforma"}
+          </span>
+          {a.prazo && (
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 bg-background/50 px-2 py-0.5 rounded border border-border/40">
+              <Calendar className="h-3 w-3 text-amber-400" />
+              Prazo: {a.prazo}
+            </span>
+          )}
+        </div>
+
+        {/* DESCRIÇÃO */}
+        {a.descricao && (
+          <p className="text-xs text-muted-foreground/90 line-clamp-3 leading-relaxed bg-background/40 p-2.5 rounded-lg border border-border/30">
+            {a.descricao}
+          </p>
+        )}
+
+        {/* METADATA (SOLICITANTE & DEV) */}
+        <div className="pt-2 border-t border-border/40 grid grid-cols-2 gap-2 text-[11px]">
+          <div className="truncate">
+            <span className="text-muted-foreground font-semibold">Solicitante: </span>
+            <span className="text-foreground font-medium">{a.solicitante || "Não informado"}</span>
+          </div>
+          <div className="truncate text-right">
+            <span className="text-muted-foreground font-semibold">DEV: </span>
+            <span className="text-sky-300 font-medium">{a.devResponsavel || "Antigravity"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* CARD FOOTER */}
+      <div className="p-3 px-5 bg-card/60 border-t border-border/40 flex items-center justify-between">
+        <span className="text-[10px] font-mono text-muted-foreground">
+          {new Date(a.created_at).toLocaleDateString("pt-BR")}
+        </span>
+
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-accent"
+            title="Editar Ajuste"
+            onClick={() => onEdit(a)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            title="Excluir"
+            onClick={() => onDelete(a.id, a.titulo)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
