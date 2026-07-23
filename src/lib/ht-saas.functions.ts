@@ -1,12 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { SaasFase, SaasProject, SaasNote } from "./ht-saas-state";
+import type { SaasFase } from "./ht-saas-state";
+
+async function db() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin as any;
+}
 
 export const listSaasProjectsServer = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     try {
-      const { data, error } = await context.supabase
+      const sb = await db();
+      const { data, error } = await sb
         .from("ht_saas_projects" as any)
         .select("*")
         .order("updated_at", { ascending: false });
@@ -19,7 +23,6 @@ export const listSaasProjectsServer = createServerFn({ method: "GET" })
   });
 
 export const saveSaasProjectServer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator(
     (d: {
       id?: string;
@@ -33,7 +36,7 @@ export const saveSaasProjectServer = createServerFn({ method: "POST" })
       descricao?: string | null;
     }) => d,
   )
-  .handler(async ({ context, data }) => {
+  .handler(async ({ data }) => {
     const id = data.id || `saas-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const payload = {
@@ -50,7 +53,8 @@ export const saveSaasProjectServer = createServerFn({ method: "POST" })
     };
 
     try {
-      await context.supabase
+      const sb = await db();
+      await sb
         .from("ht_saas_projects" as any)
         .upsert({ ...payload, created_at: now });
     } catch {
@@ -61,11 +65,11 @@ export const saveSaasProjectServer = createServerFn({ method: "POST" })
   });
 
 export const deleteSaasProjectServer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => d)
-  .handler(async ({ context, data }) => {
+  .handler(async ({ data }) => {
     try {
-      await context.supabase
+      const sb = await db();
+      await sb
         .from("ht_saas_projects" as any)
         .delete()
         .eq("id", data.id);
