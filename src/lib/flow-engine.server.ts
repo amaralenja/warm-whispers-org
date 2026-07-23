@@ -96,12 +96,22 @@ function jsonArray<T = any>(value: unknown): T[] {
 function shouldNormalizeWhatsappImage(url: string): boolean {
   const clean = String(url ?? "").split("?")[0].toLowerCase();
   if (!clean) return false;
-  return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif") || clean.endsWith(".svg") || clean.endsWith(".gif") || !/\.(jpg|jpeg)$/i.test(clean);
+  // Only normalize formats known to fail on WhatsApp — NOT JPG, PNG, WEBP (all supported)
+  return clean.endsWith(".heic") || clean.endsWith(".heif") || clean.endsWith(".svg") || clean.endsWith(".gif");
 }
 
 function shouldNormalizeWhatsappVideo(url: string): boolean {
   const clean = String(url ?? "").split("?")[0].toLowerCase();
-  return clean.endsWith(".mov") || clean.endsWith(".quicktime") || clean.endsWith(".hevc") || clean.endsWith(".heic") || clean.endsWith(".m4v") || !clean.endsWith(".mp4");
+  // Only normalize formats explicitly rejected by Meta (MOV, M4V, etc.) — NOT MP4 or unknown
+  return clean.endsWith(".mov") || clean.endsWith(".quicktime") || clean.endsWith(".hevc") || clean.endsWith(".m4v");
+}
+
+function hasTransloaditCreds(): boolean {
+  const key = process.env.TRANSLOADIT_AUTH_KEY?.trim() || process.env.TRANSLOADIT_KEY?.trim() ||
+    process.env.VITE_TRANSLOADIT_AUTH_KEY?.trim() || process.env.VITE_TRANSLOADIT_KEY?.trim();
+  const secret = process.env.TRANSLOADIT_AUTH_SECRET?.trim() || process.env.TRANSLOADIT_SECRET?.trim() ||
+    process.env.VITE_TRANSLOADIT_AUTH_SECRET?.trim() || process.env.VITE_TRANSLOADIT_SECRET?.trim();
+  return Boolean(key && secret);
 }
 
 async function resolveStageFromTags(db: any, tags: string[], operation?: unknown) {
@@ -734,35 +744,37 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
       let finalUrl = url;
 
-      // 1) Conversão prévia de formato (áudio OGG, imagem JPG, vídeo MP4)
+      // 1) Conversão prévia de formato — somente quando o Transloadit está configurado
+      //    e o formato precisa de conversão. Sem credenciais, vai direto ao espelhamento.
+      const transloaditAvailable = hasTransloaditCreds();
       if (mediaType === "audio") {
         const isAlreadyOgg = /\.(ogg|opus)($|\?)/i.test(url);
-        if (!isAlreadyOgg) {
+        if (!isAlreadyOgg && transloaditAvailable) {
           try {
             const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
             const converted = await convertAudioToWhatsappVoice(url);
             if (converted) finalUrl = converted;
           } catch (e) {
-            console.warn("[flow-engine] conversão de áudio falhou:", e);
+            console.warn("[flow-engine] conversão de áudio falhou (continuando com URL original):", e);
           }
         }
       } else {
-        if (mediaType === "image" && shouldNormalizeWhatsappImage(finalUrl)) {
+        if (mediaType === "image" && transloaditAvailable && shouldNormalizeWhatsappImage(finalUrl)) {
           try {
             const { convertImageToWhatsappJpeg } = await import("@/lib/transloadit.server");
             const converted = await convertImageToWhatsappJpeg(finalUrl);
             if (converted) finalUrl = converted;
           } catch (e) {
-            console.warn("[flow-engine] conversão de imagem falhou:", e);
+            console.warn("[flow-engine] conversão de imagem falhou (continuando com URL original):", e);
           }
         }
-        if (mediaType === "video" && shouldNormalizeWhatsappVideo(finalUrl)) {
+        if (mediaType === "video" && transloaditAvailable && shouldNormalizeWhatsappVideo(finalUrl)) {
           try {
             const { convertVideoToWhatsappMp4 } = await import("@/lib/transloadit.server");
             const converted = await convertVideoToWhatsappMp4(finalUrl);
             if (converted) finalUrl = converted;
           } catch (e) {
-            console.warn("[flow-engine] conversão de vídeo falhou:", e);
+            console.warn("[flow-engine] conversão de vídeo falhou (continuando com URL original):", e);
           }
         }
       }

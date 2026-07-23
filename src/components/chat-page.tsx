@@ -2495,7 +2495,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </span>
                           </div>
                         )}
-                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} quotedFrom={quoted} onQuotedClick={(target) => {
+                        <MessageBubble msg={m} mediaState={mediaCache[String(m.id)]} onLoadMedia={() => loadMedia(m)} onMediaSettled={scrollToBottomIfPinned} onReply={(mm) => setReplyTo(mm)} onReact={(mm, emoji) => handleReact(mm, emoji)} onInspectError={(mm) => setInspectingErrorMsg(mm)} quotedFrom={quoted} onQuotedClick={(target) => {
                           const el = document.getElementById(`msg-${target.id}`);
                           if (!el) return;
                           el.scrollIntoView({ behavior: "smooth", block: "center" });
