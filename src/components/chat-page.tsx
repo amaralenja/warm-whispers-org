@@ -1307,19 +1307,6 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     staleTime: 15_000,
   });
 
-  const checkDuplicateLeadVendorFn = useServerFn(checkDuplicateLeadVendor);
-  const { data: duplicateLeadInfo } = useQuery({
-    queryKey: ["check-duplicate-lead-vendor", active?.id, active?.contact_wa_id],
-    queryFn: async () => {
-      if (!active?.id || !active?.contact_wa_id) return null;
-      return checkDuplicateLeadVendorFn({
-        data: { conversationId: String(active.id), contactWaId: String(active.contact_wa_id) },
-      });
-    },
-    enabled: Boolean(active?.id && active?.contact_wa_id),
-    staleTime: 30_000,
-  });
-
   const msgMatchesByConvId = useMemo(() => {
     const map = new Map<string, { snippet: string; message_id: string; direction: string }>();
     for (const res of (messageSearchResults as any[])) {
@@ -1442,6 +1429,19 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const activeCandidate = conversationList.find((c) => String(c.id) === activeId) ?? null;
   if (activeCandidate) activeRef.current = activeCandidate;
   const active = activeCandidate ?? (activeId && activeRef.current && String(activeRef.current.id) === activeId ? activeRef.current : null);
+
+  const checkDuplicateLeadVendorFn = useServerFn(checkDuplicateLeadVendor);
+  const { data: duplicateLeadInfo } = useQuery({
+    queryKey: ["check-duplicate-lead-vendor", active?.id, active?.contact_wa_id],
+    queryFn: async () => {
+      if (!active?.id || !active?.contact_wa_id) return null;
+      return checkDuplicateLeadVendorFn({
+        data: { conversationId: String(active.id), contactWaId: String(active.contact_wa_id) },
+      });
+    },
+    enabled: Boolean(active?.id && active?.contact_wa_id),
+    staleTime: 30_000,
+  });
 
 
   const { data: messages = [], error: messagesError } = useQuery({
