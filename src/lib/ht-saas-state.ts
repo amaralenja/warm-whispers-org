@@ -1,4 +1,4 @@
-// Estado e persistência local/servidor para SaaS em Construção
+// Estado e persistência local/servidor para SaaS em Construção + Ajustes Urgentes / Por Fora
 export type SaasFase = "planejamento" | "desenvolvimento" | "testes" | "lancado" | "pausado";
 
 export type SaasNote = {
@@ -25,8 +25,27 @@ export type SaasProject = {
   notes?: SaasNote[];
 };
 
+export type AjustePrioridade = "urgente" | "alta" | "media" | "baixa";
+export type AjusteStatus = "pendente" | "em_andamento" | "resolvido";
+
+export type AjusteUrgente = {
+  id: string;
+  saasId?: string | null;
+  saasNome?: string | null;
+  titulo: string;
+  solicitante?: string | null;
+  devResponsavel?: string | null;
+  prioridade: AjustePrioridade;
+  status: AjusteStatus;
+  descricao?: string | null;
+  prazo?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const LS_KEY_PROJECTS = "multium_ht_saas_projects_v1";
 const LS_KEY_NOTES = "multium_ht_saas_notes_v1";
+const LS_KEY_AJUSTES = "multium_ht_saas_ajustes_v1";
 
 function emitChange() {
   if (typeof window !== "undefined") {
@@ -94,6 +113,27 @@ export function deleteLocalSaasNote(saasId: string, noteId: string) {
   } catch {}
 }
 
+// PERSISTÊNCIA DE AJUSTES URGENTES / POR FORA
+export function loadLocalAjustesUrgentes(): AjusteUrgente[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LS_KEY_AJUSTES);
+    if (!raw) return getInitialDefaultAjustes();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : getInitialDefaultAjustes();
+  } catch {
+    return getInitialDefaultAjustes();
+  }
+}
+
+export function saveLocalAjustesUrgentes(ajustes: AjusteUrgente[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LS_KEY_AJUSTES, JSON.stringify(ajustes));
+    emitChange();
+  } catch {}
+}
+
 function getInitialDefaultSaasProjects(): SaasProject[] {
   const now = new Date().toISOString();
   const initial: SaasProject[] = [
@@ -127,6 +167,60 @@ function getInitialDefaultSaasProjects(): SaasProject[] {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(LS_KEY_PROJECTS, JSON.stringify(initial));
+    } catch {}
+  }
+  return initial;
+}
+
+function getInitialDefaultAjustes(): AjusteUrgente[] {
+  const now = new Date().toISOString();
+  const initial: AjusteUrgente[] = [
+    {
+      id: "ajuste-1",
+      saasId: "saas-multium-ai",
+      saasNome: "Multium AI Chatbot & Agent",
+      titulo: "Fix no travamento de digitação no Chat ao Vivo e busca por texto",
+      solicitante: "Vendedores / Victor",
+      devResponsavel: "Antigravity DEV",
+      prioridade: "urgente",
+      status: "resolvido",
+      descricao: "Vendedores relataram travamento ao digitar. Aplicado debounce e otimização de busca em mensagens.",
+      prazo: "Imediato",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "ajuste-2",
+      saasId: "saas-cakto-hub",
+      saasNome: "Cakto Sales Hub & Webhook PV24H",
+      titulo: "Filtro de Vendas da Cakto por e-mail no PV24H Analytics",
+      solicitante: "Gerência",
+      devResponsavel: "DEV Principal",
+      prioridade: "alta",
+      status: "resolvido",
+      descricao: "Remover testes do e-mail john.doe@example.com para trazer apenas vendas reais.",
+      prazo: "Hoje",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "ajuste-3",
+      saasId: "saas-multium-ai",
+      saasNome: "Multium AI Chatbot & Agent",
+      titulo: "Alerta visual de lead repetido / atendido por outro vendedor",
+      solicitante: "Closers & SDRs",
+      devResponsavel: "Antigravity DEV",
+      prioridade: "alta",
+      status: "em_andamento",
+      descricao: "Exibir aviso destacado quando o lead já foi atendido por outro vendedor em qualquer canal.",
+      prazo: "Amanhã",
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(LS_KEY_AJUSTES, JSON.stringify(initial));
     } catch {}
   }
   return initial;
