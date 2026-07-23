@@ -42,33 +42,74 @@ function NotFoundComponent() {
 
 function ErrorComponent(props?: { error?: Error; reset?: () => void }) {
   const safeError = props?.error ?? new Error("Erro desconhecido");
-  console.error(props?.error);
+  console.error("[TanStackRootError]", props?.error);
   useEffect(() => {
     safeReportLovableError(safeError, { boundary: "tanstack_root_error_component" });
   }, [safeError]);
 
+  const errorMessage = safeError?.message || String(safeError);
+  const errorStack = safeError?.stack || "";
+  const errorName = safeError?.name || "Error";
+
+  const copyErrorToClipboard = () => {
+    const fullLog = `[MULTIUM ERROR LOG]\nName: ${errorName}\nMessage: ${errorMessage}\nStack:\n${errorStack}\nURL: ${typeof window !== "undefined" ? window.location.href : ""}`;
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(fullLog);
+      alert("Log de erro copiado para a área de transferência!");
+    } else {
+      console.log(fullLog);
+      alert("Consulte o console do navegador para copiar o log.");
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-display text-foreground">Essa página não carregou</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Algo deu errado. Tenta de novo ou volta pro início.
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-2xl text-center space-y-4">
+        <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-xl">
+          ⚠️
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Essa página não carregou</h1>
+        <p className="text-sm text-muted-foreground">
+          Ocorreu um erro no carregamento da aplicação. Veja os detalhes abaixo para diagnóstico:
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+        {/* LOG BOX NA TELA */}
+        <div className="text-left bg-zinc-950 border border-red-500/30 rounded-xl p-4 shadow-xl overflow-hidden text-xs font-mono space-y-2">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+            <span className="text-red-400 font-bold uppercase tracking-wider">{errorName}</span>
+            <button
+              type="button"
+              onClick={copyErrorToClipboard}
+              className="text-[11px] px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition"
+            >
+              📋 Copiar Log
+            </button>
+          </div>
+          <div className="text-red-300 font-semibold break-words">
+            {errorMessage}
+          </div>
+          {errorStack && (
+            <pre className="text-[10px] text-zinc-400 max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed border-t border-zinc-900 pt-2">
+              {errorStack}
+            </pre>
+          )}
+        </div>
+
+        <div className="pt-2 flex flex-wrap justify-center gap-3">
           <button
             onClick={() => {
               props?.reset?.();
               window.location.reload();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition"
           >
-            Tentar de novo
+            Tentar de novo 🔄
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground"
+            className="inline-flex items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition"
           >
-            Início
+            Voltar ao Início 🏠
           </a>
         </div>
       </div>
