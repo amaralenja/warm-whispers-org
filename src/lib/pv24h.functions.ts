@@ -308,3 +308,101 @@ export const togglePv24hStatus = createServerFn({ method: "POST" })
     await graphPost(data.id, cfg.access_token, { status: data.status });
     return { ok: true };
   });
+
+export type Pv24hSale = {
+  id: string;
+  transaction_id: string | null;
+  cliente_nome: string | null;
+  cliente_email: string | null;
+  cliente_telefone: string | null;
+  valor: number;
+  status: string;
+  origem: "pago" | "organico";
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  created_at: string;
+};
+
+export const listPv24hSales = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<Pv24hSale[]> => {
+    const salesMap = new Map<string, Pv24hSale>();
+
+    // 1. Puxa da tabela principal `pv24h_vendas`
+    try {
+      const { data: pvSales, error } = await (context.supabase.from("pv24h_vendas" as any) as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2000);
+
+      if (!error && Array.isArray(pvSales)) {
+        for (const s of pvSales as any[]) {
+          const key = s.transaction_id || s.id;
+          salesMap.set(key, {
+            id: s.id,
+            transaction_id: s.transaction_id ?? null,
+            cliente_nome: s.cliente_nome ?? null,
+            cliente_email: s.cliente_email ?? null,
+            cliente_telefone: s.cliente_telefone ?? null,
+            valor: Number(s.valor || 0),
+            status: s.status ?? "approved",
+            origem: s.origem === "pago" ? "pago" : "organico",
+            utm_source: s.utm_source ?? null,
+            utm_medium: s.utm_medium ?? null,
+            utm_campaign: s.utm_campaign ?? null,
+            utm_content: s.utm_content ?? null,
+            utm_term: s.utm_term ?? null,
+            created_at: s.created_at || new Date().toISOString(),
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[listPv24hSales] aviso pv24h_vendas:", err);
+    }
+
+    // 2. Puxa do fallback `ht_quiz_submissions` (vendas vindas do webhook da Cakto)
+    try {
+      const { data: qzSales } = await (context.supabase.from("ht_quiz_submissions" as any) as any)
+        .select("*")
+        .order("received_at", { ascending: false })
+        .limit(2000);
+
+      if (Array.isArray(qzSales)) {
+        for (const q of qzSales as any[]) {
+          const r = (q.respostas ?? {}) as Record<string, any>;
+          if (r.tipo === "pv24h_venda" || r.origem === "pv24h" || r.cakto_payload) {
+            const key = r.transaction_id || `qz_${q.id}`;
+            if (!salesMap.has(key)) {
+              const hasUtm = !!(q.utm_source || q.utm_medium || q.utm_campaign || r.utm_source || r.src);
+              salesMap.set(key, {
+                id: `qz_${q.id}`,
+                transaction_id: r.transaction_id ?? q.id,
+                cliente_nome: q.nome ?? null,
+                cliente_email: q.email ?? null,
+                cliente_telefone: q.whatsapp ?? null,
+                valor: Number(r.valor || 0),
+                status: r.status ?? "approved",
+                origem: r.origem === "pago" || hasUtm ? "pago" : "organico",
+                utm_source: q.utm_source ?? r.utm_source ?? null,
+                utm_medium: q.utm_medium ?? r.utm_medium ?? null,
+                utm_campaign: q.utm_campaign ?? r.utm_campaign ?? null,
+                utm_content: q.utm_content ?? r.utm_content ?? null,
+                utm_term: r.utm_term ?? null,
+                created_at: q.received_at || new Date().toISOString(),
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[listPv24hSales] aviso ht_quiz_submissions fallback:", err);
+    }
+
+    const list = Array.from(salesMap.values());
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  });
+

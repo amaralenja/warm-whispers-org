@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   BarChart3, Loader2, RefreshCw, Save, KeyRound, Check, Settings,
   ChevronRight, TrendingUp, DollarSign, ShoppingCart, Percent, Wallet, Layers, Megaphone, ImageIcon,
-  ShieldAlert,
+  ShieldAlert, Copy, Webhook, Link, Tag, Globe, Search, Zap, CheckCircle2, ArrowUpRight, Filter
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -15,14 +15,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   getPv24hConfig, savePv24hToken, listPv24hAdAccounts, selectPv24hAdAccount,
   listPv24hCampaigns, listPv24hAdSets, listPv24hAds, getPv24hAccountSummary,
-  togglePv24hStatus,
-  type Pv24hCampaign, type Pv24hAdSet, type Pv24hAd, type Pv24hInsights,
+  togglePv24hStatus, listPv24hSales,
+  type Pv24hCampaign, type Pv24hAdSet, type Pv24hAd, type Pv24hInsights, type Pv24hSale
 } from "@/lib/pv24h.functions";
 import { getVendorSession } from "@/lib/vendor-session";
 
@@ -149,13 +150,86 @@ function PV24HAnalyticsPage() {
   const listAdsFn = useServerFn(listPv24hAds);
   const getSummary = useServerFn(getPv24hAccountSummary);
   const toggleStatus = useServerFn(togglePv24hStatus);
+  const listSalesFn = useServerFn(listPv24hSales);
 
   const [tokenInput, setTokenInput] = useState("");
   const [preset, setPreset] = useState<Preset>("last_7d");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tab, setTab] = useState<"campaigns" | "adsets" | "ads">("campaigns");
+  const [tab, setTab] = useState<"campaigns" | "adsets" | "ads" | "sales">("sales");
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
   const [selectedAdsets, setSelectedAdsets] = useState<Set<string>>(new Set());
+
+  // Webhook e Vendas da Cakto
+  const [salesFilter, setSalesFilter] = useState<"todos" | "pago" | "organico">("todos");
+  const [salesSearch, setSalesSearch] = useState("");
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  const salesQ = useQuery({
+    queryKey: ["pv24h", "sales"],
+    queryFn: () => listSalesFn({}),
+    refetchInterval: 15_000,
+  });
+
+  const salesList = salesQ.data ?? [];
+
+  const salesStats = useMemo(() => {
+    let totalRevenue = 0;
+    let totalCount = salesList.length;
+    let pagoRevenue = 0;
+    let pagoCount = 0;
+    let organicoRevenue = 0;
+    let organicoCount = 0;
+
+    for (const sale of salesList) {
+      totalRevenue += sale.valor;
+      if (sale.origem === "pago") {
+        pagoRevenue += sale.valor;
+        pagoCount++;
+      } else {
+        organicoRevenue += sale.valor;
+        organicoCount++;
+      }
+    }
+
+    const ticketMedio = totalCount > 0 ? totalRevenue / totalCount : 0;
+    const pagoPct = totalCount > 0 ? (pagoCount / totalCount) * 100 : 0;
+    const organicoPct = totalCount > 0 ? (organicoCount / totalCount) * 100 : 0;
+
+    return {
+      totalRevenue,
+      totalCount,
+      pagoRevenue,
+      pagoCount,
+      pagoPct,
+      organicoRevenue,
+      organicoCount,
+      organicoPct,
+      ticketMedio,
+    };
+  }, [salesList]);
+
+  const filteredSales = useMemo(() => {
+    return salesList.filter((sale) => {
+      if (salesFilter !== "todos" && sale.origem !== salesFilter) return false;
+      if (salesSearch.trim()) {
+        const q = salesSearch.toLowerCase();
+        const haystack = `${sale.cliente_nome ?? ""} ${sale.cliente_email ?? ""} ${sale.cliente_telefone ?? ""} ${sale.transaction_id ?? ""} ${sale.utm_source ?? ""} ${sale.utm_campaign ?? ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [salesList, salesFilter, salesSearch]);
+
+  const webhookUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/api/public/hooks/pv24h-cakto`
+    : "https://seu-dominio.com/api/public/hooks/pv24h-cakto";
+
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    toast.success("Link do Webhook do Supabase/PV24H copiado!");
+    setTimeout(() => setCopiedWebhook(false), 3000);
+  };
 
   const configQ = useQuery({
     queryKey: ["pv24h", "config"],
@@ -274,15 +348,128 @@ function PV24HAnalyticsPage() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* Webhook Cakto Banner */}
+      <Card className="border-accent/40 bg-gradient-to-r from-accent/10 via-card to-card">
+        <CardContent className="p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0">
+                <Webhook className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  Webhook de Vendas Cakto (Supabase)
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px]">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Ativo
+                  </Badge>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Cole este link na Cakto em <strong>Webhooks de Checkout</strong>. As vendas com UTM serão classificadas em <strong>Tráfego Pago</strong> e as sem UTM em <strong>Orgânica</strong>.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleCopyWebhook}
+              className={`shrink-0 gap-2 ${copiedWebhook ? "bg-emerald-600 text-white" : "bg-accent text-accent-foreground hover:bg-accent/90"}`}
+            >
+              {copiedWebhook ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copiedWebhook ? "Copiado!" : "Copiar Link do Webhook"}
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              readOnly
+              value={webhookUrl}
+              className="font-mono text-xs bg-background/80 border-accent/30 selection:bg-accent selection:text-accent-foreground"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPIs de Vendas Cakto (Orgânico vs Pago) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-border/50 bg-card/60 backdrop-blur">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-emerald-400" /> Receita Total (Cakto)
+              </span>
+              <Badge variant="secondary" className="text-[10px]">{salesStats.totalCount} vendas</Badge>
+            </div>
+            <div className="text-2xl font-bold mt-2 font-mono text-emerald-400">
+              {brl(salesStats.totalRevenue)}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">
+              Ticket Médio: <strong className="text-foreground">{brl(salesStats.ticketMedio)}</strong>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-violet-500/30 bg-violet-500/5 backdrop-blur">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Megaphone className="h-4 w-4 text-violet-400" /> Tráfego Pago
+              </span>
+              <Badge className="bg-violet-500/20 text-violet-300 border-violet-500/30 text-[10px]">
+                {salesStats.pagoPct.toFixed(0)}% das vendas
+              </Badge>
+            </div>
+            <div className="text-2xl font-bold mt-2 font-mono text-violet-300">
+              {brl(salesStats.pagoRevenue)}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">
+              <strong className="text-violet-200">{salesStats.pagoCount}</strong> vendas com UTMs
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-500/30 bg-emerald-500/5 backdrop-blur">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Globe className="h-4 w-4 text-emerald-400" /> Vendas Orgânicas
+              </span>
+              <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
+                {salesStats.organicoPct.toFixed(0)}% das vendas
+              </Badge>
+            </div>
+            <div className="text-2xl font-bold mt-2 font-mono text-emerald-300">
+              {brl(salesStats.organicoRevenue)}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">
+              <strong className="text-emerald-200">{salesStats.organicoCount}</strong> vendas diretas/sem UTM
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 bg-card/60 backdrop-blur">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <ShoppingCart className="h-4 w-4 text-accent" /> Total de Pedidos
+              </span>
+            </div>
+            <div className="text-2xl font-bold mt-2 font-mono">
+              {salesStats.totalCount}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">
+              Pago: <strong>{salesStats.pagoCount}</strong> · Orgânico: <strong>{salesStats.organicoCount}</strong>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Meta Ads KPIs */}
       {isConfigured && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Kpi icon={<DollarSign className="h-4 w-4" />} label="Faturamento" value={brl(s?.revenue ?? 0)} accent="text-emerald-400" />
-          <Kpi icon={<Wallet className="h-4 w-4" />} label="Gasto" value={brl(s?.spend ?? 0)} />
-          <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Lucro" value={brl(s?.profit ?? 0)} accent={(s?.profit ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"} />
-          <Kpi icon={<Percent className="h-4 w-4" />} label="ROI" value={pct(s?.roi ?? 0)} accent={(s?.roi ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"} />
-          <Kpi icon={<Percent className="h-4 w-4" />} label="ROAS" value={s?.roas ? `${s.roas.toFixed(2)}x` : "—"} />
-          <Kpi icon={<ShoppingCart className="h-4 w-4" />} label="Vendas" value={num(s?.purchases ?? 0)} />
+          <Kpi icon={<DollarSign className="h-4 w-4" />} label="Meta Faturam." value={brl(s?.revenue ?? 0)} accent="text-emerald-400" />
+          <Kpi icon={<Wallet className="h-4 w-4" />} label="Meta Gasto" value={brl(s?.spend ?? 0)} />
+          <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Lucro Meta" value={brl(s?.profit ?? 0)} accent={(s?.profit ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"} />
+          <Kpi icon={<Percent className="h-4 w-4" />} label="ROI Meta" value={pct(s?.roi ?? 0)} accent={(s?.roi ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"} />
+          <Kpi icon={<Percent className="h-4 w-4" />} label="ROAS Meta" value={s?.roas ? `${s.roas.toFixed(2)}x` : "—"} />
+          <Kpi icon={<ShoppingCart className="h-4 w-4" />} label="Vendas Meta" value={num(s?.purchases ?? 0)} />
         </div>
       )}
 
@@ -348,59 +535,215 @@ function PV24HAnalyticsPage() {
       )}
 
       {/* Tabs + Tables */}
-      {isConfigured && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
-              <TabBtn active={tab === "campaigns"} onClick={() => setTab("campaigns")} icon={<Megaphone className="h-4 w-4" />}>
-                Campanhas
-              </TabBtn>
-              <TabBtn active={tab === "adsets"} onClick={() => setTab("adsets")} icon={<Layers className="h-4 w-4" />}>
-                Conjuntos {selectedCampaigns.size > 0 && <span className="text-xs opacity-70">({selectedCampaigns.size})</span>}
-              </TabBtn>
-              <TabBtn active={tab === "ads"} onClick={() => setTab("ads")} icon={<ImageIcon className="h-4 w-4" />}>
-                Anúncios {selectedAdsets.size > 0 && <span className="text-xs opacity-70">({selectedAdsets.size})</span>}
-              </TabBtn>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {tab === "campaigns" && (
-              <Table
-                loading={campaignsQ.isLoading}
-                error={campaignsQ.error as Error | undefined}
-                rows={campaigns}
-                empty="Nenhuma campanha"
-                renderRow={(c) => {
-                  const active = c.effectiveStatus === "ACTIVE";
-                  const checked = selectedCampaigns.has(c.id);
-                  return (
-                    <tr key={c.id} className={`border-t border-border/50 hover:bg-muted/20 ${checked ? "bg-accent/5" : ""}`}>
-                      <td className="px-3 py-3">
-                        <Checkbox checked={checked} onCheckedChange={() => toggleSet(selectedCampaigns, setSelectedCampaigns, c.id)} />
-                      </td>
-                      <td className="px-3 py-3"><Toggle active={active} onToggle={() => toggleMut.mutate({ id: c.id, status: active ? "PAUSED" : "ACTIVE" })} /></td>
-                      <td className="px-3 py-3"><Dot active={active} /></td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium">{c.name}</div>
-                        <div className="text-xs text-muted-foreground">{c.objective}</div>
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono text-sm">
-                        {c.dailyBudget ? `${brl(c.dailyBudget)}/dia` : c.lifetimeBudget ? brl(c.lifetimeBudget) : "—"}
-                      </td>
-                      <MetricCells i={c.insights} />
-                    </tr>
-                  );
-                }}
-                headers={<>
-                  <th className="w-8 px-3 py-2"></th>
-                  <th className="w-14 px-3 py-2 text-left">On/Off</th>
-                  <th className="w-8 px-3 py-2"></th>
-                  <th className="px-3 py-2 text-left">Nome</th>
-                  <th className="px-3 py-2 text-right">Orçamento</th>
-                  <MetricHeaders />
-                </>}
-              />
+      <Card>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            <TabBtn active={tab === "sales"} onClick={() => setTab("sales")} icon={<ShoppingCart className="h-4 w-4" />}>
+              Vendas Cakto ({salesList.length})
+            </TabBtn>
+            {isConfigured && (
+              <>
+                <TabBtn active={tab === "campaigns"} onClick={() => setTab("campaigns")} icon={<Megaphone className="h-4 w-4" />}>
+                  Campanhas
+                </TabBtn>
+                <TabBtn active={tab === "adsets"} onClick={() => setTab("adsets")} icon={<Layers className="h-4 w-4" />}>
+                  Conjuntos {selectedCampaigns.size > 0 && <span className="text-xs opacity-70">({selectedCampaigns.size})</span>}
+                </TabBtn>
+                <TabBtn active={tab === "ads"} onClick={() => setTab("ads")} icon={<ImageIcon className="h-4 w-4" />}>
+                  Anúncios {selectedAdsets.size > 0 && <span className="text-xs opacity-70">({selectedAdsets.size})</span>}
+                </TabBtn>
+              </>
             )}
+          </div>
+
+          {tab === "sales" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar cliente, email, UTM..."
+                  value={salesSearch}
+                  onChange={(e) => setSalesSearch(e.target.value)}
+                  className="h-8 pl-8 text-xs w-48 bg-background/80"
+                />
+              </div>
+
+              <div className="flex items-center rounded-lg border border-border bg-card p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSalesFilter("todos")}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${salesFilter === "todos" ? "bg-accent text-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Todos ({salesList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSalesFilter("pago")}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${salesFilter === "pago" ? "bg-violet-500/20 text-violet-300 border border-violet-500/30" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Tráfego Pago ({salesStats.pagoCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSalesFilter("organico")}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${salesFilter === "organico" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Orgânico ({salesStats.organicoCount})
+                </button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => salesQ.refetch()}
+                disabled={salesQ.isFetching}
+                title="Atualizar Vendas"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${salesQ.isFetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          )}
+        </CardHeader>
+
+        <CardContent className="pt-4">
+          {tab === "sales" && (
+            <Table
+              loading={salesQ.isLoading}
+              error={salesQ.error as Error | undefined}
+              rows={filteredSales}
+              empty="Nenhuma venda registrada até o momento. Cole o Webhook na Cakto para receber as vendas!"
+              headers={
+                <>
+                  <th className="px-3 py-2 text-left">Data & ID</th>
+                  <th className="px-3 py-2 text-left">Cliente</th>
+                  <th className="px-3 py-2 text-left">Origem</th>
+                  <th className="px-3 py-2 text-left">Parâmetros (UTMs)</th>
+                  <th className="px-3 py-2 text-right">Valor</th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                </>
+              }
+              renderRow={(sale: Pv24hSale) => {
+                const isPago = sale.origem === "pago";
+                const dateStr = sale.created_at
+                  ? new Date(sale.created_at).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "—";
+
+                return (
+                  <tr key={sale.id} className="border-t border-border/50 hover:bg-muted/20">
+                    <td className="px-3 py-3">
+                      <div className="font-mono text-xs font-semibold">{dateStr}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]" title={sale.transaction_id || sale.id}>
+                        {sale.transaction_id || sale.id}
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-3">
+                      <div className="font-semibold text-sm">{sale.cliente_nome || "Cliente Cakto"}</div>
+                      <div className="text-xs text-muted-foreground flex flex-col gap-0.5">
+                        {sale.cliente_email && <span>{sale.cliente_email}</span>}
+                        {sale.cliente_telefone && <span className="font-mono text-[11px] text-emerald-400">{sale.cliente_telefone}</span>}
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-3">
+                      {isPago ? (
+                        <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/30 flex items-center gap-1 w-fit">
+                          <Megaphone className="h-3 w-3 text-violet-400" /> Tráfego Pago
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex items-center gap-1 w-fit">
+                          <Globe className="h-3 w-3 text-emerald-400" /> Orgânico
+                        </Badge>
+                      )}
+                    </td>
+
+                    <td className="px-3 py-3">
+                      {isPago ? (
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {sale.utm_source && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                              src: {sale.utm_source}
+                            </span>
+                          )}
+                          {sale.utm_campaign && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
+                              camp: {sale.utm_campaign}
+                            </span>
+                          )}
+                          {sale.utm_medium && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-card text-muted-foreground border border-border">
+                              med: {sale.utm_medium}
+                            </span>
+                          )}
+                          {sale.utm_content && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-card text-muted-foreground border border-border">
+                              ad: {sale.utm_content}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Venda direta (sem UTM)</span>
+                      )}
+                    </td>
+
+                    <td className="px-3 py-3 text-right font-mono font-bold text-sm text-emerald-400">
+                      {brl(sale.valor)}
+                    </td>
+
+                    <td className="px-3 py-3 text-center">
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] uppercase">
+                        {sale.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              }}
+            />
+          )}
+
+          {tab === "campaigns" && (
+            <Table
+              loading={campaignsQ.isLoading}
+              error={campaignsQ.error as Error | undefined}
+              rows={campaigns}
+              empty="Nenhuma campanha"
+              renderRow={(c) => {
+                const active = c.effectiveStatus === "ACTIVE";
+                const checked = selectedCampaigns.has(c.id);
+                return (
+                  <tr key={c.id} className={`border-t border-border/50 hover:bg-muted/20 ${checked ? "bg-accent/5" : ""}`}>
+                    <td className="px-3 py-3">
+                      <Checkbox checked={checked} onCheckedChange={() => toggleSet(selectedCampaigns, setSelectedCampaigns, c.id)} />
+                    </td>
+                    <td className="px-3 py-3"><Toggle active={active} onToggle={() => toggleMut.mutate({ id: c.id, status: active ? "PAUSED" : "ACTIVE" })} /></td>
+                    <td className="px-3 py-3"><Dot active={active} /></td>
+                    <td className="px-3 py-3">
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">{c.objective}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-sm">
+                      {c.dailyBudget ? `${brl(c.dailyBudget)}/dia` : c.lifetimeBudget ? brl(c.lifetimeBudget) : "—"}
+                    </td>
+                    <MetricCells i={c.insights} />
+                  </tr>
+                );
+              }}
+              headers={<>
+                <th className="w-8 px-3 py-2"></th>
+                <th className="w-14 px-3 py-2 text-left">On/Off</th>
+                <th className="w-8 px-3 py-2"></th>
+                <th className="px-3 py-2 text-left">Nome</th>
+                <th className="px-3 py-2 text-right">Orçamento</th>
+                <MetricHeaders />
+              </>}
+            />
+          )}
 
             {tab === "adsets" && (
               selectedCampaigns.size === 0 ? (
@@ -481,7 +824,6 @@ function PV24HAnalyticsPage() {
             )}
           </CardContent>
         </Card>
-      )}
 
     </div>
   );

@@ -2132,8 +2132,6 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
   // Track highlighted cards after a sale is registered
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
   const sdrStageMap = useSdrStageMap();
-  const [saleLead, setSaleLead] = useState<QLead | null>(null);
-  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
 
 
 
@@ -2349,14 +2347,29 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                   };
                   const handle = (c.lead?.instagram || "").toLowerCase().replace(/^@/, "").replace(/\/+$/, "");
                   return (
-                            onChange={(e) => moveTo(c.id, e.target.value)}
-                            className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
-                          >
-                            {CLOSER_STAGES.map((ks) => (
-                              <option key={ks.id} value={ks.id}>{ks.label}</option>
-                            ))}
-                          </select>
-                        </div>
+                    <KanbanLeadCard
+                      key={c.id}
+                      lead={leadObj}
+                      ig={handle ? igMap.get(handle) : null}
+                      scheduledAt={(c as any).scheduledAt ?? schedMap[c.id] ?? null}
+                      lastNote={notesMap[c.id]}
+                      dragging={draggingId === c.id}
+                      onClick={() => setSelectedLead(c.lead ?? null)}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/x-closer-id", c.id);
+                        setDraggingId(c.id);
+                      }}
+                      onDragEnd={() => setDraggingId(null)}
+                      footer={
+                        <select
+                          value={stageMap[c.id] || s.id}
+                          onChange={(e) => moveTo(c.id, e.target.value)}
+                          className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
+                        >
+                          {CLOSER_STAGES.map((ks) => (
+                            <option key={ks.id} value={ks.id}>{ks.label}</option>
+                          ))}
+                        </select>
                       }
                     />
                   );
