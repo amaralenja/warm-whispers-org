@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { getVendorSession } from "@/lib/vendor-session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import {
   Rocket, Plus, ExternalLink, MessageCircle, User, Code, CheckCircle2,
   Clock, AlertTriangle, Search, Filter, Trash2, Pencil, StickyNote,
   Bug, Zap, Flag, Layers, ShieldAlert, ChevronRight, Lock, Flame,
-  Check, ArrowRight, Calendar, UserCheck, AlertCircle, Wrench, Eye, LayoutGrid
+  Check, ArrowRight, Calendar, UserCheck, AlertCircle, Wrench, Eye, LayoutGrid,
+  Image as ImageIcon, Film, X, Upload, Clipboard, CheckCheck
 } from "lucide-react";
 import {
   loadLocalSaasProjects,
@@ -31,6 +32,7 @@ import {
   type AjusteUrgente,
   type AjustePrioridade,
   type AjusteStatus,
+  type AjusteMedia,
 } from "@/lib/ht-saas-state";
 
 export const Route = createFileRoute("/_authenticated/ht-saas")({
@@ -111,7 +113,7 @@ const STATUS_CONFIG: Record<AjusteStatus, { label: string; badge: string; icon: 
     icon: Wrench,
   },
   resolvido: {
-    label: "✅ Resolvido",
+    label: "✅ Resolvido / Corrigido",
     badge: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
     icon: CheckCircle2,
   },
@@ -123,6 +125,7 @@ function SaasProjectsPage() {
   const isAdmin = !vendorSession;
 
   const [activeTab, setActiveTab] = useState<"both" | "projects" | "ajustes">("both");
+  const [ajustesSubTab, setAjustesSubTab] = useState<"pending" | "resolved">("pending");
 
   const [projects, setProjects] = useState<SaasProject[]>([]);
   const [ajustes, setAjustes] = useState<AjusteUrgente[]>([]);
@@ -134,7 +137,6 @@ function SaasProjectsPage() {
   // Filtros Ajustes
   const [searchAjustes, setSearchAjustes] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Modais
   const [projectModalOpen, setProjectModalOpen] = useState(false);
@@ -145,6 +147,8 @@ function SaasProjectsPage() {
 
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [activeProjectForNotes, setActiveProjectForNotes] = useState<SaasProject | null>(null);
+
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
 
   const refreshData = () => {
     setProjects(loadLocalSaasProjects());
@@ -170,10 +174,10 @@ function SaasProjectsPage() {
     });
   }, [projects, searchProjects, faseFilter]);
 
-  const filteredAjustes = useMemo(() => {
+  const pendingAjustes = useMemo(() => {
     return ajustes.filter((a) => {
+      if (a.status === "resolvido") return false;
       if (prioFilter !== "all" && a.prioridade !== prioFilter) return false;
-      if (statusFilter !== "all" && a.status !== statusFilter) return false;
       if (searchAjustes.trim()) {
         const q = searchAjustes.toLowerCase().trim();
         const hay = `${a.titulo} ${a.saasNome ?? ""} ${a.solicitante ?? ""} ${a.devResponsavel ?? ""} ${a.descricao ?? ""}`.toLowerCase();
@@ -181,7 +185,20 @@ function SaasProjectsPage() {
       }
       return true;
     });
-  }, [ajustes, searchAjustes, prioFilter, statusFilter]);
+  }, [ajustes, searchAjustes, prioFilter]);
+
+  const resolvedAjustes = useMemo(() => {
+    return ajustes.filter((a) => {
+      if (a.status !== "resolvido") return false;
+      if (prioFilter !== "all" && a.prioridade !== prioFilter) return false;
+      if (searchAjustes.trim()) {
+        const q = searchAjustes.toLowerCase().trim();
+        const hay = `${a.titulo} ${a.saasNome ?? ""} ${a.solicitante ?? ""} ${a.devResponsavel ?? ""} ${a.descricao ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [ajustes, searchAjustes, prioFilter]);
 
   const statsProjects = useMemo(() => {
     const total = projects.length;
@@ -247,7 +264,12 @@ function SaasProjectsPage() {
 
     item.updated_at = new Date().toISOString();
     saveLocalAjustesUrgentes(list);
-    toast.success(`Status atualizado para: ${STATUS_CONFIG[item.status].label}`);
+
+    if (item.status === "resolvido") {
+      toast.success(`Ajuste marcado como RESOLVIDO! Movido para o histórico de concluídos. 🎉`);
+    } else {
+      toast.success(`Status atualizado para: ${STATUS_CONFIG[item.status].label}`);
+    }
   };
 
   return (
@@ -273,7 +295,7 @@ function SaasProjectsPage() {
               setEditingAjuste(null);
               setAjusteModalOpen(true);
             }}
-            className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-bold h-11 px-4 shadow-lg shadow-red-500/20 hover:scale-105 transition-all gap-2"
+            className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-bold h-11 px-5 shadow-lg shadow-red-500/20 hover:scale-105 transition-all gap-2"
           >
             <Flame className="h-4 w-4" />
             + Ajuste Urgente / Por Fora
@@ -284,7 +306,7 @@ function SaasProjectsPage() {
               setEditingProject(null);
               setProjectModalOpen(true);
             }}
-            className="bg-gradient-to-r from-accent to-blue-500 text-white font-bold h-11 px-4 shadow-lg shadow-accent/20 hover:scale-105 transition-all gap-2"
+            className="bg-gradient-to-r from-accent to-blue-500 text-white font-bold h-11 px-5 shadow-lg shadow-accent/20 hover:scale-105 transition-all gap-2"
           >
             <Plus className="h-4 w-4" />
             + Novo SaaS
@@ -303,7 +325,7 @@ function SaasProjectsPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/40 font-bold uppercase text-[10px] tracking-wider animate-pulse">
-                    🚨 Atenção Requerida
+                    🚨 Fila de Ajustes Ativos
                   </Badge>
                   <span className="text-xs font-mono font-bold text-red-300">
                     {statsAjustes.abertos} {statsAjustes.abertos === 1 ? "ajuste pendente" : "ajustes pendentes / em andamento"}
@@ -319,11 +341,14 @@ function SaasProjectsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setActiveTab("ajustes")}
+                onClick={() => {
+                  setActiveTab("ajustes");
+                  setAjustesSubTab("pending");
+                }}
                 className="bg-red-500/20 text-red-200 border-red-500/40 hover:bg-red-500/30 font-bold h-9 px-4 text-xs gap-1.5"
               >
                 <Flame className="h-3.5 w-3.5 text-red-400" />
-                Focar nos Ajustes ({statsAjustes.abertos})
+                Focar nos Pendentes ({statsAjustes.abertos})
               </Button>
               <Button
                 variant="outline"
@@ -360,7 +385,7 @@ function SaasProjectsPage() {
         {/* MODO UNIFICADO ("both") */}
         {/* ============================================================== */}
         <TabsContent value="both" className="space-y-10 mt-6">
-          {/* BLOCO 1: AJUSTES URGENTES */}
+          {/* BLOCO 1: AJUSTES URGENTES PENDENTES */}
           <div className="space-y-4 rounded-3xl border border-red-500/30 bg-red-500/[0.03] p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-red-500/20 pb-4">
               <div className="flex items-center gap-2.5">
@@ -369,12 +394,12 @@ function SaasProjectsPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                    Ajustes Urgentes & Por Fora
+                    Ajustes Urgentes & Por Fora (Pendentes)
                     <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/40 text-[10px] font-bold">
-                      {statsAjustes.abertos} ativos
+                      {statsAjustes.abertos} pendentes
                     </Badge>
                   </h2>
-                  <p className="text-xs text-muted-foreground">Emergências, chamados rápidos e tarefas fora do escopo.</p>
+                  <p className="text-xs text-muted-foreground">Chamados ativos aguardando correção ou em andamento pelo DEV.</p>
                 </div>
               </div>
 
@@ -384,21 +409,21 @@ function SaasProjectsPage() {
                   setEditingAjuste(null);
                   setAjusteModalOpen(true);
                 }}
-                className="bg-red-500 hover:bg-red-600 text-white font-bold h-9 gap-1.5 text-xs"
+                className="bg-red-500 hover:bg-red-600 text-white font-bold h-9 gap-1.5 text-xs shadow-md shadow-red-500/20"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Cadastrar Ajuste
+                Cole ou Cadastre Ajuste
               </Button>
             </div>
 
-            {/* GRID DE AJUSTES */}
-            {ajustes.length === 0 ? (
-              <div className="text-center py-8 text-xs text-muted-foreground italic border border-dashed border-red-500/20 rounded-2xl">
-                Nenhum ajuste urgente cadastrado no momento.
+            {/* GRID DE AJUSTES PENDENTES */}
+            {pendingAjustes.length === 0 ? (
+              <div className="text-center py-8 text-xs text-muted-foreground italic border border-dashed border-red-500/20 rounded-2xl bg-card/20">
+                Nenhum ajuste pendente no momento! Todos os chamados foram corrigidos. 🎉
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {ajustes.map((a) => (
+                {pendingAjustes.map((a) => (
                   <AjusteCardItem
                     key={a.id}
                     ajuste={a}
@@ -408,8 +433,36 @@ function SaasProjectsPage() {
                       setAjusteModalOpen(true);
                     }}
                     onDelete={handleDeleteAjuste}
+                    onPreviewMedia={(url) => setPreviewMediaUrl(url)}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* SUB-SEÇÃO HISTÓRICO DE RESOLVIDOS EM MODO UNIFICADO */}
+            {resolvedAjustes.length > 0 && (
+              <div className="pt-6 border-t border-red-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <CheckCheck className="h-4 w-4" />
+                    Histórico de Ajustes Corrigidos ({statsAjustes.resolvidos})
+                  </span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 opacity-80 hover:opacity-100 transition-opacity">
+                  {resolvedAjustes.slice(0, 3).map((a) => (
+                    <AjusteCardItem
+                      key={a.id}
+                      ajuste={a}
+                      onCycleStatus={handleCycleAjusteStatus}
+                      onEdit={(item) => {
+                        setEditingAjuste(item);
+                        setAjusteModalOpen(true);
+                      }}
+                      onDelete={handleDeleteAjuste}
+                      onPreviewMedia={(url) => setPreviewMediaUrl(url)}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -606,8 +659,8 @@ function SaasProjectsPage() {
             <Card className="border-red-500/40 bg-red-500/10 backdrop-blur shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-red-400">Urgentes / Abertos</div>
-                  <div className="text-3xl font-black mt-1 text-red-300">{statsAjustes.urgentes}</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-red-400">Urgentes / Pendentes</div>
+                  <div className="text-3xl font-black mt-1 text-red-300">{statsAjustes.abertos}</div>
                 </div>
                 <div className="h-10 w-10 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-400">
                   <Flame className="h-5 w-5 animate-bounce" />
@@ -618,7 +671,7 @@ function SaasProjectsPage() {
             <Card className="border-amber-500/30 bg-amber-500/5 backdrop-blur shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-amber-400">Pendentes</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-amber-400">Aguardando DEV</div>
                   <div className="text-3xl font-black mt-1 text-amber-300">{statsAjustes.pendentes}</div>
                 </div>
                 <div className="h-10 w-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400">
@@ -642,7 +695,7 @@ function SaasProjectsPage() {
             <Card className="border-emerald-500/30 bg-emerald-500/5 backdrop-blur shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Resolvidos</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Corrigidos / Resolvidos</div>
                   <div className="text-3xl font-black mt-1 text-emerald-300">{statsAjustes.resolvidos}</div>
                 </div>
                 <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -652,75 +705,121 @@ function SaasProjectsPage() {
             </Card>
           </div>
 
-          {/* CONTROLS BAR AJUSTES */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-card/40 p-3 rounded-2xl border border-border/50 backdrop-blur">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchAjustes}
-                onChange={(e) => setSearchAjustes(e.target.value)}
-                placeholder="Buscar ajuste urgente por título, SaaS, solicitante ou DEV..."
-                className="pl-10 h-10 bg-background/60 border-border/50 text-sm focus-visible:ring-red-500"
-              />
+          {/* SUB-ABAS DENTRO DE AJUSTES: PENDENTES VS HISTÓRICO RESOLVIDOS */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card/60 p-2 rounded-2xl border border-border/50 backdrop-blur">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant={ajustesSubTab === "pending" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAjustesSubTab("pending")}
+                className={`h-10 px-4 text-xs font-bold rounded-xl gap-2 transition-all flex-1 sm:flex-initial ${
+                  ajustesSubTab === "pending"
+                    ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
+                    : "bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Flame className="h-4 w-4" />
+                🚨 Fila Pendentes & Em Andamento ({statsAjustes.abertos})
+              </Button>
+
+              <Button
+                variant={ajustesSubTab === "resolved" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAjustesSubTab("resolved")}
+                className={`h-10 px-4 text-xs font-bold rounded-xl gap-2 transition-all flex-1 sm:flex-initial ${
+                  ajustesSubTab === "resolved"
+                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
+                    : "bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <CheckCheck className="h-4 w-4" />
+                ✅ Histórico de Ajustes Corrigidos ({statsAjustes.resolvidos})
+              </Button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={prioFilter} onValueChange={setPrioFilter}>
-                <SelectTrigger className="h-10 w-40 bg-background/60 text-xs">
-                  <SelectValue placeholder="Prioridade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Prioridades</SelectItem>
-                  <SelectItem value="urgente">🔴 Urgentes</SelectItem>
-                  <SelectItem value="alta">🟠 Altas</SelectItem>
-                  <SelectItem value="media">🟡 Médias</SelectItem>
-                  <SelectItem value="baixa">🟢 Baixas</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 w-40 bg-background/60 text-xs">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="pendente">⏳ Pendente</SelectItem>
-                  <SelectItem value="em_andamento">🛠️ Em Andamento</SelectItem>
-                  <SelectItem value="resolvido">✅ Resolvido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={prioFilter} onValueChange={setPrioFilter}>
+              <SelectTrigger className="h-10 w-44 bg-background/60 text-xs font-semibold">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Prioridades</SelectItem>
+                <SelectItem value="urgente">🔴 Urgentes</SelectItem>
+                <SelectItem value="alta">🟠 Altas</SelectItem>
+                <SelectItem value="media">🟡 Médias</SelectItem>
+                <SelectItem value="baixa">🟢 Baixas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* GRID DE AJUSTES URGENTES */}
-          {filteredAjustes.length === 0 ? (
-            <div className="text-center py-16 rounded-3xl border border-dashed border-border/60 bg-card/20">
-              <Flame className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40 animate-pulse" />
-              <h3 className="text-lg font-bold text-foreground">Nenhum ajuste urgente encontrado</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                {searchAjustes || prioFilter !== "all" || statusFilter !== "all"
-                  ? "Tente alterar os filtros de prioridade/status."
-                  : "Cadastre um ajuste emergencial ou por fora clicando no botão acima."}
-              </p>
-            </div>
+          {/* LISTA DEPENDENDO DA SUB-ABA */}
+          {ajustesSubTab === "pending" ? (
+            pendingAjustes.length === 0 ? (
+              <div className="text-center py-16 rounded-3xl border border-dashed border-red-500/30 bg-card/20">
+                <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto mb-3 opacity-60" />
+                <h3 className="text-lg font-bold text-foreground">Fila de Ajustes Zerada! 🎉</h3>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                  Não há nenhum ajuste pendente no momento. Todos foram corrigidos ou movidos para a aba de resolvidos.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {pendingAjustes.map((a) => (
+                  <AjusteCardItem
+                    key={a.id}
+                    ajuste={a}
+                    onCycleStatus={handleCycleAjusteStatus}
+                    onEdit={(item) => {
+                      setEditingAjuste(item);
+                      setAjusteModalOpen(true);
+                    }}
+                    onDelete={handleDeleteAjuste}
+                    onPreviewMedia={(url) => setPreviewMediaUrl(url)}
+                  />
+                ))}
+              </div>
+            )
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredAjustes.map((a) => (
-                <AjusteCardItem
-                  key={a.id}
-                  ajuste={a}
-                  onCycleStatus={handleCycleAjusteStatus}
-                  onEdit={(item) => {
-                    setEditingAjuste(item);
-                    setAjusteModalOpen(true);
-                  }}
-                  onDelete={handleDeleteAjuste}
-                />
-              ))}
-            </div>
+            resolvedAjustes.length === 0 ? (
+              <div className="text-center py-16 rounded-3xl border border-dashed border-emerald-500/30 bg-card/20">
+                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+                <h3 className="text-lg font-bold text-foreground">Nenhum ajuste resolvido no histórico</h3>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                  Ao marcar um ajuste pendente como "Resolvido", ele será transferido para este histórico.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {resolvedAjustes.map((a) => (
+                  <AjusteCardItem
+                    key={a.id}
+                    ajuste={a}
+                    onCycleStatus={handleCycleAjusteStatus}
+                    onEdit={(item) => {
+                      setEditingAjuste(item);
+                      setAjusteModalOpen(true);
+                    }}
+                    onDelete={handleDeleteAjuste}
+                    onPreviewMedia={(url) => setPreviewMediaUrl(url)}
+                  />
+                ))}
+              </div>
+            )
           )}
         </TabsContent>
       </Tabs>
+
+      {/* LIGHTBOX MODAL PARA EXPANDIR FOTOS / VÍDEOS */}
+      {previewMediaUrl && (
+        <Dialog open={!!previewMediaUrl} onOpenChange={() => setPreviewMediaUrl(null)}>
+          <DialogContent className="max-w-4xl border-none bg-black/90 p-2 overflow-hidden flex items-center justify-center">
+            {previewMediaUrl.startsWith("data:video") || previewMediaUrl.endsWith(".mp4") ? (
+              <video src={previewMediaUrl} controls autoPlay className="max-h-[85vh] w-auto rounded-xl" />
+            ) : (
+              <img src={previewMediaUrl} alt="Visualização" className="max-h-[85vh] w-auto object-contain rounded-xl" />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* DIALOG ADD/EDIT PROJETO SAAS */}
       <SaasProjectFormModal
@@ -733,7 +832,7 @@ function SaasProjectsPage() {
         }}
       />
 
-      {/* DIALOG ADD/EDIT AJUSTE URGENTE */}
+      {/* DIALOG ADD/EDIT AJUSTE URGENTE COM UPLOAD & PASTE (CTRL+V) */}
       <AjusteFormModal
         open={ajusteModalOpen}
         onOpenChange={setAjusteModalOpen}
@@ -945,17 +1044,19 @@ function SaasProjectCardItem({
   );
 }
 
-// COMPONENTE DE CARD AJUSTE URGENTE
+// COMPONENTE DE CARD AJUSTE URGENTE COM MÍDIA EXPOSA (IMAGENS / VÍDEOS)
 function AjusteCardItem({
   ajuste: a,
   onCycleStatus,
   onEdit,
   onDelete,
+  onPreviewMedia,
 }: {
   ajuste: AjusteUrgente;
   onCycleStatus: (id: string) => void;
   onEdit: (a: AjusteUrgente) => void;
   onDelete: (id: string, titulo: string) => void;
+  onPreviewMedia: (url: string) => void;
 }) {
   const pConfig = PRIORIDADE_CONFIG[a.prioridade] || PRIORIDADE_CONFIG.media;
   const stConfig = STATUS_CONFIG[a.status] || STATUS_CONFIG.pendente;
@@ -965,15 +1066,17 @@ function AjusteCardItem({
   return (
     <Card
       className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border ${
-        a.prioridade === "urgente" && a.status !== "resolvido"
-          ? "border-red-500/50 bg-gradient-to-b from-red-500/[0.08] to-card/40"
-          : "border-border/50 bg-card/40"
-      } backdrop-blur transition-all duration-300 hover:border-accent/50 hover:shadow-lg`}
+        a.status === "resolvido"
+          ? "border-emerald-500/40 bg-emerald-950/10 opacity-90"
+          : a.prioridade === "urgente"
+          ? "border-red-500/60 bg-gradient-to-b from-red-950/40 to-card/50 shadow-[0_0_20px_-5px_rgba(239,68,68,0.25)]"
+          : "border-border/60 bg-card/50"
+      } backdrop-blur transition-all duration-300 hover:border-accent/80 hover:shadow-xl`}
     >
       <div className="p-5 space-y-3">
         {/* BADGES ROW */}
         <div className="flex items-center justify-between gap-2">
-          <Badge variant="outline" className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${pConfig.badge} flex items-center gap-1`}>
+          <Badge variant="outline" className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${pConfig.badge} flex items-center gap-1`}>
             <PrioIcon className="h-3 w-3" />
             {pConfig.label}
           </Badge>
@@ -982,7 +1085,7 @@ function AjusteCardItem({
             variant="outline"
             size="sm"
             onClick={() => onCycleStatus(a.id)}
-            className={`h-7 px-2.5 text-[10px] font-bold rounded-lg ${stConfig.badge} hover:scale-105 transition-all gap-1`}
+            className={`h-7 px-2.5 text-[10px] font-extrabold rounded-xl ${stConfig.badge} hover:scale-105 transition-all gap-1 shadow-sm`}
             title="Clique para alternar status (Pendente -> Em Andamento -> Resolvido)"
           >
             <StatusIcon className="h-3 w-3" />
@@ -997,11 +1100,11 @@ function AjusteCardItem({
 
         {/* SAAS TAG */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30">
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-accent/20 text-accent border border-accent/40">
             {a.saasNome || "Ajuste Geral / Plataforma"}
           </span>
           {a.prazo && (
-            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 bg-background/50 px-2 py-0.5 rounded border border-border/40">
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 bg-background/60 px-2 py-0.5 rounded border border-border/40">
               <Calendar className="h-3 w-3 text-amber-400" />
               Prazo: {a.prazo}
             </span>
@@ -1010,9 +1113,39 @@ function AjusteCardItem({
 
         {/* DESCRIÇÃO */}
         {a.descricao && (
-          <p className="text-xs text-muted-foreground/90 line-clamp-3 leading-relaxed bg-background/40 p-2.5 rounded-lg border border-border/30">
+          <p className="text-xs text-foreground/90 line-clamp-4 leading-relaxed bg-background/60 p-3 rounded-xl border border-border/40 whitespace-pre-wrap">
             {a.descricao}
           </p>
+        )}
+
+        {/* MÍDIAS / PRINTS / VÍDEOS ANEXADOS */}
+        {a.midias && a.midias.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <ImageIcon className="h-3 w-3 text-accent" />
+              Anexos ({a.midias.length}):
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {a.midias.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => onPreviewMedia(m.url)}
+                  className="group relative h-16 rounded-xl overflow-hidden border border-border/50 bg-black/40 cursor-pointer hover:border-accent transition-all"
+                >
+                  {m.type === "video" ? (
+                    <div className="h-full w-full flex items-center justify-center bg-zinc-900 text-sky-400">
+                      <Film className="h-6 w-6" />
+                    </div>
+                  ) : (
+                    <img src={m.url} alt="Print" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                  )}
+                  <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors flex items-center justify-center">
+                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* METADATA (SOLICITANTE & DEV) */}
@@ -1029,7 +1162,7 @@ function AjusteCardItem({
       </div>
 
       {/* CARD FOOTER */}
-      <div className="p-3 px-5 bg-card/60 border-t border-border/40 flex items-center justify-between">
+      <div className="p-3 px-5 bg-card/70 border-t border-border/40 flex items-center justify-between">
         <span className="text-[10px] font-mono text-muted-foreground">
           {new Date(a.created_at).toLocaleDateString("pt-BR")}
         </span>
@@ -1277,6 +1410,7 @@ function SaasProjectFormModal({
   );
 }
 
+// MODAL DE AJUSTE URGENTE COM PASTE CTRL+V E UPLOAD DE MÍDIA
 function AjusteFormModal({
   open,
   onOpenChange,
@@ -1298,6 +1432,9 @@ function AjusteFormModal({
   const [status, setStatus] = useState<AjusteStatus>("pendente");
   const [prazo, setPrazo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [midias, setMidias] = useState<AjusteMedia[]>([]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -1309,6 +1446,7 @@ function AjusteFormModal({
       setStatus(initialData.status || "pendente");
       setPrazo(initialData.prazo || "");
       setDescricao(initialData.descricao || "");
+      setMidias(initialData.midias || []);
     } else {
       setTitulo("");
       setSaasId("geral");
@@ -1318,13 +1456,69 @@ function AjusteFormModal({
       setStatus("pendente");
       setPrazo("Hoje / Imediato");
       setDescricao("");
+      setMidias([]);
     }
   }, [initialData, open]);
 
+  // SUPORTE A CTRL+V PARA COLAR IMAGENS E VÍDEOS
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/") || item.type.startsWith("video/")) {
+        const file = item.getAsFile();
+        if (file) {
+          processFile(file);
+          e.preventDefault();
+        }
+      }
+    }
+  };
+
+  const processFile = (file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("O arquivo excede o limite recomendado de 15MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const url = evt.target?.result as string;
+      if (url) {
+        setMidias((prev) => [
+          ...prev,
+          {
+            id: `media-${crypto.randomUUID()}`,
+            type: file.type.startsWith("video/") ? "video" : "image",
+            url,
+            name: file.name,
+          },
+        ]);
+        toast.success(file.type.startsWith("video/") ? "Vídeo anexado!" : "Imagem colada via Ctrl+V!");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (let i = 0; i < files.length; i++) {
+      processFile(files[i]);
+    }
+  };
+
+  const handleRemoveMedia = (id: string) => {
+    setMidias((prev) => prev.filter((m) => m.id !== id));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!titulo.trim()) {
-      toast.error("Preencha o título do ajuste.");
+
+    if (!descricao.trim() && midias.length === 0 && !titulo.trim()) {
+      toast.error("Escreva a descrição do ajuste ou cole uma imagem/vídeo para salvar!");
       return;
     }
 
@@ -1334,13 +1528,23 @@ function AjusteFormModal({
     const proj = projects.find((p) => p.id === saasId);
     const saasNome = saasId === "geral" ? "Ajuste Geral / Plataforma" : (proj?.nome || "SaaS");
 
+    // TITULO AUTOMÁTICO SE O USUÁRIO DEIXAR EM BRANCO
+    let finalTitle = titulo.trim();
+    if (!finalTitle) {
+      if (descricao.trim()) {
+        finalTitle = descricao.trim().slice(0, 45) + (descricao.trim().length > 45 ? "..." : "");
+      } else {
+        finalTitle = `Ajuste Rápido ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      }
+    }
+
     let updatedList: AjusteUrgente[];
     if (initialData) {
       updatedList = list.map((a) =>
         a.id === initialData.id
           ? {
               ...a,
-              titulo: titulo.trim(),
+              titulo: finalTitle,
               saasId: saasId === "geral" ? null : saasId,
               saasNome,
               solicitante: solicitante.trim() || null,
@@ -1349,6 +1553,7 @@ function AjusteFormModal({
               status,
               prazo: prazo.trim() || null,
               descricao: descricao.trim() || null,
+              midias,
               updated_at: now,
             }
           : a,
@@ -1357,7 +1562,7 @@ function AjusteFormModal({
     } else {
       const newAjuste: AjusteUrgente = {
         id: `ajuste-${crypto.randomUUID()}`,
-        titulo: titulo.trim(),
+        titulo: finalTitle,
         saasId: saasId === "geral" ? null : saasId,
         saasNome,
         solicitante: solicitante.trim() || null,
@@ -1366,11 +1571,12 @@ function AjusteFormModal({
         status,
         prazo: prazo.trim() || null,
         descricao: descricao.trim() || null,
+        midias,
         created_at: now,
         updated_at: now,
       };
       updatedList = [newAjuste, ...list];
-      toast.success("Ajuste urgente registrado!");
+      toast.success("Ajuste urgente registrado com sucesso!");
     }
 
     saveLocalAjustesUrgentes(updatedList);
@@ -1379,23 +1585,113 @@ function AjusteFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl border-border/60 bg-background">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl border-border/60 bg-background max-h-[92vh] flex flex-col" onPaste={handlePaste}>
+        <DialogHeader className="shrink-0 border-b border-border/40 pb-3">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <Flame className="h-5 w-5 text-red-500 animate-pulse" />
             {initialData ? "Editar Ajuste Urgente / Por Fora" : "Novo Ajuste Urgente / Por Fora"}
           </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            Escreva a descrição do ajuste e cole prints/vídeos diretamente com <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono text-[10px]">Ctrl + V</kbd>.
+          </p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 space-y-4 py-3 pr-1">
+          {/* CAMPO DE DESCRIÇÃO PRINCIPAL E COLAGEM (CTRL+V) */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Título do Ajuste *</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                Descrição do Ajuste / Problema *
+              </Label>
+              <span className="text-[10px] text-accent font-semibold flex items-center gap-1">
+                <Clipboard className="h-3 w-3" /> Pressione Ctrl+V para colar prints!
+              </span>
+            </div>
+
+            <Textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              onPaste={handlePaste}
+              placeholder="Cole aqui prints (Ctrl+V) ou descreva o ajuste necessário, erro relatado, fluxo a ser alterado..."
+              rows={4}
+              className="resize-none bg-background/80 text-sm focus-visible:ring-red-500 border-border/60"
+              autoFocus
+            />
+          </div>
+
+          {/* ÁREA DE ANEXOS / MIDIAS CARREGADAS */}
+          <div className="space-y-2 bg-card/40 p-3 rounded-2xl border border-border/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-accent" />
+                Prints e Vídeos do Ajuste ({midias.length})
+              </Label>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8 px-3 text-xs gap-1.5 bg-background/60"
+              >
+                <Upload className="h-3.5 w-3.5 text-accent" />
+                Anexar Fotos / Vídeo
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+
+            {midias.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2 pt-1">
+                {midias.map((m) => (
+                  <div key={m.id} className="relative h-20 rounded-xl overflow-hidden border border-border/60 bg-black/60 group">
+                    {m.type === "video" ? (
+                      <div className="h-full w-full flex items-center justify-center bg-zinc-900 text-sky-400">
+                        <Film className="h-8 w-8" />
+                      </div>
+                    ) : (
+                      <img src={m.url} alt="Anexo" className="h-full w-full object-cover" />
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMedia(m.id)}
+                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs opacity-80 hover:opacity-100 transition-opacity"
+                      title="Remover anexo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="text-center py-4 border border-dashed border-border/60 rounded-xl cursor-pointer hover:border-accent/60 transition-colors"
+              >
+                <p className="text-xs text-muted-foreground">
+                  Nenhuma imagem colada ainda. Pressione <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono text-[10px]">Ctrl + V</kbd> ou clique para selecionar arquivos.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* TÍTULO OPCIONAL */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-muted-foreground">
+              Título do Ajuste (Opcional - gerado automaticamente se vazio)
+            </Label>
             <Input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Ex: Corrigir bug no checkout Cakto, Ajustar disparo no chat..."
-              required
-              className="h-10"
+              placeholder="Ex: Checkout travado, Ajustar webhook..."
+              className="h-10 text-xs"
             />
           </div>
 
@@ -1403,7 +1699,7 @@ function AjusteFormModal({
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">SaaS Relacionado</Label>
               <Select value={saasId} onValueChange={setSaasId}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1420,7 +1716,7 @@ function AjusteFormModal({
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Prioridade</Label>
               <Select value={prioridade} onValueChange={(v) => setPrioridade(v as AjustePrioridade)}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1437,7 +1733,7 @@ function AjusteFormModal({
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Status Inicial</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as AjusteStatus)}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1454,7 +1750,7 @@ function AjusteFormModal({
                 value={prazo}
                 onChange={(e) => setPrazo(e.target.value)}
                 placeholder="Ex: Hoje, Amanhã 18h, Imediato"
-                className="h-10"
+                className="h-10 text-xs"
               />
             </div>
           </div>
@@ -1466,7 +1762,7 @@ function AjusteFormModal({
                 value={solicitante}
                 onChange={(e) => setSolicitante(e.target.value)}
                 placeholder="Ex: Cliente, Closer Victor, SDR Suellen"
-                className="h-10"
+                className="h-10 text-xs"
               />
             </div>
 
@@ -1476,27 +1772,16 @@ function AjusteFormModal({
                 value={devResponsavel}
                 onChange={(e) => setDevResponsavel(e.target.value)}
                 placeholder="Ex: Antigravity DEV, Victor"
-                className="h-10"
+                className="h-10 text-xs"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Descrição do Ajuste / Instruções</Label>
-            <Textarea
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Descreva o problema relatado, causa provável ou instruções de correção..."
-              rows={3}
-              className="resize-none"
-            />
-          </div>
-
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-3 border-t border-border/40 shrink-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-red-500 hover:bg-red-600 text-white font-bold">
+            <Button type="submit" className="bg-red-500 hover:bg-red-600 text-white font-bold h-10 px-6">
               {initialData ? "Salvar Alterações" : "Registrar Ajuste Urgente"}
             </Button>
           </DialogFooter>

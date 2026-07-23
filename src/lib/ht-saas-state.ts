@@ -28,6 +28,13 @@ export type SaasProject = {
 export type AjustePrioridade = "urgente" | "alta" | "media" | "baixa";
 export type AjusteStatus = "pendente" | "em_andamento" | "resolvido";
 
+export type AjusteMedia = {
+  id: string;
+  type: "image" | "video";
+  url: string;
+  name?: string;
+};
+
 export type AjusteUrgente = {
   id: string;
   saasId?: string | null;
@@ -39,6 +46,7 @@ export type AjusteUrgente = {
   status: AjusteStatus;
   descricao?: string | null;
   prazo?: string | null;
+  midias?: AjusteMedia[];
   created_at: string;
   updated_at: string;
 };
