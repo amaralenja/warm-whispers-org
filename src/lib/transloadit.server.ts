@@ -13,10 +13,19 @@ function signParams(paramsJson: string, secret: string) {
   return createHmac("sha384", secret).update(paramsJson).digest("hex");
 }
 
+function formatTransloaditExpires(offsetMs = 1000 * 60 * 10): string {
+  const d = new Date(Date.now() + offsetMs);
+  return d
+    .toISOString()
+    .replace(/-/g, "/")
+    .replace("T", " ")
+    .replace(/\.\d{3}Z$/, "+00:00");
+}
+
 async function runAssembly(steps: Record<string, any>, timeoutMs = 240_000) {
   const { key, secret } = getCreds();
 
-  const expires = new Date(Date.now() + 1000 * 60 * 10).toISOString();
+  const expires = formatTransloaditExpires();
 
   const params = {
     auth: { key, expires, nonce: randomUUID() },
@@ -24,19 +33,35 @@ async function runAssembly(steps: Record<string, any>, timeoutMs = 240_000) {
   };
 
   const paramsJson = JSON.stringify(params);
-  const signature = signParams(paramsJson, secret);
+  const sigHex = createHmac("sha384", secret).update(paramsJson).digest("hex");
 
   const form = new FormData();
   form.append("params", paramsJson);
-  form.append("signature", `sha384:${signature}`);
+  form.append("signature", `sha384:${sigHex}`);
 
-  const createRes = await fetch(`${API_BASE}/assemblies`, {
+  let createRes = await fetch(`${API_BASE}/assemblies`, {
     method: "POST",
     body: form,
   });
-  const created: any = await createRes.json();
+  let created: any = await createRes.json();
+
   if (!createRes.ok || created?.error) {
-    throw new Error(`Transloadit create failed: ${created?.message || created?.error || createRes.status}`);
+    const fallbackSig = createHmac("sha1", secret).update(paramsJson).digest("hex");
+    const formFallback = new FormData();
+    formFallback.append("params", paramsJson);
+    formFallback.append("signature", fallbackSig);
+
+    const retryRes = await fetch(`${API_BASE}/assemblies`, {
+      method: "POST",
+      body: formFallback,
+    });
+    const retryCreated: any = await retryRes.json();
+    if (retryRes.ok && !retryCreated?.error) {
+      createRes = retryRes;
+      created = retryCreated;
+    } else {
+      throw new Error(`Transloadit create failed: ${created?.message || created?.error || createRes.status}`);
+    }
   }
 
   const assemblyUrl: string = created.assembly_ssl_url;
