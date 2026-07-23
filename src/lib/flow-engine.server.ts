@@ -20,6 +20,8 @@ type Node = { id: string; type: string; data: any };
 type Edge = { id: string; source: string; target: string; sourceHandle?: string | null };
 type VendorRunContext = { id: number; codigo: string };
 
+import { getAudioFileInfo } from "./whatsapp-chat.functions";
+
 async function getAdminDb() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
@@ -744,7 +746,14 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       }
 
       const inner: any = { link: mirroredUrl };
-      if (mediaType === "audio") inner.voice = true;
+      let isVoice = false;
+      if (mediaType === "audio") {
+        const audioInfo = getAudioFileInfo(mirroredUrl, filename);
+        if (audioInfo.isOggOpus) {
+          inner.voice = true;
+          isVoice = true;
+        }
+      }
       if (mediaType !== "sticker" && caption) inner.caption = caption;
       if (mediaType === "document" && filename) inner.filename = filename;
 
@@ -768,13 +777,31 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         // 3) TENTATIVA 2 (FALLBACK): Upload direto do binário para a API de Mídia da Meta (retorna media_id)
         try {
           const { token, phoneNumberId } = await fetchChannelToken(ctx.channelId, ctx.db);
-          const mime = mediaType === "image" ? "image/jpeg" : mediaType === "video" ? "video/mp4" : mediaType === "audio" ? "audio/ogg" : "application/pdf";
-          const safeFilename = filename || `arquivo.${mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : mediaType === "audio" ? "ogg" : "pdf"}`;
+          let mime = "application/octet-stream";
+          let ext = "file";
+
+          if (mediaType === "image") {
+            mime = "image/jpeg";
+            ext = "jpg";
+          } else if (mediaType === "video") {
+            mime = "video/mp4";
+            ext = "mp4";
+          } else if (mediaType === "audio") {
+            const audioInfo = getAudioFileInfo(mirroredUrl, filename);
+            mime = audioInfo.mime;
+            ext = audioInfo.ext;
+            isVoice = audioInfo.isOggOpus;
+          } else {
+            mime = "application/pdf";
+            ext = "pdf";
+          }
+
+          const safeFilename = filename || `arquivo.${ext}`;
 
           const mediaId = await uploadMediaToMeta(token, phoneNumberId, mirroredUrl, mime, safeFilename);
 
           const mediaIdInner: any = { id: mediaId };
-          if (mediaType === "audio") mediaIdInner.voice = true;
+          if (mediaType === "audio" && isVoice) mediaIdInner.voice = true;
           if (mediaType !== "sticker" && caption) mediaIdInner.caption = caption;
           if (mediaType === "document" && filename) mediaIdInner.filename = filename;
 
@@ -784,7 +811,18 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
             ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
           };
 
-          sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+          try {
+            sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+          } catch (mErr: any) {
+            if (mediaType === "audio" && mediaIdInner.voice) {
+              console.warn("[flow-engine] Meta rejeitou voice: true no media_id, tentando sem voice: true...");
+              delete mediaIdInner.voice;
+              body[mediaType] = mediaIdInner;
+              sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+            } else {
+              throw mErr;
+            }
+          }
           console.log(`[flow-engine] SUCESSO no envio de ${mediaType} usando media_id (${mediaId})!`);
         } catch (secondSendErr: any) {
           console.error(`[flow-engine] Fallback de mídia via media_id também falhou:`, secondSendErr);

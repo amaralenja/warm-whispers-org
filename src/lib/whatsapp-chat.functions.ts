@@ -217,6 +217,32 @@ function shouldNormalizeWhatsappVideo(url: string): boolean {
   return clean.endsWith(".mov") || clean.endsWith(".quicktime") || clean.endsWith(".hevc") || clean.endsWith(".heic") || clean.endsWith(".m4v") || !clean.endsWith(".mp4");
 }
 
+export function getAudioFileInfo(url: string, filename?: string): { mime: string; ext: string; isOggOpus: boolean } {
+  const clean = String(url || "").split("?")[0].toLowerCase();
+  const fname = String(filename || "").toLowerCase();
+
+  if (clean.endsWith(".ogg") || clean.endsWith(".opus") || fname.endsWith(".ogg") || fname.endsWith(".opus")) {
+    return { mime: "audio/ogg", ext: "ogg", isOggOpus: true };
+  }
+  if (clean.endsWith(".mp3") || fname.endsWith(".mp3")) {
+    return { mime: "audio/mpeg", ext: "mp3", isOggOpus: false };
+  }
+  if (clean.endsWith(".m4a") || clean.endsWith(".aac") || fname.endsWith(".m4a") || fname.endsWith(".aac")) {
+    return { mime: "audio/aac", ext: "m4a", isOggOpus: false };
+  }
+  if (clean.endsWith(".mp4") || fname.endsWith(".mp4")) {
+    return { mime: "audio/mp4", ext: "mp4", isOggOpus: false };
+  }
+  if (clean.endsWith(".wav") || fname.endsWith(".wav")) {
+    return { mime: "audio/wav", ext: "wav", isOggOpus: false };
+  }
+  if (clean.endsWith(".webm") || fname.endsWith(".webm")) {
+    return { mime: "audio/webm", ext: "webm", isOggOpus: false };
+  }
+
+  return { mime: "audio/mpeg", ext: "mp3", isOggOpus: false };
+}
+
 async function withRetry<T>(label: string, attempts: number, fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown = null;
   for (let i = 0; i < attempts; i++) {
@@ -1065,25 +1091,65 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
           } else if (data.type !== "text" && data.mediaUrl) {
             console.warn(`[whatsapp-chat] Meta rejeitou envio de mídia por URL (${firstErr?.message}). Executando fallback via media_id...`);
             try {
-              const mime = data.type === "image" ? "image/jpeg" : data.type === "video" ? "video/mp4" : data.type === "audio" ? "audio/ogg" : "application/pdf";
-              const safeFilename = data.filename || `arquivo.${data.type === "image" ? "jpg" : data.type === "video" ? "mp4" : "pdf"}`;
+              let mime = "application/octet-stream";
+              let ext = "file";
+              let isVoice = false;
+
+              if (data.type === "image") {
+                mime = "image/jpeg";
+                ext = "jpg";
+              } else if (data.type === "video") {
+                mime = "video/mp4";
+                ext = "mp4";
+              } else if (data.type === "audio") {
+                const info = getAudioFileInfo(data.mediaUrl, data.filename);
+                mime = info.mime;
+                ext = info.ext;
+                isVoice = info.isOggOpus;
+              } else {
+                mime = "application/pdf";
+                ext = "pdf";
+              }
+
+              const safeFilename = data.filename || `arquivo.${ext}`;
               const mediaId = await uploadMediaToMetaChannel(ch, data.mediaUrl, mime, safeFilename, db);
+
+              const mediaPayload: any = { id: mediaId };
+              if (data.type === "audio" && isVoice) mediaPayload.voice = true;
+              if (data.caption) mediaPayload.caption = data.caption;
+              if (data.filename) mediaPayload.filename = data.filename;
+
               const mediaIdBody = {
                 messaging_product: "whatsapp",
                 to: toNormalized,
                 type: data.type,
-                [data.type]: {
-                  id: mediaId,
-                  ...(data.type === "audio" ? { voice: true } : {}),
-                  ...(data.caption ? { caption: data.caption } : {}),
-                  ...(data.filename ? { filename: data.filename } : {}),
-                },
+                [data.type]: mediaPayload,
                 ...(sendBody?.context?.message_id ? { context: { message_id: sendBody.context.message_id } } : {}),
               };
-              const r = await withRetry("enviar WhatsApp via media_id", 3, () => metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
-                method: "POST",
-                body: JSON.stringify(mediaIdBody),
-              }, db));
+
+              let r: any;
+              try {
+                r = await withRetry("enviar WhatsApp via media_id", 3, () => metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+                  method: "POST",
+                  body: JSON.stringify(mediaIdBody),
+                }, db));
+              } catch (mediaIdErr: any) {
+                if (data.type === "audio" && mediaPayload.voice) {
+                  console.warn("[whatsapp-chat] Meta rejeitou voice: true no media_id, tentando sem voice: true...");
+                  delete mediaPayload.voice;
+                  const retryBody = {
+                    ...mediaIdBody,
+                    audio: mediaPayload,
+                  };
+                  r = await withRetry("enviar WhatsApp via media_id (sem voice)", 3, () => metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+                    method: "POST",
+                    body: JSON.stringify(retryBody),
+                  }, db));
+                } else {
+                  throw mediaIdErr;
+                }
+              }
+
               resp = r.body;
               console.log(`[whatsapp-chat] Envio de mídia no Chat ao Vivo via media_id teve SUCESSO!`);
             } catch (secondErr: any) {
@@ -1170,13 +1236,22 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
 
     if (data.type === "audio") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
+      let voiceUrl: string | null = null;
       try {
         const { convertAudioToWhatsappVoice } = await import("@/lib/transloadit.server");
-        const voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
-        body.audio = { link: voiceUrl || data.mediaUrl, voice: true };
+        voiceUrl = await convertAudioToWhatsappVoice(data.mediaUrl);
       } catch (audioErr: any) {
-        console.warn("[sendWhatsappMessage] Converter áudio falhou/timeout, enviando URL direto:", audioErr?.message);
-        body.audio = { link: data.mediaUrl, voice: true };
+        console.warn("[sendWhatsappMessage] Converter áudio falhou/timeout, utilizando URL direto:", audioErr?.message);
+      }
+
+      if (voiceUrl) {
+        body.audio = { link: voiceUrl, voice: true };
+      } else {
+        const info = getAudioFileInfo(data.mediaUrl, data.filename);
+        body.audio = {
+          link: data.mediaUrl,
+          ...(info.isOggOpus ? { voice: true } : {}),
+        };
       }
     } else if (data.type === "image" || data.type === "video" || data.type === "sticker") {
       if (!data.mediaUrl) throw new Error("URL da mídia ausente");
