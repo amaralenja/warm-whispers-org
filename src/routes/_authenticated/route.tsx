@@ -10,8 +10,12 @@ import { AudioPlayerProvider, FloatingAudioMiniPlayer } from "@/lib/audio-player
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (!error && data.user) return { user: data.user };
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data?.user) return { user: data.user };
+    } catch (e) {
+      console.warn("[_authenticated] supabase.auth.getUser error:", e);
+    }
     // Permite vendedor logado via vendor_session (localStorage)
     if (typeof window !== "undefined") {
       const raw = window.localStorage.getItem("vendor_session");

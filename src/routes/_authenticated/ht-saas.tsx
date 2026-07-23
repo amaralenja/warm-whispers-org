@@ -27,6 +27,7 @@ import {
 } from "@/lib/ht-saas-state";
 
 export const Route = createFileRoute("/_authenticated/ht-saas")({
+  ssr: false,
   component: () => <SaasProjectsPage />,
 });
 
