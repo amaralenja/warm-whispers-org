@@ -44,6 +44,9 @@ import {
   ArrowUp,
   Pin,
   PinOff,
+  Link,
+  Copy,
+  SendHorizontal,
 } from "lucide-react";
 
 import {
@@ -2366,6 +2369,12 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 />
               </header>
 
+              <VendorQuickLinksBar
+                active={active}
+                vendorSession={vendorSession}
+                vendorId={vendorId}
+                onSendText={handleSendText}
+              />
 
               <ActiveFlowRuns conversationId={active.id} />
               <WindowCountdown lastInboundAt={
@@ -4457,4 +4466,371 @@ function ConversationMetaControls({
     </div>
   );
 }
+
+export type VendorQuickLink = {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  tipo: "checkout" | "link" | "mensagem";
+};
+
+export function getVendorStorageKey(vendorSession: any, vendorId: any): string {
+  const vId = vendorSession?.id || vendorSession?.vendorId || vendorId || "admin";
+  return `multium_vendor_quick_links_v2_${vId}`;
+}
+
+export function loadVendorQuickLinks(vendorSession: any, vendorId: any): VendorQuickLink[] {
+  if (typeof window === "undefined") return [];
+  const key = getVendorStorageKey(vendorSession, vendorId);
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return getDefaultVendorLinks();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : getDefaultVendorLinks();
+  } catch {
+    return getDefaultVendorLinks();
+  }
+}
+
+export function saveVendorQuickLinks(vendorSession: any, vendorId: any, links: VendorQuickLink[]) {
+  if (typeof window === "undefined") return;
+  const key = getVendorStorageKey(vendorSession, vendorId);
+  try {
+    localStorage.setItem(key, JSON.stringify(links));
+    window.dispatchEvent(new Event("multium-vendor-links-updated"));
+  } catch {}
+}
+
+function getDefaultVendorLinks(): VendorQuickLink[] {
+  return [
+    {
+      id: "default-1",
+      titulo: "💳 Checkout Vitalício",
+      conteudo: "https://checkout.cakto.com.br/vitalicio",
+      tipo: "checkout",
+    },
+    {
+      id: "default-2",
+      titulo: "💳 Checkout Com Sinal",
+      conteudo: "https://checkout.cakto.com.br/sinal",
+      tipo: "checkout",
+    },
+  ];
+}
+
+function VendorQuickLinksBar({
+  active,
+  vendorSession,
+  vendorId,
+  onSendText,
+}: {
+  active: any;
+  vendorSession: any;
+  vendorId: any;
+  onSendText: (text: string) => Promise<void>;
+}) {
+  const [links, setLinks] = useState<VendorQuickLink[]>([]);
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [confirmLink, setConfirmLink] = useState<VendorQuickLink | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const refreshLinks = () => {
+    setLinks(loadVendorQuickLinks(vendorSession, vendorId));
+  };
+
+  useEffect(() => {
+    refreshLinks();
+    const handler = () => refreshLinks();
+    window.addEventListener("multium-vendor-links-updated", handler);
+    return () => window.removeEventListener("multium-vendor-links-updated", handler);
+  }, [vendorSession, vendorId]);
+
+  const handleCopy = (l: VendorQuickLink) => {
+    navigator.clipboard.writeText(l.conteudo);
+    toast.success(`Copiaste '${l.titulo}' para a área de transferência! 📋`);
+  };
+
+  const handleConfirmDisparar = async () => {
+    if (!confirmLink) return;
+    try {
+      setSending(true);
+      await onSendText(confirmLink.conteudo);
+      toast.success(`Link '${confirmLink.titulo}' disparado na conversa! 🚀`);
+      setConfirmLink(null);
+    } catch (e) {
+      toast.error("Falha ao disparar link na conversa.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const contactName = toText(active?.contact_name) || toText(active?.contact_wa_id) || "este cliente";
+
+  return (
+    <>
+      <div className="border-b border-chat-line bg-chat-panel/60 px-3 py-2 md:px-6 flex items-center justify-between gap-2 overflow-x-auto text-xs shrink-0 backdrop-blur">
+        <div className="flex items-center gap-2 overflow-x-auto py-0.5 scrollbar-none flex-1">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1.5 shrink-0 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/30">
+            <Link className="h-3.5 w-3.5 text-amber-400" />
+            Meus Checkouts & Links:
+          </span>
+
+          {links.length === 0 ? (
+            <span className="text-muted-foreground text-[11px] italic shrink-0">
+              Nenhum link cadastrado. Clique em "+ Gerenciar" para cadastrar seus checkouts!
+            </span>
+          ) : (
+            links.map((l) => (
+              <div
+                key={l.id}
+                className="group flex items-center gap-1.5 rounded-xl border border-border/50 bg-chat-soft px-3 py-1 text-xs font-semibold shrink-0 hover:border-amber-500/60 transition-all shadow-sm"
+              >
+                <span className="text-foreground font-bold truncate max-w-[160px]">{l.titulo}</span>
+
+                <div className="flex items-center gap-1 ml-1 border-l border-border/40 pl-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(l)}
+                    className="p-1 rounded-md text-muted-foreground hover:bg-chat-accent/20 hover:text-chat-accent transition-colors"
+                    title={`Copiar '${l.titulo}'`}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmLink(l)}
+                    className="p-1 rounded-md text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 transition-colors"
+                    title={`Disparar '${l.titulo}' nesta conversa`}
+                  >
+                    <SendHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setManagerOpen(true)}
+          className="h-8 px-3 text-[11px] font-bold border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 shrink-0 gap-1 rounded-xl"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Gerenciar Links ({links.length})
+        </Button>
+      </div>
+
+      {/* MODAL DE CONFIRMAÇÃO ANTES DE DISPARAR */}
+      {confirmLink && (
+        <Dialog open={!!confirmLink} onOpenChange={(o) => { if (!o) setConfirmLink(null); }}>
+          <DialogContent className="max-w-md border-amber-500/40 bg-chat-panel text-foreground">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold text-amber-400">
+                <SendHorizontal className="h-5 w-5" />
+                Disparar Link na Conversa?
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3 py-2 text-xs">
+              <p className="text-muted-foreground leading-relaxed">
+                Você tem certeza que deseja disparar o seguinte conteúdo na conversa com <strong className="text-foreground font-bold">{contactName}</strong>?
+              </p>
+
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-1.5">
+                <div className="font-bold text-amber-300 text-sm flex items-center gap-1.5">
+                  <Link className="h-3.5 w-3.5" />
+                  {confirmLink.titulo}
+                </div>
+                <div className="font-mono text-foreground/90 break-all bg-background/60 p-2.5 rounded-lg text-[11px] border border-border/40">
+                  {confirmLink.conteudo}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="ghost" size="sm" onClick={() => setConfirmLink(null)} disabled={sending}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmDisparar}
+                disabled={sending}
+                className="bg-amber-500 hover:bg-amber-600 text-black font-bold gap-1.5"
+              >
+                {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <SendHorizontal className="h-3.5 w-3.5" />}
+                Confirmar & Disparar Link
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* MODAL DE GERENCIAMENTO DE LINKS DO VENDEDOR */}
+      <VendorLinksManagerModal
+        open={managerOpen}
+        onOpenChange={setManagerOpen}
+        vendorSession={vendorSession}
+        vendorId={vendorId}
+      />
+    </>
+  );
+}
+
+function VendorLinksManagerModal({
+  open,
+  onOpenChange,
+  vendorSession,
+  vendorId,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  vendorSession: any;
+  vendorId: any;
+}) {
+  const [links, setLinks] = useState<VendorQuickLink[]>([]);
+  const [titulo, setTitulo] = useState("");
+  const [conteudo, setConteudo] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const refresh = () => {
+    setLinks(loadVendorQuickLinks(vendorSession, vendorId));
+  };
+
+  useEffect(() => {
+    if (open) refresh();
+  }, [open, vendorSession, vendorId]);
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!conteudo.trim()) {
+      toast.error("Preencha a URL ou o conteúdo do link.");
+      return;
+    }
+
+    const finalTitle = titulo.trim() || conteudo.trim().slice(0, 30);
+    let next: VendorQuickLink[];
+
+    if (editingId) {
+      next = links.map((l) =>
+        l.id === editingId ? { ...l, titulo: finalTitle, conteudo: conteudo.trim() } : l,
+      );
+      toast.success("Link atualizado!");
+    } else {
+      const newLink: VendorQuickLink = {
+        id: `link-${crypto.randomUUID()}`,
+        titulo: finalTitle,
+        conteudo: conteudo.trim(),
+        tipo: "checkout",
+      };
+      next = [newLink, ...links];
+      toast.success("Link cadastrado com sucesso!");
+    }
+
+    saveVendorQuickLinks(vendorSession, vendorId, next);
+    setTitulo("");
+    setConteudo("");
+    setEditingId(null);
+    refresh();
+  };
+
+  const handleEdit = (l: VendorQuickLink) => {
+    setEditingId(l.id);
+    setTitulo(l.titulo);
+    setConteudo(l.conteudo);
+  };
+
+  const handleDelete = (id: string) => {
+    const next = links.filter((l) => l.id !== id);
+    saveVendorQuickLinks(vendorSession, vendorId, next);
+    refresh();
+    toast.success("Link removido.");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-chat-line bg-chat-panel text-foreground max-h-[90vh] flex flex-col">
+        <DialogHeader className="shrink-0 border-b border-border/40 pb-3">
+          <DialogTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
+            <Link className="h-5 w-5 text-amber-400" />
+            Meus Links de Checkout & Atalhos
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            Cadastre seus links de checkout pessoais. Estes links pertencem exclusivamente à sua conta.
+          </p>
+        </DialogHeader>
+
+        {/* FORM NOVO / EDITAR LINK */}
+        <form onSubmit={handleSave} className="shrink-0 bg-chat-soft/80 p-4 rounded-2xl border border-border/50 space-y-3 my-2">
+          <div className="space-y-1">
+            <Label className="text-xs font-bold">Título do Link (Ex: Checkout Vitalício R$ 197)</Label>
+            <Input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ex: Checkout Vitalício, Oferta Com Sinal..."
+              className="h-9 text-xs border-chat-line bg-background"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-bold">URL do Checkout / Conteúdo *</Label>
+            <Input
+              value={conteudo}
+              onChange={(e) => setConteudo(e.target.value)}
+              placeholder="https://checkout.cakto.com.br/seu-link-aqui"
+              required
+              className="h-9 text-xs font-mono border-chat-line bg-background"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            {editingId && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => { setEditingId(null); setTitulo(""); setConteudo(""); }}>
+                Cancelar Edição
+              </Button>
+            )}
+            <Button type="submit" size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 px-4">
+              {editingId ? "Salvar Alterações" : "+ Cadastrar Novo Link"}
+            </Button>
+          </div>
+        </form>
+
+        {/* LISTA DE LINKS CADASTRADOS */}
+        <div className="overflow-y-auto flex-1 space-y-2 py-2 pr-1">
+          {links.length === 0 ? (
+            <div className="text-center py-8 text-xs text-muted-foreground italic border border-dashed border-border/40 rounded-xl">
+              Nenhum link cadastrado ainda. Preencha os campos acima para salvar seu primeiro checkout!
+            </div>
+          ) : (
+            links.map((l) => (
+              <div key={l.id} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-background/50 gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-foreground truncate">{l.titulo}</div>
+                  <div className="text-[11px] font-mono text-muted-foreground truncate">{l.conteudo}</div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-amber-400" title="Editar" onClick={() => handleEdit(l)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Excluir" onClick={() => handleDelete(l.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <DialogFooter className="shrink-0 pt-2 border-t border-border/40">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
