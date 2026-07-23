@@ -37,16 +37,33 @@ export function matchesHtCloser(
   if (!session) return true; // sem sessão HT => admin/vendedor vê tudo
   const sessEmail = norm(session.email);
   const sessNome = norm(session.nome);
-  const firstName = sessNome.split(/\s+/)[0] ?? "";
-  if (!sessEmail && !firstName) return true;
+  const sessFirstName = sessNome.split(/\s+/)[0] ?? "";
+  if (!sessEmail && !sessFirstName) return true;
 
-  const c = typeof candidate === "string" ? { nome: candidate } : (candidate ?? {});
+  const c = typeof candidate === "string"
+    ? (candidate.includes("@") ? { email: candidate } : { nome: candidate })
+    : (candidate ?? {});
+
   const email = norm(c.email);
   const nome = norm(c.nome);
   const disp = norm(c.displayName);
 
-  if (sessEmail && (email === sessEmail || disp.includes(sessEmail) || nome.includes(sessEmail))) return true;
-  if (!firstName) return false;
-  const hay = `${nome} ${disp} ${email}`;
-  return hay.includes(firstName);
+  // 1. Match de e-mail (exato ou contido)
+  if (sessEmail && email) {
+    if (email === sessEmail || email.includes(sessEmail) || sessEmail.includes(email)) return true;
+  }
+
+  // 2. E-mail contido no nome/displayName do candidato
+  if (sessEmail && (disp.includes(sessEmail) || nome.includes(sessEmail))) return true;
+  if (email && (sessNome.includes(email) || sessFirstName.includes(email))) return true;
+
+  // 3. Match por Primeiro Nome (ambas as direções)
+  if (sessFirstName && sessFirstName.length >= 2) {
+    const hay = `${nome} ${disp} ${email}`;
+    if (hay.includes(sessFirstName)) return true;
+    const candFirstName = (nome || disp || "").split(/\s+/)[0] ?? "";
+    if (candFirstName && candFirstName.length >= 2 && sessNome.includes(candFirstName)) return true;
+  }
+
+  return false;
 }

@@ -198,7 +198,13 @@ export function setCloserStage(leadId: string, stage: string | null) {
   emit("ht-closer-updated");
 }
 export function setScheduledAndCloser(leadId: string, iso: string | null, email: string | null) {
-  void upsertPatch(leadId, { scheduled_at: iso, closer_email: email });
+  void upsertPatch(leadId, {
+    scheduled_at: iso,
+    closer_email: email,
+    ...(iso ? { sdr_stage: "agendado", closer_stage: "agendado" } : {}),
+  });
   emit("ht-sched-updated");
   emit("ht-closer-email-updated");
+  emit("ht-sdr-updated");
+  emit("ht-closer-updated");
 }

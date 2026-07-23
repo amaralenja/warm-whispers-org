@@ -1914,15 +1914,18 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
             try {
               const start = new Date(iso);
               const end = new Date(start.getTime() + 60 * 60 * 1000);
-              const closerObj = email ? closersList.find((c) => c.email === email || c.nome === email) : null;
-              const closerInfo = closerObj ? `Closer: ${closerObj.nome} (${closerObj.email || "Sem e-mail"})` : "";
+              const closerObj = email ? closersList.find((c) => (c.email && c.email.toLowerCase() === email.toLowerCase()) || (c.nome && c.nome.toLowerCase() === email.toLowerCase())) : null;
+              const closerDisplayName = closerObj?.nome || email || "Closer";
+              const closerInfo = closerObj ? `Closer: ${closerObj.nome} (${closerObj.email || "Sem e-mail"})` : (email ? `Closer: ${email}` : "");
+              const validAttendees = (closerObj?.email || (email && email.includes("@") ? email : "")).trim();
+
               await scheduleCall({
                 data: {
-                  summary: `Call - ${selectedLead.nome || "Lead"}`,
+                  summary: `Call - ${selectedLead.nome || "Lead"} (${closerDisplayName})`,
                   description: `Agendado pelo SDR\n\n${closerInfo}`,
                   start: start.toISOString(),
                   end: end.toISOString(),
-                  attendees: email ? [email] : [],
+                  attendees: validAttendees ? [validAttendees] : [],
                   createMeet: !!createMeet,
                 }
               });
@@ -2200,7 +2203,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
       if (!inPipeline && !bySearch) continue;
       const closerEmail = closerEmailMap[l.id];
       const closerName = closerEmail 
-        ? closersList.find((c) => c.email === closerEmail)?.nome || closerEmail
+        ? (closersList.find((c) => (c.email && c.email.toLowerCase() === closerEmail.toLowerCase()) || (c.nome && c.nome.toLowerCase() === closerEmail.toLowerCase()))?.nome || closerEmail)
         : null;
 
       list.push({
@@ -2398,15 +2401,18 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
             try {
               const start = new Date(iso);
               const end = new Date(start.getTime() + 60 * 60 * 1000);
-              const closerObj = email ? closersList.find((c) => c.email === email || c.nome === email) : null;
-              const closerInfo = closerObj ? `Closer: ${closerObj.nome} (${closerObj.email || "Sem e-mail"})` : "";
+              const closerObj = email ? closersList.find((c) => (c.email && c.email.toLowerCase() === email.toLowerCase()) || (c.nome && c.nome.toLowerCase() === email.toLowerCase())) : null;
+              const closerDisplayName = closerObj?.nome || email || "Closer";
+              const closerInfo = closerObj ? `Closer: ${closerObj.nome} (${closerObj.email || "Sem e-mail"})` : (email ? `Closer: ${email}` : "");
+              const validAttendees = (closerObj?.email || (email && email.includes("@") ? email : "")).trim();
+
               await scheduleCall({
                 data: {
-                  summary: `Call - ${selectedLead.nome || "Lead"}`,
+                  summary: `Call - ${selectedLead.nome || "Lead"} (${closerDisplayName})`,
                   description: `Agendado pelo Closer\n\n${closerInfo}`,
                   start: start.toISOString(),
                   end: end.toISOString(),
-                  attendees: email ? [email] : [],
+                  attendees: validAttendees ? [validAttendees] : [],
                   createMeet: !!createMeet,
                 }
               });

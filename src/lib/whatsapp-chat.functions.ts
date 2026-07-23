@@ -186,6 +186,27 @@ async function metaProxyForChannel(
   }
 }
 
+async function uploadMediaToMetaChannel(ch: { token: string; phoneNumberId?: string; id?: string }, mediaUrl: string, mimeType: string, filename = "file", db?: any): Promise<string> {
+  if (!ch.phoneNumberId) throw new Error("Canal sem phone_number_id");
+  const fetchRes = await fetch(mediaUrl);
+  if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status} ao baixar mídia`);
+  const arrayBuffer = await fetchRes.arrayBuffer();
+  const blob = new Blob([arrayBuffer], { type: mimeType });
+
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("file", blob, filename);
+  form.append("type", mimeType);
+
+  const { body } = await metaProxyForChannel(ch, `/${ch.phoneNumberId}/media`, {
+    method: "POST",
+    body: form,
+  }, db);
+
+  if (!body?.id) throw new Error("Upload de mídia no Meta falhou (sem id)");
+  return String(body.id);
+}
+
 function shouldNormalizeWhatsappImage(url: string): boolean {
   const clean = String(url ?? "").split("?")[0].toLowerCase();
   return clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".heic") || clean.endsWith(".heif");
@@ -1041,6 +1062,34 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
               body: JSON.stringify(retryBody),
             }, db));
             resp = r.body;
+          } else if (data.type !== "text" && data.mediaUrl) {
+            console.warn(`[whatsapp-chat] Meta rejeitou envio de mídia por URL (${firstErr?.message}). Executando fallback via media_id...`);
+            try {
+              const mime = data.type === "image" ? "image/jpeg" : data.type === "video" ? "video/mp4" : data.type === "audio" ? "audio/ogg" : "application/pdf";
+              const safeFilename = data.filename || `arquivo.${data.type === "image" ? "jpg" : data.type === "video" ? "mp4" : "pdf"}`;
+              const mediaId = await uploadMediaToMetaChannel(ch, data.mediaUrl, mime, safeFilename, db);
+              const mediaIdBody = {
+                messaging_product: "whatsapp",
+                to: toNormalized,
+                type: data.type,
+                [data.type]: {
+                  id: mediaId,
+                  ...(data.type === "audio" ? { voice: true } : {}),
+                  ...(data.caption ? { caption: data.caption } : {}),
+                  ...(data.filename ? { filename: data.filename } : {}),
+                },
+                ...(sendBody?.context?.message_id ? { context: { message_id: sendBody.context.message_id } } : {}),
+              };
+              const r = await withRetry("enviar WhatsApp via media_id", 3, () => metaProxyForChannel(ch, `/${ch.phoneNumberId}/messages`, {
+                method: "POST",
+                body: JSON.stringify(mediaIdBody),
+              }, db));
+              resp = r.body;
+              console.log(`[whatsapp-chat] Envio de mídia no Chat ao Vivo via media_id teve SUCESSO!`);
+            } catch (secondErr: any) {
+              console.error("[whatsapp-chat] Fallback de mídia via media_id no Chat ao Vivo também falhou:", secondErr);
+              throw firstErr;
+            }
           } else {
             throw firstErr;
           }
