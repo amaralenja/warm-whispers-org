@@ -838,6 +838,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned" | "archived">("all");
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
 
   const [editingNameConv, setEditingNameConv] = useState<Conv | null>(null);
   const [newName, setNewName] = useState("");
@@ -1349,6 +1350,48 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     return map;
   }, [messageSearchResults]);
 
+  const vendorAvailableTags = useMemo(() => {
+    const map = new Map<string, { nome: string; cor: string; count: number }>();
+
+    for (const t of (allCrmTags as any[])) {
+      const nome = String(t?.nome ?? "").trim();
+      if (nome && !map.has(nome.toLowerCase())) {
+        map.set(nome.toLowerCase(), { nome, cor: t?.cor || "#64748b", count: 0 });
+      }
+    }
+
+    for (const c of conversationList) {
+      if ((c as any).archived_at) continue;
+      const convTags: string[] = Array.isArray((c as any).tags) ? (c as any).tags : [];
+      const lead = findLeadForConv(c.contact_wa_id);
+      const leadTags: string[] = Array.isArray((lead as any)?.tags)
+        ? (lead as any).tags
+        : typeof (lead as any)?.tags === "string"
+        ? String((lead as any).tags).split(",")
+        : [];
+
+      const combined = new Set<string>();
+      [...convTags, ...leadTags].forEach((t) => {
+        const clean = String(t || "").trim();
+        if (clean) combined.add(clean);
+      });
+
+      for (const tagName of combined) {
+        const key = tagName.toLowerCase();
+        const existing = map.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          map.set(key, { nome: tagName, cor: "#64748b", count: 1 });
+        }
+      }
+    }
+
+    return Array.from(map.values())
+      .filter((t) => t.count > 0 || (allCrmTags as any[]).length > 0)
+      .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome));
+  }, [allCrmTags, conversationList, leadByPhone]);
+
   const filtered = useMemo(() => {
     const rawQ = search.trim();
     const q = normalizeText(rawQ);
@@ -1380,6 +1423,21 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       if (listFilter === "unread") list = list.filter((c) => Number((c as any).unread_count ?? 0) > 0);
       else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
       else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
+    }
+
+    if (selectedTagFilter) {
+      const targetTag = selectedTagFilter.toLowerCase();
+      list = list.filter((c) => {
+        const convTags: string[] = Array.isArray((c as any).tags) ? (c as any).tags : [];
+        const lead = findLeadForConv(c.contact_wa_id);
+        const leadTags: string[] = Array.isArray((lead as any)?.tags)
+          ? (lead as any).tags
+          : typeof (lead as any)?.tags === "string"
+          ? String((lead as any).tags).split(",")
+          : [];
+        const allTags = [...convTags, ...leadTags].map((t) => String(t || "").trim().toLowerCase());
+        return allTags.includes(targetTag);
+      });
     }
 
     if (q) {
@@ -1435,11 +1493,11 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
       return 0;
     });
-  }, [conversationList, search, listFilter, activeFlowConvIds, pinnedIds, msgMatchesByConvId, leadByPhone]);
+  }, [conversationList, search, listFilter, selectedTagFilter, activeFlowConvIds, pinnedIds, msgMatchesByConvId, leadByPhone]);
 
   const PAGE_SIZE = 40;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, listFilter]);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, listFilter, selectedTagFilter]);
   const visibleFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
   const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -1860,7 +1918,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {([
                 { id: "all", label: "Todos", count: conversationList.length },
                 { id: "unread", label: "Não visualizados", count: unreadTotal },
@@ -1868,15 +1926,18 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null && !(c as any).archived_at).length },
                 { id: "archived", label: "Arquivadas", count: archivedTotal },
               ] as const).map((f) => {
-                const active = listFilter === f.id;
+                const active = listFilter === f.id && !selectedTagFilter;
                 return (
                   <button
                     key={f.id}
                     type="button"
-                    onClick={() => setListFilter(f.id)}
+                    onClick={() => {
+                      setListFilter(f.id);
+                      setSelectedTagFilter(null);
+                    }}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       active
-                        ? "border-chat-accent bg-chat-accent text-chat-accent-foreground"
+                        ? "border-chat-accent bg-chat-accent text-chat-accent-foreground shadow-sm"
                         : "border-chat-line bg-chat-panel text-muted-foreground hover:bg-chat-soft"
                     }`}
                   >
@@ -1889,6 +1950,87 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   </button>
                 );
               })}
+
+              {/* Active Selected Tag Pill */}
+              {selectedTagFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedTagFilter(null)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/60 bg-amber-500/15 text-amber-500 dark:text-amber-400 px-2.5 py-1 text-[11px] font-semibold transition hover:bg-amber-500/25 shadow-sm"
+                  title="Clique para remover o filtro por etiqueta"
+                >
+                  <Tag className="h-3 w-3 shrink-0" />
+                  <span>{selectedTagFilter}</span>
+                  <span className="rounded-full bg-amber-500/20 px-1.5 text-[10px] font-bold tabular-nums">
+                    {vendorAvailableTags.find((t) => t.nome.toLowerCase() === selectedTagFilter.toLowerCase())?.count ?? 0}
+                  </span>
+                  <X className="h-3 w-3 shrink-0 ml-0.5" />
+                </button>
+              )}
+
+              {/* Popover Selector for Vendor Tags */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      selectedTagFilter
+                        ? "border-amber-500 bg-amber-500/10 text-amber-500"
+                        : "border-chat-line bg-chat-panel text-muted-foreground hover:bg-chat-soft"
+                    }`}
+                  >
+                    <Tag className="h-3 w-3 text-chat-accent" />
+                    <span>Etiquetas</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-64 p-2 shadow-xl rounded-2xl border-chat-line bg-chat-panel">
+                  <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-chat-line mb-1">
+                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5 text-chat-accent" />
+                      Filtrar por Etiqueta
+                    </span>
+                    {selectedTagFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTagFilter(null)}
+                        className="text-[10px] font-semibold text-chat-accent hover:underline"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-60 overflow-y-auto space-y-1 scrollbar-fancy p-1">
+                    {vendorAvailableTags.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-muted-foreground">Nenhuma etiqueta cadastrada</div>
+                    ) : (
+                      vendorAvailableTags.map((t) => {
+                        const active = selectedTagFilter?.toLowerCase() === t.nome.toLowerCase();
+                        return (
+                          <button
+                            key={t.nome}
+                            type="button"
+                            onClick={() => setSelectedTagFilter(active ? null : t.nome)}
+                            className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition ${
+                              active
+                                ? "bg-chat-accent/20 border border-chat-accent font-semibold text-foreground"
+                                : "hover:bg-chat-soft border border-transparent text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: t.cor || "#3b82f6" }} />
+                              <span className="truncate">{t.nome}</span>
+                            </div>
+                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums shrink-0 ${active ? "bg-chat-accent text-chat-accent-foreground" : "bg-chat-soft"}`}>
+                              {t.count}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
           </div>
