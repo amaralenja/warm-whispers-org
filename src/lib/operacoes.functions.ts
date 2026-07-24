@@ -447,24 +447,41 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       const caioVds = vendasPeriodo.filter((v: any) => v._expert === "Caio");
       let quizLeads: any[] = [];
       try {
-        // Puxa os 5.000 leads mais recentes do quiz (cobre confortavelmente todo o histórico recente)
-        const pageSize = 1000;
-        for (let page = 0; page < 5; page++) {
-          const { data: qData, error } = await quizSb
-            .from("leads")
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, crm_status, gclid, data_criacao")
-            .order("data_criacao", { ascending: false })
-            .range(page * pageSize, (page + 1) * pageSize - 1);
+        const { data: qSubData } = await db
+          .from("ht_quiz_submissions" as any)
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
+          .order("updated_at", { ascending: false })
+          .limit(3000);
+        if (qSubData) quizLeads.push(...qSubData);
 
-          if (error || !qData || qData.length === 0) break;
-          quizLeads.push(...qData);
-          if (qData.length < pageSize) break;
-        }
+        const { data: crmLeadsData } = await db
+          .from("crm_leads" as any)
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
+          .order("created_at", { ascending: false })
+          .limit(3000);
+        if (crmLeadsData) quizLeads.push(...crmLeadsData);
       } catch (err) {
-        console.warn("Falha ao buscar leads externos para fontes do Caio", err);
+        console.warn("Falha ao buscar leads para fontes do Caio", err);
       }
 
       const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+
+      const phonesMatch = (phone1: string, phone2: string): boolean => {
+        const d1 = cleanPhone(phone1);
+        const d2 = cleanPhone(phone2);
+        if (!d1 || !d2) return false;
+        if (d1 === d2) return true;
+        if (d1.length >= 8 && d2.length >= 8) {
+          const tail1 = d1.slice(-8);
+          const tail2 = d2.slice(-8);
+          if (tail1 === tail2) {
+            const ddd1 = d1.length > 8 ? (d1.startsWith("55") ? d1.slice(2, 4) : d1.slice(0, 2)) : "";
+            const ddd2 = d2.length > 8 ? (d2.startsWith("55") ? d2.slice(2, 4) : d2.slice(0, 2)) : "";
+            if (!ddd1 || !ddd2 || ddd1 === ddd2) return true;
+          }
+        }
+        return false;
+      };
 
       const fontesMap = new Map<string, { faturamento: number; vendas: number }>();
       const initFonte = (name: string) => {
@@ -484,11 +501,9 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         const vUtm = String(v.UTM ?? "").trim().toLowerCase();
         const value = parseTicket(v.Ticket);
 
-        // Busca lead no quiz por e-mail ou telefone higienizado (case-insensitive & sem caracteres especiais)
         const lead = quizLeads.find((l: any) => {
           if (vEmail && l.email && String(l.email).trim().toLowerCase() === vEmail) return true;
-          const lTel = cleanPhone(l.whatsapp ?? "");
-          if (vTel && lTel && (vTel.endsWith(lTel) || lTel.endsWith(vTel))) return true;
+          if (vTel && l.whatsapp && phonesMatch(vTel, l.whatsapp)) return true;
           return false;
         });
 
@@ -497,17 +512,22 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         if (lead) {
           const src = String(lead.utm_source || "").toLowerCase();
           const med = String(lead.utm_medium || "").toLowerCase();
+          const cp = String(lead.utm_campaign || "").toLowerCase();
+          const fbclid = String(lead.fbclid || "").trim();
+          const fbp = String(lead.fbp || "").trim();
+          const gclid = String(lead.gclid || "").trim();
+
           const isInstagram = src.includes("ig") || src.includes("instagram");
-          const isFacebook = src.includes("fb") || src.includes("facebook");
+          const isFacebook = src.includes("fb") || src.includes("facebook") || src.includes("meta");
           const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
           const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src);
-          const hasFbTracking = isPaidMedium || isAdsSource || isInstagram || isFacebook || src.includes("ads");
+          const hasFbTracking = !!fbclid || !!fbp || isPaidMedium || isAdsSource || isInstagram || isFacebook || src.includes("ads") || (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
 
           if (src === "criar_saas" || src === "criar_saas_hub") {
             fonte = "Criar SaaS";
           } else if (hasFbTracking) {
             fonte = "Tráfego Pago";
-          } else if (src.includes("google") || lead.gclid) {
+          } else if (src.includes("google") || gclid) {
             fonte = "Google Ads";
           } else if (src === "sdr-manual" || med === "sdr-manual") {
             fonte = "Prospecção SDR";
@@ -515,7 +535,6 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
             fonte = "Orgânico (Typebot)";
           }
         } else if (vUtm) {
-          // Fallback: se o lead não está no quiz mas a própria venda veio com UTM
           if (vUtm.includes("criar_saas")) {
             fonte = "Criar SaaS";
           } else if (
@@ -548,47 +567,42 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     if (data.includeHighTicket && htVendasPeriodo.length > 0) {
       let quizLeadsHt: any[] = [];
       try {
-        const leadIds = htVendasPeriodo.map((v: any) => v.lead_id).filter(Boolean);
-        const emails = htVendasPeriodo.map((v: any) => String(v.cliente ?? "").trim().toLowerCase()).filter(Boolean);
-        const uniqueIds = Array.from(new Set(leadIds));
-        const uniqueEmails = Array.from(new Set(emails));
+        const { data: qSubData } = await db
+          .from("ht_quiz_submissions" as any)
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
+          .order("updated_at", { ascending: false })
+          .limit(3000);
+        if (qSubData) quizLeadsHt.push(...qSubData);
 
-        const batchSize = 100;
-        const fetchedLeads = [];
-
-        // Busca IDs em lotes
-        for (let i = 0; i < uniqueIds.length; i += batchSize) {
-          const chunk = uniqueIds.slice(i, i + batchSize);
-          const { data } = await quizSb
-            .from("leads")
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign")
-            .in("id", chunk);
-          if (data) fetchedLeads.push(...data);
-        }
-
-        // Busca e-mails em lotes
-        for (let i = 0; i < uniqueEmails.length; i += batchSize) {
-          const chunk = uniqueEmails.slice(i, i + batchSize);
-          const { data } = await quizSb
-            .from("leads")
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign")
-            .in("email", chunk);
-          if (data) fetchedLeads.push(...data);
-        }
-
-        // Deduplicar
-        const seenIds = new Set();
-        for (const l of fetchedLeads) {
-          if (!seenIds.has(l.id)) {
-            seenIds.add(l.id);
-            quizLeadsHt.push(l);
-          }
-        }
+        const { data: crmLeadsData } = await db
+          .from("crm_leads" as any)
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
+          .order("created_at", { ascending: false })
+          .limit(3000);
+        if (crmLeadsData) quizLeadsHt.push(...crmLeadsData);
       } catch (err) {
         console.warn("Falha ao buscar leads para htFontes", err);
       }
 
       const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+
+      const phonesMatch = (phone1: string, phone2: string): boolean => {
+        const d1 = cleanPhone(phone1);
+        const d2 = cleanPhone(phone2);
+        if (!d1 || !d2) return false;
+        if (d1 === d2) return true;
+        if (d1.length >= 8 && d2.length >= 8) {
+          const tail1 = d1.slice(-8);
+          const tail2 = d2.slice(-8);
+          if (tail1 === tail2) {
+            const ddd1 = d1.length > 8 ? (d1.startsWith("55") ? d1.slice(2, 4) : d1.slice(0, 2)) : "";
+            const ddd2 = d2.length > 8 ? (d2.startsWith("55") ? d2.slice(2, 4) : d2.slice(0, 2)) : "";
+            if (!ddd1 || !ddd2 || ddd1 === ddd2) return true;
+          }
+        }
+        return false;
+      };
+
       const htFontesMap = new Map<string, { faturamento: number; vendas: number }>();
       const initF = (name: string) => { if (!htFontesMap.has(name)) htFontesMap.set(name, { faturamento: 0, vendas: 0 }); };
       initF("Tráfego Pago"); initF("Orgânico (Typebot)"); initF("SDR Manual"); initF("Direto");
@@ -596,9 +610,11 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       for (const v of htVendasPeriodo) {
         const value = parseFloat(v.valor_total) || 0;
         const vEmail = String(v.cliente ?? "").trim().toLowerCase();
+        const vTel = cleanPhone(v.telefone || v.whatsapp || "");
         const lead = quizLeadsHt.find((l: any) => {
           if (String(v.lead_id) === String(l.id)) return true;
           if (vEmail && l.email && String(l.email).trim().toLowerCase() === vEmail) return true;
+          if (vTel && l.whatsapp && phonesMatch(vTel, l.whatsapp)) return true;
           return false;
         });
 
@@ -606,12 +622,18 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         if (lead) {
           const src = String(lead.utm_source || "").toLowerCase();
           const med = String(lead.utm_medium || "").toLowerCase();
+          const cp = String(lead.utm_campaign || "").toLowerCase();
+          const fbclid = String(lead.fbclid || "").trim();
+          const fbp = String(lead.fbp || "").trim();
+          const gclid = String(lead.gclid || "").trim();
+
+          const isPaid = !!fbclid || !!fbp || !!gclid ||
+            /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) ||
+            /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(src) ||
+            (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
+
           if (src === "sdr-manual" || med === "sdr-manual") fonte = "SDR Manual";
-          else if (
-            src.includes("fb") || src.includes("ig") || src.includes("facebook") ||
-            src.includes("instagram") || src.includes("meta") || src.includes("ads") ||
-            med.includes("cpc") || med.includes("cpm") || med.includes("paid")
-          ) fonte = "Tráfego Pago";
+          else if (isPaid) fonte = "Tráfego Pago";
           else if (lead.id) fonte = "Orgânico (Typebot)";
         }
 

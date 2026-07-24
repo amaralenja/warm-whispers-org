@@ -755,6 +755,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       if (wa.length >= 8) keys.add(wa.slice(-8));
       const local = wa.startsWith("55") && wa.length > 10 ? wa.slice(2) : wa;
       keys.add(local); keys.add("55" + local);
+      if (local.length === 11 && local[2] === "9") {
+        const without9 = local.slice(0, 2) + local.slice(3);
+        keys.add(without9);
+        keys.add("55" + without9);
+      } else if (local.length === 10) {
+        const with9 = local.slice(0, 2) + "9" + local.slice(2);
+        keys.add(with9);
+        keys.add("55" + with9);
+      }
       for (const k of keys) if (!m.has(k)) m.set(k, l);
     }
     return m;
@@ -2169,37 +2178,24 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 // Só classifica origem se veio do Typebot. Sem typebot = sem etiqueta.
                                 if (!isTypebotLead) return null;
                                 const lead: any = leadForConv ?? {};
-                                const utmSrc = String(lead.utm_source ?? "").toLowerCase();
-                                const utmMed = String(lead.utm_medium ?? "").toLowerCase();
-                                const utmCamp = String(lead.utm_campaign ?? "").toLowerCase();
+                                const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+                                const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+
+                                const utmSrc = String(lead.utm_source || sub?.utm_source || "").toLowerCase();
+                                const utmMed = String(lead.utm_medium || sub?.utm_medium || "").toLowerCase();
+                                const utmCamp = String(lead.utm_campaign || sub?.utm_campaign || "").toLowerCase();
+                                const fbclid = String(lead.fbclid || sub?.fbclid || "").trim();
+                                const fbp = String(lead.fbp || sub?.fbp || "").trim();
+                                const gclid = String(lead.gclid || sub?.gclid || "").trim();
+
                                 const isPago =
-                                  !!lead.fbclid ||
-                                  !!lead.gclid ||
-                                  !!lead.fbc ||
+                                  !!fbclid ||
+                                  !!gclid ||
+                                  !!fbp ||
                                   /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmSrc) ||
                                   /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(utmMed) ||
                                   (!!utmCamp && !/organic|organico|whatsapp|direct/.test(utmCamp));
-                                // Se não tiver UTM no crm lead, tenta puxar da submissão do typebot pelo telefone
-                                if (!utmSrc && !utmMed && !utmCamp) {
-                                  const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
-                                  const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
-                                  if (sub) {
-                                    const s = String(sub.utm_source ?? "").toLowerCase();
-                                    const m = String(sub.utm_medium ?? "").toLowerCase();
-                                    const cp = String(sub.utm_campaign ?? "").toLowerCase();
-                                    const pago = /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(s)
-                                      || /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(m)
-                                      || (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
-                                    if (pago) {
-                                      return (
-                                        <>
-                                          <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">🤖 Typebot</Badge>
-                                          <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">💰 Tráfego Pago</Badge>
-                                        </>
-                                      );
-                                    }
-                                  }
-                                }
+
                                 return (
                                   <>
                                     <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
