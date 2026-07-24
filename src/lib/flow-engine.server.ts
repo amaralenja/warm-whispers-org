@@ -1275,6 +1275,7 @@ export async function runFlowAdmin(args: {
   db?: any;
   vendor?: VendorRunContext | null;
   queueOnly?: boolean;
+  startNodeId?: string | null;
 }) {
   const db = args.db ?? await getAdminDb();
   const flow = await loadFlow(args.flowId, db);
@@ -1356,16 +1357,18 @@ export async function runFlowAdmin(args: {
     }
   }
 
-  let entryId: string | null = flow.entry_node_id ?? null;
-  if (!entryId) entryId = nodes.find((n) => n.type === "trigger")?.id ?? null;
-  if (!entryId) {
-    const targets = new Set(edges.map((e) => e.target));
-    entryId = nodes.find((n) => !targets.has(n.id))?.id ?? nodes[0].id;
-  }
+  let startId: string | null = args.startNodeId ?? null;
+  if (!startId) {
+    let entryId: string | null = flow.entry_node_id ?? null;
+    if (!entryId) entryId = nodes.find((n) => n.type === "trigger")?.id ?? null;
+    if (!entryId) {
+      const targets = new Set(edges.map((e) => e.target));
+      entryId = nodes.find((n) => !targets.has(n.id))?.id ?? nodes[0].id;
+    }
 
-  const entryNode = nodes.find((n) => n.id === entryId);
-  const startId =
-    entryNode?.type === "trigger" ? nextNodeId(edges, entryId!) : entryId;
+    const entryNode = nodes.find((n) => n.id === entryId);
+    startId = entryNode?.type === "trigger" ? nextNodeId(edges, entryId!) : entryId;
+  }
 
   const run = await createFlowRun(db, {
     flowId: args.flowId,

@@ -3843,6 +3843,99 @@ function saveFlowOrder(vendorId: number | string | null | undefined, op: string 
   } catch {}
 }
 
+function flowNodeIcon(type: string) {
+  switch (type) {
+    case "audio": return "🎤";
+    case "image": return "🖼️";
+    case "video": return "🎬";
+    case "text": return "💬";
+    case "delay":
+    case "wait": return "⏱️";
+    case "document": return "📄";
+    default: return "⚡";
+  }
+}
+
+function getOrderedFlowNodes(nodesRaw: any, edgesRaw: any): Array<{ id: string; type: string; label: string; preview?: string }> {
+  const nodes: any[] = Array.isArray(nodesRaw) ? nodesRaw : typeof nodesRaw === "string" ? (() => { try { return JSON.parse(nodesRaw); } catch { return []; } })() : [];
+  const edges: any[] = Array.isArray(edgesRaw) ? edgesRaw : typeof edgesRaw === "string" ? (() => { try { return JSON.parse(edgesRaw); } catch { return []; } })() : [];
+
+  if (nodes.length === 0) return [];
+
+  let entryId: string | null = nodes.find((n) => n.type === "trigger")?.id ?? null;
+  if (!entryId) {
+    const targets = new Set(edges.map((e) => e.target));
+    entryId = nodes.find((n) => !targets.has(n.id))?.id ?? nodes[0]?.id;
+  }
+
+  const nextMap = new Map<string, string>();
+  edges.forEach((e) => {
+    if (e.source && e.target && !nextMap.has(e.source)) {
+      nextMap.set(e.source, e.target);
+    }
+  });
+
+  const nodeMap = new Map<string, any>(nodes.map((n) => [String(n.id), n]));
+  const ordered: Array<{ id: string; type: string; label: string; preview?: string }> = [];
+  const visited = new Set<string>();
+
+  let currId: string | null = entryId;
+  while (currId && !visited.has(currId)) {
+    visited.add(currId);
+    const node = nodeMap.get(currId);
+    if (node && node.type !== "trigger" && node.type !== "start") {
+      const type = String(node.type ?? "").toLowerCase();
+      let label = node.data?.label || node.data?.name || "";
+      let preview = "";
+
+      if (type === "text") {
+        label = label || "Texto";
+        preview = String(node.data?.text || node.data?.content || "").slice(0, 50);
+      } else if (type === "audio") {
+        label = label || "Áudio";
+        preview = node.data?.seconds ? `Áudio (${node.data.seconds}s)` : node.data?.filename || "Áudio gravado";
+      } else if (type === "image") {
+        label = label || "Imagem";
+        preview = node.data?.caption || node.data?.filename || "Imagem";
+      } else if (type === "video") {
+        label = label || "Vídeo";
+        preview = node.data?.caption || node.data?.filename || "Vídeo";
+      } else if (type === "delay" || type === "wait") {
+        label = label || "Aguardar";
+        preview = node.data?.seconds ? `Espera ${node.data.seconds}s` : node.data?.time ? `Espera ${node.data.time}` : "Pausa";
+      } else if (type === "document") {
+        label = label || "Documento";
+        preview = node.data?.filename || "Documento";
+      } else {
+        label = label || type;
+        preview = String(node.data?.text || node.data?.caption || "").slice(0, 40);
+      }
+
+      ordered.push({
+        id: String(node.id),
+        type,
+        label,
+        preview,
+      });
+    }
+    currId = nextMap.get(currId) ?? null;
+  }
+
+  nodes.forEach((n) => {
+    if (!visited.has(String(n.id)) && n.type !== "trigger" && n.type !== "start") {
+      const type = String(n.type ?? "").toLowerCase();
+      ordered.push({
+        id: String(n.id),
+        type,
+        label: n.data?.label || type,
+        preview: String(n.data?.text || n.data?.caption || "").slice(0, 40),
+      });
+    }
+  });
+
+  return ordered;
+}
+
 function FlowInlineBar({
   conversation,
   listFlowsFn,
@@ -3858,7 +3951,9 @@ function FlowInlineBar({
 }) {
   const [q, setQ] = useState("");
   const [firing, setFiring] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<{ id: string; nome: string } | null>(null);
+  const [confirm, setConfirm] = useState<any | null>(null);
+  const [startFromStep, setStartFromStep] = useState(false);
+  const [selectedStartNodeId, setSelectedStartNodeId] = useState<string | null>(null);
   const [reorderOpen, setReorderOpen] = useState(false);
   const vendorSession = useMemo(() => getVendorSession(), []);
   const vendorKey = vendorSession?.id ?? "admin";
@@ -3923,10 +4018,21 @@ function FlowInlineBar({
     );
   }, [sortedCompatible, q]);
 
-  function fire(flowId: string) {
+  const confirmOrderedNodes = useMemo(() => {
+    if (!confirm) return [];
+    return getOrderedFlowNodes(confirm.nodes, confirm.edges);
+  }, [confirm]);
+
+  function fire(flowId: string, startNodeId?: string | null) {
     setFiring(flowId);
     const quotedMsgId = replyTo?.wa_message_id ?? undefined;
-    toast.success(quotedMsgId ? "Disparando fluxo em resposta à mensagem selecionada..." : "Fluxo disparado, rodando em segundo plano");
+    toast.success(
+      startNodeId
+        ? "Disparando fluxo a partir da etapa selecionada..."
+        : quotedMsgId
+        ? "Disparando fluxo em resposta à mensagem selecionada..."
+        : "Fluxo disparado, rodando em segundo plano"
+    );
     Promise.resolve(
       triggerFn({
         data: {
@@ -3935,6 +4041,7 @@ function FlowInlineBar({
           contact_wa_id: conversation.contact_wa_id,
           conversation_id: conversation.id,
           initial_quoted_msg_id: quotedMsgId,
+          start_node_id: startNodeId ?? null,
         },
       }),
     )
@@ -3998,7 +4105,6 @@ function FlowInlineBar({
             const el = e.currentTarget;
             const canScrollX = el.scrollWidth > el.clientWidth;
             if (!canScrollX) return;
-            // Se o usuário rolar vertical em cima da faixa, converte pra horizontal.
             const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
             if (delta === 0) return;
             el.scrollLeft += delta;
@@ -4024,7 +4130,11 @@ function FlowInlineBar({
               key={String(f.id)}
               type="button"
               disabled={firing === f.id}
-              onClick={() => setConfirm({ id: String(f.id), nome: toText(f.nome) || "Fluxo sem nome" })}
+              onClick={() => {
+                setConfirm(f);
+                setStartFromStep(false);
+                setSelectedStartNodeId(null);
+              }}
               className="group flex shrink-0 items-center gap-2 rounded-xl border border-chat-line bg-chat-panel px-3 py-2 text-left transition hover:border-chat-accent hover:bg-chat-soft disabled:opacity-50"
             >
               <Zap className="h-3.5 w-3.5 shrink-0 text-chat-accent" />
@@ -4040,23 +4150,81 @@ function FlowInlineBar({
         </div>
       )}
 
-      <AlertDialog open={!!confirm} onOpenChange={(o: boolean) => !o && setConfirm(null)}>
-        <AlertDialogContent>
+      <AlertDialog open={!!confirm} onOpenChange={(o: boolean) => { if (!o) { setConfirm(null); setStartFromStep(false); setSelectedStartNodeId(null); } }}>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Disparar fluxo?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-chat-accent" />
+              Disparar fluxo nesta conversa?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja disparar o fluxo <span className="font-semibold text-foreground">"{toText(confirm?.nome)}"</span> nesta conversa?
+              Escolha como deseja disparar o fluxo <span className="font-semibold text-foreground">"{toText(confirm?.nome)}"</span>:
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="my-2 space-y-3">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-chat-thread rounded-xl border border-chat-line">
+              <button
+                type="button"
+                onClick={() => { setStartFromStep(false); setSelectedStartNodeId(null); }}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg transition ${!startFromStep ? "bg-chat-accent text-chat-accent-foreground shadow" : "text-muted-foreground hover:bg-chat-soft"}`}
+              >
+                ⚡ Do início
+              </button>
+              <button
+                type="button"
+                onClick={() => setStartFromStep(true)}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg transition ${startFromStep ? "bg-chat-accent text-chat-accent-foreground shadow" : "text-muted-foreground hover:bg-chat-soft"}`}
+              >
+                📌 A partir de etapa...
+              </button>
+            </div>
+
+            {startFromStep && (
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Selecione a etapa de início:
+                </label>
+                <div className="max-h-60 overflow-y-auto space-y-1 scrollbar-fancy p-1 rounded-xl border border-chat-line bg-chat-panel/60">
+                  {confirmOrderedNodes.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-muted-foreground">Nenhuma etapa encontrada neste fluxo</div>
+                  ) : (
+                    confirmOrderedNodes.map((step, idx) => (
+                      <button
+                        key={step.id}
+                        type="button"
+                        onClick={() => setSelectedStartNodeId(step.id)}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition ${selectedStartNodeId === step.id ? "bg-chat-accent/20 border border-chat-accent font-semibold" : "hover:bg-chat-soft border border-transparent"}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="shrink-0 text-[10px] font-mono opacity-60">#{idx + 1}</span>
+                          <span className="shrink-0">{flowNodeIcon(step.type)}</span>
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">{step.label}</div>
+                            {step.preview && <div className="truncate text-[10px] text-muted-foreground">{step.preview}</div>}
+                          </div>
+                        </div>
+                        {selectedStartNodeId === step.id && <Check className="h-4 w-4 shrink-0 text-chat-accent" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setConfirm(null); setStartFromStep(false); setSelectedStartNodeId(null); }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              disabled={startFromStep && !selectedStartNodeId}
               onClick={() => {
-                if (confirm) fire(confirm.id);
+                if (confirm) fire(confirm.id, startFromStep ? selectedStartNodeId : null);
                 setConfirm(null);
+                setStartFromStep(false);
+                setSelectedStartNodeId(null);
               }}
             >
-              Disparar
+              {startFromStep ? "Disparar desta etapa" : "Disparar desde o início"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
