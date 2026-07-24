@@ -1507,6 +1507,60 @@ export type Database = {
         }
         Relationships: []
       }
+      pv24h_vendas: {
+        Row: {
+          cliente_email: string | null
+          cliente_nome: string | null
+          cliente_telefone: string | null
+          created_at: string | null
+          id: string
+          origem: string
+          payload: Json | null
+          status: string | null
+          transaction_id: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+          valor: number | null
+        }
+        Insert: {
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          cliente_telefone?: string | null
+          created_at?: string | null
+          id?: string
+          origem?: string
+          payload?: Json | null
+          status?: string | null
+          transaction_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+          valor?: number | null
+        }
+        Update: {
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          cliente_telefone?: string | null
+          created_at?: string | null
+          id?: string
+          origem?: string
+          payload?: Json | null
+          status?: string | null
+          transaction_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+          valor?: number | null
+        }
+        Relationships: []
+      }
       reembolsos: {
         Row: {
           "Data da Venda": string | null
