@@ -153,6 +153,7 @@ function PV24HAnalyticsPage() {
   const listAdSetsFn = useServerFn(listPv24hAdSets);
   const listAdsFn = useServerFn(listPv24hAds);
   const getSummary = useServerFn(getPv24hAccountSummary);
+  const toggleStatus = useServerFn(togglePv24hStatus);
   const listSalesFn = useServerFn(listPv24hSales);
   const clearTestFn = useServerFn(clearTestPv24hSales);
 

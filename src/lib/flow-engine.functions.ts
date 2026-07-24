@@ -1064,7 +1064,7 @@ export const inspectFlowExecutionLogs = createServerFn({ method: "POST" })
       .select("*")
       .or(`contact_wa_id.ilike.%${digits}%,contact_wa_id.ilike.%${digits.slice(-8)}%`);
 
-    const conv = Array.isArray(convs) && convs.length > 0 ? convs[0] : null;
+    const conv = (Array.isArray(convs) && convs.length > 0 ? convs[0] : null) as any;
     if (!conv) return { ok: false, error: "Conversa não encontrada para este telefone" };
 
     // 2. Busca execuções de fluxo (runs)
