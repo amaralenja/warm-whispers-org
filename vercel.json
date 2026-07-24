@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "**/__server.func/**": {
-      "maxDuration": 60
-    }
-  }
-}
