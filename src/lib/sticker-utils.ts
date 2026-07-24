@@ -17,10 +17,26 @@ function getStorageKey(vendorId?: string | number | null): string {
 export function getVendorStickers(vendorId?: string | number | null): VendorSticker[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(getStorageKey(vendorId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const list: VendorSticker[] = [];
+    const keys = [getStorageKey(vendorId)];
+    if (vendorId != null && String(vendorId) !== "default") {
+      keys.push(getStorageKey("default"));
+    }
+    const seenUrls = new Set<string>();
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && item.url && !seenUrls.has(item.url)) {
+            seenUrls.add(item.url);
+            list.push(item);
+          }
+        }
+      }
+    }
+    return list;
   } catch (err) {
     console.error("[sticker-utils] Error reading vendor stickers:", err);
     return [];
