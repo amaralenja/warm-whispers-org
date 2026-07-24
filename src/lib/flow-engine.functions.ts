@@ -362,7 +362,12 @@ export const listFlows = createServerFn({ method: "GET" })
     if (rpcArgs) {
       const { data, error } = await db.rpc("vendor_list_flows" as any, rpcArgs);
       if (error) throw new Error(error.message);
-      return attachFlowTriggers(db, (data ?? []) as any[], context);
+      let items = (data ?? []) as any[];
+      const vendorId = context?.vendor?.id ? Number(context.vendor.id) : null;
+      if (vendorId) {
+        items = items.filter((f) => f.owner_vendor_id == null || Number(f.owner_vendor_id) === vendorId);
+      }
+      return attachFlowTriggers(db, items, context);
     }
     const { data, error } = await db
       .from("wa_flows" as any)
