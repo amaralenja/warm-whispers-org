@@ -18,10 +18,12 @@ function normalizeSession(value: unknown): VendorSession | null {
   const s = value as Record<string, unknown>;
   const id = Number(s.id);
   if (!Number.isFinite(id) || id <= 0) return null;
+  const codigo = s.codigo == null ? null : String(s.codigo).trim();
+  if (!codigo || !/^\d{6}$/.test(codigo)) return null;
   return {
     ...(s as VendorSession),
     id,
-    codigo: s.codigo == null ? null : String(s.codigo),
+    codigo,
     wa_channel_ids: Array.isArray(s.wa_channel_ids) ? s.wa_channel_ids.map(String) : [],
     workspace_ids: Array.isArray(s.workspace_ids) ? s.workspace_ids.map(String) : null,
   };

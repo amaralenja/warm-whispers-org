@@ -144,15 +144,19 @@ export function AppSidebar() {
       const raw = typeof window !== "undefined" ? localStorage.getItem("vendor_session") : null;
       if (raw) {
         const s = JSON.parse(raw);
-        if (s?.permissoes && typeof s.permissoes === "object") setPerm(s.permissoes);
-        else setPerm({});
-        if (s?.id) {
+        if (s?.id && s?.codigo) {
           supabase
-            .rpc("login_vendedor_by_codigo" as any, { _codigo: s.codigo })
-            .then(({ data }) => {
-              if (cancelled || !data) return;
+            .rpc("login_vendedor_by_codigo" as any, { _codigo: String(s.codigo).trim() })
+            .then(({ data, error }) => {
+              if (cancelled) return;
               const row = data as any;
-              if (Number(row.id) !== Number(s.id)) return;
+              if (error || !row || Number(row.id) !== Number(s.id)) {
+                clearVendorSession();
+                setPerm({});
+                window.dispatchEvent(new Event("vendor-session-updated"));
+                window.location.href = "/auth";
+                return;
+              }
               const next = (row.permissoes ?? {}) as Permissoes;
               setPerm(next);
               try {
@@ -165,7 +169,19 @@ export function AppSidebar() {
                 } as any);
                 window.dispatchEvent(new Event("vendor-session-updated"));
               } catch { /* noop */ }
+            })
+            .catch(() => {
+              if (cancelled) return;
+              clearVendorSession();
+              setPerm({});
+              window.dispatchEvent(new Event("vendor-session-updated"));
+              window.location.href = "/auth";
             });
+        } else {
+          clearVendorSession();
+          setPerm({});
+          window.dispatchEvent(new Event("vendor-session-updated"));
+          window.location.href = "/auth";
         }
         return;
       }
@@ -174,17 +190,19 @@ export function AppSidebar() {
       if (rawHt) {
         const s = JSON.parse(rawHt);
         const tipo = (s?.tipo === "sdr" || s?.tipo === "closer") ? s.tipo : "closer";
-        const initial = (s?.permissoes && typeof s.permissoes === "object")
-          ? (s.permissoes as Permissoes)
-          : htDefaultPermissoes(tipo);
-        setPerm(initial);
-        if (s?.codigo) {
+        if (s?.codigo && s?.id) {
           supabase
-            .rpc("login_ht_team_by_codigo" as any, { _codigo: s.codigo })
-            .then(({ data }) => {
-              if (cancelled || !data) return;
+            .rpc("login_ht_team_by_codigo" as any, { _codigo: String(s.codigo).trim() })
+            .then(({ data, error }) => {
+              if (cancelled) return;
               const row = data as any;
-              if (Number(row.id) !== Number(s.id)) return;
+              if (error || !row || Number(row.id) !== Number(s.id)) {
+                localStorage.removeItem("ht_team_session");
+                setPerm({});
+                window.dispatchEvent(new Event("vendor-session-updated"));
+                window.location.href = "/auth";
+                return;
+              }
               const rowTipo = (row.tipo === "sdr" || row.tipo === "closer") ? row.tipo : tipo;
               const base = htDefaultPermissoes(rowTipo);
               const cur = (row.permissoes && typeof row.permissoes === "object") ? row.permissoes : base;
@@ -194,7 +212,19 @@ export function AppSidebar() {
                 localStorage.setItem("ht_team_session", JSON.stringify({ ...s, ...row, permissoes: next }));
                 window.dispatchEvent(new Event("vendor-session-updated"));
               } catch { /* noop */ }
+            })
+            .catch(() => {
+              if (cancelled) return;
+              localStorage.removeItem("ht_team_session");
+              setPerm({});
+              window.dispatchEvent(new Event("vendor-session-updated"));
+              window.location.href = "/auth";
             });
+        } else {
+          localStorage.removeItem("ht_team_session");
+          setPerm({});
+          window.dispatchEvent(new Event("vendor-session-updated"));
+          window.location.href = "/auth";
         }
       }
     } catch {
