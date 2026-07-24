@@ -272,8 +272,18 @@ export async function sendWA(channelId: string, to: string, body: any, db: any) 
 async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl: string, mimeType: string, filename = "file"): Promise<string> {
   const fetchRes = await fetchWithTimeout(mediaUrl, {}, 35_000);
   if (!fetchRes.ok) throw new Error(`Falha ao baixar mídia para upload direto no Meta (HTTP ${fetchRes.status})`);
-  const arrayBuffer = await fetchRes.arrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: mimeType });
+  let mediaBuf = Buffer.from(await fetchRes.arrayBuffer());
+
+  if (mimeType.startsWith("image/") || fastPng.hasPngSignature(mediaBuf)) {
+    const norm = normalizePngIfNeeded(mediaBuf);
+    if (norm.converted) {
+      mediaBuf = norm.buffer;
+      mimeType = "image/png";
+      filename = filename.replace(/\.[a-zA-Z0-9]+$/, ".png");
+    }
+  }
+
+  const blob = new Blob([mediaBuf], { type: mimeType });
 
   const form = new FormData();
   form.append("messaging_product", "whatsapp");
@@ -338,7 +348,7 @@ function normalizePngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: bool
     const decoded = fastPng.decode(buffer);
 
     const is16Bit = decoded.depth === 16;
-    const isOversized = buffer.length > 4.5 * 1024 * 1024; // Excede limite seguro da Meta API (5.0 MB)
+    const isOversized = buffer.length > 4.0 * 1024 * 1024; // Excede limite seguro da Meta API (5.0 MB)
 
     if (is16Bit || isOversized) {
       console.log(`[flow-engine] PNG necessita otimização (16-bit: ${is16Bit}, tamanho: ${(buffer.length / 1024 / 1024).toFixed(2)}MB). Otimizando para Meta API...`);
@@ -362,9 +372,10 @@ function normalizePngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: bool
 
       let newWidth = decoded.width;
       let newHeight = decoded.height;
-      const maxDim = 1536;
+      let maxDim = 1280;
+      if (buffer.length > 8.0 * 1024 * 1024) maxDim = 1024;
 
-      if (isOversized && (newWidth > maxDim || newHeight > maxDim)) {
+      if (newWidth > maxDim || newHeight > maxDim) {
         if (newWidth >= newHeight) {
           newHeight = Math.round((newHeight * maxDim) / newWidth);
           newWidth = maxDim;
@@ -413,8 +424,8 @@ async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaTyp
     const cleanPath = sourceUrl.split("?")[0].toLowerCase();
     const isPng = cleanPath.endsWith(".png");
 
-    // Se já for URL assinada e NÃO for um PNG que precisa de verificação de otimização, retorna direto
-    if (!isPng && (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token="))) {
+    // Se já for URL assinada e NÃO for uma imagem que precisa de verificação de otimização, retorna direto
+    if (mediaType !== "image" && !isPng && (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token="))) {
       return sourceUrl;
     }
 
