@@ -297,6 +297,33 @@ async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl:
   return String(json.id);
 }
 
+function normalize16BitPngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: boolean } {
+  try {
+    const fastPng = require("fast-png");
+    if (!fastPng.hasPngSignature(buffer)) return { buffer, converted: false };
+    const decoded = fastPng.decode(buffer);
+    if (decoded.depth === 16) {
+      console.log("[flow-engine] PNG com profundidade 16-bit detectado. Convertendo para 8-bit compatível com a Meta API...");
+      const data16 = decoded.data;
+      const data8 = new Uint8Array(data16.length);
+      for (let i = 0; i < data16.length; i++) {
+        data8[i] = data16[i] >> 8;
+      }
+      const encoded8 = fastPng.encode({
+        width: decoded.width,
+        height: decoded.height,
+        depth: 8,
+        channels: decoded.channels,
+        data: data8,
+      });
+      return { buffer: Buffer.from(encoded8), converted: true };
+    }
+  } catch (e: any) {
+    console.warn("[flow-engine] normalize16BitPngIfNeeded warning:", e?.message || e);
+  }
+  return { buffer, converted: false };
+}
+
 async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaType: string): Promise<string> {
   try {
     if (!sourceUrl || typeof sourceUrl !== "string") return sourceUrl;
@@ -307,19 +334,37 @@ async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaTyp
       const relativePath = sourceUrl.split("/storage/v1/object/public/wa-media/")[1];
       if (relativePath) {
         const { data: signedData } = await db.storage.from("wa-media").createSignedUrl(relativePath, 31536000);
-        if (signedData?.signedUrl) return signedData.signedUrl;
+        if (signedData?.signedUrl) sourceUrl = signedData.signedUrl;
       }
     }
 
-    // Se já for uma URL assinada (com token ou /object/sign/), retorna direto
-    if (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token=")) {
+    const cleanPath = sourceUrl.split("?")[0].toLowerCase();
+    const isPng = cleanPath.endsWith(".png");
+
+    // Se já for URL assinada e NÃO for um PNG que precisa de verificação de 16-bit, retorna direto
+    if (!isPng && (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token="))) {
       return sourceUrl;
     }
 
     const res = await fetchWithTimeout(sourceUrl, {}, 25_000);
     if (!res.ok) return sourceUrl;
     const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    let buffer = Buffer.from(arrayBuffer);
+
+    // Verificação de 16-bit PNG: se for PNG de 16-bit (incompatível com Meta), converte para 8-bit
+    let pngConverted = false;
+    if (mediaType === "image" || isPng) {
+      const norm = normalize16BitPngIfNeeded(buffer);
+      if (norm.converted) {
+        buffer = norm.buffer;
+        pngConverted = true;
+      }
+    }
+
+    // Se a URL já estava assinada e não precisou de conversão de 16-bit, retorna a URL original
+    if (!pngConverted && (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token="))) {
+      return sourceUrl;
+    }
 
     // Preserva a extensão real e o Content-Type do arquivo original
     const fetchedContentType = (res.headers.get("content-type") || "").toLowerCase();
