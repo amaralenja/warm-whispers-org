@@ -17,10 +17,5 @@ export default defineConfig({
   // o preset Vercel só vale fora do sandbox (CI da Vercel).
   nitro: {
     preset: "vercel",
-    vercel: {
-      config: {
-        maxDuration: 60,
-      },
-    },
   },
 });

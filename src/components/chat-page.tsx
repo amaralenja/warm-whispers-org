@@ -468,8 +468,14 @@ function getLeadAttributionBadge(lead: any) {
   return null;
 }
 
-function StatusTick({ status }: { status: string | null }) {
-  if (status === "failed") return <span className="text-[10px] font-bold text-destructive">erro</span>;
+function StatusTick({ status, onClickFailed }: { status: string | null; onClickFailed?: () => void }) {
+  if (status === "failed") {
+    return (
+      <button type="button" onClick={onClickFailed} className="text-[10px] font-bold text-destructive">
+        erro
+      </button>
+    );
+  }
   if (status === "pending") return <Clock className="h-3.5 w-3.5 text-white/70 animate-pulse" />;
   if (status === "read") return <CheckCheck className="h-3.5 w-3.5 drop-shadow-sm" style={{ color: "#7ec8ff" }} strokeWidth={3} />;
   if (status === "delivered") return <CheckCheck className="h-3.5 w-3.5 text-white/90" strokeWidth={2.5} />;
@@ -528,9 +534,9 @@ function ChatFooterInput({
   listFlowsFn: any;
   triggerFlowFn: any;
   openPreviewOrSend: (file: File, typeOverride?: "image" | "video" | "document" | "audio") => void;
-  imageInputRef: React.RefObject<HTMLInputElement>;
-  videoInputRef: React.RefObject<HTMLInputElement>;
-  docInputRef: React.RefObject<HTMLInputElement>;
+  imageInputRef: React.RefObject<HTMLInputElement | null>;
+  videoInputRef: React.RefObject<HTMLInputElement | null>;
+  docInputRef: React.RefObject<HTMLInputElement | null>;
   setPendingType: (t: "image" | "video" | "document" | "audio") => void;
 }) {
   const convId = String(active.id);
