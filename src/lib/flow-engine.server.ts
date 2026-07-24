@@ -300,7 +300,21 @@ async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl:
 async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaType: string): Promise<string> {
   try {
     if (!sourceUrl || typeof sourceUrl !== "string") return sourceUrl;
-    if (sourceUrl.includes("/storage/v1/object/public/wa-media/")) return sourceUrl;
+
+    // Se já for uma URL do wa-media sem token (formato /object/public/wa-media/), converte para signed URL de 1 ano!
+    // Como o bucket `wa-media` é privado, URLs /public/ geram HTTP 400 'Bucket not found' na Meta API.
+    if (sourceUrl.includes("/storage/v1/object/public/wa-media/")) {
+      const relativePath = sourceUrl.split("/storage/v1/object/public/wa-media/")[1];
+      if (relativePath) {
+        const { data: signedData } = await db.storage.from("wa-media").createSignedUrl(relativePath, 31536000);
+        if (signedData?.signedUrl) return signedData.signedUrl;
+      }
+    }
+
+    // Se já for uma URL assinada (com token ou /object/sign/), retorna direto
+    if (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token=")) {
+      return sourceUrl;
+    }
 
     const res = await fetchWithTimeout(sourceUrl, {}, 25_000);
     if (!res.ok) return sourceUrl;
@@ -346,6 +360,10 @@ async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaTyp
       console.warn("[flow-engine] Upload no bucket wa-media falhou:", uploadErr.message);
       return sourceUrl;
     }
+
+    // Gera Signed URL válida por 1 ano (31.536.000s) para que o Meta consiga baixar a mídia do bucket privado
+    const { data: signedData } = await db.storage.from("wa-media").createSignedUrl(path, 31536000);
+    if (signedData?.signedUrl) return signedData.signedUrl;
 
     const { data: publicData } = db.storage.from("wa-media").getPublicUrl(path);
     return publicData?.publicUrl || sourceUrl;
