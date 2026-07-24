@@ -298,28 +298,100 @@ async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl:
   return String(json.id);
 }
 
-function normalize16BitPngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: boolean } {
+function downscaleBilinearRgb(data: Uint8Array, width: number, height: number, newWidth: number, newHeight: number): Uint8Array {
+  const newData = new Uint8Array(newWidth * newHeight * 3);
+  const xRatio = (width - 1) / newWidth;
+  const yRatio = (height - 1) / newHeight;
+
+  for (let y = 0; y < newHeight; y++) {
+    const sy = y * yRatio;
+    const y1 = Math.floor(sy);
+    const y2 = Math.min(height - 1, y1 + 1);
+    const yDiff = sy - y1;
+
+    for (let x = 0; x < newWidth; x++) {
+      const sx = x * xRatio;
+      const x1 = Math.floor(sx);
+      const x2 = Math.min(width - 1, x1 + 1);
+      const xDiff = sx - x1;
+
+      for (let c = 0; c < 3; c++) {
+        const p1 = data[(y1 * width + x1) * 3 + c];
+        const p2 = data[(y1 * width + x2) * 3 + c];
+        const p3 = data[(y2 * width + x1) * 3 + c];
+        const p4 = data[(y2 * width + x2) * 3 + c];
+
+        const top = p1 + (p2 - p1) * xDiff;
+        const bottom = p3 + (p4 - p3) * xDiff;
+        const val = Math.round(top + (bottom - top) * yDiff);
+
+        newData[(y * newWidth + x) * 3 + c] = Math.min(255, Math.max(0, val));
+      }
+    }
+  }
+  return newData;
+}
+
+function normalizePngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: boolean } {
   try {
     if (!fastPng.hasPngSignature(buffer)) return { buffer, converted: false };
     const decoded = fastPng.decode(buffer);
-    if (decoded.depth === 16) {
-      console.log("[flow-engine] PNG com profundidade 16-bit detectado. Convertendo para 8-bit compatível com a Meta API...");
-      const data16 = decoded.data;
-      const data8 = new Uint8Array(data16.length);
-      for (let i = 0; i < data16.length; i++) {
-        data8[i] = data16[i] >> 8;
+
+    const is16Bit = decoded.depth === 16;
+    const isOversized = buffer.length > 4.5 * 1024 * 1024; // Excede limite seguro da Meta API (5.0 MB)
+
+    if (is16Bit || isOversized) {
+      console.log(`[flow-engine] PNG necessita otimização (16-bit: ${is16Bit}, tamanho: ${(buffer.length / 1024 / 1024).toFixed(2)}MB). Otimizando para Meta API...`);
+      let data = decoded.data;
+
+      // Scale 16-bit to 8-bit
+      if (is16Bit) {
+        const data8 = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) data8[i] = data[i] >> 8;
+        data = data8;
       }
-      const encoded8 = fastPng.encode({
-        width: decoded.width,
-        height: decoded.height,
+
+      const channels = decoded.channels;
+      const rgbData = new Uint8Array((data.length / channels) * 3);
+      let j = 0;
+      for (let i = 0; i < data.length; i += channels) {
+        rgbData[j++] = data[i];
+        rgbData[j++] = data[i + 1];
+        rgbData[j++] = data[i + 2];
+      }
+
+      let newWidth = decoded.width;
+      let newHeight = decoded.height;
+      const maxDim = 1536;
+
+      if (isOversized && (newWidth > maxDim || newHeight > maxDim)) {
+        if (newWidth >= newHeight) {
+          newHeight = Math.round((newHeight * maxDim) / newWidth);
+          newWidth = maxDim;
+        } else {
+          newWidth = Math.round((newWidth * maxDim) / newHeight);
+          newHeight = maxDim;
+        }
+      }
+
+      let finalPixels = rgbData;
+      if (newWidth !== decoded.width || newHeight !== decoded.height) {
+        finalPixels = downscaleBilinearRgb(rgbData, decoded.width, decoded.height, newWidth, newHeight);
+      }
+
+      const encoded = fastPng.encode({
+        width: newWidth,
+        height: newHeight,
         depth: 8,
-        channels: decoded.channels,
-        data: data8,
+        channels: 3,
+        data: finalPixels,
       });
-      return { buffer: Buffer.from(encoded8), converted: true };
+
+      console.log(`[flow-engine] PNG otimizado com sucesso (${(encoded.length / 1024 / 1024).toFixed(2)}MB, ${newWidth}x${newHeight}).`);
+      return { buffer: Buffer.from(encoded), converted: true };
     }
   } catch (e: any) {
-    console.warn("[flow-engine] normalize16BitPngIfNeeded warning:", e?.message || e);
+    console.warn("[flow-engine] normalizePngIfNeeded warning:", e?.message || e);
   }
   return { buffer, converted: false };
 }
@@ -341,7 +413,7 @@ async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaTyp
     const cleanPath = sourceUrl.split("?")[0].toLowerCase();
     const isPng = cleanPath.endsWith(".png");
 
-    // Se já for URL assinada e NÃO for um PNG que precisa de verificação de 16-bit, retorna direto
+    // Se já for URL assinada e NÃO for um PNG que precisa de verificação de otimização, retorna direto
     if (!isPng && (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token="))) {
       return sourceUrl;
     }
@@ -351,17 +423,17 @@ async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaTyp
     const arrayBuffer = await res.arrayBuffer();
     let buffer = Buffer.from(arrayBuffer);
 
-    // Verificação de 16-bit PNG: se for PNG de 16-bit (incompatível com Meta), converte para 8-bit
+    // Verificação de PNG: 16-bit ou tamanho excede limite seguro da Meta (5.0 MB)
     let pngConverted = false;
     if (mediaType === "image" || isPng) {
-      const norm = normalize16BitPngIfNeeded(buffer);
+      const norm = normalizePngIfNeeded(buffer);
       if (norm.converted) {
         buffer = norm.buffer;
         pngConverted = true;
       }
     }
 
-    // Se a URL já estava assinada e não precisou de conversão de 16-bit, retorna a URL original
+    // Se a URL já estava assinada e não precisou de conversão, retorna a URL original
     if (!pngConverted && (sourceUrl.includes("/storage/v1/object/sign/wa-media/") || sourceUrl.includes("token="))) {
       return sourceUrl;
     }
