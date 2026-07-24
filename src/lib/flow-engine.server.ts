@@ -21,6 +21,7 @@ type Edge = { id: string; source: string; target: string; sourceHandle?: string 
 type VendorRunContext = { id: number; codigo: string };
 
 import { getAudioFileInfo } from "./whatsapp-chat.functions";
+import * as fastPng from "fast-png";
 
 async function getAdminDb() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -299,7 +300,6 @@ async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl:
 
 function normalize16BitPngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: boolean } {
   try {
-    const fastPng = require("fast-png");
     if (!fastPng.hasPngSignature(buffer)) return { buffer, converted: false };
     const decoded = fastPng.decode(buffer);
     if (decoded.depth === 16) {
