@@ -1,4 +1,4 @@
-import { Play, Pause, Loader2, Volume2 } from "lucide-react";
+import { Play, Pause, Loader2, Volume2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAudioPlayer, useCurrentConversationInfo, type AudioTrack } from "@/lib/audio-player-context";
 
@@ -84,6 +84,32 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
     player.setSpeed(next);
   };
 
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ext = mime?.includes("mp3") ? "mp3" : mime?.includes("m4a") ? "m4a" : mime?.includes("wav") ? "wav" : "ogg";
+    const filename = `${title || conv?.title || "audio"}.${ext}`;
+    try {
+      const response = await fetch(safeUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch {
+      const a = document.createElement("a");
+      a.href = safeUrl;
+      a.download = filename;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
   const onSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isActive) return;
     player.seek(Number(e.target.value));
@@ -92,7 +118,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   return (
     <div
       className={cn(
-        "mb-2 flex min-w-[320px] max-w-[420px] items-center gap-4 rounded-[22px] border px-4 py-3",
+        "mb-2 flex min-w-[320px] max-w-[420px] items-center gap-3 rounded-[22px] border px-4 py-3",
         outgoing ? "border-chat-accent/30 bg-background/15" : "border-chat-line bg-background/25",
       )}
     >
@@ -107,8 +133,8 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
 
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex h-7 items-end gap-1" aria-hidden="true">
-          {Array.from({ length: 22 }).map((_, idx) => {
-            const active = duration > 0 && (idx / 22) * 100 <= progress;
+          {Array.from({ length: 20 }).map((_, idx) => {
+            const active = duration > 0 && (idx / 20) * 100 <= progress;
             const height = 8 + ((idx * 7) % 17);
             return (
               <span
@@ -142,14 +168,26 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
         {safeText(error) ? <p className="mt-0.5 text-[10px] text-destructive">{safeText(error)}</p> : null}
       </div>
 
-      <button
-        type="button"
-        onClick={cycleSpeed}
-        className="h-9 min-w-12 shrink-0 rounded-full bg-chat-accent/18 px-3 text-xs font-bold tabular-nums text-chat-accent hover:bg-chat-accent/28"
-        aria-label="Mudar velocidade"
-      >
-        {speed}x
-      </button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={cycleSpeed}
+          className="h-8 min-w-10 rounded-full bg-chat-accent/18 px-2 text-[11px] font-bold tabular-nums text-chat-accent transition hover:bg-chat-accent/28"
+          aria-label="Mudar velocidade"
+          title="Velocidade"
+        >
+          {speed}x
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground transition hover:bg-chat-accent/20 hover:text-chat-accent"
+          aria-label="Baixar áudio"
+          title="Baixar áudio"
+        >
+          <Download className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

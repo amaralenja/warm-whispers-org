@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Play, Pause, Loader2, X, MessageCircle, Volume2 } from "lucide-react";
+import { Play, Pause, Loader2, X, MessageCircle, Volume2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AudioTrack = {
@@ -252,9 +252,38 @@ export function FloatingAudioMiniPlayer() {
     p.setSpeed(next);
   };
 
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!p.track?.url) return;
+    const url = p.track.url;
+    const mime = p.track.mime;
+    const ext = mime?.includes("mp3") ? "mp3" : mime?.includes("m4a") ? "m4a" : mime?.includes("wav") ? "wav" : "ogg";
+    const filename = `${p.track.title || "audio"}.${ext}`;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
   return (
     <div
-      className="fixed bottom-4 right-4 z-[70] flex w-[min(360px,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-border bg-card/95 p-3 shadow-2xl backdrop-blur"
+      className="fixed bottom-4 right-4 z-[70] flex w-[min(380px,calc(100vw-2rem))] items-center gap-2.5 rounded-2xl border border-border bg-card/95 p-3 shadow-2xl backdrop-blur"
       role="dialog"
       aria-label="Player de áudio"
     >
@@ -291,8 +320,19 @@ export function FloatingAudioMiniPlayer() {
         onClick={cycleSpeed}
         className="h-7 min-w-9 shrink-0 rounded-full bg-muted px-2 text-[11px] font-bold tabular-nums text-foreground hover:bg-muted/80"
         aria-label="Mudar velocidade"
+        title="Velocidade"
       >
         {p.speed}x
+      </button>
+
+      <button
+        type="button"
+        onClick={handleDownload}
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        aria-label="Baixar áudio"
+        title="Baixar áudio"
+      >
+        <Download className="h-4 w-4" />
       </button>
 
       <button
@@ -300,6 +340,7 @@ export function FloatingAudioMiniPlayer() {
         onClick={p.close}
         className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
         aria-label="Fechar player"
+        title="Fechar player"
       >
         <X className="h-4 w-4" />
       </button>
