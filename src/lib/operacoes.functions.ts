@@ -959,6 +959,30 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const htVendasAll = (htVendasRes.data ?? []) as any[];
     const quizLeadsRaw = (quizLeadsRes.data ?? []) as any[];
     const crmLeadsRaw = (crmLeadsRes.data ?? []) as any[];
+    const expertsRaw = (expertsRes.data ?? []) as any[];
+
+    // ── 1b. Busca wa_conversations por operacao_id de cada expert ──
+    // operacao_id em wa_conversations é o id (UUID) do expert
+    // Fazemos uma query para cada operacao_id para pegar as tags corretas sem contaminação
+    const expertIdToNome = new Map<string, string>();
+    const expertNomeToId = new Map<string, string>();
+    for (const e of expertsRaw) {
+      if (e.id && e.nome) {
+        expertIdToNome.set(String(e.id), String(e.nome));
+        expertNomeToId.set(String(e.nome).toLowerCase().trim(), String(e.id));
+      }
+    }
+
+    // Busca conversões do WhatsApp apenas de hoje (mesmo range do dashboard) com tags não-vazias
+    const { data: waConvsRawAll } = await supabase
+      .from("wa_conversations" as any)
+      .select("contact_wa_id, tags, operacao_id, updated_at")
+      .not("tags", "eq", "{}")
+      .order("updated_at", { ascending: false })
+      .limit(5000);
+    const waConvsRaw = (waConvsRawAll ?? []) as any[];
+
+    console.log(`[getDashboardStats] wa_conversations carregadas: ${waConvsRaw.length}`);
 
     // ── Log diagnóstico (visível nos logs da Vercel) ──
     const erros = [
@@ -1035,6 +1059,67 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // ── 5. Classifica leads por operação e constrói Maps por email/phone ──
     const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
 
+    const getPhoneVariations = (rawPhone: string): string[] => {
+      const digits = String(rawPhone ?? "").replace(/\D+/g, "");
+      if (!digits) return [];
+      const set = new Set<string>([digits]);
+      if (digits.length >= 8) set.add(digits.slice(-8));
+      const local = digits.startsWith("55") && digits.length > 10 ? digits.slice(2) : digits;
+      set.add(local);
+      set.add("55" + local);
+      if (local.length === 11 && local[2] === "9") {
+        const without9 = local.slice(0, 2) + local.slice(3);
+        set.add(without9);
+        set.add("55" + without9);
+      } else if (local.length === 10) {
+        const with9 = local.slice(0, 2) + "9" + local.slice(2);
+        set.add(with9);
+        set.add("55" + with9);
+      }
+      return Array.from(set);
+    };
+
+    // phoneToWaTags: Map<phoneVariation, tags[]>
+    // Indexado por variações de número de telefone, respeitando operacao_id
+    // chave: `${operacaoNome}:${phoneVariation}`  (ou apenas phoneVariation para todas)
+    const phoneToWaTagsByOp = new Map<string, string[]>(); // key = `operacaoNome::phone`
+    const phoneToWaTagsAll = new Map<string, string[]>(); // key = phone (sem filtro por op)
+
+    for (const conv of waConvsRaw) {
+      const rawTags = Array.isArray(conv.tags) ? conv.tags : [];
+      if (rawTags.length === 0) continue;
+      const vars = getPhoneVariations(conv.contact_wa_id ?? "");
+      if (vars.length === 0) continue;
+
+      const opNome = conv.operacao_id ? (expertIdToNome.get(String(conv.operacao_id)) ?? null) : null;
+
+      for (const v of vars) {
+        // Indexa por operação
+        if (opNome) {
+          const opKey = `${opNome.toLowerCase()}::${v}`;
+          const list = phoneToWaTagsByOp.get(opKey) || [];
+          for (const t of rawTags) if (t && !list.includes(String(t))) list.push(String(t));
+          phoneToWaTagsByOp.set(opKey, list);
+        }
+        // Indexa sem filtro (para leads sem operação definida)
+        const listAll = phoneToWaTagsAll.get(v) || [];
+        for (const t of rawTags) if (t && !listAll.includes(String(t))) listAll.push(String(t));
+        phoneToWaTagsAll.set(v, listAll);
+      }
+    }
+
+    const getWaTagsForPhone = (rawPhone: string, opNome?: string): string[] => {
+      const vars = getPhoneVariations(rawPhone);
+      const tagsSet = new Set<string>();
+      if (opNome) {
+        for (const v of vars) {
+          const opTags = phoneToWaTagsByOp.get(`${opNome.toLowerCase()}::${v}`);
+          if (opTags) { for (const t of opTags) if (t) tagsSet.add(String(t).toUpperCase()); }
+        }
+      }
+      return Array.from(tagsSet);
+    };
+
     const leadsByOp = new Map<string, number>();
     const leadBreakdownByOp = new Map<string, Map<string, { leads: number; vendas: number }>>();
     const emailToLead = new Map<string, any>();
@@ -1043,9 +1128,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
-    // Extrai apenas as tags nativas do lead CRM (NÃO mescla tags de wa_conversations
-    // pois tags de outras operações contaminariam a classificação)
-    const getTagsForLead = (lead: any): string[] => {
+    const getTagsForLead = (lead: any, opNome?: string): string[] => {
       const tagsSet = new Set<string>();
       if (Array.isArray(lead?.tags)) {
         for (const t of lead.tags) if (t) tagsSet.add(String(t).toUpperCase());
@@ -1056,14 +1139,14 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (typeof lead?.tags === "string") {
         tagsSet.add(String(lead.tags).toUpperCase());
       }
+      const rawPhone = String(lead?.telefone || lead?.whatsapp || lead?.dados?.telefone || lead?.dados?.whatsapp || "");
+      if (rawPhone) {
+        const waTags = getWaTagsForPhone(rawPhone, opNome);
+        for (const t of waTags) if (t) tagsSet.add(t);
+      }
       return Array.from(tagsSet);
     };
 
-    // Regras do Caio (baseadas EXCLUSIVAMENTE nas etiquetas do lead):
-    // - TYPEBOT + TRÁFEGO PAGO  => "Typebot (Tráfego Pago)"
-    // - TYPEBOT + ORGÂNICO      => "Typebot (Orgânico)"
-    // - TYPEBOT (sozinho)       => "Typebot (Orgânico)"  (padrão do Typebot sem tag de tráfego)
-    // - ORGÂNICO (sem TYPEBOT)  => "Orgânico Direto"
     const classifyLeadType = (lead: any, forceTypebot = false, targetOp?: string): string => {
       const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem);
       const med = norm(lead.utm_medium || lead.dados?.utm_medium);
@@ -1074,7 +1157,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const gclid = String(lead.gclid || lead.dados?.gclid || "").trim();
       const fbp = String(lead.fbp || lead.dados?.fbp || "").trim();
 
-      const leadTags = getTagsForLead(lead);
+      const leadTags = getTagsForLead(lead, targetOp);
 
       const hasTypebotTag = leadTags.some((t) =>
         t.includes("TYPEBOT") ||
@@ -1103,7 +1186,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const isCaioOp = targetOp ? norm(targetOp) === "caio" : true;
 
-      // Operações que não são Caio: classificação simples Orgânico / Tráfego Pago
       if (!isCaioOp) {
         const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
         const cleanCp = isCampEmpty ? "" : cp;
@@ -1116,19 +1198,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return isPaid ? "Tráfego Pago" : "Orgânico";
       }
 
-      // ── Regras do Caio (por etiquetas, depois por UTM/quiz) ──
-
-      // Quiz submissions (ht_quiz_submissions) são sempre Typebot por definição
       const isDefinitelyTypebot = forceTypebot || hasTypebotTag;
 
       if (isDefinitelyTypebot) {
-        // TYPEBOT + TRÁFEGO PAGO → Typebot (Tráfego Pago)
         if (hasPaidTag) return "Typebot (Tráfego Pago)";
-        // TYPEBOT + ORGÂNICO ou TYPEBOT sozinho → Typebot (Orgânico)
         return "Typebot (Orgânico)";
       }
 
-      // Não tem tag TYPEBOT → Orgânico Direto
       // (mesmo que tenha chegado via algum UTM orgânico — sem a etiqueta TYPEBOT é Orgânico Direto)
       return "Orgânico Direto";
     };
