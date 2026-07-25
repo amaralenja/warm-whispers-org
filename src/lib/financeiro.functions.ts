@@ -439,7 +439,10 @@ async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): P
     const token = pvCfg?.access_token || metaCfg?.access_token || process.env.META_ADS_TOKEN || process.env.FACEBOOK_ADS_ACCESS_TOKEN;
     const rawAcc = pvCfg?.ad_account_id || process.env.META_ADS_ACCOUNT_ID || process.env.FACEBOOK_ADS_ACCOUNT_ID;
 
-    if (!token || !rawAcc) return result;
+    if (!token || !rawAcc) {
+      console.warn("Meta Ads DRE: token ou ad_account_id não encontrado", { hasToken: !!token, hasAcc: !!rawAcc, hasPvCfg: !!pvCfg, hasMetaCfg: !!metaCfg });
+      return result;
+    }
 
     const acc = String(rawAcc).startsWith("act_") ? rawAcc : `act_${rawAcc}`;
     let nextUrl: string | null = null;
@@ -447,7 +450,6 @@ async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): P
     firstUrl.searchParams.set("access_token", token);
     firstUrl.searchParams.set("time_range", JSON.stringify({ since: from, until: to }));
     firstUrl.searchParams.set("time_increment", "1");
-    firstUrl.searchParams.set("level", "day");
     firstUrl.searchParams.set("fields", "spend,date_start,date_stop");
     firstUrl.searchParams.set("limit", "500");
     nextUrl = firstUrl.toString();
@@ -461,6 +463,7 @@ async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): P
         console.warn("Meta Ads API error:", json?.error?.message || res.statusText);
         break;
       }
+      console.log("Meta Ads DRE response:", { rowCount: json?.data?.length, hasPaging: !!json?.paging?.next, firstRow: json?.data?.[0] });
       if (Array.isArray(json?.data)) {
         for (const row of json.data) {
           const spend = parseFloat(row.spend || 0);

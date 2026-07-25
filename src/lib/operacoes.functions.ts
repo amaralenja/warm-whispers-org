@@ -993,11 +993,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const vendasPeriodo = vendasAll
       .filter((v: any) => inRange(v.Data))
       .map((v: any) => {
-        const m = produtoMap.get(asStr(v.Produto).trim().toLowerCase());
-        if (!m) return null;
-        return { ...v, _expert: m.expert, _tipo: m.tipo };
-      })
-      .filter((v: any): v is any => v !== null);
+        const prodName = asStr(v.Produto).trim().toLowerCase();
+        const m = produtoMap.get(prodName);
+        const exp = m?.expert || asStr(v.nome_expert).trim() || classifyOpByUtm(v.UTM) || "Caio";
+        const tipo = m?.tipo || asStr(v.tipo_produto).trim().toLowerCase() || "main";
+        return { ...v, _expert: exp, _tipo: tipo };
+      });
 
     const sameExpert = (a?: string | null, b?: string | null) => {
       if (!a || !b) return false;
@@ -1024,7 +1025,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
-    const classifyLeadType = (lead: any): string => {
+    const classifyLeadType = (lead: any, forceTypebot = false): string => {
       const src = norm(lead.utm_source || lead.origem);
       const med = norm(lead.utm_medium);
       const rawCp = String(lead.utm_campaign || "").trim();
@@ -1043,12 +1044,20 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign) && !isOrganicWord;
 
-      const isFromTypebot = !!(lead.received_at); // quiz_submissions have received_at
+      const fonteStr = norm(lead.fonte || "");
+      const origemStr = norm(lead.origem || lead.dados?.origem || "");
+      const isFromTypebot = forceTypebot ||
+        !!(lead.received_at) ||
+        !!(lead.respostas) ||
+        fonteStr.includes("typebot") ||
+        origemStr.includes("typebot") ||
+        fonteStr.includes("quiz") ||
+        origemStr.includes("quiz");
 
       if (isFromTypebot) {
         return isPaid ? "Typebot (Tráfego Pago)" : "Typebot (Orgânico)";
       }
-      return "Orgânico Direto";
+      return isPaid ? "Tráfego Pago" : "Orgânico Direto";
     };
 
     for (const l of quizLeadsRaw) {
@@ -1059,7 +1068,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (phone) phoneToLead.set(phone, l);
       const op = classifyLeadOp(l) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(l);
+      const leadType = classifyLeadType(l, true);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
       const typeMap = leadBreakdownByOp.get(op)!;
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
@@ -1074,7 +1083,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
       const op = classifyLeadOp(l) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(l);
+      const leadType = classifyLeadType(l, false);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
       const typeMap = leadBreakdownByOp.get(op)!;
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
@@ -1228,13 +1237,14 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         }
       }
       const typeMap = leadBreakdownByOp.get(eName);
+      const isCaio = sameExpert(eName, "Caio");
       const leadBreakdownArr = ["Typebot (Orgânico)", "Typebot (Tráfego Pago)", "Orgânico Direto"]
         .map((tipo) => {
           const entry = typeMap?.get(tipo) || { leads: 0, vendas: 0 };
           const vendasConvertidas = typeVendas.get(tipo) || 0;
           return { tipo, leads: entry.leads, vendas: vendasConvertidas, conversao: entry.leads > 0 ? Math.round((vendasConvertidas / entry.leads) * 1000) / 10 : 0 };
         })
-        .filter((b) => b.leads > 0 || b.vendas > 0);
+        .filter((b) => isCaio || b.leads > 0 || b.vendas > 0);
 
       opStats.push({
         id: eId, nome: eName, foto_url: eFoto,
