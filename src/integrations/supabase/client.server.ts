@@ -51,8 +51,15 @@ function pickFirstEnv(...names: string[]): { key: string; value: string } | null
 }
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const secret = pickFirstEnv('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEYS', 'SUPABASE_SECRET_KEY');
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const secret = pickFirstEnv(
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPASUPABASE_SERVICE_ROLE_KEY',   // typo fallback
+    'SUPABASE_SECRET_KEYS',
+    'SUPABASE_SECRET_KEY',
+    'SUPABASE_SERVICE_KEY',
+    'VITE_SUPABASE_SERVICE_ROLE_KEY',
+  );
   // Fallback pra chave publishable/anon quando service role não está injetada
   // (ex: preview/dev sandbox). Não bypassa RLS, mas evita crash e permite RPCs
   // SECURITY DEFINER funcionarem.
