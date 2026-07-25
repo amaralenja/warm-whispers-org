@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 export type AudioTrack = {
   id: string;                 // unique key (message id or url)
   url: string;
+  mime?: string;              // e.g. "audio/ogg" — helps browser identify codec
   title?: string;             // e.g. contact name
   subtitle?: string;          // e.g. "Áudio recebido"
   conversationId?: string | null;
@@ -44,6 +45,25 @@ export function useAudioPlayer(): Ctx {
 
 const SPEEDS = [1, 1.5, 2] as const;
 
+/** Detect MIME type from URL extension as fallback when no explicit type is provided. */
+function detectAudioMime(url: string): string {
+  try {
+    // Data URLs: extract MIME from the prefix (e.g. "data:audio/ogg;base64,...")
+    if (url.startsWith("data:")) {
+      const match = url.match(/^data:([^;,]+)/);
+      if (match?.[1]) return match[1];
+    }
+    // Regular URLs: check extension
+    const clean = url.split("?")[0].toLowerCase();
+    if (clean.endsWith(".ogg") || clean.endsWith(".opus")) return "audio/ogg";
+    if (clean.endsWith(".mp3")) return "audio/mpeg";
+    if (clean.endsWith(".m4a") || clean.endsWith(".aac")) return "audio/mp4";
+    if (clean.endsWith(".wav")) return "audio/wav";
+    if (clean.endsWith(".webm")) return "audio/webm";
+  } catch { /* noop */ }
+  return "audio/ogg"; // WhatsApp voice default
+}
+
 export function AudioPlayerProvider({ children }: { children?: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [track, setTrack] = useState<AudioTrack | null>(null);
@@ -67,7 +87,19 @@ export function AudioPlayerProvider({ children }: { children?: ReactNode }) {
       a.addEventListener("playing", () => { setLoading(false); setPlaying(true); });
       a.addEventListener("pause", () => setPlaying(false));
       a.addEventListener("ended", () => { setPlaying(false); setCurrent(0); });
-      a.addEventListener("error", () => { setError("Falha ao carregar áudio"); setLoading(false); setPlaying(false); });
+      a.addEventListener("error", () => {
+        const err = a.error;
+        const code = err?.code ?? 0;
+        const msg =
+          code === 1 ? "Reprodução bloqueada pelo navegador"
+          : code === 2 ? "Falha na rede ao carregar áudio"
+          : code === 3 ? "Formato de áudio não suportado pelo navegador"
+          : code === 4 ? "Áudio indisponível ou URL expirada"
+          : "Falha ao carregar áudio";
+        setError(msg);
+        setLoading(false);
+        setPlaying(false);
+      });
       audioRef.current = a;
     }
     return audioRef.current;
@@ -79,6 +111,7 @@ export function AudioPlayerProvider({ children }: { children?: ReactNode }) {
     setError(null);
     if (track?.id !== t.id || a.src !== t.url) {
       a.src = t.url;
+      a.setAttribute("type", t.mime || detectAudioMime(t.url));
       setCurrent(0);
       setDuration(0);
       setTrack(t);

@@ -811,7 +811,7 @@ export const uploadWhatsappMedia = createServerFn({ method: "POST" })
       return true;
     });
     const signed = await withRetry("gerar URL da mídia", 3, async () => {
-      const res = await supabaseAdmin.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24);
+      const res = await supabaseAdmin.storage.from("wa-media").createSignedUrl(path, 60 * 60 * 24 * 30);
       if (res.error || !res.data?.signedUrl) throw new Error(res.error?.message ?? "Erro ao gerar URL");
       return res;
     });

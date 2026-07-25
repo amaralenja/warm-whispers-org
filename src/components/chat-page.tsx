@@ -3459,7 +3459,7 @@ function RenderMedia({
     return <video src={safeUrl} controls onLoadedMetadata={onMediaSettled} className="mb-2 max-h-[420px] max-w-full rounded-2xl border border-chat-line" />;
   }
   if (safeType === "audio") {
-    return <WhatsappAudioPlayer url={safeUrl} outgoing={outgoing} trackId={trackId} />;
+    return <WhatsappAudioPlayer url={safeUrl} mime={mime} outgoing={outgoing} trackId={trackId} />;
   }
   if (safeType === "document") {
     return (

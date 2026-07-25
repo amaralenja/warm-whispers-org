@@ -4,6 +4,7 @@ import { useAudioPlayer, useCurrentConversationInfo, type AudioTrack } from "@/l
 
 interface WhatsappAudioPlayerProps {
   url?: unknown;
+  mime?: string | null;
   outgoing?: boolean;
   trackId?: string | null;
   title?: string | null;
@@ -30,6 +31,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   const outgoing = Boolean(props?.outgoing);
   const trackId = safeText(props?.trackId) || safeUrl;
   const title = safeText(props?.title);
+  const mime = safeText(props?.mime).trim() || null;
   const conv = useCurrentConversationInfo();
   const player = useAudioPlayer();
 
@@ -59,6 +61,7 @@ export function WhatsappAudioPlayer(props: WhatsappAudioPlayerProps = {}) {
   const track: AudioTrack = {
     id: trackId,
     url: safeUrl,
+    mime: mime || undefined,
     title: title || conv?.title || "Áudio",
     subtitle: outgoing ? "Áudio enviado" : "Áudio recebido",
     conversationId: conv?.conversationId ?? null,
