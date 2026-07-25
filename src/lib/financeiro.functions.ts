@@ -424,14 +424,12 @@ async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): P
   const result: { total: number; itens: DreCustoItem[] } = { total: 0, itens: [] };
   try {
     const supabase = context.supabase;
-    // Try pv24h_config
     const { data: pvCfg } = await supabase
       .from("pv24h_config" as any)
       .select("access_token, ad_account_id")
       .eq("user_id", context.userId)
       .maybeSingle();
 
-    // Try meta_ads_config
     const { data: metaCfg } = await supabase
       .from("meta_ads_config" as any)
       .select("access_token, pixel_id")
@@ -444,28 +442,42 @@ async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): P
     if (!token || !rawAcc) return result;
 
     const acc = String(rawAcc).startsWith("act_") ? rawAcc : `act_${rawAcc}`;
-    const url = new URL(`https://graph.facebook.com/v21.0/${acc}/insights`);
-    url.searchParams.set("access_token", token);
-    url.searchParams.set("time_range", JSON.stringify({ since: from, until: to }));
-    url.searchParams.set("time_increment", "1");
-    url.searchParams.set("fields", "spend,date_start,date_stop");
+    let nextUrl: string | null = null;
+    const firstUrl = new URL(`https://graph.facebook.com/v21.0/${acc}/insights`);
+    firstUrl.searchParams.set("access_token", token);
+    firstUrl.searchParams.set("time_range", JSON.stringify({ since: from, until: to }));
+    firstUrl.searchParams.set("time_increment", "1");
+    firstUrl.searchParams.set("level", "day");
+    firstUrl.searchParams.set("fields", "spend,date_start,date_stop");
+    firstUrl.searchParams.set("limit", "500");
+    nextUrl = firstUrl.toString();
 
-    const res = await fetch(url.toString());
-    const json: any = await res.json();
-    if (res.ok && Array.isArray(json?.data)) {
-      for (const row of json.data) {
-        const spend = parseFloat(row.spend || 0);
-        if (spend > 0) {
-          result.total += spend;
+    const seenDates = new Set<string>();
+
+    while (nextUrl) {
+      const res = await fetch(nextUrl);
+      const json: any = await res.json();
+      if (!res.ok) {
+        console.warn("Meta Ads API error:", json?.error?.message || res.statusText);
+        break;
+      }
+      if (Array.isArray(json?.data)) {
+        for (const row of json.data) {
+          const spend = parseFloat(row.spend || 0);
           const dia = String(row.date_start || from);
-          result.itens.push({
-            id: `meta_${dia}`,
-            descricao: `Tráfego Pago Meta Ads (${dia.split("-").reverse().join("/")})`,
-            valor: spend,
-            date: dia,
-          });
+          if (spend > 0 && !seenDates.has(dia)) {
+            seenDates.add(dia);
+            result.total += spend;
+            result.itens.push({
+              id: `meta_${dia}`,
+              descricao: `Tráfego Pago Meta Ads (${dia.split("-").reverse().join("/")})`,
+              valor: spend,
+              date: dia,
+            });
+          }
         }
       }
+      nextUrl = json?.paging?.next ?? null;
     }
   } catch (err) {
     console.warn("Falha ao buscar custo de Meta Ads na API para DRE", err);
