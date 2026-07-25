@@ -1026,7 +1026,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
-    const classifyLeadType = (lead: any, forceTypebot = false): string => {
+    const classifyLeadType = (lead: any, forceTypebot = false, targetOp?: string): string => {
       const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm);
       const med = norm(lead.utm_medium);
       const rawCp = String(lead.utm_campaign || "").trim();
@@ -1045,27 +1045,36 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign) && !isOrganicWord;
 
+      const isCaioOp = targetOp ? norm(targetOp) === "caio" : true;
+
+      // Operations other than Caio use standard Orgânico / Tráfego Pago categories
+      if (!isCaioOp) {
+        return isPaid ? "Tráfego Pago" : "Orgânico";
+      }
+
       const fonteStr = norm(lead.fonte || "");
       const origemStr = norm(lead.origem || lead.dados?.origem || "");
       const emailKey = norm(lead.email);
       const phoneKey = cleanPhone(lead.whatsapp || lead.telefone);
       const hasQuizMatch = (!!emailKey && emailToLead.has(emailKey)) || (!!phoneKey && phoneToLead.has(phoneKey));
 
+      const leadTags = Array.isArray(lead.tags) ? lead.tags.map((t: any) => String(t).toUpperCase()) : [];
+      const hasTypebotTag = leadTags.some((t: string) => t.includes("TYPEBOT") || t.includes("SALVE") || t.includes("QUIZ") || t.includes("FLORESTA") || t.includes("BOT"));
+
       const isFromTypebot = forceTypebot ||
         hasQuizMatch ||
+        hasTypebotTag ||
         !!(lead.received_at) ||
         !!(lead.respostas) ||
         fonteStr.includes("typebot") ||
         origemStr.includes("typebot") ||
         fonteStr.includes("quiz") ||
-        origemStr.includes("quiz") ||
-        fonteStr.includes("whatsapp") ||
-        origemStr.includes("whatsapp");
+        origemStr.includes("quiz");
 
       if (isFromTypebot) {
         return isPaid ? "Typebot (Tráfego Pago)" : "Typebot (Orgânico)";
       }
-      return isPaid ? "Tráfego Pago" : "Orgânico Direto";
+      return "Orgânico Direto";
     };
 
     for (const l of quizLeadsRaw) {
@@ -1076,7 +1085,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (phone) phoneToLead.set(phone, l);
       const op = classifyLeadOp(l) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(l, true);
+      const leadType = classifyLeadType(l, true, op);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
       const typeMap = leadBreakdownByOp.get(op)!;
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
@@ -1091,7 +1100,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
       const op = classifyLeadOp(l) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(l, false);
+      const leadType = classifyLeadType(l, false, op);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
       const typeMap = leadBreakdownByOp.get(op)!;
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
@@ -1240,13 +1249,17 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         const vTel = cleanPhone(v.Telefone ?? "");
         const lead = matchLead(vEmail, vTel);
         if (lead) {
-          const lt = classifyLeadType(lead);
+          const lt = classifyLeadType(lead, false, eName);
           typeVendas.set(lt, (typeVendas.get(lt) || 0) + 1);
         }
       }
       const typeMap = leadBreakdownByOp.get(eName);
       const isCaio = sameExpert(eName, "Caio");
-      const leadBreakdownArr = ["Typebot (Orgânico)", "Typebot (Tráfego Pago)", "Orgânico Direto"]
+      const breakdownCategories = isCaio
+        ? ["Typebot (Orgânico)", "Typebot (Tráfego Pago)", "Orgânico Direto"]
+        : ["Tráfego Pago", "Orgânico"];
+
+      const leadBreakdownArr = breakdownCategories
         .map((tipo) => {
           const entry = typeMap?.get(tipo) || { leads: 0, vendas: 0 };
           const vendasConvertidas = typeVendas.get(tipo) || 0;
