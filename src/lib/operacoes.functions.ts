@@ -1209,7 +1209,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     };
 
     for (const l of quizLeadsRaw) {
-      if (!inRange(l.received_at || l.created_at || l.updated_at)) continue;
+      if (!inRange(l.received_at || l.created_at)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
       if (email) emailToLead.set(email, l);
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
@@ -1224,14 +1224,50 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       typeMap.set(leadType, entry);
     }
     for (const l of crmLeadsRaw) {
-      if (!inRange(l.created_at || l.updated_at || l.received_at)) continue;
+      // Usa APENAS created_at para o filtro de data — updated_at muda quando tags são alteradas
+      // e causaria leads antigos (com tags atualizadas hoje) aparecerem como leads de hoje
+      if (!inRange(l.created_at)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
-      if (email && !emailToLead.has(email)) emailToLead.set(email, l);
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
+      // Deduplicar: se já existe no quiz, não conta novamente
+      const alreadyCounted = (email && emailToLead.has(email)) || (phone && phoneToLead.has(phone));
+      if (email && !emailToLead.has(email)) emailToLead.set(email, l);
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
+      if (alreadyCounted) continue; // já contado no quiz
       const op = classifyLeadOp(l) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
       const leadType = classifyLeadType(l, false, op);
+      if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
+      const typeMap = leadBreakdownByOp.get(op)!;
+      const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
+      entry.leads += 1;
+      typeMap.set(leadType, entry);
+    }
+    // Contabiliza conversas do WhatsApp como leads (para operações onde nem todo lead vai pro CRM)
+    for (const conv of waConvsRaw) {
+      if (!inRange(conv.created_at || conv.updated_at)) continue;
+      const opId = String(conv.operacao_id ?? "").trim();
+      if (!opId || opId === "__notificador__") continue;
+      const op = opId; // operacao_id já é o nome do expert
+      // Só conta operações conhecidas (evita ruído)
+      const opNorm = norm(op);
+      if (opNorm !== "caio" && opNorm !== "gustavo" && opNorm !== "jessica") continue;
+      const phone = cleanPhone(conv.contact_wa_id ?? "");
+      if (!phone) continue;
+      // Deduplicar: não conta se já existe como lead do CRM ou quiz
+      if (phoneToLead.has(phone)) continue;
+      const vars = getPhoneVariations(phone);
+      if (vars.some((v) => phoneToLead.has(v))) continue;
+      // Lead novo — registra e conta
+      phoneToLead.set(phone, conv);
+      const rawTags = Array.isArray(conv.tags) ? conv.tags : [];
+      const fakeLeadForClassify = {
+        telefone: conv.contact_wa_id,
+        tags: rawTags,
+        expert: opId,
+      };
+      leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+      const leadType = classifyLeadType(fakeLeadForClassify, false, op);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
       const typeMap = leadBreakdownByOp.get(op)!;
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
