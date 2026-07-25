@@ -420,27 +420,14 @@ export type DrePayload = {
   margemLiquida: number;
 };
 
-async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): Promise<{ total: number; itens: DreCustoItem[] }> {
+async function fetchMetaAdsSpendDaily(from: string, to: string, _context: any): Promise<{ total: number; itens: DreCustoItem[] }> {
   const result: { total: number; itens: DreCustoItem[] } = { total: 0, itens: [] };
   try {
-    const supabase = context.supabase;
-    const { data: pvCfg } = await supabase
-      .from("pv24h_config" as any)
-      .select("access_token, ad_account_id")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-
-    const { data: metaCfg } = await supabase
-      .from("meta_ads_config" as any)
-      .select("access_token, pixel_id")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-
-    const token = pvCfg?.access_token || metaCfg?.access_token || process.env.META_ADS_TOKEN || process.env.FACEBOOK_ADS_ACCESS_TOKEN;
-    const rawAcc = pvCfg?.ad_account_id || process.env.META_ADS_ACCOUNT_ID || process.env.FACEBOOK_ADS_ACCOUNT_ID;
+    const token = process.env.META_ADS_SYSTEM_USER_TOKEN;
+    const rawAcc = process.env.META_ADS_ACCOUNT_ID;
 
     if (!token || !rawAcc) {
-      console.warn("Meta Ads DRE: token ou ad_account_id não encontrado", { hasToken: !!token, hasAcc: !!rawAcc, hasPvCfg: !!pvCfg, hasMetaCfg: !!metaCfg });
+      console.warn("Meta Ads DRE: token ou ad_account_id não encontrado", { hasToken: !!token, hasAcc: !!rawAcc });
       return result;
     }
 
