@@ -437,6 +437,7 @@ export type DrePayload = {
   fatGustavo: number;
   fatHt: number;
   fatTotal: number;
+  sharePct: Record<string, number>;
   custos: {
     trafegoPago: { total: number; itens: DreCustoItem[] };
     devSaas: { total: number; itens: DreCustoItem[] };
@@ -542,18 +543,19 @@ export const listMetaAdsSpend = createServerFn({ method: "POST" })
 
 export const getDRE = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string } | undefined) => {
+  .inputValidator((input: { from: string; to: string; sharePct?: Record<string, number> } | undefined) => {
     const i = input ?? { from: "", to: "" };
     return {
       from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(i.from),
       to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(i.to),
+      sharePct: (i as any).sharePct ?? {},
     };
   })
   .handler(async (opts): Promise<DrePayload> => {
     const context = opts?.context;
     const data = opts?.data;
     if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
-    const { from, to } = data;
+    const { from, to, sharePct } = data;
     const { supabase } = context;
 
     // produtos_map + vendedores p/ classificar expert
@@ -645,7 +647,10 @@ export const getDRE = createServerFn({ method: "POST" })
       }
     });
 
-    const fatTotal = fatCaio + fatGu * 0.5 + fatHt;
+    const shareCaio = typeof sharePct["caio"] === "number" ? sharePct["caio"] / 100 : 1;
+    const shareGustavo = typeof sharePct["gustavo"] === "number" ? sharePct["gustavo"] / 100 : 1;
+    const shareHt = typeof sharePct["ht"] === "number" ? sharePct["ht"] / 100 : 1;
+    const fatTotal = fatCaio * shareCaio + fatGu * shareGustavo + fatHt * shareHt;
     const totalCustos = trafegoPago.total + devSaas.total + folha.total + comX1.total + comHt.total + imposto.total + outros.total;
     const lucroLiquido = fatTotal - totalCustos;
     const margemLiquida = fatTotal > 0 ? (lucroLiquido / fatTotal) * 100 : 0;
@@ -653,6 +658,7 @@ export const getDRE = createServerFn({ method: "POST" })
     return {
       fatCaio, fatGustavo: fatGu, fatHt,
       fatTotal,
+      sharePct,
       custos: { trafegoPago, devSaas, folha, comissaoX1: comX1, comissaoHt: comHt, imposto, outros },
       totalCustos,
       lucroLiquido,

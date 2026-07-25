@@ -14,6 +14,7 @@ import {
   listConfirmacoes, toggleConfirmacao, type Confirmacao,
   listMetaAdsSpend,
 } from "@/lib/financeiro.functions";
+import { useDashboardConfig } from "@/lib/dashboard-config";
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
   head: () => ({
