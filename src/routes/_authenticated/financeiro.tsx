@@ -872,7 +872,7 @@ function LancamentoModal({
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-2xl transition-all"
+        className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl transition-all"
       >
         {/* Header com Seletor Principal */}
         <div className="border-b border-border p-5">
