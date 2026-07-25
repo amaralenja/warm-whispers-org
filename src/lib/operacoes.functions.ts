@@ -896,6 +896,24 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const quizLeadsRaw = (quizLeadsRes.data ?? []) as any[];
     const crmLeadsRaw = (crmLeadsRes.data ?? []) as any[];
 
+    // ── Log diagnóstico (visível nos logs da Vercel) ──
+    const erros = [
+      expertsRes.error && `experts: ${expertsRes.error.message}`,
+      vendedoresRes.error && `vendedores: ${vendedoresRes.error.message}`,
+      produtosMapRes.error && `produtos_map: ${produtosMapRes.error.message}`,
+      vendasRes.error && `vendas: ${vendasRes.error.message}`,
+      reembolsosRes.error && `reembolsos: ${reembolsosRes.error.message}`,
+      crmLeadsRes.error && `crm_leads: ${crmLeadsRes.error.message}`,
+    ].filter(Boolean);
+
+    if (erros.length > 0) {
+      console.error("[getDashboardStats] ERROS nas queries:", erros.join(" | "));
+      throw new Error(`Falha ao carregar dados: ${erros.join(" | ")}`);
+    }
+
+    console.log(`[getDashboardStats] OK — vendas:${vendasAll.length} leads:${crmLeadsRaw.length} reembolsos:${reembolsosAll.length} experts:${expertsRes.data?.length}`);
+
+
     // ── 2. Maps de lookup (O(1) em vez de O(N)) ──
     const produtoMap = new Map<string, { expert: string; tipo: string }>();
     for (const p of (produtosMapRes.data ?? []) as any[]) {

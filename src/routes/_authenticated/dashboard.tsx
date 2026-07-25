@@ -53,11 +53,18 @@ function Dashboard() {
 
   const expertFilter = workspace.id === "all" ? null : workspace.id;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard-stats", range.from, range.to, expertFilter, config.includeHighTicket],
     queryFn: () => fetchStats({ data: { from: range.from, to: range.to, expert: expertFilter, includeHighTicket: config.includeHighTicket } }),
     staleTime: 30_000,
+    retry: 1,
   });
+
+  const errMsg = isError
+    ? String((error as any)?.message || (error as any)?.toString() || "Erro desconhecido ao carregar dados")
+    : null;
+
+  const hasNoData = !isLoading && !isError && data && data.totalLeads === 0 && data.totalFat === 0 && data.totalVendas === 0 && (data.ops?.length ?? 0) === 0;
 
   const ops = data?.ops ?? [];
   const visibleOps = workspace.id === "all"
@@ -76,6 +83,49 @@ function Dashboard() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
       <div className="mx-auto max-w-7xl px-8 py-10">
+
+        {/* ── Error Banner ── */}
+        {errMsg && (
+          <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-red-400">❌ Erro ao carregar dados do servidor</p>
+                <p className="mt-1 font-mono text-xs text-red-300/80 break-all">{errMsg}</p>
+              </div>
+              <button
+                onClick={() => refetch()}
+                className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/30 transition-colors"
+              >
+                🔄 Tentar novamente
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Empty Data Warning ── */}
+        {hasNoData && (
+          <div className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-400">⚠️ Dados carregados mas todos zerados</p>
+                <p className="mt-1 text-xs text-amber-300/80">
+                  O servidor respondeu mas não retornou nenhum dado para o período selecionado.
+                  Isso pode indicar problema com a chave de acesso ao banco (SUPABASE_SERVICE_ROLE_KEY) ou ausência de dados no banco.
+                </p>
+                <p className="mt-1 font-mono text-[10px] text-amber-300/60">
+                  Período: {range.from} → {range.to} | Workspace: {workspace.id}
+                </p>
+              </div>
+              <button
+                onClick={() => refetch()}
+                className="shrink-0 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition-colors"
+              >
+                🔄 Recarregar
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-6 border-b border-border pb-6">
           <div>
