@@ -130,6 +130,7 @@ import {
 import { Archive, ArchiveRestore } from "lucide-react";
 import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
+import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
 import { getUserPref, setUserPref } from "@/lib/user-prefs.functions";
 import { DEFAULT_STAGES } from "@/components/tags-manager-dialog";
 import { WhatsappAudioPlayer } from "@/components/whatsapp-audio-player";
@@ -709,16 +710,24 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const reactFn = useServerFn(reactToWhatsappMessage);
   
   // Query to fetch recent Typebot quiz submissions for live highlights and attribution
+  // Uses server function to trigger sync from external quiz Supabase before reading local data
+  const listQuizSubsFn = useServerFn(listHtQuizSubmissions);
   const { data: typebotLeads = [] } = useQuery<any[]>({
     queryKey: ["typebot-leads-list-for-highlight"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ht_quiz_submissions")
-        .select("id, whatsapp, nome, email, utm_source, utm_medium, utm_campaign, utm_content, origem, status")
-        .order("received_at", { ascending: false })
-        .limit(1000);
-      if (error || !data) return [];
-      return data;
+      try {
+        const res = await listQuizSubsFn();
+        return (res?.submissions ?? []) as any[];
+      } catch {
+        // Fallback: read directly from local table if server function fails
+        const { data, error } = await supabase
+          .from("ht_quiz_submissions")
+          .select("id, whatsapp, nome, email, utm_source, utm_medium, utm_campaign, utm_content, origem, status, fbclid, gclid, fbp, fbc")
+          .order("received_at", { ascending: false })
+          .limit(1000);
+        if (error || !data) return [];
+        return data;
+      }
     },
     staleTime: 30_000,
   });
