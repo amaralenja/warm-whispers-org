@@ -1678,6 +1678,21 @@ export async function advanceWaitingRun(args: {
   if (!run) return null;
 
   const r = run as any;
+
+  // 1. Se a execução está num nó de DELAY/TIMER (waiting_for === "timer"),
+  // mensagens enviadas pelo lead NÃO devem avançar o fluxo!
+  // O timer é de responsabilidade exclusiva do cron/processExpiredTimerRuns.
+  // Avançar um nó de delay ao receber mensagem fazia o fluxo travar na metade.
+  if (r.waiting_for === "timer") {
+    return null;
+  }
+
+  // 2. Se está aguardando um BOTÃO (waiting_for === "button") mas o lead mandou texto simples (sem buttonId),
+  // mantém o fluxo aguardando o clique do botão.
+  if (r.waiting_for === "button" && !args.input.buttonId) {
+    return null;
+  }
+
   const flow = await loadFlow(r.flow_id, db);
   const edges: Edge[] = jsonArray<Edge>(flow.edges);
 
