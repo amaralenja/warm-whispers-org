@@ -110,19 +110,19 @@ export const getRankingStats = createServerFn({ method: "POST" })
       return true;
     };
 
-    const PAGE = 1000;
-    const sales: any[] = [];
-    for (let i = 0; ; i++) {
-      const { data: rows, error } = await supabase
-        .from("vendas")
-        .select('"Data","Ticket","UTM",nome_expert,"Produto","Evento"')
-        .or("Evento.eq.purchase_approved,Evento.ilike.*aprov*")
-        .range(i * PAGE, i * PAGE + PAGE - 1);
-      if (error) throw error;
-      const list = (rows ?? []) as any[];
-      sales.push(...list);
-      if (list.length < PAGE) break;
-    }
+    const sameExpert = (a?: string | null, b?: string | null) => {
+      if (!a || !b) return false;
+      return a.trim().toLowerCase() === b.trim().toLowerCase();
+    };
+
+    const { data: rows, error } = await supabase
+      .from("vendas")
+      .select('"Ticket","Data","UTM",nome_expert,"Produto","Evento"')
+      .or("Evento.eq.purchase_approved,Evento.ilike.*aprov*")
+      .order("id", { ascending: false })
+      .limit(5000);
+    if (error) throw error;
+    const sales: any[] = (rows ?? []) as any[];
 
     const [{ data: vendedoresRaw }, { data: prodMapRows }] = await Promise.all([
       supabase.from("vendedores").select("utm,nome,expert,ativo,foto_url"),
@@ -157,7 +157,7 @@ export const getRankingStats = createServerFn({ method: "POST" })
         if (!inRange(ts)) return null;
         const prodKey = String(r.Produto ?? "").trim().toLowerCase();
         const expertOfRow = prodMap.get(prodKey) ?? r.nome_expert ?? null;
-        if (expertFilter && expertOfRow !== expertFilter) return null;
+        if (expertFilter && !sameExpert(expertOfRow, expertFilter)) return null;
         const utm = String(r.UTM ?? "").trim().toUpperCase();
         return { utm, ticket: parseTicket(r.Ticket), expert: expertOfRow };
       })

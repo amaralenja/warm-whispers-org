@@ -146,18 +146,6 @@ function Dashboard() {
             <DateRangeFilter value={range} onChange={setRange} />
             <button
               type="button"
-              onClick={() => setShowDebug((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors ${
-                showDebug || totalFat === 0
-                  ? "border-sky-500/50 bg-sky-500/10 text-sky-300"
-                  : "border-border bg-card/40 text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-              }`}
-            >
-              <Bug className="h-3.5 w-3.5" />
-              Diagnóstico
-            </button>
-            <button
-              type="button"
               onClick={() => setConfigOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/40 px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
             >
@@ -166,60 +154,6 @@ function Dashboard() {
             </button>
           </div>
         </div>
-
-        {/* ── Live Server Diagnostic Log Box ── */}
-        {(showDebug || (totalFat === 0 && !isLoading && !isError)) && (
-          <div className="mt-6 rounded-xl border border-sky-500/40 bg-sky-950/40 p-4 font-mono text-xs shadow-lg">
-            <div className="flex items-center justify-between border-b border-sky-800/40 pb-2 mb-3">
-              <span className="font-bold text-sky-400 flex items-center gap-2">
-                🔍 DIAGNÓSTICO DE VENDAS & DADOS DO SERVIDOR — PERÍODO: {data?.debug?.periodo ?? `${range.from} ate ${range.to}`}
-              </span>
-              <button onClick={() => setShowDebug(false)} className="text-sky-300/60 hover:text-sky-300 text-[11px]">
-                Fechar [✕]
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-              <div className="bg-sky-900/30 p-2.5 rounded border border-sky-800/40">
-                <div className="text-sky-400/80 text-[10px] uppercase font-sans font-semibold">Vendas no Banco (Raw)</div>
-                <div className="text-xl font-bold text-sky-100">{data?.debug?.vendasRawCount ?? 0}</div>
-              </div>
-              <div className="bg-sky-900/30 p-2.5 rounded border border-sky-800/40">
-                <div className="text-sky-400/80 text-[10px] uppercase font-sans font-semibold">Vendas no Período</div>
-                <div className="text-xl font-bold text-sky-100">{data?.debug?.vendasPeriodoCount ?? 0}</div>
-              </div>
-              <div className="bg-sky-900/30 p-2.5 rounded border border-sky-800/40">
-                <div className="text-sky-400/80 text-[10px] uppercase font-sans font-semibold">Vendas da Operação</div>
-                <div className="text-xl font-bold text-sky-100">{data?.debug?.vendasScopedCount ?? 0}</div>
-              </div>
-              <div className="bg-sky-900/30 p-2.5 rounded border border-sky-800/40">
-                <div className="text-sky-400/80 text-[10px] uppercase font-sans font-semibold">Leads CRM / Quiz</div>
-                <div className="text-xl font-bold text-sky-100">{data?.debug?.crmLeadsCount ?? 0} / {data?.debug?.quizLeadsCount ?? 0}</div>
-              </div>
-            </div>
-
-            {data?.debug?.vendasAprovadasSample?.length > 0 ? (
-              <div>
-                <div className="text-sky-300 font-semibold mb-1">Top 5 Vendas Encontradas no Banco:</div>
-                <div className="space-y-1.5 overflow-x-auto">
-                  {data.debug.vendasAprovadasSample.map((v: any, idx: number) => (
-                    <div key={idx} className="bg-black/50 p-2 rounded text-[11px] flex flex-wrap gap-x-4 gap-y-1 text-sky-200/90 border border-sky-900/40">
-                      <span>📅 Data: <b>{String(v.data ?? "N/A")}</b></span>
-                      <span>🏷️ Produto: <b>{v.produto || "N/A"}</b></span>
-                      <span>💰 Ticket: <b>R$ {v.ticket}</b></span>
-                      <span>👤 Expert: <b>{v.expert || "N/A"}</b></span>
-                      <span>⚡ Evento: <b>{v.evento}</b></span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-amber-300 bg-amber-950/40 p-3 rounded border border-amber-800/40 font-sans text-xs">
-                ℹ️ Nenhuma venda foi retornada do banco de dados na consulta (limite 3.000). Caso existam vendas hoje, verifique se a coluna <b>Evento</b> na tabela `vendas` contém o valor <code>purchase_approved</code> ou termo com <code>aprov</code>.
-              </div>
-            )}
-          </div>
-        )}
 
         <Tabs defaultValue="operacoes" className="mt-8">
           <TabsList className="grid w-full max-w-2xl grid-cols-4">

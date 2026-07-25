@@ -12,6 +12,7 @@ import {
   listLancamentos, upsertLancamento, deleteLancamento, type Lancamento,
   getFinanceiroRelatorio, getDRE, getRowsForMonth,
   listConfirmacoes, toggleConfirmacao, type Confirmacao,
+  listMetaAdsSpend,
 } from "@/lib/financeiro.functions";
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
@@ -67,6 +68,7 @@ function Financeiro() {
   const deleteFn = useServerFn(deleteLancamento);
   const fetchConf = useServerFn(listConfirmacoes);
   const toggleConf = useServerFn(toggleConfirmacao);
+  const fetchMeta = useServerFn(listMetaAdsSpend);
   const qc = useQueryClient();
 
   const { data: all = [], isLoading } = useQuery({
@@ -80,6 +82,11 @@ function Financeiro() {
   });
 
   const [mes, setMes] = useState(() => todayISO().slice(0, 7));
+
+  const { data: metaAdsRows = [] } = useQuery({
+    queryKey: ["financeiro-meta-ads", mes],
+    queryFn: () => fetchMeta({ data: { mes } }),
+  });
   const [tipo, setTipo] = useState<"all" | "gasto" | "receita">("all");
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
@@ -88,7 +95,10 @@ function Financeiro() {
   const [tab, setTab] = useState<"lancamentos" | "relatorios" | "dre">("lancamentos");
   const [recorrencia, setRecorrencia] = useState<"all" | "recorrente" | "avulso">("all");
 
-  const rowsMes = useMemo(() => getRowsForMonth(all, mes, confirmacoes), [all, mes, confirmacoes]);
+  const rowsMes = useMemo(() => {
+    const base = getRowsForMonth(all, mes, confirmacoes);
+    return [...base, ...metaAdsRows];
+  }, [all, mes, confirmacoes, metaAdsRows]);
 
   const kpis = useMemo(() => {
     const gastos = rowsMes.filter((r) => r.tipo === "gasto");
@@ -463,6 +473,7 @@ function LancamentoRow({
   const isRecurrent = r.recorrente;
   const isConfirmed = r.status === "pago";
   const isOverdue = r.status === "atrasado";
+  const isVirtual = r.id < 0;
   return (
     <div className={`group grid grid-cols-[100px_1fr_140px_110px_120px_100px_70px] items-center gap-3 border-b border-border/50 px-4 py-3 text-sm transition hover:bg-accent/[0.04] ${
       isOverdue ? "bg-red-500/[0.04]" : ""
@@ -508,20 +519,22 @@ function LancamentoRow({
         {isGasto ? "− " : "+ "}{BRL(+r.valor)}
       </span>
       <StatusBadge status={r.status} />
-      <div className="flex items-center justify-end gap-1 opacity-0 transition group-hover:opacity-100">
-        <button
-          onClick={() => onEdit(r)}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => onDelete(r.id)}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {!isVirtual && (
+        <div className="flex items-center justify-end gap-1 opacity-0 transition group-hover:opacity-100">
+          <button
+            onClick={() => onEdit(r)}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => onDelete(r.id)}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

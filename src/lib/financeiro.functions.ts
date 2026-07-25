@@ -300,11 +300,6 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     if (error) throw error;
     const all = (rows ?? []) as Lancamento[];
 
-    // Fetch Meta Ads spend for the ref month (and prior month for trends)
-    const refLastDay = new Date(parseInt(refMes.slice(0, 4)), parseInt(refMes.slice(5, 7)), 0).getDate();
-    const metaSpend = await fetchMetaAdsSpendDaily(`${refMes}-01`, `${refMes}-${String(refLastDay).padStart(2, "0")}`, context);
-    const metaSpendPrev = await fetchMetaAdsSpendDaily(`${prevMes}-01`, `${new Date(parseInt(prevMes.slice(0, 4)), parseInt(prevMes.slice(5, 7)), 0).getDate()}`.padStart(2, "0") ? `${prevMes}-${String(new Date(parseInt(prevMes.slice(0, 4)), parseInt(prevMes.slice(5, 7)), 0).getDate()).padStart(2, "0")}` : `${prevMes}-28`, context);
-
     const salesByMonth = new Map<string, number>();
     ((vendasRows ?? []) as any[]).forEach((v) => {
       const iso = normalizeIsoDate(v.Data);
@@ -318,6 +313,18 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
       const m = iso.slice(0, 7);
       salesByMonth.set(m, (salesByMonth.get(m) || 0) + (parseFloat(v.valor_total) || 0));
     });
+
+    // Inject Meta Ads spend as virtual gasto entries so they flow through all calculations
+    const metaSpend = await fetchMetaAdsSpendDaily(`${refMes}-01`, `${refMes}-28`, context);
+    if (metaSpend.total > 0) {
+      all.push({
+        id: -1, tipo: "gasto", categoria: "marketing",
+        descricao: `Tráfego Pago — Meta Ads`,
+        valor: metaSpend.total, data_ref: `${refMes}-01`,
+        data_vencimento: null, data_pagamento: null,
+        recorrente: false, status: "pago", responsavel: null, obs: null,
+      });
+    }
 
     // Trend últimos 6 meses (com receita das vendas + lançamentos manuais e gastos com recorrência)
     const trend: MesPonto[] = [];
@@ -385,6 +392,17 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     // Mês anterior
     const prevRef = new Date(ref.getFullYear(), ref.getMonth() - 1, 1);
     const prevMes = `${prevRef.getFullYear()}-${String(prevRef.getMonth() + 1).padStart(2, "0")}`;
+    const prevLastDay = new Date(prevRef.getFullYear(), prevRef.getMonth() + 1, 0).getDate();
+    const metaSpendPrev = await fetchMetaAdsSpendDaily(`${prevMes}-01`, `${prevMes}-${String(prevLastDay).padStart(2, "0")}`, context);
+    if (metaSpendPrev.total > 0) {
+      all.push({
+        id: -2, tipo: "gasto", categoria: "marketing",
+        descricao: `Tráfego Pago — Meta Ads`,
+        valor: metaSpendPrev.total, data_ref: `${prevMes}-01`,
+        data_vencimento: null, data_pagamento: null,
+        recorrente: false, status: "pago", responsavel: null, obs: null,
+      });
+    }
     const mesAnterior = computeResumo(prevMes, salesByMonth);
 
     // Top 5 gastos do mês
