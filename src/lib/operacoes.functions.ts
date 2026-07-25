@@ -287,12 +287,35 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return getRefundExpert(r) === expertFilter;
     });
 
-    const gastosMes = financeiroAll
-      .filter((f: any) => {
+    const getGastosScoped = (financeiroItems: any[]): number => {
+      const direct = financeiroItems.filter((f: any) => {
         const tipo = String(f.tipo ?? "").toLowerCase();
-        return (tipo === "gasto" || tipo === "saida" || tipo === "despesa") && inRange(parseDataField(f.data_ref));
-      })
-      .reduce((acc, f: any) => acc + Number(f.valor ?? 0), 0);
+        const isGasto = tipo === "gasto" || tipo === "saida" || tipo === "despesa";
+        return isGasto && inRange(parseDataField(f.data_ref));
+      });
+      const directKeys = new Set(direct.map((f: any) => `${f.categoria}|${String(f.descricao || "").toLowerCase().trim()}`));
+
+      let sum = direct.reduce((acc, f: any) => acc + Number(f.valor ?? 0), 0);
+
+      const handledRecurring = new Set<string>();
+      for (const f of financeiroItems) {
+        const tipo = String(f.tipo ?? "").toLowerCase();
+        const isGasto = tipo === "gasto" || tipo === "saida" || tipo === "despesa";
+        if (!isGasto || !f.recorrente) continue;
+        const refDate = parseDataField(f.data_ref);
+        if (refDate && toTs != null && refDate > toTs) continue;
+        const key = `${f.categoria}|${String(f.descricao || "").toLowerCase().trim()}`;
+        if (!directKeys.has(key) && !handledRecurring.has(key)) {
+          if (refDate && fromTs != null && refDate < fromTs) {
+            handledRecurring.add(key);
+            sum += Number(f.valor ?? 0);
+          }
+        }
+      }
+      return sum;
+    };
+
+    const gastosMes = getGastosScoped(financeiroAll);
 
     let totalFaturamento = vendasScoped.reduce((acc, v: any) => acc + parseTicket(v.Ticket), 0);
     let totalVendas = vendasScoped.length;

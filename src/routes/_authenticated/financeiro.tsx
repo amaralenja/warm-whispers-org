@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import {
   listLancamentos, upsertLancamento, deleteLancamento, type Lancamento,
-  getFinanceiroRelatorio, getDRE,
+  getFinanceiroRelatorio, getDRE, getRowsForMonth,
 } from "@/lib/financeiro.functions";
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
@@ -69,7 +69,7 @@ function Financeiro() {
   const [modalOpen, setModalOpen] = useState(false);
   const [tab, setTab] = useState<"lancamentos" | "relatorios" | "dre">("lancamentos");
 
-  const rowsMes = useMemo(() => all.filter((r) => yearMon(r.data_ref) === mes), [all, mes]);
+  const rowsMes = useMemo(() => getRowsForMonth(all, mes), [all, mes]);
 
   const kpis = useMemo(() => {
     const g = rowsMes.filter((r) => r.tipo === "gasto");
@@ -409,7 +409,7 @@ function StatusBadge({ status }: { status: Lancamento["status"] }) {
   const cfg = {
     pago: { label: "Pago", icon: CheckCircle2, cls: "text-emerald-400 bg-emerald-400/10" },
     pendente: { label: "Pendente", icon: Clock, cls: "text-amber-400 bg-amber-400/10" },
-    atrasado: { label: "Atrasado", icon: AlertCircle, cls: "text-red-400 bg-red-400/10" },
+atrasado: { label: "Atrasado", icon: AlertCircle, cls: "text-red-400 bg-red-400/10" },
   }[status] || { label: status, icon: Clock, cls: "text-muted-foreground bg-muted/30" };
   const Icon = cfg.icon;
   return (
@@ -420,134 +420,289 @@ function StatusBadge({ status }: { status: Lancamento["status"] }) {
 }
 
 function LancamentoModal({
-  initial, onClose, onSave,
+  initial,
+  onClose,
+  onSave,
 }: {
   initial: Lancamento | null;
   onClose: () => void;
-  onSave: (data: Partial<Lancamento>, id?: number) => Promise<void>;
+  onSave: (payload: Partial<Lancamento>, id?: number) => Promise<void>;
 }) {
-  const [form, setForm] = useState<Partial<Lancamento>>(() => initial ?? {
-    tipo: "gasto", categoria: "outros", descricao: "", valor: 0,
-    data_ref: todayISO(), status: "pendente", recorrente: false,
+  const [form, setForm] = useState<Partial<Lancamento>>(() => {
+    if (initial) return { ...initial };
+    return {
+      tipo: "gasto",
+      categoria: "ferramenta",
+      descricao: "",
+      valor: undefined,
+      data_ref: todayISO(),
+      status: "pago",
+      recorrente: false,
+    };
   });
-  const [saving, setSaving] = useState(false);
 
-  const update = <K extends keyof Lancamento>(k: K, v: any) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const [saving, setSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const update = (key: keyof Lancamento, val: any) =>
+    setForm((f) => ({ ...f, [key]: val }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.descricao?.trim()) { toast.error("Descrição obrigatória"); return; }
+    if (form.valor == null || isNaN(Number(form.valor)) || Number(form.valor) <= 0) {
+      toast.error("Informe um valor válido maior que R$ 0");
+      return;
+    }
     setSaving(true);
-    await onSave(form, initial?.id);
-    setSaving(false);
+    try {
+      await onSave(form, initial?.id);
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const isGasto = form.tipo === "gasto";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-150" onClick={onClose}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-2xl transition-all"
       >
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-display text-xl">
-            {initial ? "Editar lançamento" : "Novo lançamento"}
-          </h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        {/* Header com Seletor Principal */}
+        <div className="border-b border-border p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl font-bold">
+              {initial ? "Editar Lançamento" : "Novo Lançamento"}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-secondary/60 p-1">
+            <button
+              type="button"
+              onClick={() => update("tipo", "gasto")}
+              className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold transition-all ${
+                isGasto
+                  ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <TrendingDown className="h-3.5 w-3.5" />
+              💸 Gasto (Saída)
+            </button>
+            <button
+              type="button"
+              onClick={() => update("tipo", "receita")}
+              className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold transition-all ${
+                !isGasto
+                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              💰 Receita (Entrada)
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 p-6">
-          <Field label="Tipo">
-            <select value={form.tipo} onChange={(e) => update("tipo", e.target.value)} className={inputCls}>
-              <option value="gasto">Gasto</option>
-              <option value="receita">Receita</option>
-            </select>
-          </Field>
-          <Field label="Categoria">
-            <select value={form.categoria} onChange={(e) => update("categoria", e.target.value)} className={inputCls}>
-              {CATEGORIAS.map((c) => (
-                <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Descrição" full>
+        <div className="space-y-4 p-5">
+          {/* Valor Principal (Destaque Grande) */}
+          <div>
+            <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+              Valor (R$)
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute left-3.5 text-base font-bold text-muted-foreground">R$</span>
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="0,00"
+                value={form.valor != null ? form.valor : ""}
+                onChange={(e) => update("valor", parseFloat(e.target.value) || 0)}
+                className={`w-full rounded-xl border border-border bg-background pl-11 pr-4 py-2.5 text-2xl font-black tabular-nums tracking-tight focus:outline-none focus:ring-2 ${
+                  isGasto ? "focus:border-rose-500 focus:ring-rose-500/20 text-rose-400" : "focus:border-emerald-500 focus:ring-emerald-500/20 text-emerald-400"
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+              Descrição
+            </label>
             <input
-              required maxLength={200} value={form.descricao || ""}
+              required
+              maxLength={200}
+              value={form.descricao || ""}
               onChange={(e) => update("descricao", e.target.value)}
-              className={inputCls} placeholder="Ex: Mensalidade Cursor"
+              className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent"
+              placeholder={isGasto ? "Ex: Servidor OpenAI, Gestor de Tráfego, Aluguel" : "Ex: Venda Consultoria, Aporte, Reembolso"}
             />
-          </Field>
-          <Field label="Valor (R$)">
+          </div>
+
+          {/* Categorias em Seleção Rápida */}
+          <div>
+            <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1.5">
+              Categoria
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIAS.map((c) => {
+                const active = form.categoria === c.value;
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => update("categoria", c.value)}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all border ${
+                      active
+                        ? "bg-accent text-accent-foreground border-accent shadow-sm"
+                        : "bg-secondary/40 text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    <span>{c.emoji}</span>
+                    <span>{c.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Data & Status */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+                Data de Referência
+              </label>
+              <input
+                required
+                type="date"
+                value={form.data_ref || todayISO()}
+                onChange={(e) => update("data_ref", e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+                Status
+              </label>
+              <select
+                value={form.status || "pago"}
+                onChange={(e) => {
+                  const st = e.target.value as Lancamento["status"];
+                  update("status", st);
+                  if (st === "pago" && !form.data_pagamento) {
+                    update("data_pagamento", todayISO());
+                  }
+                }}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="pago">✅ Pago (Concluído)</option>
+                <option value="pendente">⏳ Pendente</option>
+                <option value="atrasado">🔴 Atrasado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Recorrência (Custo Fixo Mensal) */}
+          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-violet-500/20 text-violet-300">
+                <Repeat className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground">Lançamento Recorrente (Custo Fixo)</p>
+                <p className="text-[0.65rem] text-muted-foreground">Repete automaticamente todos os meses no financeiro e no dashboard</p>
+              </div>
+            </div>
             <input
-              required type="number" min="0" step="0.01"
-              value={form.valor ?? 0}
-              onChange={(e) => update("valor", Number(e.target.value))}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Data">
-            <input
-              required type="date" value={form.data_ref || todayISO()}
-              onChange={(e) => update("data_ref", e.target.value)}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Vencimento">
-            <input
-              type="date" value={form.data_vencimento || ""}
-              onChange={(e) => update("data_vencimento", e.target.value || null)}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Pagamento">
-            <input
-              type="date" value={form.data_pagamento || ""}
-              onChange={(e) => update("data_pagamento", e.target.value || null)}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Status">
-            <select value={form.status || "pendente"} onChange={(e) => update("status", e.target.value)} className={inputCls}>
-              <option value="pendente">Pendente</option>
-              <option value="pago">Pago</option>
-              <option value="atrasado">Atrasado</option>
-            </select>
-          </Field>
-          <Field label="Responsável">
-            <input
-              maxLength={100} value={form.responsavel || ""}
-              onChange={(e) => update("responsavel", e.target.value)}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Observações" full>
-            <textarea
-              maxLength={500} rows={2} value={form.obs || ""}
-              onChange={(e) => update("obs", e.target.value)}
-              className={inputCls}
-            />
-          </Field>
-          <label className="col-span-2 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox" checked={!!form.recorrente}
+              type="checkbox"
+              checked={!!form.recorrente}
               onChange={(e) => update("recorrente", e.target.checked)}
-              className="h-4 w-4 accent-violet-500"
+              className="h-4 w-4 accent-violet-500 cursor-pointer rounded"
             />
-            <Repeat className="h-3.5 w-3.5 text-violet-400" />
-            Lançamento recorrente (custo fixo)
-          </label>
+          </div>
+
+          {/* Opções Avançadas */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              {showAdvanced ? "▲ Ocultar detalhes" : "▼ Adicionar responsável, vencimento ou notas..."}
+            </button>
+            {showAdvanced && (
+              <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in duration-150">
+                <div>
+                  <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+                    Vencimento
+                  </label>
+                  <input
+                    type="date"
+                    value={form.data_vencimento || ""}
+                    onChange={(e) => update("data_vencimento", e.target.value || null)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+                    Responsável
+                  </label>
+                  <input
+                    maxLength={100}
+                    placeholder="Ex: Caio, Gustavo, Jessica"
+                    value={form.responsavel || ""}
+                    onChange={(e) => update("responsavel", e.target.value)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+                    Observações
+                  </label>
+                  <textarea
+                    maxLength={500}
+                    rows={2}
+                    placeholder="Detalhes adicionais..."
+                    value={form.obs || ""}
+                    onChange={(e) => update("obs", e.target.value)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-border bg-muted/20 px-6 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/20 px-5 py-3.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          >
             Cancelar
           </button>
           <button
-            type="submit" disabled={saving}
-            className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110 disabled:opacity-50"
+            type="submit"
+            disabled={saving}
+            className={`rounded-xl px-6 py-2.5 text-xs font-bold text-white shadow-lg transition-all disabled:opacity-50 ${
+              isGasto ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20" : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20"
+            }`}
           >
-            {saving ? "Salvando..." : initial ? "Atualizar" : "Criar"}
+            {saving ? "Salvando..." : initial ? "Salvar Alterações" : isGasto ? "Registrar Gasto" : "Registrar Receita"}
           </button>
         </div>
       </form>

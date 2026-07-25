@@ -127,6 +127,31 @@ export type RelatorioPayload = {
   totalFixos: number;
 };
 
+export function getRowsForMonth(all: Lancamento[], mesStr: string): Lancamento[] {
+  const directRows = all.filter((r) => (r.data_ref || "").slice(0, 7) === mesStr);
+  const directKeys = new Set(directRows.map((r) => `${r.tipo}|${r.categoria}|${(r.descricao || "").toLowerCase().trim()}`));
+
+  const recurringRows: Lancamento[] = [];
+  const handledRecurringKeys = new Set<string>();
+
+  all.forEach((r) => {
+    if (!r.recorrente) return;
+    const refMes = (r.data_ref || "").slice(0, 7);
+    if (refMes < mesStr) {
+      const key = `${r.tipo}|${r.categoria}|${(r.descricao || "").toLowerCase().trim()}`;
+      if (!directKeys.has(key) && !handledRecurringKeys.has(key)) {
+        handledRecurringKeys.add(key);
+        recurringRows.push({
+          ...r,
+          data_ref: `${mesStr}-01`,
+        });
+      }
+    }
+  });
+
+  return [...directRows, ...recurringRows];
+}
+
 export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { mes?: string } | undefined) => input ?? {})
@@ -143,20 +168,20 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     if (error) throw error;
     const all = (rows ?? []) as Lancamento[];
 
-    // Trend últimos 6 meses
+    // Trend últimos 6 meses (com recorrência acumulada)
     const trend: MesPonto[] = [];
     const ref = new Date(refMes + "-01T00:00:00");
     for (let i = 5; i >= 0; i--) {
       const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
       const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const mRows = all.filter((r) => (r.data_ref || "").slice(0, 7) === mes);
+      const mRows = getRowsForMonth(all, mes);
       const receita = mRows.filter((r) => r.tipo === "receita").reduce((s, x) => s + (+x.valor || 0), 0);
       const gasto = mRows.filter((r) => r.tipo === "gasto").reduce((s, x) => s + (+x.valor || 0), 0);
       trend.push({ mes, receita, gasto, saldo: receita - gasto });
     }
 
-    // Breakdown categoria do mês
-    const mesRows = all.filter((r) => (r.data_ref || "").slice(0, 7) === refMes && r.tipo === "gasto");
+    // Breakdown categoria do mês (com recorrência acumulada)
+    const mesRows = getRowsForMonth(all, refMes).filter((r) => r.tipo === "gasto");
     const totalMes = mesRows.reduce((s, x) => s + (+x.valor || 0), 0);
     const catMap = new Map<string, { total: number; count: number }>();
     mesRows.forEach((r) => {
