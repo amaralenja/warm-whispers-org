@@ -439,18 +439,18 @@ function formatDateLabel(iso: unknown) {
 function getLeadAttributionBadge(lead: any) {
   if (!lead) return null;
 
-  const src = String(lead.utm_source || lead.origem || "").toLowerCase().trim();
-  const med = String(lead.utm_medium || "").toLowerCase().trim();
-  const camp = String(lead.utm_campaign || "").toLowerCase().trim();
-  const cont = String(lead.utm_content || "").toLowerCase().trim();
+  const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const src = norm(lead.utm_source || lead.origem);
+  const med = norm(lead.utm_medium);
+  const camp = norm(lead.utm_campaign);
+  const cont = norm(lead.utm_content);
 
-  // Se for link da bio (link_in_bio, bio_instagram, ig_bio, etc.), é orgânico!
-  const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(src)
-    || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(med)
-    || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(camp)
-    || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(cont);
+  // Se for orgânico, direto, link da bio, etc.
+  const organicPattern = /organic|organico|direto|direct|link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b|whatsapp|referral|email|sms|none/i;
+  const isOrganic = (organicPattern.test(src) || organicPattern.test(med) || organicPattern.test(camp) || organicPattern.test(cont))
+    && !lead.fbclid && !lead.gclid && !lead.fbc && !/^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
 
-  if (isLinkInBio) {
+  if (isOrganic) {
     return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
   }
 
@@ -469,10 +469,10 @@ function getLeadAttributionBadge(lead: any) {
     return { text: "Google Ads", class: "bg-amber-500/15 text-amber-300 border-amber-500/30", textShort: "GAds" };
   }
 
-  // 4. Tráfego Pago / Meta Ads (fb, facebook, meta, ads, cpc, cpm, paid, etc.)
+  // 4. Tráfego Pago / Meta Ads
   const isPaidSrc = /\b(fb|facebook|meta|ads?|google|tiktok|gads|patrocinado)\b/.test(src) || src === "fb";
   const isPaidMed = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
-  const isPaidCamp = !!camp && !/organic|organico|whatsapp|direct|direto|referral|email|sms|none|bio/i.test(camp);
+  const isPaidCamp = !!camp && !organicPattern.test(camp);
 
   if (isPaidSrc || isPaidMed || isPaidCamp || !!lead.fbclid || !!lead.fbc) {
     return { text: "Tráfego Pago", class: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30", textShort: "Tráfego Pago" };
@@ -2207,35 +2207,31 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
                                 const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
 
-                                const utmSrc = String(lead.utm_source || sub?.utm_source || "").toLowerCase();
-                                const utmMed = String(lead.utm_medium || sub?.utm_medium || "").toLowerCase();
-                                const utmCamp = String(lead.utm_campaign || sub?.utm_campaign || "").toLowerCase();
-                                const utmCont = String(lead.utm_content || sub?.utm_content || "").toLowerCase();
+                                const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                                const utmSrc = norm(lead.utm_source || sub?.utm_source);
+                                const utmMed = norm(lead.utm_medium || sub?.utm_medium);
+                                const utmCamp = norm(lead.utm_campaign || sub?.utm_campaign);
+                                const utmCont = norm(lead.utm_content || sub?.utm_content);
                                 const fbclid = String(lead.fbclid || sub?.fbclid || "").trim();
                                 const fbp = String(lead.fbp || sub?.fbp || "").trim();
                                 const gclid = String(lead.gclid || sub?.gclid || "").trim();
-                                const origem = String(lead.origem || "").toLowerCase();
+                                const origem = norm(lead.origem);
 
-                                const isLinkInBio =
-                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmSrc) ||
-                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmMed) ||
-                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmCamp) ||
-                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmCont);
+                                const organicPattern = /organic|organico|direto|direct|link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b|whatsapp|referral|email|sms|none/i;
+                                const isOrganic = (organicPattern.test(utmSrc) || organicPattern.test(utmMed) || organicPattern.test(utmCamp) || organicPattern.test(utmCont) || organicPattern.test(origem))
+                                  && !fbclid && !gclid && !fbp && !/^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(utmMed);
 
-                                const isPago =
-                                  !isLinkInBio && (
-                                    !!fbclid ||
-                                    !!gclid ||
-                                    !!fbp ||
-                                    /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(utmSrc) ||
-                                    /\b(cpc|cpm|paid|ads?|social.paid|patrocinado|anuncio)\b/.test(utmMed) ||
-                                    /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmCont) ||
-                                    (origem === "criar_saas" ? false : (
-                                      !!utmCamp &&
-                                      !/organic|organico|whatsapp|direct|direto|referral|email|sms|none|bio/i.test(utmCamp) &&
-                                      !/organic|organico|whatsapp|direct|direto|referral|bio/i.test(utmSrc)
-                                    ))
-                                  );
+                                const isPago = !isOrganic && (
+                                  !!fbclid ||
+                                  !!gclid ||
+                                  !!fbp ||
+                                  /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(utmSrc) ||
+                                  /\b(cpc|cpm|paid|ads?|social.paid|patrocinado|anuncio)\b/.test(utmMed) ||
+                                  /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmCont) ||
+                                  (origem === "criar_saas" ? false : (
+                                    !!utmCamp && !organicPattern.test(utmCamp)
+                                  ))
+                                );
 
                                 return (
                                   <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] font-bold uppercase ${
