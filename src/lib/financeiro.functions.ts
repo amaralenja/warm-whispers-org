@@ -160,22 +160,48 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     const data = opts?.data ?? {};
     if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
     const refMes = data.mes ?? new Date().toISOString().slice(0, 7);
-    const { data: rows, error } = await context.supabase
-      .from("financeiro")
-      .select("*")
-      .order("data_ref", { ascending: false })
-      .limit(5000);
+    const [{ data: rows, error }, { data: vendasRows }, { data: htRows }] = await Promise.all([
+      context.supabase
+        .from("financeiro")
+        .select("*")
+        .order("data_ref", { ascending: false })
+        .limit(5000),
+      context.supabase
+        .from("vendas")
+        .select('Ticket, Data, Evento')
+        .or("Evento.eq.purchase_approved,Evento.ilike.*aprov*"),
+      context.supabase
+        .from("ht_vendas")
+        .select("valor_total, data, status")
+        .neq("status", "reembolso"),
+    ]);
     if (error) throw error;
     const all = (rows ?? []) as Lancamento[];
 
-    // Trend últimos 6 meses (com recorrência acumulada)
+    const salesByMonth = new Map<string, number>();
+    ((vendasRows ?? []) as any[]).forEach((v) => {
+      const iso = normalizeIsoDate(v.Data);
+      if (!iso) return;
+      const m = iso.slice(0, 7);
+      salesByMonth.set(m, (salesByMonth.get(m) || 0) + parseTicket(v.Ticket));
+    });
+    ((htRows ?? []) as any[]).forEach((v) => {
+      const iso = normalizeIsoDate(v.data);
+      if (!iso) return;
+      const m = iso.slice(0, 7);
+      salesByMonth.set(m, (salesByMonth.get(m) || 0) + (parseFloat(v.valor_total) || 0));
+    });
+
+    // Trend últimos 6 meses (com receita das vendas + lançamentos manuais e gastos com recorrência)
     const trend: MesPonto[] = [];
     const ref = new Date(refMes + "-01T00:00:00");
     for (let i = 5; i >= 0; i--) {
       const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
       const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const mRows = getRowsForMonth(all, mes);
-      const receita = mRows.filter((r) => r.tipo === "receita").reduce((s, x) => s + (+x.valor || 0), 0);
+      const manualReceita = mRows.filter((r) => r.tipo === "receita").reduce((s, x) => s + (+x.valor || 0), 0);
+      const salesReceita = salesByMonth.get(mes) || 0;
+      const receita = manualReceita + salesReceita;
       const gasto = mRows.filter((r) => r.tipo === "gasto").reduce((s, x) => s + (+x.valor || 0), 0);
       trend.push({ mes, receita, gasto, saldo: receita - gasto });
     }

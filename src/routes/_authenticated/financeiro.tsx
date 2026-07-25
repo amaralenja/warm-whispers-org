@@ -32,6 +32,7 @@ const CATEGORIAS: { value: string; label: string; emoji: string }[] = [
   { value: "plataforma", label: "Plataformas", emoji: "🖥" },
   { value: "salario", label: "Folha Pgto", emoji: "💼" },
   { value: "dev_saas", label: "Dev SaaS", emoji: "💻" },
+  { value: "comissao", label: "Comissões", emoji: "💰" },
   { value: "comissao_x1", label: "Comissão X1", emoji: "💰" },
   { value: "comissao_ht", label: "Comissão HT", emoji: "💎" },
   { value: "imposto", label: "Impostos", emoji: "🏛️" },
@@ -40,6 +41,15 @@ const CATEGORIAS: { value: string; label: string; emoji: string }[] = [
   { value: "outros", label: "Outros", emoji: "📌" },
 ];
 const CAT_MAP = new Map(CATEGORIAS.map((c) => [c.value, c]));
+
+function getCatMeta(key: string) {
+  const normKey = String(key || "").toLowerCase().trim();
+  if (CAT_MAP.has(normKey)) return CAT_MAP.get(normKey)!;
+  if (normKey.includes("comiss")) return { value: normKey, label: "Comissão", emoji: "💰" };
+  if (normKey.includes("infra") || normKey.includes("equip")) return { value: normKey, label: "Infraestrutura", emoji: "📦" };
+  if (normKey.includes("salari") || normKey.includes("folha")) return { value: normKey, label: "Folha Pgto", emoji: "💼" };
+  return { value: normKey, label: key || "Outros", emoji: "📌" };
+}
 
 function todayISO() {
   const d = new Date();
@@ -735,42 +745,58 @@ function RelatoriosTab({ mes }: { mes: string }) {
   });
 
   if (isLoading || !data) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">Carregando relatórios...</div>;
+    return <div className="py-20 text-center text-sm text-muted-foreground animate-pulse">Carregando relatórios financeiros...</div>;
   }
 
   const maxTrend = Math.max(1, ...data.trend.map((t) => Math.max(t.receita, t.gasto)));
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Trend */}
-      <div className="rounded-2xl border border-border bg-card/40 p-5">
-        <div className="flex items-end justify-between">
+      {/* Evolução Mensal */}
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
-            <h3 className="font-display text-lg">Evolução Mensal</h3>
-            <p className="text-xs text-muted-foreground">Gastos vs Receitas — últimos 6 meses</p>
+            <h3 className="font-display text-xl font-bold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-emerald-400" />
+              Evolução Mensal
+            </h3>
+            <p className="text-xs text-muted-foreground">Receitas Brutas (Vendas + Entradas) vs Gastos Totais acumulados</p>
           </div>
-          <div className="flex items-center gap-3 text-[0.65rem] uppercase tracking-widest">
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-emerald-400" /> Receita</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-red-400" /> Gasto</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-accent" /> Saldo</span>
+          <div className="flex items-center gap-4 text-xs font-semibold">
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-400 shadow-sm shadow-emerald-500/20" /> Receita</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-rose-500 shadow-sm shadow-rose-500/20" /> Gasto</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-accent" /> Lucro Liquido</span>
           </div>
         </div>
-        <div className="mt-6 flex items-end justify-between gap-3 h-56">
+
+        <div className="mt-6 grid grid-cols-6 gap-2 sm:gap-4 h-64 items-end pt-4">
           {data.trend.map((t) => {
-            const hR = (t.receita / maxTrend) * 100;
-            const hG = (t.gasto / maxTrend) * 100;
+            const hR = t.receita > 0 ? Math.max(6, (t.receita / maxTrend) * 100) : 0;
+            const hG = t.gasto > 0 ? Math.max(6, (t.gasto / maxTrend) * 100) : 0;
             const positive = t.saldo >= 0;
+            const mesNome = new Date(t.mes + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+
             return (
-              <div key={t.mes} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-full w-full items-end gap-1">
-                  <div className="flex-1 rounded-t bg-gradient-to-t from-emerald-500/30 to-emerald-400 transition-all" style={{ height: `${hR}%` }} title={BRL(t.receita)} />
-                  <div className="flex-1 rounded-t bg-gradient-to-t from-red-500/30 to-red-400 transition-all" style={{ height: `${hG}%` }} title={BRL(t.gasto)} />
+              <div key={t.mes} className="flex flex-col items-center justify-end h-full gap-2 group">
+                <div className="w-full flex items-end justify-center gap-1 h-full px-1">
+                  {/* Barra de Receita */}
+                  <div
+                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-emerald-600/40 to-emerald-400 group-hover:brightness-125 transition-all duration-300 relative"
+                    style={{ height: `${hR}%` }}
+                    title={`Receita (${t.mes}): ${BRL(t.receita)}`}
+                  />
+                  {/* Barra de Gasto */}
+                  <div
+                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-rose-600/40 to-rose-400 group-hover:brightness-125 transition-all duration-300 relative"
+                    style={{ height: `${hG}%` }}
+                    title={`Gasto (${t.mes}): ${BRL(t.gasto)}`}
+                  />
                 </div>
-                <div className="w-full text-center">
-                  <p className="text-[0.6rem] uppercase tracking-widest text-muted-foreground">
-                    {new Date(t.mes + "-01").toLocaleDateString("pt-BR", { month: "short" })}
+                <div className="w-full text-center border-t border-border/50 pt-2">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
+                    {mesNome}
                   </p>
-                  <p className={`mt-0.5 font-mono text-[0.7rem] font-bold tabular-nums ${positive ? "text-emerald-400" : "text-red-400"}`}>
+                  <p className={`mt-0.5 text-xs font-extrabold tabular-nums ${positive ? "text-emerald-400" : "text-rose-400"}`}>
                     {positive ? "+" : ""}{BRL(t.saldo)}
                   </p>
                 </div>
@@ -780,67 +806,87 @@ function RelatoriosTab({ mes }: { mes: string }) {
         </div>
       </div>
 
-      {/* Breakdown */}
-      <div className="rounded-2xl border border-border bg-card/40 p-5">
-        <h3 className="font-display text-lg">Breakdown por Categoria</h3>
-        <p className="text-xs text-muted-foreground">Distribuição dos gastos do mês selecionado</p>
-        <div className="mt-5 space-y-3">
-          {data.breakdown.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">Sem gastos nesse mês.</p>
+      {/* Breakdown por Categoria */}
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+        <div className="flex items-center justify-between border-b border-border/60 pb-4">
+          <div>
+            <h3 className="font-display text-xl font-bold">Breakdown por Categoria</h3>
+            <p className="text-xs text-muted-foreground">Distribuição dos custos e saídas do mês selecionado</p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {data.breakdown.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground bg-secondary/20 rounded-xl">
+              Nenhum gasto ou custo registrado para este mês.
+            </div>
+          ) : (
+            data.breakdown.map((b) => {
+              const cat = getCatMeta(b.categoria);
+              return (
+                <div key={b.categoria} className="group">
+                  <div className="flex items-center justify-between text-sm mb-1.5">
+                    <span className="flex items-center gap-2 font-bold text-foreground">
+                      <span className="p-1 rounded bg-secondary/60 text-base">{cat.emoji}</span>
+                      <span>{cat.label}</span>
+                      <span className="text-xs font-normal text-muted-foreground">· {b.count} {b.count === 1 ? "lançamento" : "lançamentos"}</span>
+                    </span>
+                    <span className="font-mono tabular-nums font-extrabold text-rose-400">
+                      {BRL(b.total)} <span className="text-xs text-muted-foreground font-normal">({b.pct.toFixed(1)}%)</span>
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/60 p-0.5">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400 transition-all duration-300 group-hover:brightness-110"
+                      style={{ width: `${Math.max(2, b.pct)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })
           )}
-          {data.breakdown.map((b) => {
-            const cat = CAT_MAP.get(b.categoria);
-            return (
-              <div key={b.categoria}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 font-semibold">
-                    <span>{cat?.emoji}</span> {cat?.label ?? b.categoria}
-                    <span className="text-[0.65rem] font-normal text-muted-foreground">· {b.count} lançamentos</span>
-                  </span>
-                  <span className={`font-mono tabular-nums font-bold text-red-400`}>
-                    {BRL(b.total)} <span className="text-muted-foreground">({b.pct.toFixed(1)}%)</span>
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
-                  <div className="h-full rounded-full bg-gradient-to-r from-red-500/60 to-red-400" style={{ width: `${b.pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 
-      {/* Fixos */}
-      <div className="rounded-2xl border border-violet-400/20 bg-violet-400/[0.03] p-5">
-        <div className="flex items-center justify-between">
+      {/* Gastos Fixos Recorrentes */}
+      <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-card/50 to-transparent p-6 shadow-sm">
+        <div className="flex items-center justify-between border-b border-violet-500/20 pb-4">
           <div>
-            <h3 className="font-display text-lg flex items-center gap-2">
-              <Repeat className="h-4 w-4 text-violet-400" /> Gastos Fixos Recorrentes
+            <h3 className="font-display text-xl font-bold flex items-center gap-2 text-violet-300">
+              <Repeat className="h-5 w-5 text-violet-400" /> Gastos Fixos Recorrentes
             </h3>
-            <p className="text-xs text-muted-foreground">Despesas mensais automáticas</p>
+            <p className="text-xs text-muted-foreground">Despesas mensais repetidas automaticamente no financeiro e no dashboard</p>
           </div>
-          <p className="font-mono text-2xl font-black tabular-nums text-violet-400">{BRL(data.totalFixos)}</p>
+          <div className="text-right">
+            <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-violet-400/80 block">Total Fixo Mensal</span>
+            <p className="font-mono text-2xl font-black tabular-nums text-violet-300">{BRL(data.totalFixos)}</p>
+          </div>
         </div>
-        <div className="mt-5 grid grid-cols-1 gap-2 md:grid-cols-2">
-          {data.fixos.length === 0 && (
-            <p className="col-span-2 py-6 text-center text-sm text-muted-foreground">
-              Marca um lançamento como "recorrente" pra aparecer aqui.
-            </p>
-          )}
-          {data.fixos.map((f) => {
-            const cat = CAT_MAP.get(f.categoria);
-            return (
-              <div key={f.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-background/40 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{f.descricao}</p>
-                  <p className="text-[0.65rem] uppercase tracking-widest text-muted-foreground">
-                    {cat?.emoji} {cat?.label ?? f.categoria}
-                  </p>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+          {data.fixos.length === 0 ? (
+            <div className="col-span-2 py-8 text-center text-sm text-muted-foreground bg-secondary/20 rounded-xl">
+              Nenhum gasto fixo cadastrado. Marque o checkbox "Lançamento Recorrente" ao criar um gasto para listá-lo aqui.
+            </div>
+          ) : (
+            data.fixos.map((f) => {
+              const cat = getCatMeta(f.categoria);
+              return (
+                <div key={f.id} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/80 p-3.5 hover:border-violet-500/40 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="p-2 rounded-lg bg-secondary/60 text-lg">{cat.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-foreground">{f.descricao}</p>
+                      <p className="text-[0.65rem] uppercase tracking-widest text-muted-foreground font-semibold">
+                        {cat.label}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="font-mono text-sm font-extrabold tabular-nums text-violet-300 pl-2">{BRL(f.valor)}</p>
                 </div>
-                <p className="font-mono text-sm font-bold tabular-nums text-violet-300">{BRL(f.valor)}</p>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </div>
