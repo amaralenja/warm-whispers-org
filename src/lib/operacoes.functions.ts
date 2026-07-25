@@ -33,14 +33,20 @@ function parseTicket(raw: unknown): number {
 function toSpDateString(raw: unknown): string | null {
   if (!raw) return null;
   const s = String(raw).trim();
+
+  // Plain date "YYYY-MM-DD" — not a timestamp, return as-is (no timezone shift)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Full ISO timestamp — convert to SP local date
   const d = new Date(s);
   if (!isNaN(d.getTime())) {
     return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   }
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+  // Brazilian format "DD/MM/YYYY" or "DD-MM-YYYY"
   const m2 = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
   if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+
   return null;
 }
 
