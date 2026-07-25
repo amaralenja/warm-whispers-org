@@ -195,11 +195,32 @@ export type MesPonto = { mes: string; receita: number; gasto: number; saldo: num
 export type CategoriaBreakdown = { categoria: string; total: number; count: number; pct: number };
 export type FixoItem = { id: number; descricao: string; categoria: string; valor: number };
 
+export type ResumoMes = {
+  receita: number;
+  receitaMan: number;
+  receitaVendas: number;
+  gasto: number;
+  gastoFixo: number;
+  gastoVariavel: number;
+  lucro: number;
+  margem: number;
+};
+
+export type TopGasto = {
+  descricao: string;
+  categoria: string;
+  valor: number;
+  recorrente: boolean;
+};
+
 export type RelatorioPayload = {
   trend: MesPonto[];
   breakdown: CategoriaBreakdown[];
   fixos: FixoItem[];
   totalFixos: number;
+  mesAtual: ResumoMes;
+  mesAnterior: ResumoMes;
+  topGastos: TopGasto[];
 };
 
 export function getRowsForMonth(
@@ -339,7 +360,40 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     const fixos = Array.from(uniq.values()).sort((a, b) => b.valor - a.valor);
     const totalFixos = fixos.reduce((s, x) => s + x.valor, 0);
 
-    return { trend, breakdown, fixos, totalFixos };
+    // Helper: compute resumo for a given month
+    const computeResumo = (m: string, salesMap: Map<string, number>): ResumoMes => {
+      const mRows = getRowsForMonth(all, m);
+      const rMan = mRows.filter((r) => r.tipo === "receita").reduce((s, x) => s + (+x.valor || 0), 0);
+      const rVendas = salesMap.get(m) || 0;
+      const receita = rMan + rVendas;
+      const gastos = mRows.filter((r) => r.tipo === "gasto");
+      const gasto = gastos.reduce((s, x) => s + (+x.valor || 0), 0);
+      const gastoFixo = gastos.filter((r) => r.recorrente).reduce((s, x) => s + (+x.valor || 0), 0);
+      const gastoVariavel = gasto - gastoFixo;
+      const lucro = receita - gasto;
+      const margem = receita > 0 ? (lucro / receita) * 100 : 0;
+      return { receita, receitaMan: rMan, receitaVendas: rVendas, gasto, gastoFixo, gastoVariavel, lucro, margem };
+    };
+
+    const mesAtual = computeResumo(refMes, salesByMonth);
+
+    // Mês anterior
+    const prevRef = new Date(ref.getFullYear(), ref.getMonth() - 1, 1);
+    const prevMes = `${prevRef.getFullYear()}-${String(prevRef.getMonth() + 1).padStart(2, "0")}`;
+    const mesAnterior = computeResumo(prevMes, salesByMonth);
+
+    // Top 5 gastos do mês
+    const topGastos: TopGasto[] = mesRows
+      .sort((a, b) => (+b.valor || 0) - (+a.valor || 0))
+      .slice(0, 5)
+      .map((r) => ({
+        descricao: r.descricao,
+        categoria: r.categoria,
+        valor: +r.valor || 0,
+        recorrente: r.recorrente,
+      }));
+
+    return { trend, breakdown, fixos, totalFixos, mesAtual, mesAnterior, topGastos };
   });
 
 // ============================================================

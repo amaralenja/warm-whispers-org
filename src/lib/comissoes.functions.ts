@@ -95,18 +95,18 @@ export const getComissoes = createServerFn({ method: "POST" })
       return out;
     }
 
-    const [vendedoresRes, vendasAll] = await Promise.all([
+    const [vendedoresRes, vendasRes] = await Promise.all([
       supabase.from("vendedores").select("id, utm, nome, expert, foto_url, ativo, pix_chave"),
-      fetchAll<any>((from, to) =>
-        supabase
-          .from("vendas")
-          .select('"Ticket", "Data", "UTM", "Evento"')
-          .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
-          .range(from, to),
-      ),
+      supabase
+        .from("vendas")
+        .select('"Ticket", "Data", "UTM", "Evento"')
+        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+        .order('"Data"', { ascending: false })
+        .limit(3000),
     ]);
 
     const vendedores = (vendedoresRes.data ?? []) as any[];
+    const vendasAll = (vendasRes.data ?? []) as any[];
 
     // Agrupa vendas por UTM + dia (ISO)
     const byUtm = new Map<string, Map<string, { faturamento: number; vendas: number }>>();

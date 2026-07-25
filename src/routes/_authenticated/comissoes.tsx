@@ -419,23 +419,53 @@ function ComissoesPage() {
                                               <th className="px-2 py-1 text-right">Comissão</th>
                                             </tr>
                                           </thead>
+                                          {/* Saturday 2x legend */}
+                                          {r.dias.some((d) => d.isSaturday && d.vendas > 0 && String(r.expert ?? "").toLowerCase().trim() !== "gustavo") && (
+                                            <caption className="caption-bottom mt-1 text-left">
+                                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                                                🔥 Sábado = comissão 2x (exceto Op. Gustavo)
+                                              </span>
+                                            </caption>
+                                          )}
                                           <tbody>
                                             {r.dias.map((d) => {
                                               const checked = !!sel[d.data];
+                                              const isGustavo = String(r.expert ?? "").toLowerCase().trim() === "gustavo";
+                                              const showSat = d.isSaturday && !isGustavo && d.vendas > 0;
                                               return (
                                                 <tr
                                                   key={d.data}
-                                                  className={`cursor-pointer border-t border-border/40 hover:bg-muted/20 ${checked ? "bg-accent/5" : ""}`}
+                                                  className={`cursor-pointer border-t border-border/40 transition-colors ${
+                                                    showSat
+                                                      ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20"
+                                                      : checked
+                                                      ? "bg-accent/5 hover:bg-muted/20"
+                                                      : "hover:bg-muted/20"
+                                                  }`}
                                                   onClick={() => toggleDay(r.id, d.data)}
                                                 >
                                                   <td className="px-2 py-1"><Checkbox checked={checked} onCheckedChange={() => toggleDay(r.id, d.data)} onClick={(e) => e.stopPropagation()} /></td>
-                                                  <td className="px-2 py-1">{fmtDate(d.data)}</td>
-                                                  <td className="px-2 py-1 text-right">{d.vendas}</td>
-                                                  <td className="px-2 py-1 text-right">{fmtBRL(d.faturamento)}</td>
+                                                  <td className="px-2 py-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                      <span className={showSat ? "font-semibold text-emerald-400" : ""}>{fmtDate(d.data)}</span>
+                                                      {showSat && (
+                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400 leading-none">
+                                                          🔥 2x
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                  <td className={`px-2 py-1 text-right font-medium ${showSat ? "text-emerald-300" : ""}`}>{d.vendas}</td>
+                                                  <td className={`px-2 py-1 text-right ${showSat ? "text-emerald-300" : ""}`}>{fmtBRL(d.faturamento)}</td>
                                                   <td className="px-2 py-1 text-right">{fmtBRL(d.cumulativo)}</td>
-                                                  <td className="px-2 py-1 text-right">{fmtBRL(d.rate)}</td>
+                                                  <td className="px-2 py-1 text-right">
+                                                    <span className={showSat ? "font-bold text-emerald-400" : ""}>{fmtBRL(d.rate)}</span>
+                                                    {showSat && (
+                                                      <span className="ml-1 text-[9px] text-emerald-500/70 line-through">{fmtBRL(d.rate / 2)}</span>
+                                                    )}
+                                                  </td>
                                                   <td className="px-2 py-1 text-right">{d.milhares}</td>
-                                                  <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
+                                                  <td className={`px-2 py-1 text-right font-bold ${showSat ? "text-emerald-400" : "text-accent"}`}>{fmtBRL(d.comissao)}</td>
                                                 </tr>
                                               );
                                             })}
