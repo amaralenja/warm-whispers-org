@@ -336,12 +336,12 @@ const AVATAR_PALETTE: Record<string, { bg: string; text: string }> = {
   N: { bg: "linear-gradient(135deg,#0f766e,#134e4a)", text: "#99f6e4" }, // teal claro
   O: { bg: "linear-gradient(135deg,#6b21a8,#3b0764)", text: "#d8b4fe" }, // violeta
   P: { bg: "linear-gradient(135deg,#9d174d,#500724)", text: "#f9a8d4" }, // pink
-  Q: { bg: "linear-gradient(135deg,#065f46,#022c22)", text: "#6ee7b7" }, // emerald
+  Q: { bg: "linear-gradient(135deg,#5c3d00,#2e1f00)", text: "#f5d98a" }, // amber
   R: { bg: "linear-gradient(135deg,#991b1b,#450a0a)", text: "#fca5a5" }, // rose
   S: { bg: "linear-gradient(135deg,#1e3a8a,#172554)", text: "#93c5fd" }, // sky
   T: { bg: "linear-gradient(135deg,#854d0e,#422006)", text: "#fde047" }, // yellow
   U: { bg: "linear-gradient(135deg,#3730a3,#1e1b4b)", text: "#a5b4fc" }, // indigo
-  V: { bg: "linear-gradient(135deg,#166534,#052e16)", text: "#86efac" }, // green
+  V: { bg: "linear-gradient(135deg,#6b4c00,#2e1f00)", text: "#f5d98a" }, // amber
   W: { bg: "linear-gradient(135deg,#155e75,#083344)", text: "#67e8f9" }, // cyan
   X: { bg: "linear-gradient(135deg,#86198f,#4a044e)", text: "#f0abfc" }, // magenta
   Y: { bg: "linear-gradient(135deg,#a16207,#422006)", text: "#fde047" }, // ouro
@@ -563,7 +563,7 @@ function ChatFooterInput({
     <footer className="shrink-0 border-t border-chat-line/50 bg-chat-panel/90 backdrop-blur-sm px-1.5 py-1.5 md:px-5 md:py-4">
       {replyTo && (
         <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line/60 bg-chat-thread px-3 py-2 shadow-sm">
-          <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
+          <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-amber-400"}`} />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-chat-accent">
               Respondendo a {replyTo.direction === "out" ? "você" : "cliente"}
@@ -2116,7 +2116,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           isActive
                             ? { borderLeft: `3px solid var(--chat-accent, #3b82f6)` }
                             : checkIsComprador(contactWaId)
-                              ? { borderLeft: "3px solid #10b981" }
+                              ? { borderLeft: "3px solid #d4a03a" }
                               : leadStage
                                 ? { borderLeft: `3px solid ${leadStage.cor}` }
                                 : isTypebotLead
@@ -2127,7 +2127,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           isActive 
                             ? "bg-chat-soft/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]" 
                             : checkIsComprador(contactWaId)
-                              ? "bg-emerald-500/[0.03] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+                              ? "bg-amber-500/[0.03] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
                               : isTypebotLead 
                                 ? "bg-amber-500/[0.02] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]" 
                                 : "hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
@@ -2211,7 +2211,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                   <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] font-bold uppercase ${
                                     isPago
                                       ? "bg-blue-500/10 text-blue-400 border-blue-500/40"
-                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/40"
+                                      : "bg-amber-500/10 text-amber-400 border-amber-500/40"
                                   }`}>
                                     {isPago ? "💰 Tráfego Pago" : "🌱 Orgânico"}
                                   </Badge>
@@ -2232,7 +2232,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 const comprador = checkIsComprador(contactWaId);
                                 if (!comprador) return null;
                                 return (
-                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 font-bold uppercase animate-pulse">
+                                  <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/30 flex items-center gap-0.5 font-bold uppercase animate-pulse">
                                     💰 Comprador
                                   </Badge>
                                 );
@@ -2497,7 +2497,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                         if (!comprador) return null;
                         return (
                           <span
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 uppercase tracking-wide animate-pulse"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-400 uppercase tracking-wide animate-pulse"
                             title={`Produto: ${comprador.produto}`}
                           >
                             💰 COMPRADOR: {comprador.produto}
@@ -2513,7 +2513,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       {(() => {
                         const lead = findLeadForConv(active.contact_wa_id);
                         const attr = getLeadAttributionBadge(lead);
-                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
+                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-amber-500/15 text-amber-300 border-amber-500/30" };
                         const campaign = (lead as any)?.utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
                         const adContent = (lead as any)?.utm_content ? ` · Anúncio: ${(lead as any).utm_content}` : "";
 
@@ -2945,7 +2945,7 @@ function LiveSendLogConsoleModal({
                     l.level === "error"
                       ? "border-red-500/40 bg-red-500/10 text-red-300"
                       : l.level === "success"
-                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
                       : "border-chat-line bg-chat-soft text-foreground/90"
                   }`}
                 >
@@ -3218,7 +3218,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
                 type="button"
                 onClick={(e) => { e.stopPropagation(); if (quotedFrom && onQuotedClick) onQuotedClick(quotedFrom); }}
                 disabled={!quotedFrom || !onQuotedClick}
-                className={`mb-2 block w-full text-left rounded-lg border-l-[3px] px-3 py-2 text-xs transition-colors ${quotedFromOut === false ? "border-chat-accent bg-black/30" : "border-emerald-400 bg-black/30"} ${quotedFrom && onQuotedClick ? "hover:bg-black/40 cursor-pointer" : "cursor-default"}`}
+                className={`mb-2 block w-full text-left rounded-lg border-l-[3px] px-3 py-2 text-xs transition-colors ${quotedFromOut === false ? "border-chat-accent bg-black/30" : "border-amber-400 bg-black/30"} ${quotedFrom && onQuotedClick ? "hover:bg-black/40 cursor-pointer" : "cursor-default"}`}
               >
                 <div className="font-semibold opacity-80">
                   {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
@@ -3781,8 +3781,8 @@ function WindowCountdown({ lastInboundAt }: { lastInboundAt: string | null }) {
   const h = Math.max(0, Math.floor(ms / 3_600_000));
   const m = Math.max(0, Math.floor((ms % 3_600_000) / 60_000));
   const pct = Math.max(0, Math.min(100, (ms / (24 * 60 * 60 * 1000)) * 100));
-  const tone = !open ? "text-red-500" : h < 2 ? "text-red-500" : h < 6 ? "text-amber-500" : "text-emerald-500";
-  const bar = !open ? "bg-red-500" : h < 2 ? "bg-red-500" : h < 6 ? "bg-amber-500" : "bg-emerald-500";
+  const tone = !open ? "text-red-500" : h < 2 ? "text-red-500" : h < 6 ? "text-amber-500" : "text-amber-400";
+  const bar = !open ? "bg-red-500" : h < 2 ? "bg-red-500" : h < 6 ? "bg-amber-500" : "bg-amber-400";
   return (
     <div className="shrink-0 border-b border-chat-line bg-chat-soft/40 px-6 py-2">
       <div className="mx-auto flex w-full max-w-5xl items-center gap-3">

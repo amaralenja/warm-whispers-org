@@ -82,7 +82,7 @@
   --input: oklch(0.20 0.006 270);
   --ring: oklch(0.78 0.13 75);
 
-  /* WhatsApp Web — refined dark mode with added depth */
+  /* MULTIUM brand — amber/gold accent on dark */
   --chat-shell: #0d1117;
   --chat-sidebar: #111b21;
   --chat-thread: #0a0f14;
@@ -90,10 +90,10 @@
   --chat-line: #253341;
   --chat-soft: #1e2d3d;
   --chat-message-in: #1c2b3a;
-  --chat-message-out: #005c4b;
-  --chat-message-out-foreground: #e9edef;
-  --chat-accent: #00a884;
-  --chat-accent-foreground: #ffffff;
+  --chat-message-out: #3d2e00;
+  --chat-message-out-foreground: #f5ead0;
+  --chat-accent: #d4a03a;
+  --chat-accent-foreground: #1a1200;
 
   /* Premium FX */
   --gradient-radial: radial-gradient(ellipse at top, oklch(0.20 0.02 75 / 0.4), transparent 60%);
