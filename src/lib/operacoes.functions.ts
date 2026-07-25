@@ -821,6 +821,7 @@ export type DashboardPayload = {
   vendedores: VendedorStat[];
   serieDiaria: SerieDiaria[];
   reembolsos: ReembolsoItem[];
+  debug?: any;
 };
 
 const EMPTY_DASHBOARD: DashboardPayload = {
@@ -1398,6 +1399,28 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const totalLeadsFromOps = opStats.reduce((a, o) => a + o.leads, 0);
     const totalLeads = totalLeadsCalculated > 0 ? totalLeadsCalculated : totalLeadsFromOps;
 
+    const debug = {
+      timestamp: new Date().toISOString(),
+      periodo: `${data.from} até ${data.to}`,
+      expertFilter: expertFilter ?? "todos",
+      vendasRawCount: vendasAll.length,
+      vendasPeriodoCount: vendasPeriodo.length,
+      vendasScopedCount: vendasScoped.length,
+      crmLeadsCount: crmLeadsRaw.length,
+      quizLeadsCount: quizLeadsRaw.length,
+      reembolsosCount: reembolsosAll.length,
+      expertsCount: expertsRes.data?.length ?? 0,
+      vendasAprovadasSample: vendasAll.slice(0, 5).map((v: any) => ({
+        data: v.Data,
+        evento: v.Evento,
+        produto: v.Produto,
+        ticket: v.Ticket,
+        expert: v.nome_expert || v._expert,
+        utm: v.UTM,
+      })),
+      erros,
+    };
+
     return {
       ops: opStats,
       totalFat,
@@ -1410,6 +1433,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       vendedores,
       serieDiaria,
       reembolsos: reembolsosList,
+      debug,
     };
   });
 
