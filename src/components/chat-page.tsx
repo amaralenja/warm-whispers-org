@@ -2174,9 +2174,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             </div>
                             
                             <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {isTypebotLead && (
+                                <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
+                                  🤖 Typebot
+                                </Badge>
+                              )}
+
                               {(() => {
-                                // Só classifica origem se veio do Typebot. Sem typebot = sem etiqueta.
-                                if (!isTypebotLead) return null;
                                 const lead: any = leadForConv ?? {};
                                 const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
                                 const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
@@ -2184,33 +2188,33 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 const utmSrc = String(lead.utm_source || sub?.utm_source || "").toLowerCase();
                                 const utmMed = String(lead.utm_medium || sub?.utm_medium || "").toLowerCase();
                                 const utmCamp = String(lead.utm_campaign || sub?.utm_campaign || "").toLowerCase();
+                                const utmCont = String(lead.utm_content || sub?.utm_content || "").toLowerCase();
                                 const fbclid = String(lead.fbclid || sub?.fbclid || "").trim();
                                 const fbp = String(lead.fbp || sub?.fbp || "").trim();
                                 const gclid = String(lead.gclid || sub?.gclid || "").trim();
+                                const origem = String(lead.origem || "").toLowerCase();
 
                                 const isPago =
                                   !!fbclid ||
                                   !!gclid ||
                                   !!fbp ||
-                                  /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmSrc) ||
-                                  /\b(cpc|cpm|paid|ads?|social-paid)\b/.test(utmMed) ||
-                                  (!!utmCamp && !/organic|organico|whatsapp|direct/.test(utmCamp));
+                                  /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(utmSrc) ||
+                                  /\b(cpc|cpm|paid|ads?|social.paid|patrocinado|anuncio)\b/.test(utmMed) ||
+                                  /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmCont) ||
+                                  (origem === "criar_saas" ? false : (
+                                    !!utmCamp &&
+                                    !/organic|organico|whatsapp|direct|referral|email|sms|none/i.test(utmCamp) &&
+                                    !/organic|organico|whatsapp|direct|referral/i.test(utmSrc)
+                                  ));
 
                                 return (
-                                  <>
-                                    <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold uppercase">
-                                      🤖 Typebot
-                                    </Badge>
-                                    {isPago ? (
-                                      <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/40 font-bold uppercase">
-                                        💰 Tráfego Pago
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="shrink-0 h-4 px-1.5 text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/40 font-bold uppercase">
-                                        🌱 Orgânico
-                                      </Badge>
-                                    )}
-                                  </>
+                                  <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] font-bold uppercase ${
+                                    isPago
+                                      ? "bg-blue-500/10 text-blue-400 border-blue-500/40"
+                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/40"
+                                  }`}>
+                                    {isPago ? "💰 Tráfego Pago" : "🌱 Orgânico"}
+                                  </Badge>
                                 );
                               })()}
 
