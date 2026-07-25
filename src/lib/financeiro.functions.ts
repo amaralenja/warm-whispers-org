@@ -101,7 +101,8 @@ export const listConfirmacoes = createServerFn({ method: "POST" })
   .handler(async (opts): Promise<Confirmacao[]> => {
     const context = opts?.context;
     if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
-    const { data, error } = await context.supabase
+    const db = context.supabase as any;
+    const { data, error } = await db
       .from("financeiro_confirmacoes")
       .select("*")
       .order("mes", { ascending: false });
@@ -124,8 +125,9 @@ export const toggleConfirmacao = createServerFn({ method: "POST" })
     const context = opts?.context;
     const data = opts?.data;
     if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
+    const db = context.supabase as any;
 
-    const { data: existing } = await context.supabase
+    const { data: existing } = await db
       .from("financeiro_confirmacoes")
       .select("id, confirmado")
       .eq("lancamento_id", data.lancamento_id)
@@ -133,7 +135,7 @@ export const toggleConfirmacao = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (existing) {
-      const { error } = await context.supabase
+      const { error } = await db
         .from("financeiro_confirmacoes")
         .update({
           confirmado: !existing.confirmado,
@@ -144,7 +146,7 @@ export const toggleConfirmacao = createServerFn({ method: "POST" })
       return { confirmado: !existing.confirmado };
     }
 
-    const { error: insertErr } = await context.supabase
+    const { error: insertErr } = await db
       .from("financeiro_confirmacoes")
       .insert({
         lancamento_id: data.lancamento_id,

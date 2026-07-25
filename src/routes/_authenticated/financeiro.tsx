@@ -368,10 +368,15 @@ function Financeiro() {
               <div className="flex items-center gap-2 bg-violet-500/[0.06] border-b border-violet-500/20 px-4 py-2 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-violet-400">
                 <Repeat className="h-3 w-3" />
                 Recorrentes ({recorrentes.length})
-                <span className="ml-auto font-mono text-xs tabular-nums">{BRL(recorrentes.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
+                <span className="ml-auto flex items-center gap-3 text-[0.55rem]">
+                  <span className="text-emerald-400">{recorrentes.filter((r) => r.status === "pago").length} pagos</span>
+                  <span className="text-amber-400">{recorrentes.filter((r) => r.status === "pendente").length} pendentes</span>
+                  <span className="text-red-400">{recorrentes.filter((r) => r.status === "atrasado").length} atrasados</span>
+                  <span className="font-mono text-xs tabular-nums text-violet-300">{BRL(recorrentes.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
+                </span>
               </div>
               {recorrentes.map((r) => (
-                <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+                <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} onToggleConf={handleToggleConf} mes={mes} />
               ))}
             </div>
           )}
@@ -382,12 +387,12 @@ function Financeiro() {
                 <span className="ml-auto font-mono text-xs tabular-nums">{BRL(avulsos.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
               </div>
               {avulsos.map((r) => (
-                <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+                <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} onToggleConf={handleToggleConf} mes={mes} />
               ))}
             </div>
           )}
           {recorrencia !== "all" && filtered.map((r) => (
-            <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+            <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} onToggleConf={handleToggleConf} mes={mes} />
           ))}
         </div>
 
@@ -409,7 +414,7 @@ function Financeiro() {
                 <span className="ml-auto font-mono text-xs tabular-nums">{BRL(recorrentes.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
               </div>
               {recorrentes.map((r) => (
-                <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+                <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} onToggleConf={handleToggleConf} mes={mes} />
               ))}
             </div>
           )}
@@ -420,12 +425,12 @@ function Financeiro() {
                 <span className="ml-auto font-mono text-xs tabular-nums">{BRL(avulsos.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
               </div>
               {avulsos.map((r) => (
-                <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+                <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} onToggleConf={handleToggleConf} mes={mes} />
               ))}
             </div>
           )}
           {recorrencia !== "all" && filtered.map((r) => (
-            <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+            <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} onToggleConf={handleToggleConf} mes={mes} />
           ))}
         </div>
         </>)}
@@ -615,12 +620,13 @@ function KpiCard({
   label, value, sub, icon, trend,
 }: {
   label: string; value: string; sub: string; icon: React.ReactNode;
-  trend: "up" | "down" | "neutral";
+  trend: "up" | "down" | "neutral" | "warning";
 }) {
   const tones = {
     up: { icon: "text-emerald-400", border: "border-emerald-500/25", bg: "from-emerald-500/[0.08] to-transparent" },
     down: { icon: "text-red-400", border: "border-red-500/25", bg: "from-red-500/[0.08] to-transparent" },
     neutral: { icon: "text-violet-400", border: "border-violet-500/25", bg: "from-violet-500/[0.08] to-transparent" },
+    warning: { icon: "text-amber-400", border: "border-amber-500/25", bg: "from-amber-500/[0.08] to-transparent" },
   }[trend];
   return (
     <div className={`rounded-2xl border bg-gradient-to-br ${tones.bg} ${tones.border} p-5 shadow-sm`}>
