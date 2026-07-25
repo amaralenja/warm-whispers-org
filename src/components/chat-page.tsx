@@ -2213,7 +2213,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                   (origem === "criar_saas" ? false : (
                                     !!utmCamp &&
                                     !/organic|organico|whatsapp|direct|referral|email|sms|none/i.test(utmCamp) &&
-                                    !/organic|organico|whatsapp|direct|referral/i.test(utmSrc)
+                                    !/organic|organico|whatsapp|direct|referral|link_?in_?bio/i.test(utmSrc)
                                   ));
 
                                 return (
