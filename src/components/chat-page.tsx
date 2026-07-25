@@ -436,37 +436,41 @@ function formatDateLabel(iso: unknown) {
   return d.toLocaleDateString("pt-BR");
 }
 
-function getLeadAttributionBadge(lead: any) {
-  if (!lead) return null;
+function getLeadAttributionBadge(lead: any, sub?: any) {
+  if (!lead && !sub) return null;
 
   const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const src = norm(lead.utm_source || lead.origem);
-  const med = norm(lead.utm_medium);
-  const camp = norm(lead.utm_campaign);
-  const cont = norm(lead.utm_content);
+  const src = norm(lead?.utm_source || sub?.utm_source || lead?.origem || sub?.origem);
+  const med = norm(lead?.utm_medium || sub?.utm_medium);
+  const camp = norm(lead?.utm_campaign || sub?.utm_campaign);
+  const cont = norm(lead?.utm_content || sub?.utm_content);
+  const fbclid = String(lead?.fbclid || sub?.fbclid || "").trim();
+  const fbp = String(lead?.fbp || sub?.fbp || "").trim();
+  const gclid = String(lead?.gclid || sub?.gclid || "").trim();
+  const origem = norm(lead?.origem || sub?.origem);
 
   // Se for orgânico, direto, link da bio, etc.
   const organicPattern = /organic|organico|direto|direct|link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b|whatsapp|referral|email|sms|none/i;
-  const isOrganic = (organicPattern.test(src) || organicPattern.test(med) || organicPattern.test(camp) || organicPattern.test(cont))
-    && !lead.fbclid && !lead.gclid && !lead.fbc && !/^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
+  const isOrganic = (organicPattern.test(src) || organicPattern.test(med) || organicPattern.test(camp) || organicPattern.test(cont) || organicPattern.test(origem))
+    && !fbclid && !gclid && !fbp && !/^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
 
   if (isOrganic) {
-    return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+    return { text: "Orgânico", class: "bg-amber-500/10 text-amber-400 border-amber-500/40", textShort: "Orgânico", isPago: false };
   }
 
   // 1. Criar SaaS
-  if (src === "criar_saas" || lead.origem === "criar_saas") {
-    return { text: "Criar SaaS", class: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30", textShort: "Criar SaaS" };
+  if (src === "criar_saas" || origem === "criar_saas") {
+    return { text: "Criar SaaS", class: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30", textShort: "Criar SaaS", isPago: false };
   }
 
   // 2. Prospecção SDR
   if (src === "sdr-manual" || med === "sdr-manual" || src.includes("sdr")) {
-    return { text: "Prospecção SDR", class: "bg-blue-500/15 text-blue-300 border-blue-500/30", textShort: "SDR" };
+    return { text: "Prospecção SDR", class: "bg-blue-500/15 text-blue-300 border-blue-500/30", textShort: "SDR", isPago: false };
   }
 
   // 3. Google Ads
-  if (src.includes("google") || src.includes("gads") || lead.gclid) {
-    return { text: "Google Ads", class: "bg-amber-500/15 text-amber-300 border-amber-500/30", textShort: "GAds" };
+  if (src.includes("google") || src.includes("gads") || gclid) {
+    return { text: "Google Ads", class: "bg-amber-500/15 text-amber-300 border-amber-500/30", textShort: "GAds", isPago: true };
   }
 
   // 4. Tráfego Pago / Meta Ads
@@ -474,11 +478,11 @@ function getLeadAttributionBadge(lead: any) {
   const isPaidMed = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
   const isPaidCamp = !!camp && !organicPattern.test(camp);
 
-  if (isPaidSrc || isPaidMed || isPaidCamp || !!lead.fbclid || !!lead.fbc) {
-    return { text: "Tráfego Pago", class: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30", textShort: "Tráfego Pago" };
+  if (isPaidSrc || isPaidMed || isPaidCamp || !!fbclid || !!fbp) {
+    return { text: "Tráfego Pago", class: "bg-blue-500/10 text-blue-400 border-blue-500/40", textShort: "Tráfego Pago", isPago: true };
   }
 
-  return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+  return { text: "Orgânico", class: "bg-amber-500/10 text-amber-400 border-amber-500/40", textShort: "Orgânico", isPago: false };
 }
 
 function StatusTick({ status, onClickFailed }: { status: string | null; onClickFailed?: () => void }) {
@@ -2216,46 +2220,18 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                               )}
 
                               {(() => {
-                                const lead: any = leadForConv ?? {};
-                                const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
-                                const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+                                 const lead = findLeadForConv(contactWaId);
+                                 const d = String(c.contact_wa_id ?? "").replace(/\D+/g, "");
+                                 const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+                                 const attr = getLeadAttributionBadge(lead, sub);
+                                 if (!attr) return null;
 
-                                const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-                                const utmSrc = norm(lead.utm_source || sub?.utm_source);
-                                const utmMed = norm(lead.utm_medium || sub?.utm_medium);
-                                const utmCamp = norm(lead.utm_campaign || sub?.utm_campaign);
-                                const utmCont = norm(lead.utm_content || sub?.utm_content);
-                                const fbclid = String(lead.fbclid || sub?.fbclid || "").trim();
-                                const fbp = String(lead.fbp || sub?.fbp || "").trim();
-                                const gclid = String(lead.gclid || sub?.gclid || "").trim();
-                                const origem = norm(lead.origem);
-
-                                const organicPattern = /organic|organico|direto|direct|link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b|whatsapp|referral|email|sms|none/i;
-                                const isOrganic = (organicPattern.test(utmSrc) || organicPattern.test(utmMed) || organicPattern.test(utmCamp) || organicPattern.test(utmCont) || organicPattern.test(origem))
-                                  && !fbclid && !gclid && !fbp && !/^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(utmMed);
-
-                                const isPago = !isOrganic && (
-                                  !!fbclid ||
-                                  !!gclid ||
-                                  !!fbp ||
-                                  /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(utmSrc) ||
-                                  /\b(cpc|cpm|paid|ads?|social.paid|patrocinado|anuncio)\b/.test(utmMed) ||
-                                  /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmCont) ||
-                                  (origem === "criar_saas" ? false : (
-                                    !!utmCamp && !organicPattern.test(utmCamp)
-                                  ))
-                                );
-
-                                return (
-                                  <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] font-bold uppercase ${
-                                    isPago
-                                      ? "bg-blue-500/10 text-blue-400 border-blue-500/40"
-                                      : "bg-amber-500/10 text-amber-400 border-amber-500/40"
-                                  }`}>
-                                    {isPago ? "💰 Tráfego Pago" : "🌱 Orgânico"}
-                                  </Badge>
-                                );
-                              })()}
+                                 return (
+                                   <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] font-bold uppercase ${attr.class}`}>
+                                     {attr.isPago ? "💰 Tráfego Pago" : "🌱 Orgânico"}
+                                   </Badge>
+                                 );
+                               })()}
 
                               {(() => {
                                 const comprador = checkIsComprador(contactWaId);
@@ -2541,11 +2517,13 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       <span className="text-sm font-mono text-muted-foreground">{toText(active.contact_wa_id)}</span>
                       {(() => {
                         const lead = findLeadForConv(active.contact_wa_id);
-                        const attr = getLeadAttributionBadge(lead);
-                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
-                        const campaign = (lead as any)?.utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
-                        const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(String((lead as any)?.utm_content || "")) || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(String((lead as any)?.utm_source || ""));
-                        const adContent = (lead as any)?.utm_content && !isLinkInBio ? ` · Anúncio: ${(lead as any).utm_content}` : "";
+                        const d = String(active.contact_wa_id ?? "").replace(/\D+/g, "");
+                        const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+                        const attr = getLeadAttributionBadge(lead, sub);
+                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-amber-500/10 text-amber-400 border-amber-500/40" };
+                        const campaign = (lead as any)?.utm_campaign || sub?.utm_campaign ? ` · Campanha: ${(lead as any)?.utm_campaign || sub?.utm_campaign}` : "";
+                        const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(String((lead as any)?.utm_content || sub?.utm_content || "")) || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(String((lead as any)?.utm_source || sub?.utm_source || ""));
+                        const adContent = ((lead as any)?.utm_content || sub?.utm_content) && !isLinkInBio ? ` · Anúncio: ${(lead as any)?.utm_content || sub?.utm_content}` : "";
 
                         return (
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${badgeObj.class}`} title={`Atribuição: ${badgeObj.text}${campaign}${adContent}`}>
