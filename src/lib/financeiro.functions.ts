@@ -17,6 +17,15 @@ export type Lancamento = {
   obs: string | null;
 };
 
+export type Confirmacao = {
+  id: number;
+  lancamento_id: number;
+  mes: string;
+  confirmado: boolean;
+  confirmado_em: string | null;
+  confirmado_por: string | null;
+};
+
 export const listLancamentos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async (opts): Promise<Lancamento[]> => {
@@ -84,6 +93,70 @@ export const deleteLancamento = createServerFn({ method: "POST" })
   });
 
 // ============================================================
+// CONFIRMAÇÕES DE PAGAMENTO (RECORRENTES)
+// ============================================================
+
+export const listConfirmacoes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (opts): Promise<Confirmacao[]> => {
+    const context = opts?.context;
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
+    const { data, error } = await context.supabase
+      .from("financeiro_confirmacoes")
+      .select("*")
+      .order("mes", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Confirmacao[];
+  });
+
+export const toggleConfirmacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: unknown) =>
+      z
+        .object({
+          lancamento_id: z.number().int().positive(),
+          mes: z.string().regex(/^\d{4}-\d{2}$/),
+        })
+        .parse(input),
+  )
+  .handler(async (opts) => {
+    const context = opts?.context;
+    const data = opts?.data;
+    if (!context?.supabase || !data) throw new Error("Sessão Supabase indisponível");
+
+    const { data: existing } = await context.supabase
+      .from("financeiro_confirmacoes")
+      .select("id, confirmado")
+      .eq("lancamento_id", data.lancamento_id)
+      .eq("mes", data.mes)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await context.supabase
+        .from("financeiro_confirmacoes")
+        .update({
+          confirmado: !existing.confirmado,
+          confirmado_em: !existing.confirmado ? new Date().toISOString() : null,
+        })
+        .eq("id", existing.id);
+      if (error) throw error;
+      return { confirmado: !existing.confirmado };
+    }
+
+    const { error: insertErr } = await context.supabase
+      .from("financeiro_confirmacoes")
+      .insert({
+        lancamento_id: data.lancamento_id,
+        mes: data.mes,
+        confirmado: true,
+        confirmado_em: new Date().toISOString(),
+      });
+    if (insertErr) throw insertErr;
+    return { confirmado: true };
+  });
+
+// ============================================================
 // RELATÓRIOS & DRE
 // ============================================================
 
@@ -127,7 +200,23 @@ export type RelatorioPayload = {
   totalFixos: number;
 };
 
-export function getRowsForMonth(all: Lancamento[], mesStr: string): Lancamento[] {
+export function getRowsForMonth(
+  all: Lancamento[],
+  mesStr: string,
+  confirmacoes: Confirmacao[] = [],
+): Lancamento[] {
+  const now = new Date();
+  const currentMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // Build lookup: lancamento_id → Set of confirmed months
+  const confMap = new Map<number, Set<string>>();
+  confirmacoes.forEach((c) => {
+    if (c.confirmado) {
+      if (!confMap.has(c.lancamento_id)) confMap.set(c.lancamento_id, new Set());
+      confMap.get(c.lancamento_id)!.add(c.mes);
+    }
+  });
+
   const directRows = all.filter((r) => (r.data_ref || "").slice(0, 7) === mesStr);
   const directKeys = new Set(directRows.map((r) => `${r.tipo}|${r.categoria}|${(r.descricao || "").toLowerCase().trim()}`));
 
@@ -141,9 +230,19 @@ export function getRowsForMonth(all: Lancamento[], mesStr: string): Lancamento[]
       const key = `${r.tipo}|${r.categoria}|${(r.descricao || "").toLowerCase().trim()}`;
       if (!directKeys.has(key) && !handledRecurringKeys.has(key)) {
         handledRecurringKeys.add(key);
+        const isConfirmed = confMap.get(r.id)?.has(mesStr) ?? false;
+        let computedStatus: Lancamento["status"];
+        if (isConfirmed) {
+          computedStatus = "pago";
+        } else if (mesStr < currentMes) {
+          computedStatus = "atrasado";
+        } else {
+          computedStatus = "pendente";
+        }
         recurringRows.push({
           ...r,
           data_ref: `${mesStr}-01`,
+          status: computedStatus,
         });
       }
     }

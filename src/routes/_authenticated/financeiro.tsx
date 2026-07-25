@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   listLancamentos, upsertLancamento, deleteLancamento, type Lancamento,
   getFinanceiroRelatorio, getDRE, getRowsForMonth,
+  listConfirmacoes, toggleConfirmacao, type Confirmacao,
 } from "@/lib/financeiro.functions";
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
@@ -64,11 +65,18 @@ function Financeiro() {
   const fetchAll = useServerFn(listLancamentos);
   const upsertFn = useServerFn(upsertLancamento);
   const deleteFn = useServerFn(deleteLancamento);
+  const fetchConf = useServerFn(listConfirmacoes);
+  const toggleConf = useServerFn(toggleConfirmacao);
   const qc = useQueryClient();
 
   const { data: all = [], isLoading } = useQuery({
     queryKey: ["financeiro"],
     queryFn: () => fetchAll(),
+  });
+
+  const { data: confirmacoes = [] } = useQuery({
+    queryKey: ["financeiro-confirmacoes"],
+    queryFn: () => fetchConf(),
   });
 
   const [mes, setMes] = useState(() => todayISO().slice(0, 7));
@@ -80,26 +88,43 @@ function Financeiro() {
   const [tab, setTab] = useState<"lancamentos" | "relatorios" | "dre">("lancamentos");
   const [recorrencia, setRecorrencia] = useState<"all" | "recorrente" | "avulso">("all");
 
-  const rowsMes = useMemo(() => getRowsForMonth(all, mes), [all, mes]);
+  const rowsMes = useMemo(() => getRowsForMonth(all, mes, confirmacoes), [all, mes, confirmacoes]);
 
   const kpis = useMemo(() => {
-    const g = rowsMes.filter((r) => r.tipo === "gasto");
-    const r = rowsMes.filter((r) => r.tipo === "receita");
-    const totalG = g.reduce((s, x) => s + (+x.valor || 0), 0);
-    const totalR = r.reduce((s, x) => s + (+x.valor || 0), 0);
-    const pendente = rowsMes
-      .filter((x) => x.status === "pendente" || x.status === "atrasado")
-      .reduce((s, x) => s + (+x.valor || 0), 0);
+    const gastos = rowsMes.filter((r) => r.tipo === "gasto");
+    const receitas = rowsMes.filter((r) => r.tipo === "receita");
+    const totalReceita = receitas.reduce((s, x) => s + (+x.valor || 0), 0);
+
+    // Only count "pago" items as realized gastos
+    const gastosRealizados = gastos.filter((r) => r.status === "pago");
+    const totalGastoRealizado = gastosRealizados.reduce((s, x) => s + (+x.valor || 0), 0);
+
+    // Unconfirmed recurring = atrasado or pendente from virtual rows
+    const gastosPendentes = gastos.filter((r) => r.status === "pendente" || r.status === "atrasado");
+    const totalPendente = gastosPendentes.reduce((s, x) => s + (+x.valor || 0), 0);
+
     const fixos = all
       .filter((x) => x.recorrente && x.tipo === "gasto")
       .reduce((s, x) => s + (+x.valor || 0), 0);
+
     return {
-      gasto: totalG, gastoCount: g.length,
-      receita: totalR, receitaCount: r.length,
-      saldo: totalR - totalG,
-      pendente, fixos,
+      gasto: totalGastoRealizado, gastoCount: gastosRealizados.length,
+      receita: totalReceita, receitaCount: receitas.length,
+      saldo: totalReceita - totalGastoRealizado,
+      pendente: totalPendente, pendenteCount: gastosPendentes.length,
+      fixos,
     };
   }, [rowsMes, all]);
+
+  const handleToggleConf = async (lancamentoId: number, mesStr: string) => {
+    try {
+      await toggleConf({ data: { lancamento_id: lancamentoId, mes: mesStr } });
+      await qc.invalidateQueries({ queryKey: ["financeiro-confirmacoes"] });
+      await qc.invalidateQueries({ queryKey: ["financeiro"] });
+    } catch (e: any) {
+      toast.error("Erro ao confirmar: " + (e?.message || "tenta de novo"));
+    }
+  };
 
   const filtered = useMemo(() => {
     let rows = rowsMes;
@@ -160,6 +185,7 @@ function Financeiro() {
     try {
       await deleteFn({ data: { id } });
       await qc.invalidateQueries({ queryKey: ["financeiro"] });
+      await qc.invalidateQueries({ queryKey: ["financeiro-confirmacoes"] });
       toast.success("Lançamento removido");
     } catch (e: any) {
       toast.error("Erro: " + (e?.message || "tenta de novo"));
@@ -228,20 +254,20 @@ function Financeiro() {
 
         {tab === "lancamentos" && (<>
         {/* KPIs */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard
             label="Receita do mês"
             value={BRL(kpis.receita)}
             sub={`${kpis.receitaCount} lançamentos`}
             icon={<TrendingUp className="h-4 w-4" />}
-            trend={kpis.receita >= 0 ? "up" : "down"}
+            trend="up"
           />
           <KpiCard
-            label="Gasto do mês"
+            label="Gasto realizado"
             value={BRL(kpis.gasto)}
-            sub={`${kpis.gastoCount} lançamentos`}
+            sub={`${kpis.gastoCount} confirmados`}
             icon={<TrendingDown className="h-4 w-4" />}
-            trend={kpis.gasto > 0 ? "down" : "up"}
+            trend="down"
           />
           <KpiCard
             label="Saldo"
@@ -257,6 +283,15 @@ function Financeiro() {
             icon={<Repeat className="h-4 w-4" />}
             trend="neutral"
           />
+          {kpis.pendente > 0 && (
+            <KpiCard
+              label="A confirmar"
+              value={BRL(kpis.pendente)}
+              sub={`${kpis.pendenteCount} não confirmados`}
+              icon={<AlertCircle className="h-4 w-4" />}
+              trend="warning"
+            />
+          )}
         </div>
 
         {/* Filtros */}
@@ -411,26 +446,53 @@ function Financeiro() {
 }
 
 function LancamentoRow({
-  r, onEdit, onDelete,
+  r, onEdit, onDelete, onToggleConf, mes,
 }: {
   r: Lancamento;
   onEdit: (r: Lancamento) => void;
   onDelete: (id: number) => void;
+  onToggleConf?: (lancamentoId: number, mes: string) => void;
+  mes?: string;
 }) {
   const c = CAT_MAP.get(r.categoria);
   const isGasto = r.tipo === "gasto";
+  const isRecurrent = r.recorrente;
+  const isConfirmed = r.status === "pago";
+  const isOverdue = r.status === "atrasado";
   return (
-    <div className="group grid grid-cols-[100px_1fr_140px_110px_120px_100px_70px] items-center gap-3 border-b border-border/50 px-4 py-3 text-sm transition hover:bg-accent/[0.04]">
+    <div className={`group grid grid-cols-[100px_1fr_140px_110px_120px_100px_70px] items-center gap-3 border-b border-border/50 px-4 py-3 text-sm transition hover:bg-accent/[0.04] ${
+      isOverdue ? "bg-red-500/[0.04]" : ""
+    }`}>
       <span className="text-xs text-muted-foreground">
         {new Date(r.data_ref + "T00:00:00").toLocaleDateString("pt-BR", {
           day: "2-digit", month: "short",
         })}
       </span>
       <div className="min-w-0">
-        <p className="truncate font-semibold">{r.descricao}</p>
-        {r.recorrente && (
-          <span className="mt-0.5 inline-flex items-center gap-1 text-[0.55rem] uppercase tracking-widest text-violet-400">
-            <Repeat className="h-2.5 w-2.5" /> recorrente
+        <div className="flex items-center gap-2">
+          {isRecurrent && onToggleConf && mes && (
+            <button
+              onClick={() => onToggleConf(r.id, mes)}
+              className={`shrink-0 h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                isConfirmed
+                  ? "bg-emerald-500 border-emerald-500 text-white"
+                  : isOverdue
+                    ? "border-red-400 bg-red-400/10 hover:bg-red-400/20"
+                    : "border-amber-400 bg-amber-400/10 hover:bg-amber-400/20"
+              }`}
+              title={isConfirmed ? "Pago — clique para desmarcar" : "Marcar como pago"}
+            >
+              {isConfirmed && <CheckCircle2 className="h-3 w-3" />}
+            </button>
+          )}
+          <p className={`truncate font-semibold ${isOverdue ? "text-red-400" : ""}`}>{r.descricao}</p>
+        </div>
+        {isRecurrent && (
+          <span className={`mt-0.5 inline-flex items-center gap-1 text-[0.55rem] uppercase tracking-widest ${
+            isConfirmed ? "text-emerald-400" : isOverdue ? "text-red-400" : "text-violet-400"
+          }`}>
+            <Repeat className="h-2.5 w-2.5" />
+            {isConfirmed ? "pago" : isOverdue ? "atrasado" : "recorrente"}
           </span>
         )}
       </div>
@@ -461,27 +523,58 @@ function LancamentoRow({
 }
 
 function LancamentoCard({
-  r, onEdit, onDelete,
+  r, onEdit, onDelete, onToggleConf, mes,
 }: {
   r: Lancamento;
   onEdit: (r: Lancamento) => void;
   onDelete: (id: number) => void;
+  onToggleConf?: (lancamentoId: number, mes: string) => void;
+  mes?: string;
 }) {
   const c = CAT_MAP.get(r.categoria);
   const isGasto = r.tipo === "gasto";
+  const isRecurrent = r.recorrente;
+  const isConfirmed = r.status === "pago";
+  const isOverdue = r.status === "atrasado";
   return (
     <div className={`rounded-xl border p-3.5 transition-colors ${
-      r.recorrente
-        ? "border-violet-500/20 bg-violet-500/[0.04]"
-        : "border-border bg-card/60"
+      isOverdue
+        ? "border-red-500/30 bg-red-500/[0.06]"
+        : isConfirmed && isRecurrent
+          ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+          : isRecurrent
+            ? "border-violet-500/20 bg-violet-500/[0.04]"
+            : "border-border bg-card/60"
     } hover:border-accent/30`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="truncate text-sm font-bold">{r.descricao}</p>
-            {r.recorrente && (
-              <span className="inline-flex items-center gap-0.5 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-widest text-violet-400">
-                <Repeat className="h-2 w-2" /> fixo
+            {isRecurrent && onToggleConf && mes && (
+              <button
+                onClick={() => onToggleConf(r.id, mes)}
+                className={`shrink-0 h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                  isConfirmed
+                    ? "bg-emerald-500 border-emerald-500 text-white"
+                    : isOverdue
+                      ? "border-red-400 bg-red-400/10"
+                      : "border-amber-400 bg-amber-400/10"
+                }`}
+                title={isConfirmed ? "Pago — clique para desmarcar" : "Marcar como pago"}
+              >
+                {isConfirmed && <CheckCircle2 className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            <p className={`truncate text-sm font-bold ${isOverdue ? "text-red-400" : ""}`}>{r.descricao}</p>
+            {isRecurrent && (
+              <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-widest ${
+                isConfirmed
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : isOverdue
+                    ? "bg-red-500/15 text-red-400"
+                    : "bg-violet-500/15 text-violet-400"
+              }`}>
+                <Repeat className="h-2 w-2" />
+                {isConfirmed ? "pago" : isOverdue ? "atrasado" : "fixo"}
               </span>
             )}
           </div>

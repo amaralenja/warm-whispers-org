@@ -110,15 +110,13 @@ const CAIO_UTMS = ["GC", "BP"];
 const GUSTAVO_UTMS = ["LS", "LF"];
 
 async function dbFor(context: any) {
-  if (context?.vendor) {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      return supabaseAdmin as any;
-    } catch (err) {
-      console.warn("[operacoes] supabaseAdmin indisponível — usando client autenticado", err);
-    }
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (supabaseAdmin) return supabaseAdmin as any;
+  } catch (err) {
+    console.warn("[operacoes] supabaseAdmin indisponível — usando client autenticado", err);
   }
-  return context.supabase as any;
+  return context?.supabase as any;
 }
 
 function vendorWorkspaceIds(context: any): string[] | null {
@@ -1093,9 +1091,18 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
     // ── 7. Stats por expert (O(V) total usando pré-agrupamento) ──
     const experts = expertsRes.data ?? [];
-    const allExpertNames = new Set<string>(experts.map((e: any) => asStr(e.nome).trim()));
-
-    if (data.includeHighTicket) allExpertNames.add("High Ticket");
+    const allExpertNames = new Set<string>(["Gustavo", "Caio", "Jessica"]);
+    for (const e of experts) {
+      const name = asStr(e.nome).trim();
+      if (name) allExpertNames.add(name);
+    }
+    for (const opName of leadsByOp.keys()) {
+      if (opName) allExpertNames.add(opName);
+    }
+    for (const opName of vendasByExpert.keys()) {
+      if (opName) allExpertNames.add(opName);
+    }
+    if (data.includeHighTicket !== false) allExpertNames.add("High Ticket");
 
     let totalFat = 0;
     let totalVendas = vendasScoped.length;
