@@ -1926,7 +1926,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               <div className="flex items-center gap-2">
                 {unreadTotal > 0 ? (
                   <span
-                    className="grid h-8 min-w-8 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground shadow-[0_0_10px_-3px_var(--chat-accent)]"
+                    className="grid h-7 min-w-7 place-items-center rounded-full bg-emerald-500 px-2 text-xs font-black text-slate-950 shadow-md shadow-emerald-500/30 ring-1 ring-emerald-400/50"
                     title="Leads não visualizados"
                   >
                     {unreadTotal}
@@ -1958,6 +1958,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 { id: "archived", label: "Arquivadas", count: archivedTotal },
               ] as const).map((f) => {
                 const active = listFilter === f.id && !selectedTagFilter;
+                const isUnreadTab = f.id === "unread";
                 return (
                   <button
                     key={f.id}
@@ -1966,15 +1967,25 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       setListFilter(f.id);
                       setSelectedTagFilter(null);
                     }}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 ${
                       active
-                        ? "border-chat-accent bg-chat-accent text-chat-accent-foreground shadow-[0_0_12px_-4px_var(--chat-accent)]"
-                        : "border-chat-line/60 bg-chat-panel/60 text-muted-foreground hover:bg-chat-soft/60 hover:border-chat-line"
+                        ? isUnreadTab
+                          ? "border-emerald-500/60 bg-emerald-500/20 text-emerald-400 shadow-[0_0_12px_-4px_rgba(16,185,129,0.5)]"
+                          : "border-chat-accent bg-chat-accent text-chat-accent-foreground shadow-[0_0_12px_-4px_var(--chat-accent)]"
+                        : isUnreadTab && f.count > 0
+                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                          : "border-chat-line/60 bg-chat-panel/60 text-muted-foreground hover:bg-chat-soft/60 hover:border-chat-line"
                     }`}
                   >
                     <span>{f.label}</span>
                     {f.count > 0 ? (
-                      <span className={`rounded-full px-1.5 text-[10px] font-bold tabular-nums ${active ? "bg-chat-accent-foreground/20" : "bg-chat-soft"}`}>
+                      <span className={`rounded-full px-1.5 text-[10px] font-extrabold tabular-nums ${
+                        isUnreadTab
+                          ? "bg-emerald-500 text-slate-950"
+                          : active
+                            ? "bg-chat-accent-foreground/20"
+                            : "bg-chat-soft"
+                      }`}>
                         {f.count}
                       </span>
                     ) : null}
@@ -2147,12 +2158,14 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                         }
                         className={`group relative w-full cursor-pointer border-b border-chat-line/60 px-4 py-3.5 text-left transition-all duration-150 ${
                           isActive 
-                            ? "bg-chat-soft/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]" 
-                            : checkIsComprador(contactWaId)
-                              ? "bg-amber-500/[0.03] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
-                              : isTypebotLead 
-                                ? "bg-amber-500/[0.02] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]" 
-                                : "hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+                            ? "bg-emerald-500/10 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.2)]" 
+                            : Number(c.unread_count ?? 0) > 0
+                              ? "bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]"
+                              : checkIsComprador(contactWaId)
+                                ? "bg-amber-500/[0.03] hover:bg-chat-soft/50"
+                                : isTypebotLead 
+                                  ? "bg-amber-500/[0.02] hover:bg-chat-soft/50" 
+                                  : "hover:bg-chat-soft/50"
                         } ${isArchived ? "opacity-60" : ""}`}
                       >
 
@@ -2341,15 +2354,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
                           </div>
                           <div className="flex h-12 shrink-0 flex-col items-end justify-between gap-1">
-                            <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                            <span className={`text-[11px] font-medium tabular-nums ${Number(c.unread_count ?? 0) > 0 ? "text-emerald-400 font-bold" : "text-muted-foreground"}`}>
                               {formatListStamp(c.last_message_at)}
                             </span>
                             {Number(c.unread_count ?? 0) > 0 ? (
-                              <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground">
+                              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-black text-slate-950 shadow-md shadow-emerald-500/30 ring-1 ring-emerald-400/50">
                                 {Number(c.unread_count ?? 0)}
                               </span>
                             ) : (
-                              <span className={`h-2 w-2 rounded-full ${isActive ? "bg-chat-accent" : "bg-transparent"}`} />
+                              <span className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500" : "bg-transparent"}`} />
                             )}
                           </div>
                         </div>
