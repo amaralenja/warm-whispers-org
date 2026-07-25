@@ -442,19 +442,29 @@ function getLeadAttributionBadge(lead: any, sub?: any) {
   const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const src = norm(lead?.utm_source || sub?.utm_source || lead?.origem || sub?.origem);
   const med = norm(lead?.utm_medium || sub?.utm_medium);
-  const camp = norm(lead?.utm_campaign || sub?.utm_campaign);
+  const rawCamp = String(lead?.utm_campaign || sub?.utm_campaign || "").trim();
+  const camp = norm(rawCamp);
   const cont = norm(lead?.utm_content || sub?.utm_content);
   const fbclid = String(lead?.fbclid || sub?.fbclid || "").trim();
   const fbp = String(lead?.fbp || sub?.fbp || "").trim();
   const gclid = String(lead?.gclid || sub?.gclid || "").trim();
   const origem = norm(lead?.origem || sub?.origem);
 
-  // Se for orgânico, direto, link da bio, etc.
-  const organicPattern = /organic|organico|direto|direct|link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b|whatsapp|referral|email|sms|none/i;
-  const isOrganic = (organicPattern.test(src) || organicPattern.test(med) || organicPattern.test(camp) || organicPattern.test(cont) || organicPattern.test(origem))
-    && !fbclid && !gclid && !fbp && !/^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
+  // Consider empty campaign if rawCamp is empty, '—', '-', 'none', 'null', 'undefined'
+  const isCampEmpty = !rawCamp || rawCamp === "—" || rawCamp === "-" || camp === "none" || camp === "null" || camp === "undefined";
+  const cleanCamp = isCampEmpty ? "" : camp;
 
-  if (isOrganic) {
+  // Organic indicators
+  const organicPattern = /organic|organico|direto|direct|link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b|whatsapp|referral|email|sms|none/i;
+  const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCamp && organicPattern.test(cleanCamp)) || organicPattern.test(cont) || organicPattern.test(origem);
+
+  const hasClickId = !!fbclid || !!gclid || !!fbp;
+  const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+  const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
+  const hasRealCampaign = !!cleanCamp && !organicPattern.test(cleanCamp);
+
+  // If organic pattern matched OR there is NO real paid campaign and NO paid click ID/medium -> Orgânico
+  if ((isOrganicWord || !hasRealCampaign) && !hasClickId && !isPaidMedium && !isPaidSource) {
     return { text: "Orgânico", class: "bg-amber-500/10 text-amber-400 border-amber-500/40", textShort: "Orgânico", isPago: false };
   }
 
@@ -469,16 +479,12 @@ function getLeadAttributionBadge(lead: any, sub?: any) {
   }
 
   // 3. Google Ads
-  if (src.includes("google") || src.includes("gads") || gclid) {
+  if (src.includes("google_ads") || src.includes("gads") || !!gclid) {
     return { text: "Google Ads", class: "bg-amber-500/15 text-amber-300 border-amber-500/30", textShort: "GAds", isPago: true };
   }
 
-  // 4. Tráfego Pago / Meta Ads
-  const isPaidSrc = /\b(fb|facebook|meta|ads?|google|tiktok|gads|patrocinado)\b/.test(src) || src === "fb";
-  const isPaidMed = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
-  const isPaidCamp = !!camp && !organicPattern.test(camp);
-
-  if (isPaidSrc || isPaidMed || isPaidCamp || !!fbclid || !!fbp) {
+  // 4. Tráfego Pago
+  if (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign) {
     return { text: "Tráfego Pago", class: "bg-blue-500/10 text-blue-400 border-blue-500/40", textShort: "Tráfego Pago", isPago: true };
   }
 
