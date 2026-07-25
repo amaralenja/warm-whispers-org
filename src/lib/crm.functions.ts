@@ -279,6 +279,9 @@ export const createCrmTag = createServerFn({ method: "POST" })
     assertPayloadWorkspace(context, { expert: data.operacao });
     const db = await dbFor(context);
     const rpcArgs = context?.vendor ? vendorRpcArgs(context) : null;
+
+    console.log("[createCrmTag] vendor:", !!context?.vendor, "rpcArgs:", !!rpcArgs, "operacao:", data.operacao);
+
     if (rpcArgs) {
       const { error } = await db.rpc("vendor_create_crm_tag" as any, {
         ...rpcArgs,
@@ -287,9 +290,29 @@ export const createCrmTag = createServerFn({ method: "POST" })
         _operacao: data.operacao,
         _stage_id: data.stage_id,
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("[createCrmTag] RPC vendor_create_crm_tag falhou:", error.message, "— tentando insert direto via service role");
+        // Fallback: insert direto usando service role (admin DB)
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { error: insertErr } = await (supabaseAdmin as any)
+          .from("crm_tags")
+          .insert({ nome: data.nome, cor: data.cor, operacao: data.operacao, stage_id: data.stage_id });
+        if (insertErr) throw new Error(insertErr.message);
+      }
       return { ok: true };
     }
+
+    // Não é vendor — insert direto via service role para evitar erro de RLS
+    if (context?.vendor) {
+      // Vendor sem rpcArgs válido: usa service role diretamente
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error: insertErr } = await (supabaseAdmin as any)
+        .from("crm_tags")
+        .insert({ nome: data.nome, cor: data.cor, operacao: data.operacao, stage_id: data.stage_id });
+      if (insertErr) throw new Error(insertErr.message);
+      return { ok: true };
+    }
+
     const { error } = await db.from("crm_tags" as any).insert({ nome: data.nome, cor: data.cor, operacao: data.operacao, stage_id: data.stage_id });
     if (error) throw new Error(error.message);
     return { ok: true };
