@@ -82,14 +82,14 @@
   --input: oklch(0.20 0.006 270);
   --ring: oklch(0.78 0.13 75);
 
-  /* WhatsApp Web — dark mode parity (#111b21 / #202c33 / #0b141a / #005c4b) */
-  --chat-shell: #111b21;
+  /* WhatsApp Web — refined dark mode with added depth */
+  --chat-shell: #0d1117;
   --chat-sidebar: #111b21;
-  --chat-thread: #0b141a;
-  --chat-panel: #202c33;
-  --chat-line: #2a3942;
-  --chat-soft: #2a3942;
-  --chat-message-in: #202c33;
+  --chat-thread: #0a0f14;
+  --chat-panel: #1a2332;
+  --chat-line: #253341;
+  --chat-soft: #1e2d3d;
+  --chat-message-in: #1c2b3a;
   --chat-message-out: #005c4b;
   --chat-message-out-foreground: #e9edef;
   --chat-accent: #00a884;
@@ -159,6 +159,31 @@
 
 @utility chat-thread-glow {
   background-image: none;
+}
+
+/* Chat panel enhancements */
+.chat-sidebar-glow {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--chat-accent) 4%, transparent) 0%, transparent 40%);
+}
+.chat-header-glass {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--chat-panel) 95%, transparent) 0%, color-mix(in oklab, var(--chat-panel) 85%, transparent) 100%);
+  backdrop-filter: blur(12px);
+}
+.chat-bubble-in {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.chat-bubble-out {
+  box-shadow: 0 1px 3px rgba(0, 80, 60, 0.3), 0 0 0 1px rgba(0, 168, 132, 0.08);
+}
+.chat-input-glow {
+  box-shadow: 0 -1px 12px rgba(0, 168, 132, 0.06), 0 0 0 1px var(--chat-line);
+}
+.chat-row-hover {
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.chat-row-hover:hover {
+  background-color: var(--chat-soft);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 /* React Flow — garantir que nós fiquem acima do background e sejam clicáveis */

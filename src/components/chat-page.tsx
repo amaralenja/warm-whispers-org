@@ -560,9 +560,9 @@ function ChatFooterInput({
   };
 
   return (
-    <footer className="shrink-0 border-t border-chat-line bg-chat-panel px-1.5 py-1.5 md:px-5 md:py-4">
+    <footer className="shrink-0 border-t border-chat-line/50 bg-chat-panel/90 backdrop-blur-sm px-1.5 py-1.5 md:px-5 md:py-4">
       {replyTo && (
-        <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line bg-chat-thread px-3 py-2">
+        <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-xl border border-chat-line/60 bg-chat-thread px-3 py-2 shadow-sm">
           <div className={`h-10 w-1 rounded-full ${replyTo.direction === "out" ? "bg-chat-accent" : "bg-emerald-400"}`} />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-chat-accent">
@@ -575,7 +575,7 @@ function ChatFooterInput({
           </Button>
         </div>
       )}
-      <div className="mx-auto flex max-w-5xl items-end gap-1 md:gap-3 rounded-2xl border border-chat-line bg-chat-thread p-1 md:p-2">
+      <div className="mx-auto flex max-w-5xl items-end gap-1 md:gap-3 rounded-2xl border border-chat-line/60 bg-chat-thread p-1 md:p-2 chat-input-glow">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="ghost" size="icon" className="hidden md:grid h-12 w-12 shrink-0 rounded-2xl text-muted-foreground hover:bg-chat-soft hover:text-chat-accent" aria-label="Emojis">
@@ -660,7 +660,7 @@ function ChatFooterInput({
         {draft.trim() ? (
           <Button
             size="icon"
-            className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90"
+            className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-2xl bg-chat-accent text-chat-accent-foreground hover:bg-chat-accent/90 shadow-[0_0_12px_-3px_var(--chat-accent)] hover:shadow-[0_0_16px_-2px_var(--chat-accent)] transition-all duration-150"
             onClick={handleSend}
             disabled={sendMutPending}
           >
@@ -1886,10 +1886,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         <aside className={`min-h-0 flex-col border-r border-chat-line bg-chat-sidebar ${active ? "hidden md:flex" : "flex"}`}>
 
 
-          <div className="shrink-0 border-b border-chat-line p-3 md:p-5">
+          <div className="shrink-0 border-b border-chat-line bg-chat-sidebar chat-sidebar-glow p-3 md:p-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-chat-soft text-chat-accent">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-chat-accent/15 text-chat-accent shadow-[0_0_16px_-6px_var(--chat-accent)]">
                   <MessagesSquare className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
@@ -1904,7 +1904,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
               <div className="flex items-center gap-2">
                 {unreadTotal > 0 ? (
                   <span
-                    className="grid h-8 min-w-8 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground"
+                    className="grid h-8 min-w-8 place-items-center rounded-full bg-chat-accent px-2 text-xs font-bold text-chat-accent-foreground shadow-[0_0_10px_-3px_var(--chat-accent)]"
                     title="Leads não visualizados"
                   >
                     {unreadTotal}
@@ -1922,7 +1922,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar contato ou mensagem"
-                className="h-11 rounded-2xl border-chat-line bg-chat-panel pl-11 text-base md:h-12 md:text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-chat-accent"
+                className="h-11 rounded-2xl border-chat-line bg-chat-panel/80 pl-11 text-base md:h-12 md:text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-chat-accent/50 focus-visible:border-chat-accent/40 transition-all"
               />
 
             </div>
@@ -1944,10 +1944,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       setListFilter(f.id);
                       setSelectedTagFilter(null);
                     }}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
                       active
-                        ? "border-chat-accent bg-chat-accent text-chat-accent-foreground shadow-sm"
-                        : "border-chat-line bg-chat-panel text-muted-foreground hover:bg-chat-soft"
+                        ? "border-chat-accent bg-chat-accent text-chat-accent-foreground shadow-[0_0_12px_-4px_var(--chat-accent)]"
+                        : "border-chat-line/60 bg-chat-panel/60 text-muted-foreground hover:bg-chat-soft/60 hover:border-chat-line"
                     }`}
                   >
                     <span>{f.label}</span>
@@ -2123,15 +2123,15 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                   ? { borderLeft: "3px solid #f59e0b" } // Borda dourada para indicar Typebot!
                                   : undefined
                         }
-                        className={`group relative w-full cursor-pointer border-b border-chat-line px-4 py-3.5 text-left transition-colors ${
+                        className={`group relative w-full cursor-pointer border-b border-chat-line/60 px-4 py-3.5 text-left transition-all duration-150 ${
                           isActive 
-                            ? "bg-chat-soft" 
+                            ? "bg-chat-soft/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]" 
                             : checkIsComprador(contactWaId)
-                              ? "bg-emerald-500/[0.03] hover:bg-chat-panel"
+                              ? "bg-emerald-500/[0.03] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
                               : isTypebotLead 
-                                ? "bg-amber-500/[0.02] hover:bg-chat-panel" 
-                                : "hover:bg-chat-panel"
-                        } ${isArchived ? "opacity-70" : ""}`}
+                                ? "bg-amber-500/[0.02] hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]" 
+                                : "hover:bg-chat-soft/50 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+                        } ${isArchived ? "opacity-60" : ""}`}
                       >
 
                         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
@@ -2149,7 +2149,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                             }}
                             onKeyDown={(e) => e.stopPropagation()}
                           >
-                            <Avatar className="h-12 w-12 rounded-full border border-chat-line">
+                            <Avatar className="h-12 w-12 rounded-full border border-chat-line/80 shadow-sm">
                               {(c as any).contact_avatar_url ? (
                                 <AvatarImage src={(c as any).contact_avatar_url} alt={contactName || contactWaId} className="rounded-full object-cover" />
                               ) : null}
@@ -2381,7 +2381,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
               <div className="max-w-sm text-center">
-                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-chat-line bg-chat-panel text-chat-accent">
+                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-chat-line/50 bg-chat-panel/60 text-chat-accent shadow-[0_0_24px_-8px_var(--chat-accent)]">
                   {searchParams.embed && (requestedPhone || requestedConversationId) ? <Loader2 className="h-9 w-9 animate-spin" /> : <Headphones className="h-9 w-9" />}
                 </div>
                 {searchParams.embed && (requestedPhone || requestedConversationId) ? (
@@ -2403,7 +2403,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
             </div>
           ) : (
             <>
-              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-chat-line bg-chat-panel/80 px-3 py-3 backdrop-blur md:gap-4 md:px-6 md:py-4">
+              <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-chat-line/60 chat-header-glass px-3 py-3 md:gap-4 md:px-6 md:py-4">
                 <div className="flex min-w-0 items-center gap-2 md:gap-4">
                   {!searchParams.embed && (
                     <button
@@ -2427,7 +2427,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       setProfilePhotoPreview({ src, alt: toText(active.contact_name) || toText(active.contact_wa_id) || "Foto do lead" });
                     }}
                   >
-                    <Avatar className="h-10 w-10 rounded-2xl border border-chat-line md:h-14 md:w-14">
+                    <Avatar className="h-10 w-10 rounded-2xl border border-chat-line/80 shadow-sm md:h-14 md:w-14">
                       {(active as any).contact_avatar_url ? (
                         <AvatarImage src={(active as any).contact_avatar_url} alt={toText(active.contact_name) || toText(active.contact_wa_id)} className="rounded-2xl object-cover" />
                       ) : null}
@@ -2457,7 +2457,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-line bg-chat-soft px-2.5 py-1 text-[11px] font-medium text-chat-accent">
+                      <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-chat-accent/30 bg-chat-accent/10 px-2.5 py-1 text-[11px] font-medium text-chat-accent shadow-[0_0_8px_-3px_var(--chat-accent)]">
                         <Radio className="h-3 w-3" /> ativo
                       </span>
 
@@ -2634,7 +2634,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       <div key={String(m.id)} id={`msg-${m.id}`} className="scroll-mt-20 rounded-xl transition-colors duration-500">
                         {showDate && (
                           <div className="my-5 flex justify-center">
-                            <span className="rounded-full border border-chat-line bg-chat-panel px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+                            <span className="rounded-full border border-chat-line/50 bg-chat-panel/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-md">
                               {formatDateLabel(m.created_at)}
                             </span>
                           </div>
@@ -2659,7 +2659,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                   type="button"
                   onClick={scrollToBottom}
                   aria-label="Ir para o final da conversa"
-                  className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-chat-line bg-chat-panel text-foreground shadow-lg transition-colors hover:bg-chat-soft"
+                  className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-chat-line/60 bg-chat-panel/90 backdrop-blur-sm text-foreground shadow-xl transition-all duration-150 hover:bg-chat-soft hover:shadow-[0_0_16px_-4px_var(--chat-accent)] hover:border-chat-accent/40 hover:text-chat-accent"
                 >
                   <ChevronDown className="h-5 w-5" />
                 </button>
@@ -3205,8 +3205,8 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
           <div
             className={`inline-block max-w-full overflow-hidden rounded-2xl border px-4 py-3 break-words ${
               isOut
-                ? "border-chat-accent/35 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg"
-                : "border-chat-line bg-chat-message-in text-foreground rounded-bl-lg"
+                ? "border-chat-accent/25 bg-chat-message-out text-chat-message-out-foreground rounded-br-lg chat-bubble-out"
+                : "border-chat-line/60 bg-chat-message-in text-foreground rounded-bl-lg chat-bubble-in"
             }`}
           >
             {(quotedPreview || quotedFrom) && (
@@ -3214,7 +3214,7 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
                 type="button"
                 onClick={(e) => { e.stopPropagation(); if (quotedFrom && onQuotedClick) onQuotedClick(quotedFrom); }}
                 disabled={!quotedFrom || !onQuotedClick}
-                className={`mb-2 block w-full text-left rounded-lg border-l-4 px-3 py-2 text-xs transition-colors ${quotedFromOut === false ? "border-chat-accent bg-black/20" : "border-emerald-400 bg-black/20"} ${quotedFrom && onQuotedClick ? "hover:bg-black/30 cursor-pointer" : "cursor-default"}`}
+                className={`mb-2 block w-full text-left rounded-lg border-l-[3px] px-3 py-2 text-xs transition-colors ${quotedFromOut === false ? "border-chat-accent bg-black/30" : "border-emerald-400 bg-black/30"} ${quotedFrom && onQuotedClick ? "hover:bg-black/40 cursor-pointer" : "cursor-default"}`}
               >
                 <div className="font-semibold opacity-80">
                   {quotedFrom ? (quotedFrom.direction === "out" ? "Você" : "Cliente") : "Mensagem"}
@@ -3246,10 +3246,10 @@ function MessageBubble({ msg, mediaState, onLoadMedia, onMediaSettled, onReply, 
           {(myReaction || theirReaction) && (
             <div className={`absolute -bottom-3 ${isOut ? "right-3" : "left-3"} flex gap-1`}>
               {theirReaction && (
-                <span className="rounded-full border border-chat-line bg-chat-panel px-2 py-0.5 text-sm shadow">{theirReaction}</span>
+                <span className="rounded-full border border-chat-line/60 bg-chat-panel px-2 py-0.5 text-sm shadow-md">{theirReaction}</span>
               )}
               {myReaction && (
-                <span className="rounded-full border border-chat-line bg-chat-panel px-2 py-0.5 text-sm shadow">{myReaction}</span>
+                <span className="rounded-full border border-chat-line/60 bg-chat-panel px-2 py-0.5 text-sm shadow-md">{myReaction}</span>
               )}
             </div>
           )}
