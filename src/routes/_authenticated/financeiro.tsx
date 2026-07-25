@@ -724,7 +724,7 @@ function CustomDatePicker({
         <span className="text-muted-foreground text-xs">📅</span>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl p-3 animate-in fade-in duration-100">
+        <div className="absolute z-[60] mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl p-3 animate-in fade-in duration-100">
           <div className="flex items-center justify-between mb-2">
             <button type="button" onClick={prev} className="rounded-lg px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary transition-colors">←</button>
             <span className="text-xs font-bold uppercase tracking-wider text-foreground">{monthName}</span>
@@ -800,7 +800,7 @@ function CustomSelect({
         <span className={`text-xs transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl py-1 animate-in fade-in duration-100">
+        <div className="absolute z-[60] mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl py-1 animate-in fade-in duration-100">
           {options.map((o) => (
             <button
               key={o.value}
