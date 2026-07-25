@@ -1149,10 +1149,143 @@ function RelatoriosTab({ mes }: { mes: string }) {
   }
 
   const maxTrend = Math.max(1, ...data.trend.map((t) => Math.max(t.receita, t.gasto)));
+  const { mesAtual: ma, mesAnterior: mp } = data;
+
+  const deltaReceita = mp.receita > 0 ? ((ma.receita - mp.receita) / mp.receita) * 100 : 0;
+  const deltaGasto = mp.gasto > 0 ? ((ma.gasto - mp.gasto) / mp.gasto) * 100 : 0;
+  const deltaLucro = mp.lucro !== 0 ? ((ma.lucro - mp.lucro) / Math.abs(mp.lucro)) * 100 : 0;
+
+  const Delta = ({ value, invert }: { value: number; invert?: boolean }) => {
+    if (Math.abs(value) < 0.1) return <span className="text-[0.6rem] text-muted-foreground">=</span>;
+    const positive = invert ? value < 0 : value > 0;
+    return (
+      <span className={`text-[0.6rem] font-bold ${positive ? "text-emerald-400" : "text-red-400"}`}>
+        {positive ? "↑" : "↓"} {Math.abs(value).toFixed(1)}%
+      </span>
+    );
+  };
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Evolução Mensal */}
+
+      {/* KPI Resumo do Mês */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Receita Total</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-emerald-400">{BRL(ma.receita)}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <Delta value={deltaReceita} />
+            <span className="text-[0.55rem] text-muted-foreground">vs mês anterior</span>
+          </div>
+          <div className="mt-2.5 flex items-center gap-2 text-[0.6rem] text-muted-foreground">
+            <span>🛒 Vendas: <b className="text-foreground">{BRL(ma.receitaVendas)}</b></span>
+            <span>📝 Manual: <b className="text-foreground">{BRL(ma.receitaMan)}</b></span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-red-500/25 bg-gradient-to-br from-red-500/[0.08] to-transparent p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Gastos Total</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-red-400">{BRL(ma.gasto)}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <Delta value={deltaGasto} invert />
+            <span className="text-[0.55rem] text-muted-foreground">vs mês anterior</span>
+          </div>
+          <div className="mt-2.5 flex items-center gap-2 text-[0.6rem] text-muted-foreground">
+            <span>📌 Fixos: <b className="text-foreground">{BRL(ma.gastoFixo)}</b></span>
+            <span>🔄 Variável: <b className="text-foreground">{BRL(ma.gastoVariavel)}</b></span>
+          </div>
+        </div>
+
+        <div className={`rounded-2xl border p-5 ${ma.lucro >= 0 ? "border-emerald-500/30 bg-emerald-500/15" : "border-red-500/30 bg-red-500/15"}`}>
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Lucro Líquido</p>
+          <p className={`mt-2 text-2xl font-black tabular-nums ${ma.lucro >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {ma.lucro >= 0 ? "+" : ""}{BRL(ma.lucro)}
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <Delta value={deltaLucro} />
+            <span className="text-[0.55rem] text-muted-foreground">vs mês anterior</span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card/60 p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Margem</p>
+          <p className={`mt-2 text-2xl font-black tabular-nums ${ma.margem >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {ma.margem.toFixed(1)}%
+          </p>
+          <p className="mt-1 text-[0.55rem] text-muted-foreground">
+            Mês anterior: {mp.margem.toFixed(1)}%
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card/60 p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Fixo / Variável</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-foreground">
+            {ma.gasto > 0 ? ((ma.gastoFixo / ma.gasto) * 100).toFixed(0) : 0}%
+          </p>
+          <p className="mt-1 text-[0.55rem] text-muted-foreground">
+            fixo de {BRL(ma.gasto)} total
+          </p>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-violet-400 transition-all"
+              style={{ width: `${ma.gasto > 0 ? Math.max(2, (ma.gastoFixo / ma.gasto) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Comparativo Mês Anterior vs Atual */}
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+        <h3 className="font-display text-lg font-bold flex items-center gap-2 mb-4">
+          📊 Comparativo Mensal
+        </h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            { label: "Receita", atual: ma.receita, anterior: mp.receita, color: "emerald" },
+            { label: "Gastos", atual: ma.gasto, anterior: mp.gasto, color: "red" },
+            { label: "Lucro", atual: ma.lucro, anterior: mp.lucro, color: ma.lucro >= 0 ? "emerald" : "red" },
+          ].map((item) => {
+            const maxVal = Math.max(item.atual, item.anterior, 1);
+            return (
+              <div key={item.label} className="rounded-xl border border-border/50 bg-background/50 p-4">
+                <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-3">{item.label}</p>
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Este mês</span>
+                      <span className={`font-mono font-bold tabular-nums ${item.color === "emerald" ? "text-emerald-400" : "text-red-400"}`}>
+                        {BRL(item.atual)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${item.color === "emerald" ? "bg-emerald-400" : "bg-red-400"}`}
+                        style={{ width: `${Math.max(2, (item.atual / maxVal) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Mês anterior</span>
+                      <span className="font-mono font-semibold tabular-nums text-muted-foreground">
+                        {BRL(item.anterior)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-muted-foreground/30"
+                        style={{ width: `${Math.max(2, (item.anterior / maxVal) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Evolução Mensal — enhanced */}
       <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
@@ -1160,42 +1293,49 @@ function RelatoriosTab({ mes }: { mes: string }) {
               <BarChart3 className="h-5 w-5 text-emerald-400" />
               Evolução Mensal
             </h3>
-            <p className="text-xs text-muted-foreground">Receitas Brutas (Vendas + Entradas) vs Gastos Totais acumulados</p>
+            <p className="text-xs text-muted-foreground">Receita vs Gastos vs Lucro nos últimos 6 meses</p>
           </div>
-          <div className="flex items-center gap-4 text-xs font-semibold">
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-400 shadow-sm shadow-emerald-500/20" /> Receita</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-rose-500 shadow-sm shadow-rose-500/20" /> Gasto</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-accent" /> Lucro Liquido</span>
+          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-400" /> Receita</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-rose-500" /> Gasto</span>
+            <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-accent" /> Lucro</span>
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-6 gap-2 sm:gap-4 h-64 items-end pt-4">
+        <div className="mt-6 grid grid-cols-6 gap-2 sm:gap-4 h-72 items-end pt-4">
           {data.trend.map((t) => {
             const hR = t.receita > 0 ? Math.max(6, (t.receita / maxTrend) * 100) : 0;
             const hG = t.gasto > 0 ? Math.max(6, (t.gasto / maxTrend) * 100) : 0;
             const positive = t.saldo >= 0;
             const mesNome = new Date(t.mes + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+            const hL = Math.abs(t.saldo) > 0 ? Math.max(4, (Math.abs(t.saldo) / maxTrend) * 100) : 0;
 
             return (
               <div key={t.mes} className="flex flex-col items-center justify-end h-full gap-2 group">
+                {/* Lucro line indicator */}
+                {hL > 0 && (
+                  <div className="w-full flex justify-center">
+                    <div
+                      className={`h-0.5 rounded-full ${positive ? "bg-accent" : "bg-red-400"}`}
+                      style={{ width: "60%", marginTop: `${100 - Math.max(hR, hG) - hL / 2}%` }}
+                      title={`Lucro (${t.mes}): ${BRL(t.saldo)}`}
+                    />
+                  </div>
+                )}
                 <div className="w-full flex items-end justify-center gap-1 h-full px-1">
-                  {/* Barra de Receita */}
                   <div
-                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-emerald-600/40 to-emerald-400 group-hover:brightness-125 transition-all duration-300 relative"
+                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-emerald-600/40 to-emerald-400 group-hover:brightness-125 transition-all duration-300"
                     style={{ height: `${hR}%` }}
-                    title={`Receita (${t.mes}): ${BRL(t.receita)}`}
+                    title={`Receita: ${BRL(t.receita)}`}
                   />
-                  {/* Barra de Gasto */}
                   <div
-                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-rose-600/40 to-rose-400 group-hover:brightness-125 transition-all duration-300 relative"
+                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-rose-600/40 to-rose-400 group-hover:brightness-125 transition-all duration-300"
                     style={{ height: `${hG}%` }}
-                    title={`Gasto (${t.mes}): ${BRL(t.gasto)}`}
+                    title={`Gasto: ${BRL(t.gasto)}`}
                   />
                 </div>
                 <div className="w-full text-center border-t border-border/50 pt-2">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
-                    {mesNome}
-                  </p>
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">{mesNome}</p>
                   <p className={`mt-0.5 text-xs font-extrabold tabular-nums ${positive ? "text-emerald-400" : "text-rose-400"}`}>
                     {positive ? "+" : ""}{BRL(t.saldo)}
                   </p>
@@ -1206,30 +1346,118 @@ function RelatoriosTab({ mes }: { mes: string }) {
         </div>
       </div>
 
-      {/* Breakdown por Categoria */}
-      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
-        <div className="flex items-center justify-between border-b border-border/60 pb-4">
-          <div>
-            <h3 className="font-display text-xl font-bold">Breakdown por Categoria</h3>
-            <p className="text-xs text-muted-foreground">Distribuição dos custos e saídas do mês selecionado</p>
-          </div>
+      {/* Top 5 Gastos + Breakdown lado a lado */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        {/* Top 5 Maiores Gastos */}
+        <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2 mb-4">
+            🔥 Top 5 Maiores Gastos
+          </h3>
+          {data.topGastos.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">Nenhum gasto registrado.</div>
+          ) : (
+            <div className="space-y-3">
+              {data.topGastos.map((g, i) => {
+                const cat = getCatMeta(g.categoria);
+                const pct = ma.gasto > 0 ? (g.valor / ma.gasto) * 100 : 0;
+                return (
+                  <div key={i} className="group">
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-secondary/60 text-[0.6rem] font-black text-muted-foreground">
+                          {i + 1}
+                        </span>
+                        <span className="font-semibold">{g.descricao}</span>
+                        {g.recorrente && (
+                          <span className="rounded bg-violet-500/15 px-1 py-0.5 text-[0.5rem] font-bold text-violet-400 uppercase">fixo</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">{cat.emoji} {cat.label}</span>
+                      </span>
+                      <span className="font-mono text-sm font-extrabold tabular-nums text-red-400">−{BRL(g.valor)}</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400 transition-all group-hover:brightness-110"
+                        style={{ width: `${Math.max(2, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="mt-5 space-y-4">
-          {data.breakdown.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground bg-secondary/20 rounded-xl">
-              Nenhum gasto ou custo registrado para este mês.
+        {/* Breakdown por Categoria */}
+        <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2 mb-1">
+            📦 Breakdown por Categoria
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">Distribuição dos custos do mês</p>
+
+          {/* Mini donut visual via CSS */}
+          <div className="flex items-center gap-6">
+            <div className="relative h-32 w-32 shrink-0">
+              <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+                {(() => {
+                  let offset = 0;
+                  const colors = ["#f43f5e", "#a855f7", "#3b82f6", "#f59e0b", "#10b981", "#6366f1", "#ec4899"];
+                  return data.breakdown.slice(0, 7).map((b, i) => {
+                    const pct = b.pct;
+                    const dash = pct;
+                    const gap = 100 - pct;
+                    const el = (
+                      <circle
+                        key={b.categoria}
+                        cx="18" cy="18" r="15.915"
+                        fill="none"
+                        stroke={colors[i % colors.length]}
+                        strokeWidth="3.5"
+                        strokeDasharray={`${dash} ${gap}`}
+                        strokeDashoffset={`${-offset}`}
+                        className="transition-all duration-500"
+                      />
+                    );
+                    offset += pct;
+                    return el;
+                  });
+                })()}
+                <circle cx="18" cy="18" r="12" fill="var(--card, #1a1a1a)" />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <p className="text-lg font-black tabular-nums">{BRL(ma.gasto)}</p>
+                <p className="text-[0.55rem] text-muted-foreground">total</p>
+              </div>
             </div>
-          ) : (
-            data.breakdown.map((b) => {
+            <div className="flex-1 space-y-2">
+              {data.breakdown.slice(0, 5).map((b, i) => {
+                const cat = getCatMeta(b.categoria);
+                const colors = ["bg-rose-500", "bg-violet-500", "bg-blue-500", "bg-amber-500", "bg-emerald-500"];
+                return (
+                  <div key={b.categoria} className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-sm ${colors[i % colors.length]}`} />
+                      <span className="text-muted-foreground">{cat.emoji} {cat.label}</span>
+                    </span>
+                    <span className="font-mono font-bold tabular-nums">{BRL(b.total)} <span className="text-muted-foreground">({b.pct.toFixed(0)}%)</span></span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Lista completa */}
+          <div className="mt-5 space-y-3">
+            {data.breakdown.map((b) => {
               const cat = getCatMeta(b.categoria);
               return (
                 <div key={b.categoria} className="group">
-                  <div className="flex items-center justify-between text-sm mb-1.5">
-                    <span className="flex items-center gap-2 font-bold text-foreground">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="flex items-center gap-2 font-bold">
                       <span className="p-1 rounded bg-secondary/60 text-base">{cat.emoji}</span>
                       <span>{cat.label}</span>
-                      <span className="text-xs font-normal text-muted-foreground">· {b.count} {b.count === 1 ? "lançamento" : "lançamentos"}</span>
+                      <span className="text-xs font-normal text-muted-foreground">· {b.count} lanç.</span>
                     </span>
                     <span className="font-mono tabular-nums font-extrabold text-rose-400">
                       {BRL(b.total)} <span className="text-xs text-muted-foreground font-normal">({b.pct.toFixed(1)}%)</span>
@@ -1243,52 +1471,68 @@ function RelatoriosTab({ mes }: { mes: string }) {
                   </div>
                 </div>
               );
-            })
-          )}
+            })}
+          </div>
         </div>
       </div>
 
       {/* Gastos Fixos Recorrentes */}
       <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-card/50 to-transparent p-6 shadow-sm">
-        <div className="flex items-center justify-between border-b border-violet-500/20 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-violet-500/20 pb-4">
           <div>
             <h3 className="font-display text-xl font-bold flex items-center gap-2 text-violet-300">
               <Repeat className="h-5 w-5 text-violet-400" /> Gastos Fixos Recorrentes
             </h3>
-            <p className="text-xs text-muted-foreground">Despesas mensais repetidas automaticamente no financeiro e no dashboard</p>
+            <p className="text-xs text-muted-foreground">Despesas mensais que se repetem</p>
           </div>
-          <div className="text-right">
-            <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-violet-400/80 block">Total Fixo Mensal</span>
-            <p className="font-mono text-2xl font-black tabular-nums text-violet-300">{BRL(data.totalFixos)}</p>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-violet-400/80 block">Total Fixo Mensal</span>
+              <p className="font-mono text-2xl font-black tabular-nums text-violet-300">{BRL(data.totalFixos)}</p>
+            </div>
+            {ma.gasto > 0 && (
+              <div className="text-right">
+                <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block">% do Total</span>
+                <p className="font-mono text-2xl font-black tabular-nums text-foreground">
+                  {((data.totalFixos / ma.gasto) * 100).toFixed(0)}%
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
           {data.fixos.length === 0 ? (
             <div className="col-span-2 py-8 text-center text-sm text-muted-foreground bg-secondary/20 rounded-xl">
-              Nenhum gasto fixo cadastrado. Marque o checkbox "Lançamento Recorrente" ao criar um gasto para listá-lo aqui.
+              Nenhum gasto fixo cadastrado.
             </div>
           ) : (
             data.fixos.map((f) => {
               const cat = getCatMeta(f.categoria);
+              const pct = data.totalFixos > 0 ? (f.valor / data.totalFixos) * 100 : 0;
               return (
                 <div key={f.id} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/80 p-3.5 hover:border-violet-500/40 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="p-2 rounded-lg bg-secondary/60 text-lg">{cat.emoji}</span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-foreground">{f.descricao}</p>
-                      <p className="text-[0.65rem] uppercase tracking-widest text-muted-foreground font-semibold">
-                        {cat.label}
-                      </p>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className="p-2 rounded-lg bg-secondary/60 text-lg shrink-0">{cat.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{f.descricao}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[0.6rem] uppercase tracking-widest text-muted-foreground font-semibold">{cat.label}</p>
+                        <div className="h-1 flex-1 max-w-[60px] rounded-full bg-secondary/60 overflow-hidden">
+                          <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.max(2, pct)}%` }} />
+                        </div>
+                        <span className="text-[0.55rem] text-muted-foreground">{pct.toFixed(0)}%</span>
+                      </div>
                     </div>
                   </div>
-                  <p className="font-mono text-sm font-extrabold tabular-nums text-violet-300 pl-2">{BRL(f.valor)}</p>
+                  <p className="font-mono text-sm font-extrabold tabular-nums text-violet-300 pl-3 shrink-0">{BRL(f.valor)}</p>
                 </div>
               );
             })
           )}
         </div>
       </div>
+
     </div>
   );
 }
