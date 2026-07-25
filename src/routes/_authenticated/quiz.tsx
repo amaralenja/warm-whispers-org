@@ -205,7 +205,7 @@ function periodToRange(
 }
 
 // ---------- Lead Classification ----------
-type OriginKey = "criar_saas" | "trafego_pago" | "google" | "organic" | "tiktok" | "unknown";
+type OriginKey = "criar_saas" | "trafego_pago" | "google" | "youtube" | "organic" | "tiktok" | "unknown";
 type LeadOrigin = {
   key: OriginKey;
   label: string;
@@ -217,7 +217,7 @@ type LeadOrigin = {
   border: string;
 };
 
-const ORIGIN_ORDER: OriginKey[] = ["criar_saas", "trafego_pago", "google", "tiktok", "organic", "unknown"];
+const ORIGIN_ORDER: OriginKey[] = ["criar_saas", "trafego_pago", "google", "youtube", "tiktok", "organic", "unknown"];
 
 function classifyLead(l: Lead): LeadOrigin {
   const src = (l.utm_source ?? "").toLowerCase();
@@ -267,6 +267,13 @@ function classifyLead(l: Lead): LeadOrigin {
       key: "tiktok", label: "TikTok", icon: Flame,
       ring: "ring-pink-500/40", bg: "bg-pink-500/10", text: "text-pink-300",
       glow: "shadow-[0_0_24px_-8px_rgba(236,72,153,0.5)]", border: "border-pink-500/40",
+    };
+  }
+  if (src.includes("youtube") || src.includes("yt")) {
+    return {
+      key: "youtube", label: "YouTube", icon: Megaphone,
+      ring: "ring-red-500/40", bg: "bg-red-500/10", text: "text-red-300",
+      glow: "shadow-[0_0_24px_-8px_rgba(239,68,68,0.5)]", border: "border-red-500/40",
     };
   }
   if (src && src !== "(direct)" && src !== "direct") {
@@ -527,7 +534,7 @@ function QuizPage() {
 
   const stats = useMemo(() => {
     const total = filteredLeads.length;
-    const byOrigin: Record<OriginKey, number> = { criar_saas: 0, trafego_pago: 0, google: 0, organic: 0, tiktok: 0, unknown: 0 };
+    const byOrigin: Record<OriginKey, number> = { criar_saas: 0, trafego_pago: 0, google: 0, youtube: 0, organic: 0, tiktok: 0, unknown: 0 };
     let high = 0;
     let real = 0;
     let fake = 0;
@@ -552,7 +559,7 @@ function QuizPage() {
   }, [filteredLeads]);
 
   const grouped = useMemo(() => {
-    const g: Record<OriginKey, Lead[]> = { criar_saas: [], trafego_pago: [], google: [], tiktok: [], organic: [], unknown: [] };
+    const g: Record<OriginKey, Lead[]> = { criar_saas: [], trafego_pago: [], google: [], youtube: [], tiktok: [], organic: [], unknown: [] };
     const fakes: Lead[] = [];
     for (const l of sortedLeads) {
       if (!leadIsReal(l)) { fakes.push(l); continue; }
@@ -751,6 +758,7 @@ function QuizPage() {
         <StatPill active={originFilter === "criar_saas"} onClick={() => setOriginFilter(originFilter === "criar_saas" ? "all" : "criar_saas")} icon={<Sparkles className="h-4 w-4" />} label="Criar SaaS" value={stats.byOrigin.criar_saas} accent="text-yellow-300" loading={isLoading} />
         <StatPill active={originFilter === "trafego_pago"} onClick={() => setOriginFilter(originFilter === "trafego_pago" ? "all" : "trafego_pago")} icon={<Megaphone className="h-4 w-4" />} label="Tráfego Pago" value={stats.byOrigin.trafego_pago} accent="text-indigo-300" loading={isLoading} />
         <StatPill active={originFilter === "google"} onClick={() => setOriginFilter(originFilter === "google" ? "all" : "google")} icon={<Megaphone className="h-4 w-4" />} label="Google" value={stats.byOrigin.google} accent="text-amber-300" loading={isLoading} />
+        <StatPill active={originFilter === "youtube"} onClick={() => setOriginFilter(originFilter === "youtube" ? "all" : "youtube")} icon={<Megaphone className="h-4 w-4" />} label="YouTube" value={stats.byOrigin.youtube} accent="text-red-300" loading={isLoading} />
         <StatPill active={originFilter === "tiktok"} onClick={() => setOriginFilter(originFilter === "tiktok" ? "all" : "tiktok")} icon={<Flame className="h-4 w-4" />} label="TikTok" value={stats.byOrigin.tiktok} accent="text-pink-300" loading={isLoading} />
         <StatPill active={originFilter === "organic"} onClick={() => setOriginFilter(originFilter === "organic" ? "all" : "organic")} icon={<Leaf className="h-4 w-4" />} label="Orgânico" value={stats.byOrigin.organic} accent="text-emerald-300" loading={isLoading} />
         <StatPill icon={<CheckCircle2 className="h-4 w-4" />} label="Reais" value={stats.real} accent="text-emerald-300" loading={isLoading} active={reality === "real"} onClick={() => setReality(reality === "real" ? "all" : "real")} />
