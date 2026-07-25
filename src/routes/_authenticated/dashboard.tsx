@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   TrendingUp, ShoppingBag, Receipt, AlertTriangle, Coins,
-  Users, Settings, Activity, ArrowUpRight,
+  Users, Settings, Activity,
   BarChart3, UserCheck, Percent, Wallet, Trophy, Sparkles, Crown, Medal,
   LineChart,
 } from "lucide-react";
