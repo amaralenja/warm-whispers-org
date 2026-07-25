@@ -32,10 +32,25 @@ function parseTicket(raw: unknown): number {
 /** Converte qualquer ISO/Timestamp ou string de data para YYYY-MM-DD no fuso de São Paulo (America/Sao_Paulo) */
 function toSpDateString(raw: unknown): string | null {
   if (!raw) return null;
+  if (typeof raw === "number") {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    }
+    return null;
+  }
   const s = String(raw).trim();
 
   // Plain date "YYYY-MM-DD" — not a timestamp, return as-is (no timezone shift)
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Numeric timestamp string "1784955079138"
+  if (/^\d{10,13}$/.test(s)) {
+    const d = new Date(Number(s));
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    }
+  }
 
   // Full ISO timestamp — convert to SP local date
   const d = new Date(s);
@@ -1369,7 +1384,9 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       else if (email) allLeadKeys.add(`e:${email}`);
       else if (phone) allLeadKeys.add(`p:${phone}`);
     }
-    const totalLeads = allLeadKeys.size;
+    const totalLeadsCalculated = allLeadKeys.size;
+    const totalLeadsFromOps = opStats.reduce((a, o) => a + o.leads, 0);
+    const totalLeads = totalLeadsCalculated > 0 ? totalLeadsCalculated : totalLeadsFromOps;
 
     return {
       ops: opStats,

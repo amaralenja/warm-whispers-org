@@ -70,11 +70,16 @@ function Dashboard() {
   const visibleOps = workspace.id === "all"
     ? ops
     : ops.filter((o) => o.nome.toLowerCase().replace(/[\s-_]+/g, "").includes(workspace.id.toLowerCase().replace(/[\s-_]+/g, "")) || workspace.id.toLowerCase().includes(o.nome.toLowerCase()));
-  const totalFat = data?.totalFat ?? 0;
-  const totalVendas = data?.totalVendas ?? 0;
-  const totalLeads = data?.totalLeads ?? 0;
-  const totalReemb = data?.totalReembolsos ?? 0;
-  const tmGeral = data?.ticketMedioGeral ?? 0;
+  const opsFat = visibleOps.reduce((a, o) => a + o.faturamento, 0);
+  const opsVendas = visibleOps.reduce((a, o) => a + o.vendas, 0);
+  const opsLeads = visibleOps.reduce((a, o) => a + o.leads, 0);
+  const opsReemb = visibleOps.reduce((a, o) => a + o.reembolsos, 0);
+
+  const totalFat = workspace.id === "all" ? Math.max(data?.totalFat ?? 0, opsFat) : opsFat;
+  const totalVendas = workspace.id === "all" ? Math.max(data?.totalVendas ?? 0, opsVendas) : opsVendas;
+  const totalLeads = workspace.id === "all" ? (data?.totalLeads && data.totalLeads > 0 ? data.totalLeads : opsLeads) : opsLeads;
+  const totalReemb = workspace.id === "all" ? Math.max(data?.totalReembolsos ?? 0, opsReemb) : opsReemb;
+  const tmGeral = data?.ticketMedioGeral && data.ticketMedioGeral > 0 ? data.ticketMedioGeral : (totalVendas > 0 ? totalFat / totalVendas : 0);
   const conversaoGeral = totalLeads > 0 ? ((totalVendas / totalLeads) * 100) : 0;
   const gastosMes = data?.gastosMes ?? 0;
   const saldoEstimado = totalFat - gastosMes;
