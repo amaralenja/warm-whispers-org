@@ -300,6 +300,11 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     if (error) throw error;
     const all = (rows ?? []) as Lancamento[];
 
+    // Fetch Meta Ads spend for the ref month (and prior month for trends)
+    const refLastDay = new Date(parseInt(refMes.slice(0, 4)), parseInt(refMes.slice(5, 7)), 0).getDate();
+    const metaSpend = await fetchMetaAdsSpendDaily(`${refMes}-01`, `${refMes}-${String(refLastDay).padStart(2, "0")}`, context);
+    const metaSpendPrev = await fetchMetaAdsSpendDaily(`${prevMes}-01`, `${new Date(parseInt(prevMes.slice(0, 4)), parseInt(prevMes.slice(5, 7)), 0).getDate()}`.padStart(2, "0") ? `${prevMes}-${String(new Date(parseInt(prevMes.slice(0, 4)), parseInt(prevMes.slice(5, 7)), 0).getDate()).padStart(2, "0")}` : `${prevMes}-28`, context);
+
     const salesByMonth = new Map<string, number>();
     ((vendasRows ?? []) as any[]).forEach((v) => {
       const iso = normalizeIsoDate(v.Data);
@@ -474,6 +479,40 @@ async function fetchMetaAdsSpendDaily(from: string, to: string, _context: any): 
   }
   return result;
 }
+
+/** Busca gastos do Meta Ads para um mês e retorna como Lancamento[] (virtuais, somente leitura) */
+export const listMetaAdsSpend = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { mes?: string } | undefined) => input ?? {})
+  .handler(async (opts): Promise<Lancamento[]> => {
+    const data = opts?.data ?? {};
+    const mes = data.mes ?? new Date().toISOString().slice(0, 7);
+    const from = `${mes}-01`;
+    const lastDay = new Date(parseInt(mes.slice(0, 4)), parseInt(mes.slice(5, 7)), 0).getDate();
+    const to = `${mes}-${String(lastDay).padStart(2, "0")}`;
+
+    const { total, itens } = await fetchMetaAdsSpendDaily(from, to, opts?.context);
+
+    if (itens.length === 0) return [];
+
+    const totalDoMes = itens.reduce((s, i) => s + i.valor, 0);
+    return [
+      {
+        id: -1,
+        tipo: "gasto",
+        categoria: "marketing",
+        descricao: `Tráfego Pago — Meta Ads (${new Date(from + "T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })})`,
+        valor: totalDoMes,
+        data_ref: `${mes}-01`,
+        data_vencimento: null,
+        data_pagamento: null,
+        recorrente: false,
+        status: "pago",
+        responsavel: null,
+        obs: `${itens.length} dias com investimento`,
+      },
+    ];
+  });
 
 export const getDRE = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

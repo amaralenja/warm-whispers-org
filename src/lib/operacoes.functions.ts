@@ -255,13 +255,13 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         .from("vendas")
         .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
         .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
-        .order('"Data"', { ascending: false })
-        .limit(3000),
+        .order("id", { ascending: false })
+        .limit(5000),
       supabase
         .from("reembolsos")
         .select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source')
-        .order('"Data do Reembolso"', { ascending: false })
-        .limit(1000),
+        .order("id", { ascending: false })
+        .limit(2000),
       supabase
         .from("financeiro")
         .select("valor, tipo, data_ref")
@@ -914,12 +914,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       supabase.from("vendas")
         .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
         .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
-        .order('"Data"', { ascending: false })
-        .limit(3000),
+        .order("id", { ascending: false })
+        .limit(5000),
       supabase.from("reembolsos")
         .select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source')
-        .order('"Data do Reembolso"', { ascending: false })
-        .limit(1000),
+        .order("id", { ascending: false })
+        .limit(2000),
       supabase.from("financeiro")
         .select("valor, tipo, data_ref")
         .order("data_ref", { ascending: false })

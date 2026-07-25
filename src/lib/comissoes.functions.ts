@@ -101,8 +101,8 @@ export const getComissoes = createServerFn({ method: "POST" })
         .from("vendas")
         .select('"Ticket", "Data", "UTM", "Evento"')
         .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
-        .order('"Data"', { ascending: false })
-        .limit(3000),
+        .order("id", { ascending: false })
+        .limit(5000),
     ]);
 
     const vendedores = (vendedoresRes.data ?? []) as any[];
