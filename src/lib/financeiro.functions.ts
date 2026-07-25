@@ -213,6 +213,7 @@ export type TopGasto = {
   recorrente: boolean;
 };
 
+export type MetaAdsDay = { date: string; spend: number };
 export type RelatorioPayload = {
   trend: MesPonto[];
   breakdown: CategoriaBreakdown[];
@@ -221,6 +222,8 @@ export type RelatorioPayload = {
   mesAtual: ResumoMes;
   mesAnterior: ResumoMes;
   topGastos: TopGasto[];
+  metaAdsTotal: number;
+  metaAdsDays: MetaAdsDay[];
 };
 
 export function getRowsForMonth(
@@ -315,7 +318,8 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
     });
 
     // Inject Meta Ads spend as virtual gasto entries so they flow through all calculations
-    const metaSpend = await fetchMetaAdsSpendDaily(`${refMes}-01`, `${refMes}-28`, context);
+    const refLastDay = new Date(parseInt(refMes.slice(0, 4)), parseInt(refMes.slice(5, 7)), 0).getDate();
+    const metaSpend = await fetchMetaAdsSpendDaily(`${refMes}-01`, `${refMes}-${String(refLastDay).padStart(2, "0")}`, context);
     if (metaSpend.total > 0) {
       all.push({
         id: -1, tipo: "gasto", categoria: "marketing",
@@ -416,7 +420,11 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
         recorrente: r.recorrente,
       }));
 
-    return { trend, breakdown, fixos, totalFixos, mesAtual, mesAnterior, topGastos };
+    return {
+      trend, breakdown, fixos, totalFixos, mesAtual, mesAnterior, topGastos,
+      metaAdsTotal: metaSpend.total,
+      metaAdsDays: metaSpend.itens.map((i) => ({ date: i.date || "", spend: i.valor })),
+    };
   });
 
 // ============================================================

@@ -838,10 +838,10 @@ const EMPTY_DASHBOARD: DashboardPayload = {
   reembolsos: [],
 };
 
-function classifyLeadOp(lead: any): string | null {
+function classifyLeadOp(lead: any, phoneToWaTags?: Map<string, string[]>): string | null {
   if (!lead) return null;
   // 1. Expert explícito do lead (Ex: "Caio", "Gustavo", "Jessica", "High Ticket")
-  const exp = String(lead.expert ?? "").trim();
+  const exp = String(lead.expert ?? lead.dados?.expert ?? "").trim();
   if (exp) {
     const normExp = exp.toLowerCase();
     if (normExp.includes("caio")) return "Caio";
@@ -857,7 +857,8 @@ function classifyLeadOp(lead: any): string | null {
 
   // 3. Verifica parâmetros de UTM, origem e fonte
   const fields = [
-    lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_content, lead.origem, lead.fonte
+    lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_content, lead.origem, lead.fonte,
+    lead.dados?.utm_source, lead.dados?.origem, lead.dados?.fonte
   ].map((f) => String(f ?? "").trim().toUpperCase());
 
   for (const src of fields) {
@@ -866,6 +867,21 @@ function classifyLeadOp(lead: any): string | null {
     if (GUSTAVO_UTMS.some((p) => src.includes(p)) || src.includes("GUSTAVO")) return "Gustavo";
     if (src.includes("GM") || src.includes("JESSICA")) return "Jessica";
     if (src.includes("HT") || src.includes("HIGH")) return "High Ticket";
+  }
+
+  // 4. Verifica tags
+  const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+  const pKey = cleanPhone(lead.whatsapp || lead.telefone);
+  const rawTags = [
+    ...(Array.isArray(lead.tags) ? lead.tags : []),
+    ...(Array.isArray(lead.dados?.tags) ? lead.dados.tags : []),
+    ...(pKey && phoneToWaTags ? (phoneToWaTags.get(pKey) || []) : [])
+  ].map((t) => String(t).toUpperCase());
+
+  for (const tag of rawTags) {
+    if (tag.includes("CAIO") || tag.includes("BP") || tag.includes("GC")) return "Caio";
+    if (tag.includes("GUSTAVO") || tag.includes("LS") || tag.includes("LF")) return "Gustavo";
+    if (tag.includes("JESSICA") || tag.includes("GM")) return "Jessica";
   }
 
   return "Caio";
@@ -906,8 +922,8 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    // ── 1. Busca paralela ultrarrápida: experts, vendedores, produtos, vendas, reembolsos, financeiro, ht_vendas, leads ──
-    const [expertsRes, vendedoresRes, produtosMapRes, vendasRes, reembolsosRes, financeiroRes, htVendasRes, quizLeadsRes, crmLeadsRes] = await Promise.all([
+    // ── 1. Busca paralela: experts, vendedores, produtos, vendas, reembolsos, financeiro, ht_vendas, quiz, crm_leads, wa_conversations ──
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasRes, reembolsosRes, financeiroRes, htVendasRes, quizLeadsRes, crmLeadsRes, waConvsRes] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
@@ -932,8 +948,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         .order("id", { ascending: false })
         .limit(3000),
       supabase.from("crm_leads" as any)
-        .select("id, email, telefone, expert, fonte, responsavel_utm, created_at, updated_at, dados")
+        .select("*")
         .order("created_at", { ascending: false })
+        .limit(3000),
+      supabase.from("wa_conversations" as any)
+        .select("contact_wa_id, tags, operacao_id, updated_at")
+        .order("updated_at", { ascending: false })
         .limit(3000),
     ]);
 
@@ -943,6 +963,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const htVendasAll = (htVendasRes.data ?? []) as any[];
     const quizLeadsRaw = (quizLeadsRes.data ?? []) as any[];
     const crmLeadsRaw = (crmLeadsRes.data ?? []) as any[];
+    const waConvsRaw = (waConvsRes?.data ?? []) as any[];
 
     // ── Log diagnóstico (visível nos logs da Vercel) ──
     const erros = [
@@ -1018,6 +1039,21 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
     // ── 5. Classifica leads por operação e constrói Maps por email/phone ──
     const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+
+    const phoneToWaTags = new Map<string, string[]>();
+    for (const conv of waConvsRaw) {
+      const waId = cleanPhone(conv.contact_wa_id ?? "");
+      if (!waId) continue;
+      const rawTags = Array.isArray(conv.tags) ? conv.tags : [];
+      if (rawTags.length === 0) continue;
+      const list = phoneToWaTags.get(waId) || [];
+      for (const t of rawTags) {
+        if (t && !list.includes(String(t))) list.push(String(t));
+      }
+      phoneToWaTags.set(waId, list);
+      if (waId.length >= 8) phoneToWaTags.set(waId.slice(-8), list);
+    }
+
     const leadsByOp = new Map<string, number>();
     const leadBreakdownByOp = new Map<string, Map<string, { leads: number; vendas: number }>>();
     const emailToLead = new Map<string, any>();
@@ -1026,15 +1062,38 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
+    const getTagsForLead = (lead: any, phoneKey?: string): string[] => {
+      const tagsSet = new Set<string>();
+      if (Array.isArray(lead?.tags)) {
+        for (const t of lead.tags) if (t) tagsSet.add(String(t).toUpperCase());
+      }
+      if (Array.isArray(lead?.dados?.tags)) {
+        for (const t of lead.dados.tags) if (t) tagsSet.add(String(t).toUpperCase());
+      }
+      if (typeof lead?.tags === "string") {
+        tagsSet.add(String(lead.tags).toUpperCase());
+      }
+      if (phoneKey) {
+        const waTags = phoneToWaTags.get(phoneKey) || (phoneKey.length >= 8 ? phoneToWaTags.get(phoneKey.slice(-8)) : undefined);
+        if (waTags) {
+          for (const t of waTags) if (t) tagsSet.add(String(t).toUpperCase());
+        }
+      }
+      return Array.from(tagsSet);
+    };
+
     const classifyLeadType = (lead: any, forceTypebot = false, targetOp?: string): string => {
-      const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm);
-      const med = norm(lead.utm_medium);
-      const rawCp = String(lead.utm_campaign || "").trim();
+      const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem);
+      const med = norm(lead.utm_medium || lead.dados?.utm_medium);
+      const rawCp = String(lead.utm_campaign || lead.dados?.utm_campaign || "").trim();
       const cp = norm(rawCp);
-      const cont = norm(lead.utm_content);
-      const fbclid = String(lead.fbclid || "").trim();
-      const gclid = String(lead.gclid || "").trim();
-      const fbp = String(lead.fbp || "").trim();
+      const cont = norm(lead.utm_content || lead.dados?.utm_content);
+      const fbclid = String(lead.fbclid || lead.dados?.fbclid || "").trim();
+      const gclid = String(lead.gclid || lead.dados?.gclid || "").trim();
+      const fbp = String(lead.fbp || lead.dados?.fbp || "").trim();
+
+      const phoneKey = cleanPhone(lead.whatsapp || lead.telefone);
+      const leadTags = getTagsForLead(lead, phoneKey);
 
       const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
       const cleanCp = isCampEmpty ? "" : cp;
@@ -1043,7 +1102,11 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
       const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
-      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign) && !isOrganicWord;
+
+      const hasPaidTag = leadTags.some((t) => t.includes("PAGO") || t.includes("ADS") || t.includes("PATROCINADO") || t.includes("CPC"));
+      const hasOrganicTag = leadTags.some((t) => t.includes("ORGANICO") || t.includes("ORGÂNICO") || t.includes("DIRETO"));
+
+      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
       const isCaioOp = targetOp ? norm(targetOp) === "caio" : true;
 
@@ -1052,14 +1115,20 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return isPaid ? "Tráfego Pago" : "Orgânico";
       }
 
-      const fonteStr = norm(lead.fonte || "");
+      const fonteStr = norm(lead.fonte || lead.dados?.fonte || "");
       const origemStr = norm(lead.origem || lead.dados?.origem || "");
       const emailKey = norm(lead.email);
-      const phoneKey = cleanPhone(lead.whatsapp || lead.telefone);
       const hasQuizMatch = (!!emailKey && emailToLead.has(emailKey)) || (!!phoneKey && phoneToLead.has(phoneKey));
 
-      const leadTags = Array.isArray(lead.tags) ? lead.tags.map((t: any) => String(t).toUpperCase()) : [];
-      const hasTypebotTag = leadTags.some((t: string) => t.includes("TYPEBOT") || t.includes("SALVE") || t.includes("QUIZ") || t.includes("FLORESTA") || t.includes("BOT"));
+      const hasTypebotTag = leadTags.some((t) =>
+        t.includes("TYPEBOT") ||
+        t.includes("SALVE") ||
+        t.includes("QUIZ") ||
+        t.includes("FLORESTA") ||
+        t.includes("BOT") ||
+        t.includes("MINICHAT") ||
+        t.includes("MANYCHAT")
+      );
 
       const isFromTypebot = forceTypebot ||
         hasQuizMatch ||
@@ -1083,7 +1152,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (email) emailToLead.set(email, l);
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
       if (phone) phoneToLead.set(phone, l);
-      const op = classifyLeadOp(l) || "Caio";
+      const op = classifyLeadOp(l, phoneToWaTags) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
       const leadType = classifyLeadType(l, true, op);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
@@ -1098,7 +1167,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (email && !emailToLead.has(email)) emailToLead.set(email, l);
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
-      const op = classifyLeadOp(l) || "Caio";
+      const op = classifyLeadOp(l, phoneToWaTags) || "Caio";
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
       const leadType = classifyLeadType(l, false, op);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());

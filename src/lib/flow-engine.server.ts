@@ -277,7 +277,7 @@ async function uploadMediaToMeta(token: string, phoneNumberId: string, mediaUrl:
   if (mimeType.startsWith("image/") || fastPng.hasPngSignature(mediaBuf)) {
     const norm = normalizePngIfNeeded(mediaBuf);
     if (norm.converted) {
-      mediaBuf = norm.buffer;
+      mediaBuf = Buffer.from(norm.buffer) as any;
       mimeType = "image/png";
       filename = filename.replace(/\.[a-zA-Z0-9]+$/, ".png");
     }
@@ -385,7 +385,7 @@ function normalizePngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: bool
         }
       }
 
-      let finalPixels = rgbData;
+      let finalPixels: any = rgbData;
       if (newWidth !== decoded.width || newHeight !== decoded.height) {
         finalPixels = downscaleBilinearRgb(rgbData, decoded.width, decoded.height, newWidth, newHeight);
       }
@@ -395,11 +395,11 @@ function normalizePngIfNeeded(buffer: Buffer): { buffer: Buffer; converted: bool
         height: newHeight,
         depth: 8,
         channels: 3,
-        data: finalPixels,
+        data: Uint8Array.from(finalPixels as any),
       });
 
       console.log(`[flow-engine] PNG otimizado com sucesso (${(encoded.length / 1024 / 1024).toFixed(2)}MB, ${newWidth}x${newHeight}).`);
-      return { buffer: Buffer.from(encoded), converted: true };
+      return { buffer: Buffer.from(encoded) as any, converted: true };
     }
   } catch (e: any) {
     console.warn("[flow-engine] normalizePngIfNeeded warning:", e?.message || e);
@@ -432,14 +432,14 @@ async function mirrorMediaToSupabaseStorage(db: any, sourceUrl: string, mediaTyp
     const res = await fetchWithTimeout(sourceUrl, {}, 25_000);
     if (!res.ok) return sourceUrl;
     const arrayBuffer = await res.arrayBuffer();
-    let buffer = Buffer.from(arrayBuffer);
+    let buffer = Buffer.from(arrayBuffer) as any;
 
     // Verificação de PNG: 16-bit ou tamanho excede limite seguro da Meta (5.0 MB)
     let pngConverted = false;
     if (mediaType === "image" || isPng) {
       const norm = normalizePngIfNeeded(buffer);
       if (norm.converted) {
-        buffer = norm.buffer;
+        buffer = Buffer.from(norm.buffer) as any;
         pngConverted = true;
       }
     }
@@ -1369,12 +1369,13 @@ export async function runFlowAdmin(args: {
   }
 
   let startId: string | null = args.startNodeId ?? null;
+  let entryId: string | null = null;
   if (!startId) {
-    let entryId: string | null = flow.entry_node_id ?? null;
+    entryId = flow.entry_node_id ?? null;
     if (!entryId) entryId = nodes.find((n) => n.type === "trigger")?.id ?? null;
     if (!entryId) {
       const targets = new Set(edges.map((e) => e.target));
-      entryId = nodes.find((n) => !targets.has(n.id))?.id ?? nodes[0].id;
+      entryId = nodes.find((n) => !targets.has(n.id))?.id ?? nodes[0]?.id ?? null;
     }
 
     const entryNode = nodes.find((n) => n.id === entryId);

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { canSee, htDefaultPermissoes, mergePermissoes, type Permissoes } from "@/lib/menu-permissions";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getVendorSession } from "@/lib/vendor-session";
+import { getVendorSession, saveVendorSession, clearVendorSession } from "@/lib/vendor-session";
 import {
   LayoutDashboard,
   LineChart,
@@ -37,7 +37,6 @@ import {
   Rocket,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { saveVendorSession } from "@/lib/vendor-session";
 import {
   Sidebar,
   SidebarContent,
@@ -140,9 +139,8 @@ export function AppSidebar() {
       if (raw) {
         const s = JSON.parse(raw);
         if (s?.id && s?.codigo) {
-          supabase
-            .rpc("login_vendedor_by_codigo" as any, { _codigo: String(s.codigo).trim() })
-            .then(({ data, error }) => {
+          Promise.resolve(supabase.rpc("login_vendedor_by_codigo" as any, { _codigo: String(s.codigo).trim() }))
+            .then(({ data, error }: any) => {
               if (cancelled) return;
               const row = data as any;
               if (error || !row || Number(row.id) !== Number(s.id)) {
@@ -186,9 +184,8 @@ export function AppSidebar() {
         const s = JSON.parse(rawHt);
         const tipo = (s?.tipo === "sdr" || s?.tipo === "closer") ? s.tipo : "closer";
         if (s?.codigo && s?.id) {
-          supabase
-            .rpc("login_ht_team_by_codigo" as any, { _codigo: String(s.codigo).trim() })
-            .then(({ data, error }) => {
+          Promise.resolve(supabase.rpc("login_ht_team_by_codigo" as any, { _codigo: String(s.codigo).trim() }))
+            .then(({ data, error }: any) => {
               if (cancelled) return;
               const row = data as any;
               if (error || !row || Number(row.id) !== Number(s.id)) {
