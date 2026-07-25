@@ -964,6 +964,24 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return null;
     };
 
+    // ── 5b. Complementa leads por operação via match venda→lead (email/phone) ──
+    // Leads que não foram classificados por UTM mas têm venda associada são contabilizados aqui
+    const countedLeadsByOp = new Map<string, Set<string>>();
+    for (const v of vendasPeriodo) {
+      const vEmail = String(v.Email ?? "").trim().toLowerCase();
+      const vTel = cleanPhone(v.Telefone ?? "");
+      const lead = matchLead(vEmail, vTel);
+      if (!lead) continue;
+      const leadId = String(lead.id ?? lead.email ?? lead.whatsapp ?? "");
+      const op = v._expert;
+      if (!countedLeadsByOp.has(op)) countedLeadsByOp.set(op, new Set());
+      countedLeadsByOp.get(op)!.add(leadId);
+    }
+    for (const [op, ids] of countedLeadsByOp) {
+      const existing = leadsByOp.get(op) || 0;
+      if (ids.size > existing) leadsByOp.set(op, ids.size);
+    }
+
     const classifyFonte = (lead: any): string => {
       const src = norm(lead.utm_source || lead.origem);
       const med = norm(lead.utm_medium);
@@ -1211,7 +1229,25 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     }
 
     const totalReembolsos = reembolsosList.length;
-    const totalLeads = leadsByOp.size > 0 ? Array.from(leadsByOp.values()).reduce((a, b) => a + b, 0) : 0;
+    // totalLeads = leads únicos — usa id/email/phone pra dedup entre quiz e CRM
+    const allLeadKeys = new Set<string>();
+    for (const l of quizLeadsRaw) {
+      const id = String(l.id ?? "");
+      const email = String(l.email ?? "").trim().toLowerCase();
+      const phone = cleanPhone(l.whatsapp ?? "");
+      if (id) allLeadKeys.add(`id:${id}`);
+      else if (email) allLeadKeys.add(`e:${email}`);
+      else if (phone) allLeadKeys.add(`p:${phone}`);
+    }
+    for (const l of crmLeadsRaw) {
+      const id = String(l.id ?? "");
+      const email = String(l.email ?? "").trim().toLowerCase();
+      const phone = cleanPhone(l.whatsapp ?? "");
+      if (id) allLeadKeys.add(`id:${id}`);
+      else if (email) allLeadKeys.add(`e:${email}`);
+      else if (phone) allLeadKeys.add(`p:${phone}`);
+    }
+    const totalLeads = allLeadKeys.size;
 
     return {
       ops: opStats,
