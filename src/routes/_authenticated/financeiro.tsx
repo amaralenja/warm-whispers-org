@@ -501,6 +501,11 @@ function LancamentoRow({
             </button>
           )}
           <p className={`truncate font-semibold ${isOverdue ? "text-red-400" : ""}`}>{r.descricao}</p>
+          {isVirtual && (
+            <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider text-amber-400">
+              API
+            </span>
+          )}
         </div>
         {isRecurrent && (
           <span className={`mt-0.5 inline-flex items-center gap-1 text-[0.55rem] uppercase tracking-widest ${
@@ -553,6 +558,7 @@ function LancamentoCard({
   const isRecurrent = r.recorrente;
   const isConfirmed = r.status === "pago";
   const isOverdue = r.status === "atrasado";
+  const isVirtual = r.id < 0;
   return (
     <div className={`rounded-xl border p-3.5 transition-colors ${
       isOverdue
@@ -561,7 +567,9 @@ function LancamentoCard({
           ? "border-emerald-500/20 bg-emerald-500/[0.04]"
           : isRecurrent
             ? "border-violet-500/20 bg-violet-500/[0.04]"
-            : "border-border bg-card/60"
+            : isVirtual
+              ? "border-amber-500/20 bg-amber-500/[0.04]"
+              : "border-border bg-card/60"
     } hover:border-accent/30`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -582,6 +590,11 @@ function LancamentoCard({
               </button>
             )}
             <p className={`truncate text-sm font-bold ${isOverdue ? "text-red-400" : ""}`}>{r.descricao}</p>
+            {isVirtual && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-wider text-amber-400">
+                API
+              </span>
+            )}
             {isRecurrent && (
               <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-widest ${
                 isConfirmed
@@ -610,20 +623,22 @@ function LancamentoCard({
           <StatusBadge status={r.status} />
         </div>
       </div>
-      <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-border/40 pt-2 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
-        <button
-          onClick={() => onEdit(r)}
-          className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
-        >
-          Editar
-        </button>
-        <button
-          onClick={() => onDelete(r.id)}
-          className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-        >
-          Apagar
-        </button>
-      </div>
+      {!isVirtual && (
+        <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-border/40 pt-2 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
+          <button
+            onClick={() => onEdit(r)}
+            className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => onDelete(r.id)}
+            className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+          >
+            Apagar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

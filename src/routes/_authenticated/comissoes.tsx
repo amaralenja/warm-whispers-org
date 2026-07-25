@@ -46,6 +46,15 @@ const fmtDate = (iso: string) => {
   return `${d}/${m}/${y?.slice(2)}`;
 };
 
+function isSaturdayDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const m1 = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m1) return new Date(Date.UTC(+m1[1], +m1[2] - 1, +m1[3], 12, 0, 0)).getUTCDay() === 6;
+  const m2 = dateStr.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (m2) return new Date(Date.UTC(+m2[3], +m2[2] - 1, +m2[1], 12, 0, 0)).getUTCDay() === 6;
+  return false;
+}
+
 type Tab = "x1" | "sdr" | "closer";
 
 function ComissoesPage() {
@@ -352,7 +361,10 @@ function ComissoesPage() {
                                         ? fmtDate(base[0].data)
                                         : `${fmtDate(base[0].data)} até ${fmtDate(base[base.length - 1].data)}`;
                                       const pix = r.pixChave?.trim();
+                                      const isGustavo = String(r.expert ?? "").toLowerCase().trim() === "gustavo";
+                                      const hasSaturday = base.some((d: any) => d.isSaturday || isSaturdayDate(d.data));
                                       const BR = "\u200B";
+
                                       const lines = [
                                         `💰 *Relatório de Comissão*`,
                                         BR,
@@ -361,7 +373,12 @@ function ComissoesPage() {
                                         `📅 *Período:* ${periodo}`,
                                         BR,
                                         `📊 *Detalhamento por dia:*`,
-                                        ...base.map((d) => `• ${fmtDate(d.data)} — ${fmtBRL(d.faturamento)}  →  ${d.milhares} × ${fmtBRL(d.rate)} = *${fmtBRL(d.comissao)}*`),
+                                        ...base.map((d: any) => {
+                                          const isSat = d.isSaturday || isSaturdayDate(d.data);
+                                          const satText = isSat ? (isGustavo ? " (Sábado)" : " 🔥 *[SÁBADO 2X]*") : "";
+                                          return `• ${fmtDate(d.data)}${satText} — ${fmtBRL(d.faturamento)}  →  ${d.milhares} × ${fmtBRL(d.rate)} = *${fmtBRL(d.comissao)}*`;
+                                        }),
+                                        hasSaturday && !isGustavo ? `\n🔥 *Obs:* Sábados possuem taxa de comissão dobrada (2x).` : null,
                                         BR,
                                         `🧾 *Faturamento total:* ${fmtBRL(totalFat)}`,
                                         `✅ *Comissão a receber:* *${fmtBRL(totalCom)}*`,
