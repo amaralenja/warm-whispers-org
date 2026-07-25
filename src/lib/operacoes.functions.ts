@@ -124,6 +124,18 @@ function vendorWorkspaceIds(context: any): string[] | null {
   return expert;
 }
 
+// Coerce defensivo: alguns campos podem vir como objeto/jsonb vazio do Postgres
+const asStr = (x: unknown): string => {
+  if (x == null) return "";
+  if (typeof x === "string") return x;
+  if (typeof x === "number" || typeof x === "boolean") return String(x);
+  return "";
+};
+const asStrOrNull = (x: unknown): string | null => {
+  const s = asStr(x);
+  return s ? s : null;
+};
+
 const EMPTY_OPERACOES: OperacoesPayload = {
   experts: [],
   totalFaturamento: 0,
@@ -688,6 +700,435 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       reembolsos: reembolsosList,
       caioFontes,
       htFontes,
+    };
+  });
+
+// ─── Dashboard Otimizado ──────────────────────────────────────────────────────
+// Busca leads UMA ÚNICA vez e classifica por operação via UTM.
+// Pré-agrupa vendas por expert para evitar O(E*V).
+// Retorna leads por operação + breakdown de fontes de tráfego por operação.
+
+export type DashboardOpStats = {
+  id: number;
+  nome: string;
+  foto_url: string | null;
+  faturamento: number;
+  vendas: number;
+  ticketMedio: number;
+  reembolsos: number;
+  leads: number;
+  conversao: number;
+  vendedoresCount: number;
+  pctTotal: number;
+  fontes: { fonte: string; vendas: number; faturamento: number }[];
+};
+
+export type DashboardPayload = {
+  ops: DashboardOpStats[];
+  totalFat: number;
+  totalVendas: number;
+  totalReembolsos: number;
+  totalLeads: number;
+  ticketMedioGeral: number;
+  gastosMes: number;
+  saldoEstimado: number;
+  vendedores: VendedorStat[];
+  serieDiaria: SerieDiaria[];
+  reembolsos: ReembolsoItem[];
+};
+
+const EMPTY_DASHBOARD: DashboardPayload = {
+  ops: [],
+  totalFat: 0,
+  totalVendas: 0,
+  totalReembolsos: 0,
+  totalLeads: 0,
+  ticketMedioGeral: 0,
+  gastosMes: 0,
+  saldoEstimado: 0,
+  vendedores: [],
+  serieDiaria: [],
+  reembolsos: [],
+};
+
+function classifyLeadOp(lead: any): string | null {
+  const src = String(lead.utm_source || lead.origem || "").trim().toUpperCase();
+  if (!src) return null;
+  if (CAIO_UTMS.some((p) => src.startsWith(p))) return "Caio";
+  if (GUSTAVO_UTMS.some((p) => src.startsWith(p))) return "Gustavo";
+  return null;
+}
+
+export const getDashboardStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: DateRange | undefined) => input ?? {})
+  .handler(async (opts): Promise<DashboardPayload> => {
+    const context = opts?.context;
+    const data = opts?.data ?? {};
+    if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
+    const supabase = await dbFor(context);
+
+    let expertFilter = data.expert && data.expert !== "all" ? data.expert : null;
+    const allowedWorkspaces = vendorWorkspaceIds(context);
+    if (allowedWorkspaces) {
+      if (allowedWorkspaces.length === 0) return EMPTY_DASHBOARD;
+      if (expertFilter && !allowedWorkspaces.includes(expertFilter)) return EMPTY_DASHBOARD;
+      expertFilter = expertFilter ?? allowedWorkspaces[0];
+    }
+
+    const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
+    const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
+
+    const inRange = (t: number | null) => {
+      if (fromTs == null && toTs == null) return true;
+      if (t == null) return false;
+      if (fromTs != null && t < fromTs) return false;
+      if (toTs != null && t > toTs) return false;
+      return true;
+    };
+
+    const PAGE = 1000;
+    async function fetchAll<T = any>(build: (from: number, to: number) => any): Promise<T[]> {
+      const out: T[] = [];
+      for (let i = 0; ; i++) {
+        const { data: rows, error } = await build(i * PAGE, (i + 1) * PAGE - 1);
+        if (error) throw error;
+        const chunk = (rows ?? []) as T[];
+        out.push(...chunk);
+        if (chunk.length < PAGE) break;
+      }
+      return out;
+    }
+
+    // ── 1. Busca paralela: experts, produtos, vendas, reembolsos, financeiro, leads (ÚNICA) ──
+    const [expertsRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll, quizLeadsRaw, crmLeadsRaw] = await Promise.all([
+      supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
+      supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
+      fetchAll<any>((from, to) =>
+        supabase.from("vendas").select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"').or('Evento.eq.purchase_approved,Evento.ilike.*aprov*').range(from, to)
+      ),
+      fetchAll<any>((from, to) =>
+        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source').range(from, to)
+      ),
+      fetchAll<any>((from, to) =>
+        supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to)
+      ),
+      // Leads: busca UMA ÚNICA vez (não mais duas)
+      (async (): Promise<any[]> => {
+        try {
+          const [q, c] = await Promise.all([
+            supabase.from("ht_quiz_submissions" as any)
+              .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
+              .order("updated_at", { ascending: false }).limit(3000),
+            supabase.from("crm_leads" as any)
+              .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
+              .order("created_at", { ascending: false }).limit(3000),
+          ]);
+          return [...(q.data ?? []), ...(c.data ?? [])];
+        } catch { return []; }
+      })(),
+    ]);
+
+    // ── 2. Maps de lookup (O(1) em vez de O(N)) ──
+    const produtoMap = new Map<string, { expert: string; tipo: string }>();
+    for (const p of (produtosMapRes.data ?? []) as any[]) {
+      const key = asStr(p.nome_produto).trim().toLowerCase();
+      if (key) produtoMap.set(key, { expert: asStr(p.nome_expert).trim(), tipo: asStr(p.tipo_produto || "main").toLowerCase() });
+    }
+
+    // ── 3. Filtra e atribui expert via produtos_map ──
+    const vendasPeriodo = vendasAll
+      .filter((v: any) => inRange(parseDataField(v.Data)))
+      .map((v: any) => {
+        const m = produtoMap.get(asStr(v.Produto).trim().toLowerCase());
+        if (!m) return null;
+        return { ...v, _expert: m.expert, _tipo: m.tipo };
+      })
+      .filter((v: any): v is any => v !== null);
+
+    const vendasScoped = expertFilter ? vendasPeriodo.filter((v: any) => v._expert === expertFilter) : vendasPeriodo;
+
+    // ── 4. Pré-agrupa vendas por expert (O(V) em vez de O(E*V)) ──
+    const vendasByExpert = new Map<string, any[]>();
+    for (const v of vendasPeriodo) {
+      const list = vendasByExpert.get(v._expert) || [];
+      list.push(v);
+      vendasByExpert.set(v._expert, list);
+    }
+
+    // ── 5. Classifica leads por operação e constrói Maps por email/phone ──
+    const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+    const leadsByOp = new Map<string, number>();
+    const emailToLead = new Map<string, any>();
+    const phoneToLead = new Map<string, any>();
+
+    for (const l of quizLeadsRaw) {
+      const email = String(l.email ?? "").trim().toLowerCase();
+      if (email) emailToLead.set(email, l);
+      const phone = cleanPhone(l.whatsapp ?? "");
+      if (phone) phoneToLead.set(phone, l);
+      const op = classifyLeadOp(l);
+      if (op) leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+    }
+    for (const l of crmLeadsRaw) {
+      const email = String(l.email ?? "").trim().toLowerCase();
+      if (email && !emailToLead.has(email)) emailToLead.set(email, l);
+      const phone = cleanPhone(l.whatsapp ?? "");
+      if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
+      const op = classifyLeadOp(l);
+      if (op) leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+    }
+
+    const matchLead = (vEmail: string, vTel: string) => {
+      if (vEmail && emailToLead.has(vEmail)) return emailToLead.get(vEmail);
+      if (vTel && phoneToLead.has(vTel)) return phoneToLead.get(vTel);
+      return null;
+    };
+
+    const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
+
+    const classifyFonte = (lead: any): string => {
+      const src = norm(lead.utm_source || lead.origem);
+      const med = norm(lead.utm_medium);
+      const rawCp = String(lead.utm_campaign || "").trim();
+      const cp = norm(rawCp);
+      const cont = norm(lead.utm_content);
+      const fbclid = String(lead.fbclid || "").trim();
+      const gclid = String(lead.gclid || "").trim();
+      const fbp = String(lead.fbp || "").trim();
+
+      const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
+      const cleanCp = isCampEmpty ? "" : cp;
+      const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
+      const hasClickId = !!fbclid || !!gclid || !!fbp;
+      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
+      const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
+      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign) && !isOrganicWord;
+
+      if (src === "criar_saas" || src === "criar_saas_hub") return "Criar SaaS";
+      if (isPaid) return "Tráfego Pago";
+      if (src.includes("google_ads") || src.includes("gads") || !!gclid) return "Google Ads";
+      if (src === "sdr-manual" || med === "sdr-manual") return "Prospecção SDR";
+      if (organicPattern.test(src) || organicPattern.test(med) || organicPattern.test(cont) || organicPattern.test(norm(lead.origem))) return "Orgânico";
+      return "Orgânico";
+    };
+
+    // ── 6. Fontes de tráfego por operação ──
+    const fontesByOp = new Map<string, Map<string, { vendas: number; faturamento: number }>>();
+    for (const [opName] of vendasByExpert) {
+      fontesByOp.set(opName, new Map());
+    }
+
+    for (const v of vendasPeriodo) {
+      const vEmail = String(v.Email ?? "").trim().toLowerCase();
+      const vTel = cleanPhone(v.Telefone ?? "");
+      const value = parseTicket(v.Ticket);
+      const lead = matchLead(vEmail, vTel);
+
+      let fonte = "Orgânico";
+      if (lead) {
+        fonte = classifyFonte(lead);
+      } else {
+        const vUtm = String(v.UTM ?? "").trim().toLowerCase();
+        if (vUtm.includes("criar_saas")) fonte = "Criar SaaS";
+        else if (vUtm.includes("cpc") || vUtm.includes("cpm") || vUtm.includes("paid") || vUtm.includes("patrocinado")) fonte = "Tráfego Pago";
+        else if (vUtm.includes("google") || vUtm.includes("gclid")) fonte = "Google Ads";
+        else if (vUtm.includes("sdr")) fonte = "Prospecção SDR";
+      }
+
+      const opFontes = fontesByOp.get(v._expert);
+      if (opFontes) {
+        const entry = opFontes.get(fonte) || { vendas: 0, faturamento: 0 };
+        entry.vendas += 1;
+        entry.faturamento += value;
+        opFontes.set(fonte, entry);
+      }
+    }
+
+    // ── 7. Stats por expert (O(V) total usando pré-agrupamento) ──
+    const experts = expertsRes.data ?? [];
+    const allExpertNames = new Set<string>(experts.map((e: any) => asStr(e.nome).trim()));
+
+    if (data.includeHighTicket) allExpertNames.add("High Ticket");
+
+    let totalFat = 0;
+    let totalVendas = vendasScoped.length;
+
+    const opStats: DashboardOpStats[] = [];
+    for (const eName of allExpertNames) {
+      const vds = vendasByExpert.get(eName) || [];
+      const scopedVds = expertFilter ? vds.filter((v) => v._expert === expertFilter) : vds;
+      const faturamento = scopedVds.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
+      const vendasCount = scopedVds.length;
+      const vdsTm = scopedVds.filter((v: any) => parseTicket(v.Ticket) >= 97);
+      const fatTm = vdsTm.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
+      const ticketMedio = vdsTm.length ? fatTm / vdsTm.length : 0;
+
+      const reembCount = reembolsosAll.filter((r: any) => {
+        if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
+        return getRefundExpert(r) === eName;
+      }).length;
+
+      const leads = leadsByOp.get(eName) || 0;
+      const conversao = leads > 0 ? (vendasCount / leads) * 100 : 0;
+
+      let eId = -1;
+      let eFoto: string | null = null;
+      if (eName !== "High Ticket") {
+        const found = experts.find((ex: any) => asStr(ex.nome).trim() === eName);
+        if (found) { eId = found.id; eFoto = found.foto_url || null; }
+      }
+
+      const vdsCount = vendedoresRaw.filter((vd: any) => vd.expert === eName && vd.ativo).length;
+      totalFat += faturamento;
+
+      const fontesArr = Array.from(fontesByOp.get(eName)?.entries() || [])
+        .map(([fonte, s]) => ({ fonte, ...s }))
+        .filter((f) => f.vendas > 0)
+        .sort((a, b) => b.faturamento - a.faturamento);
+
+      opStats.push({
+        id: eId, nome: eName, foto_url: eFoto,
+        faturamento, vendas: vendasCount, ticketMedio,
+        reembolsos: reembCount, leads, conversao: Math.round(conversao * 10) / 10,
+        vendedoresCount: vdsCount, pctTotal: 0, fontes: fontesArr,
+      });
+    }
+
+    if (data.includeHighTicket) {
+      const htVendas = (htVendasAll as any[]).filter((v: any) => inRange(parseDataField(v.data)));
+      const fatHt = htVendas.reduce((a: number, v: any) => a + (parseFloat(v.valor_total) || 0), 0);
+      totalFat += fatHt;
+      const htEntry = opStats.find((o) => o.nome === "High Ticket");
+      if (htEntry) {
+        htEntry.faturamento = fatHt;
+        htEntry.vendas = htVendas.length;
+        htEntry.ticketMedio = htVendas.length ? fatHt / htVendas.length : 0;
+        htEntry.leads = leadsByOp.get("High Ticket") || 0;
+        htEntry.conversao = htEntry.leads > 0 ? (htEntry.vendas / htEntry.leads) * 100 : 0;
+      }
+    }
+
+    for (const o of opStats) {
+      o.pctTotal = totalFat > 0 ? o.faturamento / totalFat : 0;
+    }
+
+    opStats.sort((a, b) => b.faturamento - a.faturamento);
+
+    // ── 8. Ticket Médio Geral ──
+    const vendasTm = vendasScoped.filter((v: any) => parseTicket(v.Ticket) >= 97);
+    const fatTmGeral = vendasTm.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
+    const ticketMedioGeral = vendasTm.length ? fatTmGeral / vendasTm.length : 0;
+
+    // ── 9. Gastos ──
+    const gastosMes = financeiroAll
+      .filter((f: any) => {
+        const tipo = String(f.tipo ?? "").toLowerCase();
+        return (tipo === "gasto" || tipo === "saida" || tipo === "despesa") && inRange(parseDataField(f.data_ref));
+      })
+      .reduce((acc: number, f: any) => acc + Number(f.valor ?? 0), 0);
+
+    // ── 10. Reembolsos ──
+    const reembolsos = reembolsosAll.filter((r: any) => {
+      if (!inRange(parseDataField(r["Data do Reembolso"]))) return false;
+      if (expertFilter) return getRefundExpert(r) === expertFilter;
+      return true;
+    });
+
+    const reembolsosList: ReembolsoItem[] = (reembolsos as any[]).map((r) => ({
+      idVenda: asStr(r["ID da Venda"]),
+      produto: asStrOrNull(r["Produto"]),
+      cliente: asStrOrNull(r["Nome do Cliente"]),
+      valor: parseTicket(r["Valor Base do Produto"]),
+      dataVenda: asStrOrNull(r["Data da Venda"]),
+      dataReembolso: asStrOrNull(r["Data do Reembolso"]),
+      expert: asStrOrNull(getRefundExpert(r)),
+    })).sort((a, b) => (b.dataReembolso ?? "").localeCompare(a.dataReembolso ?? ""));
+
+    // ── 11. Vendedores (UTM) ──
+    const vendedorMap = new Map<string, VendedorStat>();
+    for (const vd of vendedoresRaw as any[]) {
+      if (!vd.utm) continue;
+      vendedorMap.set(String(vd.utm).toUpperCase(), {
+        utm: String(vd.utm).toUpperCase(), nome: vd.nome ?? vd.utm,
+        expert: vd.expert ?? null, fotoUrl: vd.foto_url || null,
+        faturamento: 0, vendas: 0, pctTotal: 0,
+      });
+    }
+    for (const v of vendasScoped as any[]) {
+      const rawUtm = v.UTM ? String(v.UTM).toUpperCase() : "";
+      if (!rawUtm) continue;
+      let entry = vendedorMap.get(rawUtm);
+      if (!entry) {
+        entry = { utm: rawUtm, nome: rawUtm, expert: null, fotoUrl: null, faturamento: 0, vendas: 0, pctTotal: 0 };
+        vendedorMap.set(rawUtm, entry);
+      }
+      entry.faturamento += parseTicket(v.Ticket);
+      entry.vendas += 1;
+    }
+    const vendedores = Array.from(vendedorMap.values())
+      .filter((v) => v.vendas > 0)
+      .map((v) => ({ ...v, pctTotal: totalFat > 0 ? v.faturamento / totalFat : 0 }))
+      .sort((a, b) => b.faturamento - a.faturamento);
+
+    // ── 12. Série diária ──
+    const serieMap = new Map<string, { total: number; vendas: number }>();
+    for (const v of vendasScoped as any[]) {
+      const t = parseDataField(v.Data);
+      if (t == null) continue;
+      const d = new Date(t);
+      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      const entry = serieMap.get(iso) ?? { total: 0, vendas: 0 };
+      entry.total += parseTicket(v.Ticket);
+      entry.vendas += 1;
+      serieMap.set(iso, entry);
+    }
+    if (data.includeHighTicket) {
+      const htVendas = (htVendasAll as any[]).filter((v: any) => inRange(parseDataField(v.data)));
+      for (const v of htVendas) {
+        const t = parseDataField(v.data);
+        if (t == null) continue;
+        const d = new Date(t);
+        const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+        const entry = serieMap.get(iso) ?? { total: 0, vendas: 0 };
+        entry.total += (parseFloat(v.valor_total) || 0);
+        entry.vendas += 1;
+        serieMap.set(iso, entry);
+      }
+    }
+    let startTs = fromTs, endTs = toTs;
+    if (startTs == null || endTs == null) {
+      const allTs = Array.from(serieMap.keys()).map((s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)));
+      if (allTs.length) { startTs = startTs ?? Math.min(...allTs); endTs = endTs ?? Math.max(...allTs); }
+    }
+    const serieDiaria: SerieDiaria[] = [];
+    if (startTs != null && endTs != null) {
+      const DAY = 86400_000;
+      for (let t = startTs; t <= endTs; t += DAY) {
+        const d = new Date(t);
+        const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+        const entry = serieMap.get(iso) ?? { total: 0, vendas: 0 };
+        serieDiaria.push({ data: iso, total: entry.total, vendas: entry.vendas });
+      }
+    }
+
+    const totalReembolsos = reembolsosList.length;
+    const totalLeads = leadsByOp.size > 0 ? Array.from(leadsByOp.values()).reduce((a, b) => a + b, 0) : 0;
+
+    return {
+      ops: opStats,
+      totalFat,
+      totalVendas,
+      totalReembolsos,
+      totalLeads,
+      ticketMedioGeral,
+      gastosMes,
+      saldoEstimado: totalFat - gastosMes,
+      vendedores,
+      serieDiaria,
+      reembolsos: reembolsosList,
     };
   });
 

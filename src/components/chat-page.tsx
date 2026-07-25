@@ -734,14 +734,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
         const res = await listQuizSubsFn();
         return (res?.submissions ?? []) as any[];
       } catch {
-        // Fallback: read directly from local table if server function fails
-        const { data, error } = await supabase
-          .from("ht_quiz_submissions")
-          .select("id, whatsapp, nome, email, utm_source, utm_medium, utm_campaign, utm_content, origem, status, fbclid, gclid, fbp, fbc")
-          .order("received_at", { ascending: false })
-          .limit(1000);
-        if (error || !data) return [];
-        return data;
+        return [];
       }
     },
     staleTime: 30_000,
