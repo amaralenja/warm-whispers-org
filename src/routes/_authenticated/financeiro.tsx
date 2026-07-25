@@ -109,7 +109,7 @@ function Financeiro() {
     return {
       gasto: totalGastoRealizado, gastoCount: gastosRealizados.length,
       receita: totalReceita, receitaCount: receitas.length,
-      saldo: totalReceita - totalGasto,
+      saldo: totalReceita - totalGastoRealizado,
       pendente: totalPendente, pendenteCount: gastosPendentes.length,
       fixos,
     };
