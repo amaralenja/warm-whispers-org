@@ -1072,6 +1072,20 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // phoneToWaTags: Map<phoneVariation, tags[]>
     // Indexado por variações de número de telefone, respeitando operacao_id
     // chave: `${operacaoNome}:${phoneVariation}`  (ou apenas phoneVariation para todas)
+    const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+    const canonicalOpName = (rawOp: string): string => {
+      const n = norm(rawOp);
+      if (n.includes("caio")) return "Caio";
+      if (n.includes("jessica") || n.includes("je")) return "Jessica";
+      if (n.includes("gustavo") || n.includes("gu")) return "Gustavo";
+      if (n.includes("high") || n.includes("ticket") || n.includes("ht")) return "High Ticket";
+      return rawOp.trim();
+    };
+
+    // phoneToWaTags: Map<phoneVariation, tags[]>
+    // Indexado por variações de número de telefone, respeitando operacao_id
+    // chave: `${operacaoNome}:${phoneVariation}`  (ou apenas phoneVariation para todas)
     const phoneToWaTagsByOp = new Map<string, string[]>(); // key = `operacaoNome::phone`
     const phoneToWaTagsAll = new Map<string, string[]>(); // key = phone (sem filtro por op)
 
@@ -1124,16 +1138,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const emailToLead = new Map<string, any>();
     const phoneToLead = new Map<string, any>();
 
-    const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-
-    const canonicalOpName = (rawOp: string): string => {
-      const n = norm(rawOp);
-      if (n.includes("caio")) return "Caio";
-      if (n.includes("jessica") || n.includes("je")) return "Jessica";
-      if (n.includes("gustavo") || n.includes("gu")) return "Gustavo";
-      if (n.includes("high") || n.includes("ticket") || n.includes("ht")) return "High Ticket";
-      return rawOp.trim();
-    };
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
     const getTagsForLead = (lead: any, opNome?: string): string[] => {
