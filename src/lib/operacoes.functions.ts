@@ -199,29 +199,35 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll, htVendasAll] = await Promise.all([
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasRes, reembolsosRes, financeiroRes, htVendasRes] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
-      fetchAll<any>((from, to) =>
-        supabase
-          .from("vendas")
-          .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
-          .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
-          .range(from, to),
-      ),
-      fetchAll<any>((from, to) =>
-        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source').range(from, to),
-      ),
-      fetchAll<any>((from, to) =>
-        supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to),
-      ),
+      supabase
+        .from("vendas")
+        .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
+        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+        .order('"Data"', { ascending: false })
+        .limit(3000),
+      supabase
+        .from("reembolsos")
+        .select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source')
+        .order('"Data do Reembolso"', { ascending: false })
+        .limit(1000),
+      supabase
+        .from("financeiro")
+        .select("valor, tipo, data_ref")
+        .order("data_ref", { ascending: false })
+        .limit(1000),
       data.includeHighTicket
-        ? fetchAll<any>((from, to) =>
-          supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").range(from, to)
-        )
-        : Promise.resolve([]),
+        ? supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").order("data", { ascending: false }).limit(1000)
+        : Promise.resolve({ data: [] }),
     ]);
+
+    const vendasAll = (vendasRes.data ?? []) as any[];
+    const reembolsosAll = (reembolsosRes.data ?? []) as any[];
+    const financeiroAll = (financeiroRes.data ?? []) as any[];
+    const htVendasAll = (htVendasRes.data ?? []) as any[];
 
     // Coerce defensivo: alguns campos podem vir como objeto/jsonb vazio do Postgres
     const asStr = (x: unknown): string => {
@@ -848,41 +854,43 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    // ── 1. Busca paralela: experts, vendedores, produtos, vendas, reembolsos, financeiro, ht_vendas, leads ──
-    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll, htVendasAll, quizLeadsRaw, crmLeadsRaw] = await Promise.all([
+    // ── 1. Busca paralela ultrarrápida: experts, vendedores, produtos, vendas, reembolsos, financeiro, ht_vendas, leads ──
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasRes, reembolsosRes, financeiroRes, htVendasRes, quizLeadsRes, crmLeadsRes] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
       supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
-      fetchAll<any>((from, to) =>
-        supabase.from("vendas").select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"').or('Evento.eq.purchase_approved,Evento.ilike.*aprov*').range(from, to)
-      ),
-      fetchAll<any>((from, to) =>
-        supabase.from("reembolsos").select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source').range(from, to)
-      ),
-      fetchAll<any>((from, to) =>
-        supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to)
-      ),
+      supabase.from("vendas")
+        .select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
+        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
+        .order('"Data"', { ascending: false })
+        .limit(3000),
+      supabase.from("reembolsos")
+        .select('"ID da Venda", "Data do Reembolso", "Data da Venda", "Produto", "Nome do Cliente", "Valor Base do Produto", "Tipo da Venda", utm_source')
+        .order('"Data do Reembolso"', { ascending: false })
+        .limit(1000),
+      supabase.from("financeiro")
+        .select("valor, tipo, data_ref")
+        .order("data_ref", { ascending: false })
+        .limit(1000),
       data.includeHighTicket
-        ? fetchAll<any>((from, to) =>
-          supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").range(from, to)
-        )
-        : Promise.resolve([] as any[]),
-      // Quiz leads (sem limite de 3000)
-      fetchAll<any>((from, to) =>
-        supabase.from("ht_quiz_submissions" as any)
-          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at, updated_at")
-          .range(from, to)
-      ).catch(() => []),
-      // CRM leads (sem limite de 3000)
-      fetchAll<any>((from, to) =>
-        supabase.from("crm_leads" as any)
-          .select("id, email, telefone, expert, fonte, responsavel_utm, created_at, updated_at, dados")
-          .range(from, to)
-      ).catch((err) => {
-        console.warn("Erro ao buscar crm_leads:", err);
-        return [];
-      }),
+        ? supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").order("data", { ascending: false }).limit(1000)
+        : Promise.resolve({ data: [] }),
+      supabase.from("ht_quiz_submissions" as any)
+        .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at, updated_at")
+        .order("received_at", { ascending: false })
+        .limit(2000),
+      supabase.from("crm_leads" as any)
+        .select("id, email, telefone, expert, fonte, responsavel_utm, created_at, updated_at, dados")
+        .order("created_at", { ascending: false })
+        .limit(2000),
     ]);
+
+    const vendasAll = (vendasRes.data ?? []) as any[];
+    const reembolsosAll = (reembolsosRes.data ?? []) as any[];
+    const financeiroAll = (financeiroRes.data ?? []) as any[];
+    const htVendasAll = (htVendasRes.data ?? []) as any[];
+    const quizLeadsRaw = (quizLeadsRes.data ?? []) as any[];
+    const crmLeadsRaw = (crmLeadsRes.data ?? []) as any[];
 
     // ── 2. Maps de lookup (O(1) em vez de O(N)) ──
     const produtoMap = new Map<string, { expert: string; tipo: string }>();

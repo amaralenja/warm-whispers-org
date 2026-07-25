@@ -78,6 +78,7 @@ function Financeiro() {
   const [editing, setEditing] = useState<Lancamento | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [tab, setTab] = useState<"lancamentos" | "relatorios" | "dre">("lancamentos");
+  const [recorrencia, setRecorrencia] = useState<"all" | "recorrente" | "avulso">("all");
 
   const rowsMes = useMemo(() => getRowsForMonth(all, mes), [all, mes]);
 
@@ -104,6 +105,8 @@ function Financeiro() {
     let rows = rowsMes;
     if (tipo !== "all") rows = rows.filter((r) => r.tipo === tipo);
     if (cat !== "all") rows = rows.filter((r) => r.categoria === cat);
+    if (recorrencia === "recorrente") rows = rows.filter((r) => r.recorrente);
+    if (recorrencia === "avulso") rows = rows.filter((r) => !r.recorrente);
     const term = q.trim().toLowerCase();
     if (term)
       rows = rows.filter(
@@ -112,7 +115,10 @@ function Financeiro() {
           (r.responsavel || "").toLowerCase().includes(term),
       );
     return rows;
-  }, [rowsMes, tipo, cat, q]);
+  }, [rowsMes, tipo, cat, recorrencia, q]);
+
+  const recorrentes = useMemo(() => filtered.filter((r) => r.recorrente), [filtered]);
+  const avulsos = useMemo(() => filtered.filter((r) => !r.recorrente), [filtered]);
 
   const meses = useMemo(() => {
     const set = new Set<string>();
@@ -164,9 +170,9 @@ function Financeiro() {
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
       <div className="mx-auto max-w-7xl px-8 py-10">
         {/* Header */}
-        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
+        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border/60 pb-6">
           <div>
-            <p className="text-[0.65rem] uppercase tracking-[0.28em] text-accent">— Caixa</p>
+            <p className="text-[0.6rem] font-bold uppercase tracking-[0.28em] text-accent">— Caixa</p>
             <h1 className="mt-2 font-display text-3xl leading-tight md:text-4xl">
               <em className="text-accent">Financeiro</em>
             </h1>
@@ -178,7 +184,7 @@ function Financeiro() {
             <select
               value={mes}
               onChange={(e) => setMes(e.target.value)}
-              className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-card/60 px-3.5 py-2.5 text-sm font-semibold shadow-sm focus:outline-none focus:ring-1 focus:ring-accent"
             >
               {meses.map((m) => (
                 <option key={m} value={m}>
@@ -188,7 +194,7 @@ function Financeiro() {
             </select>
             <button
               onClick={() => { setEditing(null); setModalOpen(true); }}
-              className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
+              className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground shadow-md transition hover:brightness-110"
             >
               <Plus className="h-4 w-4" /> Novo lançamento
             </button>
@@ -196,7 +202,7 @@ function Financeiro() {
         </div>
 
         {/* Sub-tabs */}
-        <div className="mt-6 flex gap-1 border-b border-border">
+        <div className="mt-6 flex gap-1 border-b border-border/60">
           {[
             { id: "lancamentos", label: "Lançamentos", icon: ClipboardList },
             { id: "relatorios", label: "Relatórios", icon: BarChart3 },
@@ -208,13 +214,13 @@ function Financeiro() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id as typeof tab)}
-                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-semibold transition ${
+                className={`relative flex items-center gap-2 px-5 py-3 text-sm font-semibold transition ${
                   active ? "text-accent" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Icon className="h-4 w-4" />
                 {t.label}
-                {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />}
+                {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />}
               </button>
             );
           })}
@@ -222,39 +228,39 @@ function Financeiro() {
 
         {tab === "lancamentos" && (<>
         {/* KPIs */}
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Receita do mês"
             value={BRL(kpis.receita)}
             sub={`${kpis.receitaCount} lançamentos`}
             icon={<TrendingUp className="h-4 w-4" />}
-            tone="emerald"
+            trend={kpis.receita >= 0 ? "up" : "down"}
           />
           <KpiCard
             label="Gasto do mês"
             value={BRL(kpis.gasto)}
             sub={`${kpis.gastoCount} lançamentos`}
             icon={<TrendingDown className="h-4 w-4" />}
-            tone="red"
+            trend={kpis.gasto > 0 ? "down" : "up"}
           />
           <KpiCard
             label="Saldo"
             value={BRL(kpis.saldo)}
-            sub={kpis.saldo >= 0 ? "no azul" : "no vermelho"}
+            sub={kpis.saldo >= 0 ? "no azul" : "negativo"}
             icon={<Wallet className="h-4 w-4" />}
-            tone={kpis.saldo >= 0 ? "emerald" : "red"}
+            trend={kpis.saldo >= 0 ? "up" : "down"}
           />
           <KpiCard
             label="Custos fixos"
             value={BRL(kpis.fixos)}
-            sub="recorrentes"
+            sub={`${all.filter((x) => x.recorrente && x.tipo === "gasto").length} recorrentes`}
             icon={<Repeat className="h-4 w-4" />}
-            tone="violet"
+            trend="neutral"
           />
         </div>
 
         {/* Filtros */}
-        <div className="mt-6 rounded-2xl border border-border bg-card/40 p-4">
+        <div className="mt-6 rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <FilterChip active={tipo === "all"} onClick={() => setTipo("all")}>Todos</FilterChip>
             <FilterChip active={tipo === "gasto"} onClick={() => setTipo("gasto")} tone="red">
@@ -263,7 +269,17 @@ function Financeiro() {
             <FilterChip active={tipo === "receita"} onClick={() => setTipo("receita")} tone="emerald">
               Receitas
             </FilterChip>
-            <span className="mx-2 h-5 w-px bg-border" />
+            <span className="mx-1 h-5 w-px bg-border hidden sm:block" />
+            <FilterChip active={recorrencia === "all"} onClick={() => setRecorrencia("all")}>
+              Todos (fixo+avulso)
+            </FilterChip>
+            <FilterChip active={recorrencia === "recorrente"} onClick={() => setRecorrencia("recorrente")} tone="violet">
+              <Repeat className="mr-0.5 h-3 w-3" /> Fixos
+            </FilterChip>
+            <FilterChip active={recorrencia === "avulso"} onClick={() => setRecorrencia("avulso")}>
+              Avulsos
+            </FilterChip>
+            <span className="mx-1 h-5 w-px bg-border hidden sm:block" />
             <FilterChip active={cat === "all"} onClick={() => setCat("all")}>
               <Filter className="mr-1 inline h-3 w-3" /> Categorias
             </FilterChip>
@@ -272,21 +288,30 @@ function Financeiro() {
                 <span>{c.emoji}</span> <span>{c.label}</span>
               </FilterChip>
             ))}
-            <div className="ml-auto relative">
+            <div className="ml-auto relative hidden sm:block">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar..."
-                className="w-64 rounded-lg border border-border bg-background py-2 pl-8 pr-3 text-sm"
+                className="w-56 rounded-lg border border-border bg-background py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
           </div>
+          <div className="mt-3 sm:hidden relative">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar lançamento..."
+              className="w-full rounded-lg border border-border bg-background py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
         </div>
 
-        {/* Tabela */}
-        <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card/40">
-          <div className="grid grid-cols-[110px_1fr_140px_120px_130px_110px_70px] gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {/* Tabela — Desktop */}
+        <div className="mt-4 hidden md:block overflow-hidden rounded-2xl border border-border bg-card/40 shadow-sm">
+          <div className="grid grid-cols-[100px_1fr_140px_110px_120px_100px_70px] gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[0.6rem] font-bold uppercase tracking-[0.18em] text-muted-foreground">
             <span>Data</span>
             <span>Descrição</span>
             <span>Categoria</span>
@@ -303,52 +328,70 @@ function Financeiro() {
               Nenhum lançamento nesse filtro.
             </div>
           )}
-          {filtered.map((r) => {
-            const c = CAT_MAP.get(r.categoria);
-            const isGasto = r.tipo === "gasto";
-            return (
-              <div
-                key={r.id}
-                className="group grid grid-cols-[110px_1fr_140px_120px_130px_110px_70px] items-center gap-3 border-b border-border/50 px-4 py-3 text-sm transition hover:bg-accent/5"
-              >
-                <span className="text-xs text-muted-foreground">
-                  {new Date(r.data_ref + "T00:00:00").toLocaleDateString("pt-BR", {
-                    day: "2-digit", month: "short",
-                  })}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{r.descricao}</p>
-                  {r.recorrente && (
-                    <span className="mt-0.5 inline-flex items-center gap-1 text-[0.6rem] uppercase tracking-widest text-violet-400">
-                      <Repeat className="h-2.5 w-2.5" /> recorrente
-                    </span>
-                  )}
-                </div>
-                <span className="inline-flex items-center gap-1 truncate rounded-md bg-muted/60 px-2 py-0.5 text-xs">
-                  {c?.emoji} {c?.label ?? r.categoria}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">{r.responsavel || "—"}</span>
-                <span className={`text-right ${NUM} ${isGasto ? "text-red-400" : "text-emerald-400"}`}>
-                  {isGasto ? "− " : "+ "}{BRL(+r.valor)}
-                </span>
-                <StatusBadge status={r.status} />
-                <div className="flex items-center justify-end gap-1 opacity-0 transition group-hover:opacity-100">
-                  <button
-                    onClick={() => { setEditing(r); setModalOpen(true); }}
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(r.id)}
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+          {recorrencia === "all" && recorrentes.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 bg-violet-500/[0.06] border-b border-violet-500/20 px-4 py-2 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-violet-400">
+                <Repeat className="h-3 w-3" />
+                Recorrentes ({recorrentes.length})
+                <span className="ml-auto font-mono text-xs tabular-nums">{BRL(recorrentes.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
               </div>
-            );
-          })}
+              {recorrentes.map((r) => (
+                <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+          {recorrencia === "all" && avulsos.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 bg-muted/20 border-b border-border px-4 py-2 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Avulsos ({avulsos.length})
+                <span className="ml-auto font-mono text-xs tabular-nums">{BRL(avulsos.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
+              </div>
+              {avulsos.map((r) => (
+                <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+          {recorrencia !== "all" && filtered.map((r) => (
+            <LancamentoRow key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+          ))}
+        </div>
+
+        {/* Cards — Mobile */}
+        <div className="mt-4 md:hidden space-y-3">
+          {isLoading && (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">Carregando...</div>
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+              Nenhum lançamento nesse filtro.
+            </div>
+          )}
+          {recorrencia === "all" && recorrentes.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-violet-400">
+                <Repeat className="h-3 w-3" />
+                Recorrentes ({recorrentes.length})
+                <span className="ml-auto font-mono text-xs tabular-nums">{BRL(recorrentes.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
+              </div>
+              {recorrentes.map((r) => (
+                <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+          {recorrencia === "all" && avulsos.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Avulsos ({avulsos.length})
+                <span className="ml-auto font-mono text-xs tabular-nums">{BRL(avulsos.reduce((s, x) => s + (+x.valor || 0), 0))}</span>
+              </div>
+              {avulsos.map((r) => (
+                <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+          {recorrencia !== "all" && filtered.map((r) => (
+            <LancamentoCard key={r.id} r={r} onEdit={(r) => { setEditing(r); setModalOpen(true); }} onDelete={handleDelete} />
+          ))}
         </div>
         </>)}
 
@@ -367,27 +410,135 @@ function Financeiro() {
   );
 }
 
+function LancamentoRow({
+  r, onEdit, onDelete,
+}: {
+  r: Lancamento;
+  onEdit: (r: Lancamento) => void;
+  onDelete: (id: number) => void;
+}) {
+  const c = CAT_MAP.get(r.categoria);
+  const isGasto = r.tipo === "gasto";
+  return (
+    <div className="group grid grid-cols-[100px_1fr_140px_110px_120px_100px_70px] items-center gap-3 border-b border-border/50 px-4 py-3 text-sm transition hover:bg-accent/[0.04]">
+      <span className="text-xs text-muted-foreground">
+        {new Date(r.data_ref + "T00:00:00").toLocaleDateString("pt-BR", {
+          day: "2-digit", month: "short",
+        })}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{r.descricao}</p>
+        {r.recorrente && (
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[0.55rem] uppercase tracking-widest text-violet-400">
+            <Repeat className="h-2.5 w-2.5" /> recorrente
+          </span>
+        )}
+      </div>
+      <span className="inline-flex items-center gap-1 truncate rounded-md bg-muted/50 px-2 py-0.5 text-xs">
+        {c?.emoji} {c?.label ?? r.categoria}
+      </span>
+      <span className="truncate text-xs text-muted-foreground">{r.responsavel || "—"}</span>
+      <span className={`text-right ${NUM} ${isGasto ? "text-red-400" : "text-emerald-400"}`}>
+        {isGasto ? "− " : "+ "}{BRL(+r.valor)}
+      </span>
+      <StatusBadge status={r.status} />
+      <div className="flex items-center justify-end gap-1 opacity-0 transition group-hover:opacity-100">
+        <button
+          onClick={() => onEdit(r)}
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => onDelete(r.id)}
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LancamentoCard({
+  r, onEdit, onDelete,
+}: {
+  r: Lancamento;
+  onEdit: (r: Lancamento) => void;
+  onDelete: (id: number) => void;
+}) {
+  const c = CAT_MAP.get(r.categoria);
+  const isGasto = r.tipo === "gasto";
+  return (
+    <div className={`rounded-xl border p-3.5 transition-colors ${
+      r.recorrente
+        ? "border-violet-500/20 bg-violet-500/[0.04]"
+        : "border-border bg-card/60"
+    } hover:border-accent/30`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="truncate text-sm font-bold">{r.descricao}</p>
+            {r.recorrente && (
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-widest text-violet-400">
+                <Repeat className="h-2 w-2" /> fixo
+              </span>
+            )}
+          </div>
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-1.5 py-0.5">
+              {c?.emoji} {c?.label ?? r.categoria}
+            </span>
+            {r.responsavel && <span>{r.responsavel}</span>}
+            <span>{new Date(r.data_ref + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <span className={`text-base ${NUM} ${isGasto ? "text-red-400" : "text-emerald-400"}`}>
+            {isGasto ? "− " : "+ "}{BRL(+r.valor)}
+          </span>
+          <StatusBadge status={r.status} />
+        </div>
+      </div>
+      <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-border/40 pt-2 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
+        <button
+          onClick={() => onEdit(r)}
+          className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
+        >
+          Editar
+        </button>
+        <button
+          onClick={() => onDelete(r.id)}
+          className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        >
+          Apagar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function KpiCard({
-  label, value, sub, icon, tone,
+  label, value, sub, icon, trend,
 }: {
   label: string; value: string; sub: string; icon: React.ReactNode;
-  tone: "emerald" | "red" | "violet";
+  trend: "up" | "down" | "neutral";
 }) {
   const tones = {
-    emerald: "text-emerald-400 border-emerald-400/20 bg-emerald-400/[0.04]",
-    red: "text-red-400 border-red-400/20 bg-red-400/[0.04]",
-    violet: "text-violet-400 border-violet-400/20 bg-violet-400/[0.04]",
-  }[tone];
+    up: { icon: "text-emerald-400", border: "border-emerald-500/25", bg: "from-emerald-500/[0.08] to-transparent" },
+    down: { icon: "text-red-400", border: "border-red-500/25", bg: "from-red-500/[0.08] to-transparent" },
+    neutral: { icon: "text-violet-400", border: "border-violet-500/25", bg: "from-violet-500/[0.08] to-transparent" },
+  }[trend];
   return (
-    <div className={`rounded-2xl border bg-card/40 p-4 ${tones.split(" ").slice(1).join(" ")}`}>
+    <div className={`rounded-2xl border bg-gradient-to-br ${tones.bg} ${tones.border} p-5 shadow-sm`}>
       <div className="flex items-center justify-between">
-        <p className="text-[0.6rem] font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+        <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">
           {label}
         </p>
-        <span className={tones.split(" ")[0]}>{icon}</span>
+        <span className={tones.icon}>{icon}</span>
       </div>
-      <p className={`mt-2 text-2xl ${NUM}`}>{value}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+      <p className={`mt-3 text-2xl ${NUM}`}>{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
     </div>
   );
 }
@@ -396,18 +547,20 @@ function FilterChip({
   active, onClick, children, tone,
 }: {
   active: boolean; onClick: () => void; children: React.ReactNode;
-  tone?: "emerald" | "red";
+  tone?: "emerald" | "red" | "violet";
 }) {
   const activeCls = tone === "emerald"
     ? "bg-emerald-400 text-black"
     : tone === "red"
       ? "bg-red-400 text-black"
-      : "bg-accent text-accent-foreground";
+      : tone === "violet"
+        ? "bg-violet-400 text-black"
+        : "bg-accent text-accent-foreground";
   return (
     <button
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-        active ? activeCls : "border border-border bg-background text-muted-foreground hover:text-foreground"
+        active ? activeCls : "border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary/50"
       }`}
     >
       {children}
