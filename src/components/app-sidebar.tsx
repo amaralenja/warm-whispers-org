@@ -9,7 +9,6 @@ import { getVendorSession } from "@/lib/vendor-session";
 import {
   LayoutDashboard,
   LineChart,
-  Trophy,
   Tv,
   Wallet,
   Activity,
@@ -62,8 +61,6 @@ type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
   { title: "Início", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Relatórios", url: "/relatorios", icon: LineChart },
-  { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
   { title: "Financeiro", url: "/financeiro", icon: Wallet },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
@@ -101,8 +98,6 @@ const highTicketItems: Item[] = [
 
 const URL_TO_KEY: Record<string, string> = {
   "/dashboard": "dashboard",
-  "/relatorios": "relatorios",
-  "/ranking": "ranking",
   "/ranking-tv": "ranking-tv",
   "/financeiro": "financeiro",
   "/crm": "crm",

@@ -7,8 +7,6 @@ export type MenuNode = MenuLeaf | MenuGroup;
 
 export const MENU_TREE: MenuNode[] = [
   { key: "dashboard", title: "Dashboard", url: "/dashboard" },
-  { key: "relatorios", title: "Relatórios", url: "/relatorios" },
-  { key: "ranking", title: "Ranking", url: "/ranking" },
   { key: "ranking-tv", title: "Ranking TV", url: "/ranking-tv" },
   { key: "financeiro", title: "Financeiro", url: "/financeiro" },
   { key: "tasks", title: "Tarefas", url: "/tasks" },

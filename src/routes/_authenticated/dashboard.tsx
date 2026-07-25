@@ -4,10 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   TrendingUp, ShoppingBag, Receipt, AlertTriangle, Coins,
-  Users, Settings, Activity, Target, ArrowUpRight, ArrowDownRight,
-  BarChart3, UserCheck, Percent, Wallet,
+  Users, Settings, Activity, ArrowUpRight,
+  BarChart3, UserCheck, Percent, Wallet, Trophy, Sparkles, Crown, Medal,
+  LineChart,
 } from "lucide-react";
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+  PieChart, Pie, Cell,
+} from "recharts";
 import { getDashboardStats, type DashboardOpStats } from "@/lib/operacoes.functions";
+import { getRankingStats, type RankingItem } from "@/lib/ranking.functions";
+import { getRelatoriosStats } from "@/lib/relatorios.functions";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useDashboardConfig } from "@/lib/dashboard-config";
 import { DashboardConfigDialog } from "@/components/dashboard-config-dialog";
@@ -90,11 +97,19 @@ function Dashboard() {
           </div>
         </div>
 
-        <Tabs defaultValue="geral" className="mt-8">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="geral" className="gap-2">
+        <Tabs defaultValue="operacoes" className="mt-8">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsTrigger value="operacoes" className="gap-2">
               <BarChart3 className="h-3.5 w-3.5" />
               Operações
+            </TabsTrigger>
+            <TabsTrigger value="ranking" className="gap-2">
+              <Trophy className="h-3.5 w-3.5" />
+              Ranking
+            </TabsTrigger>
+            <TabsTrigger value="relatorios" className="gap-2">
+              <LineChart className="h-3.5 w-3.5" />
+              Relatórios
             </TabsTrigger>
             <TabsTrigger value="vendedores" className="gap-2">
               <Users className="h-3.5 w-3.5" />
@@ -102,8 +117,8 @@ function Dashboard() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ════════ ABA GERAL ════════ */}
-          <TabsContent value="geral" className="mt-6 space-y-6">
+          {/* ════════ ABA OPERAÇÕES ════════ */}
+          <TabsContent value="operacoes" className="mt-6 space-y-6">
 
             {/* ── KPIs Globais ── */}
             <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border lg:grid-cols-6">
@@ -226,7 +241,28 @@ function Dashboard() {
                               </div>
                             </div>
                           )}
-                          {isExpanded && op.fontes.length === 0 && (
+
+                          {/* Lead Breakdown (Typebot Org/Pago, Orgânico Direto) */}
+                          {isExpanded && op.leadBreakdown.length > 0 && (
+                            <div className="border-t border-border/50 bg-secondary/10 px-5 py-3">
+                              <div className="mb-2 text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                                Detalhamento de Leads
+                              </div>
+                              <div className="grid grid-cols-3 gap-3">
+                                {op.leadBreakdown.map((lb) => (
+                                  <div key={lb.tipo} className="rounded-lg border border-border/40 bg-card/60 p-3">
+                                    <div className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{lb.tipo}</div>
+                                    <div className={`mt-1 text-lg ${NUM} ${ac.text}`}>{lb.leads.toLocaleString("pt-BR")}</div>
+                                    <div className="mt-0.5 text-[0.6rem] text-muted-foreground">
+                                      {lb.vendas} {lb.vendas === 1 ? "venda" : "vendas"} · {lb.conversao}% conversão
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {isExpanded && op.fontes.length === 0 && op.leadBreakdown.length === 0 && (
                             <div className="border-t border-border/50 bg-secondary/10 px-5 py-3">
                               <span className="text-xs text-muted-foreground">Sem fontes de tráfego registradas.</span>
                             </div>
@@ -381,6 +417,16 @@ function Dashboard() {
 
             <ParticipacaoVendedores vendedores={data?.vendedores ?? []} loading={isLoading} />
           </TabsContent>
+
+          {/* ════════ ABA RANKING ════════ */}
+          <TabsContent value="ranking" className="mt-6">
+            <RankingTab />
+          </TabsContent>
+
+          {/* ════════ ABA RELATÓRIOS ════════ */}
+          <TabsContent value="relatorios" className="mt-6">
+            <RelatoriosTab />
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -473,5 +519,331 @@ function ComparativoOps({ ops, totalFat, loading }: { ops: DashboardOpStats[]; t
         </div>
       )}
     </section>
+  );
+}
+
+/* ── ABA RANKING ── */
+function RankingTab() {
+  const { workspace, workspaces } = useWorkspace();
+  const fetchRanking = useServerFn(getRankingStats);
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("7d"));
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-ranking", range.from, range.to],
+    queryFn: () => fetchRanking({ data: { from: range.from, to: range.to, expert: workspace.id === "all" ? null : workspace.id } }),
+  });
+
+  const ranking = data?.ranking ?? [];
+  const top3 = ranking.slice(0, 3);
+  const rest = ranking.slice(3);
+  const maxFat = top3[0]?.faturamento ?? 1;
+
+  const PLACE_META = [
+    { icon: <Crown className="h-5 w-5" />, color: "text-amber-300", glow: "shadow-[0_0_60px_-10px_rgba(251,191,36,0.5)]", border: "border-amber-300/40", grad: "from-amber-300/20 via-card/60 to-card/40", label: "1º Lugar", bar: "from-amber-400 to-amber-200" },
+    { icon: <Trophy className="h-5 w-5" />, color: "text-slate-300", glow: "", border: "border-slate-300/30", grad: "from-slate-300/10 via-card/60 to-card/40", label: "2º Lugar", bar: "from-slate-400 to-slate-200" },
+    { icon: <Medal className="h-5 w-5" />, color: "text-orange-300", glow: "", border: "border-orange-300/30", grad: "from-orange-400/10 via-card/60 to-card/40", label: "3º Lugar", bar: "from-orange-500 to-orange-300" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.18em]">Ranking de Vendas</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Quem tá puxando o time no período selecionado</p>
+        </div>
+        <DateRangeFilter value={range} onChange={setRange} />
+      </div>
+
+      {isLoading && (
+        <div className="grid gap-4 md:grid-cols-3">
+          {[0, 1, 2].map((i) => <div key={i} className="h-60 animate-pulse rounded-2xl bg-card/40" />)}
+        </div>
+      )}
+
+      {!isLoading && top3.length === 0 && (
+        <div className="rounded-2xl border border-border bg-card/40 p-12 text-center">
+          <div className="text-sm text-muted-foreground">Nenhuma venda no período.</div>
+        </div>
+      )}
+
+      {top3.length > 0 && (
+        <div className="grid items-end gap-4 md:grid-cols-3">
+          {top3.map((item, idx) => {
+            const place = (idx + 1) as 1 | 2 | 3;
+            const meta = PLACE_META[idx];
+            const fillPct = maxFat > 0 ? (item.faturamento / maxFat) * 100 : 0;
+            const heightCls = place === 1 ? "md:-mt-2" : place === 2 ? "md:mt-10" : "md:mt-16";
+            return (
+              <div key={item.utm} className={heightCls}>
+                <div className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-6 transition ${meta.border} ${meta.grad} ${place === 1 ? `${meta.glow} ring-1 ring-accent/20` : ""}`}>
+                  <div className={`absolute right-4 top-4 ${meta.color}`}>{meta.icon}</div>
+                  <div className={`text-[0.65rem] uppercase tracking-[0.22em] ${meta.color}`}>{meta.label}</div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border bg-secondary/40 text-sm font-semibold text-muted-foreground">
+                      {item.nome.split(/\s+/).slice(0, 2).map((s: string) => s[0]?.toUpperCase() ?? "").join("")}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-display text-xl">{item.nome}</div>
+                      <div className="truncate text-xs text-muted-foreground">{item.expert ?? "—"} · {item.utm}</div>
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <div className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">Faturamento</div>
+                    <div className={`mt-1 font-display ${place === 1 ? "text-4xl" : "text-3xl"} ${NUM}`}>{BRL(item.faturamento)}</div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-4 text-xs">
+                    <div>
+                      <div className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">Vendas</div>
+                      <div className={`${NUM} text-base`}>{item.vendas}</div>
+                    </div>
+                    <div>
+                      <div className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">Ticket médio</div>
+                      <div className={`${NUM} text-base`}>{BRL(item.ticketMedio)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-5 h-1 overflow-hidden rounded-full bg-secondary/40">
+                    <div className={`h-full rounded-full bg-gradient-to-r ${meta.bar}`} style={{ width: `${fillPct}%` }} />
+                  </div>
+                  <div className="mt-1 text-right text-[0.65rem] text-muted-foreground">{item.pctTotal.toFixed(1)}% do total</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {ranking.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-border bg-card/40">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-secondary/20 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">
+                  <th className="w-14 px-5 py-3 text-center">Pos</th>
+                  <th className="px-3 py-3">Vendedor</th>
+                  <th className="px-3 py-3">Expert</th>
+                  <th className="px-3 py-3 text-center">Vendas</th>
+                  <th className="px-3 py-3 text-right">Faturamento</th>
+                  <th className="px-5 py-3 text-right">% do total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...top3, ...rest].map((item, i) => {
+                  const pos = i + 1;
+                  return (
+                    <tr key={item.utm} className="border-b border-border/60 transition hover:bg-secondary/20">
+                      <td className="px-5 py-3 text-center">
+                        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${
+                          pos === 1 ? "bg-amber-300/15 text-amber-300 border-amber-300/30"
+                          : pos === 2 ? "bg-slate-300/10 text-slate-200 border-slate-300/30"
+                          : pos === 3 ? "bg-orange-400/10 text-orange-300 border-orange-400/30"
+                          : "bg-secondary/40 text-muted-foreground border-border"
+                        }`}>{pos}</span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary/40 text-xs font-semibold text-muted-foreground">
+                            {item.nome.split(/\s+/).slice(0, 2).map((s: string) => s[0]?.toUpperCase() ?? "").join("")}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-foreground">{item.nome}</div>
+                            <div className="truncate text-[0.7rem] text-muted-foreground">{item.utm}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-muted-foreground">{item.expert ?? "—"}</td>
+                      <td className={`px-3 py-3 text-center ${NUM}`}>{item.vendas}</td>
+                      <td className={`px-3 py-3 text-right ${NUM}`}>{BRL(item.faturamento)}</td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-secondary/40 md:block">
+                            <div className="h-full rounded-full bg-gradient-to-r from-accent/70 to-accent" style={{ width: `${Math.min(100, item.pctTotal)}%` }} />
+                          </div>
+                          <span className={`${NUM} text-foreground`}>{item.pctTotal.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {data && data.semUtm.vendas > 0 && (
+        <section className="rounded-2xl border border-border bg-card/40 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[0.7rem] uppercase tracking-[0.22em] text-muted-foreground">Sem vendedor</div>
+              <h4 className="mt-1 font-display text-base">Vendas diretas / orgânicas</h4>
+              <p className="text-xs text-muted-foreground">UTM não cadastrada ou vendedor inativo</p>
+            </div>
+            <div className="flex gap-6 text-right">
+              <div>
+                <div className="text-[0.7rem] uppercase tracking-wider text-muted-foreground">Vendas</div>
+                <div className={`${NUM} text-lg`}>{data.semUtm.vendas}</div>
+              </div>
+              <div>
+                <div className="text-[0.7rem] uppercase tracking-wider text-muted-foreground">Faturamento</div>
+                <div className={`${NUM} text-lg`}>{BRL(data.semUtm.faturamento)}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/* ── ABA RELATÓRIOS ── */
+function RelatoriosTab() {
+  const { workspace } = useWorkspace();
+  const fetchRelatorios = useServerFn(getRelatoriosStats);
+  const [range, setRange] = useState<DateRangeValue>(() => computeRange("mes"));
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-relatorios", range.from, range.to],
+    queryFn: () => fetchRelatorios({ data: { from: range.from, to: range.to, expert: workspace.id === "all" ? null : workspace.id } }),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.18em]">Relatórios</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Análise de performance e insights do período</p>
+        </div>
+        <DateRangeFilter value={range} onChange={setRange} />
+      </div>
+
+      {/* Insights */}
+      {data && data.insights.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {data.insights.map((ins, i) => (
+            <div key={i} className={`rounded-2xl border p-4 ${
+              ins.tone === "positivo" ? "border-emerald-500/30 bg-emerald-500/5"
+              : ins.tone === "alerta" ? "border-rose-500/30 bg-rose-500/5"
+              : ins.tone === "destaque" ? "border-amber-500/30 bg-amber-500/5"
+              : "border-border bg-card/40"
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{ins.icon}</span>
+                <span className="text-sm font-semibold">{ins.title}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{ins.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* KPIs */}
+      {data && (
+        <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border lg:grid-cols-4">
+          <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Faturamento" value={BRL(data.sumPeriod)} accent="text-emerald-400" />
+          <Kpi icon={<ShoppingBag className="h-4 w-4" />} label="Vendas" value={String(data.vendasPeriod)} />
+          <Kpi icon={<Receipt className="h-4 w-4" />} label="Ticket Médio" value={BRL(data.ticketMedioPeriod)} accent="text-amber-400" />
+          <Kpi icon={<Activity className="h-4 w-4" />} label="Variação" value={`${data.periodDiffPct >= 0 ? "+" : ""}${data.periodDiffPct.toFixed(1)}%`} accent={data.periodDiffPct >= 0 ? "text-emerald-400" : "text-rose-400"} />
+        </section>
+      )}
+
+      {/* Série diária (área) */}
+      {data && data.serieDaily.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-border bg-card/40 p-5">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <LineChart className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Faturamento — Últimos 30 dias</span>
+          </div>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.serieDaily}>
+                <defs>
+                  <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#d4a03a" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#d4a03a" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="data" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v: string) => v.slice(5)} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }}
+                  formatter={(v: number) => [BRL(v), "Faturamento"]}
+                  labelFormatter={(l: string) => l}
+                />
+                <Area type="monotone" dataKey="total" stroke="#d4a03a" fill="url(#gradFat)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
+
+      {/* Top vendedores (pie) */}
+      {data && data.topVendedores.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-border bg-card/40 p-5">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Top Vendedores</span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-8">
+            <div className="h-48 w-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={data.topVendedores.slice(0, 6)} dataKey="total" nameKey="utm" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={2}>
+                    {data.topVendedores.slice(0, 6).map((_, i) => (
+                      <Cell key={i} fill={["#d4a03a", "#8b5cf6", "#06b6d4", "#f43f5e", "#22c55e", "#f97316"][i % 6]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => BRL(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-1 space-y-2">
+              {data.topVendedores.slice(0, 6).map((v, i) => (
+                <div key={v.utm} className="flex items-center gap-3">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: ["#d4a03a", "#8b5cf6", "#06b6d4", "#f43f5e", "#22c55e", "#f97316"][i % 6] }} />
+                  <span className="flex-1 text-sm">{v.utm}</span>
+                  <span className={`${NUM} text-sm`}>{BRL(v.total)}</span>
+                  <span className="text-xs text-muted-foreground">{v.pct.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Expert breakdown (barras) */}
+      {data && data.expertBreakdown.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-border bg-card/40 p-5">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <BarChart3 className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Performance por Expert</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {data.expertBreakdown.map((e) => (
+              <div key={e.nome}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold">{e.nome}</span>
+                  <div className="flex items-center gap-3">
+                    <span className={`${NUM}`}>{BRL(e.total)}</span>
+                    <span className="w-12 text-right text-xs text-muted-foreground">{e.pct.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-secondary/40">
+                  <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${Math.min(100, e.pct)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {isLoading && (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-card/40" />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

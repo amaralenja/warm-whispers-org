@@ -459,14 +459,14 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
       const caioVds = vendasPeriodo.filter((v: any) => v._expert === "Caio");
       let quizLeads: any[] = [];
       try {
-        const { data: qSubData } = await db
+        const { data: qSubData } = await supabase
           .from("ht_quiz_submissions" as any)
           .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
           .order("updated_at", { ascending: false })
           .limit(3000);
         if (qSubData) quizLeads.push(...qSubData);
 
-        const { data: crmLeadsData } = await db
+        const { data: crmLeadsData } = await supabase
           .from("crm_leads" as any)
           .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
           .order("created_at", { ascending: false })
@@ -592,14 +592,14 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
     if (data.includeHighTicket && htVendasPeriodo.length > 0) {
       let quizLeadsHt: any[] = [];
       try {
-        const { data: qSubData } = await db
+        const { data: qSubData } = await supabase
           .from("ht_quiz_submissions" as any)
           .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
           .order("updated_at", { ascending: false })
           .limit(3000);
         if (qSubData) quizLeadsHt.push(...qSubData);
 
-        const { data: crmLeadsData } = await db
+        const { data: crmLeadsData } = await supabase
           .from("crm_leads" as any)
           .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
           .order("created_at", { ascending: false })
@@ -721,6 +721,7 @@ export type DashboardOpStats = {
   vendedoresCount: number;
   pctTotal: number;
   fontes: { fonte: string; vendas: number; faturamento: number }[];
+  leadBreakdown: { tipo: string; leads: number; vendas: number; conversao: number }[];
 };
 
 export type DashboardPayload = {
@@ -800,9 +801,10 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return out;
     }
 
-    // ── 1. Busca paralela: experts, produtos, vendas, reembolsos, financeiro, leads (ÚNICA) ──
-    const [expertsRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll, quizLeadsRaw, crmLeadsRaw] = await Promise.all([
+    // ── 1. Busca paralela: experts, vendedores, produtos, vendas, reembolsos, financeiro, ht_vendas, leads ──
+    const [expertsRes, vendedoresRes, produtosMapRes, vendasAll, reembolsosAll, financeiroAll, htVendasAll, quizLeadsRaw, crmLeadsRaw] = await Promise.all([
       supabase.from("experts").select("id, nome, foto_url, ativo").eq("ativo", true),
+      supabase.from("vendedores").select("utm, nome, expert, foto_url, ativo"),
       supabase.from("produtos_map").select("nome_produto, nome_expert, tipo_produto"),
       fetchAll<any>((from, to) =>
         supabase.from("vendas").select('"Ticket", nome_expert, tipo_produto, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"').or('Evento.eq.purchase_approved,Evento.ilike.*aprov*').range(from, to)
@@ -813,18 +815,27 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       fetchAll<any>((from, to) =>
         supabase.from("financeiro").select("valor, tipo, data_ref").range(from, to)
       ),
-      // Leads: busca UMA ÚNICA vez (não mais duas)
+      data.includeHighTicket
+        ? fetchAll<any>((from, to) =>
+          supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").range(from, to)
+        )
+        : Promise.resolve([] as any[]),
+      // Quiz leads
       (async (): Promise<any[]> => {
         try {
-          const [q, c] = await Promise.all([
-            supabase.from("ht_quiz_submissions" as any)
-              .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
-              .order("updated_at", { ascending: false }).limit(3000),
-            supabase.from("crm_leads" as any)
-              .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
-              .order("created_at", { ascending: false }).limit(3000),
-          ]);
-          return [...(q.data ?? []), ...(c.data ?? [])];
+          const { data: qData } = await supabase.from("ht_quiz_submissions" as any)
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
+            .order("updated_at", { ascending: false }).limit(3000);
+          return qData ?? [];
+        } catch { return []; }
+      })(),
+      // CRM leads
+      (async (): Promise<any[]> => {
+        try {
+          const { data: cData } = await supabase.from("crm_leads" as any)
+            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
+            .order("created_at", { ascending: false }).limit(3000);
+          return cData ?? [];
         } catch { return []; }
       })(),
     ]);
@@ -835,6 +846,27 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const key = asStr(p.nome_produto).trim().toLowerCase();
       if (key) produtoMap.set(key, { expert: asStr(p.nome_expert).trim(), tipo: asStr(p.tipo_produto || "main").toLowerCase() });
     }
+    const lookupProduto = (v: any) => produtoMap.get(asStr(v.Produto).trim().toLowerCase()) ?? null;
+
+    const vendedoresRaw = vendedoresRes.data ?? [];
+
+    // Map ID da venda -> expert (para getRefundExpert)
+    const vendaToExpert = new Map<string, string>();
+    for (const v of vendasAll as any[]) {
+      const mapped = lookupProduto(v);
+      const expertName = mapped?.expert ?? v.nome_expert;
+      if (v["ID de Referência"] && expertName) {
+        vendaToExpert.set(String(v["ID de Referência"]), expertName);
+      }
+    }
+
+    const getRefundExpert = (r: any) =>
+      classifyOpByUtm(r.utm_source) ??
+      classifyOpByUtm(r["UTM Source"]) ??
+      classifyOpByUtm(r.UTM) ??
+      lookupProduto(r)?.expert ??
+      vendaToExpert.get(String(r["ID da Venda"] ?? "")) ??
+      null;
 
     // ── 3. Filtra e atribui expert via produtos_map ──
     const vendasPeriodo = vendasAll
@@ -859,8 +891,39 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // ── 5. Classifica leads por operação e constrói Maps por email/phone ──
     const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
     const leadsByOp = new Map<string, number>();
+    const leadBreakdownByOp = new Map<string, Map<string, { leads: number; vendas: number }>>();
     const emailToLead = new Map<string, any>();
     const phoneToLead = new Map<string, any>();
+
+    const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
+
+    const classifyLeadType = (lead: any): string => {
+      const src = norm(lead.utm_source || lead.origem);
+      const med = norm(lead.utm_medium);
+      const rawCp = String(lead.utm_campaign || "").trim();
+      const cp = norm(rawCp);
+      const cont = norm(lead.utm_content);
+      const fbclid = String(lead.fbclid || "").trim();
+      const gclid = String(lead.gclid || "").trim();
+      const fbp = String(lead.fbp || "").trim();
+
+      const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
+      const cleanCp = isCampEmpty ? "" : cp;
+      const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
+      const hasClickId = !!fbclid || !!gclid || !!fbp;
+      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
+      const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
+      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign) && !isOrganicWord;
+
+      const isFromTypebot = !!(lead.received_at); // quiz_submissions have received_at
+
+      if (isFromTypebot) {
+        return isPaid ? "Typebot (Tráfego Pago)" : "Typebot (Orgânico)";
+      }
+      return "Orgânico Direto";
+    };
 
     for (const l of quizLeadsRaw) {
       const email = String(l.email ?? "").trim().toLowerCase();
@@ -868,7 +931,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const phone = cleanPhone(l.whatsapp ?? "");
       if (phone) phoneToLead.set(phone, l);
       const op = classifyLeadOp(l);
-      if (op) leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+      if (op) {
+        leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+        const leadType = classifyLeadType(l);
+        if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
+        const typeMap = leadBreakdownByOp.get(op)!;
+        const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
+        entry.leads += 1;
+        typeMap.set(leadType, entry);
+      }
     }
     for (const l of crmLeadsRaw) {
       const email = String(l.email ?? "").trim().toLowerCase();
@@ -876,7 +947,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const phone = cleanPhone(l.whatsapp ?? "");
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
       const op = classifyLeadOp(l);
-      if (op) leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+      if (op) {
+        leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+        const leadType = classifyLeadType(l);
+        if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
+        const typeMap = leadBreakdownByOp.get(op)!;
+        const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
+        entry.leads += 1;
+        typeMap.set(leadType, entry);
+      }
     }
 
     const matchLead = (vEmail: string, vTel: string) => {
@@ -884,9 +963,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (vTel && phoneToLead.has(vTel)) return phoneToLead.get(vTel);
       return null;
     };
-
-    const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-    const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
     const classifyFonte = (lead: any): string => {
       const src = norm(lead.utm_source || lead.origem);
@@ -989,11 +1065,31 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         .filter((f) => f.vendas > 0)
         .sort((a, b) => b.faturamento - a.faturamento);
 
+      // Lead breakdown: conta vendas convertidas por tipo de lead
+      const typeVendas = new Map<string, number>();
+      for (const v of scopedVds) {
+        const vEmail = String(v.Email ?? "").trim().toLowerCase();
+        const vTel = cleanPhone(v.Telefone ?? "");
+        const lead = matchLead(vEmail, vTel);
+        if (lead) {
+          const lt = classifyLeadType(lead);
+          typeVendas.set(lt, (typeVendas.get(lt) || 0) + 1);
+        }
+      }
+      const typeMap = leadBreakdownByOp.get(eName);
+      const leadBreakdownArr = ["Typebot (Orgânico)", "Typebot (Tráfego Pago)", "Orgânico Direto"]
+        .map((tipo) => {
+          const entry = typeMap?.get(tipo) || { leads: 0, vendas: 0 };
+          const vendasConvertidas = typeVendas.get(tipo) || 0;
+          return { tipo, leads: entry.leads, vendas: vendasConvertidas, conversao: entry.leads > 0 ? Math.round((vendasConvertidas / entry.leads) * 1000) / 10 : 0 };
+        })
+        .filter((b) => b.leads > 0 || b.vendas > 0);
+
       opStats.push({
         id: eId, nome: eName, foto_url: eFoto,
         faturamento, vendas: vendasCount, ticketMedio,
         reembolsos: reembCount, leads, conversao: Math.round(conversao * 10) / 10,
-        vendedoresCount: vdsCount, pctTotal: 0, fontes: fontesArr,
+        vendedoresCount: vdsCount, pctTotal: 0, fontes: fontesArr, leadBreakdown: leadBreakdownArr,
       });
     }
 
