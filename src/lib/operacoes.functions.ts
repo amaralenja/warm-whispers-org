@@ -961,18 +961,9 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const crmLeadsRaw = (crmLeadsRes.data ?? []) as any[];
     const expertsRaw = (expertsRes.data ?? []) as any[];
 
-    // ── 1b. Busca wa_conversations por operacao_id de cada expert ──
-    // operacao_id em wa_conversations é o id (UUID) do expert
-    // Fazemos uma query para cada operacao_id para pegar as tags corretas sem contaminação
-    const expertIdToNome = new Map<string, string>();
-    const expertNomeToId = new Map<string, string>();
-    for (const e of expertsRaw) {
-      if (e.id && e.nome) {
-        expertIdToNome.set(String(e.id), String(e.nome));
-        expertNomeToId.set(String(e.nome).toLowerCase().trim(), String(e.id));
-      }
-    }
-
+    // ── 1b. Busca wa_conversations com tags (para cruzar com leads por telefone) ──
+    // IMPORTANTE: wa_conversations.operacao_id é o NOME do expert (ex: "Caio"), não um UUID
+    // (confirmado em syncConversationTagsToCrmLead onde é comparado com lead.expert por nome)
     // Busca conversões do WhatsApp apenas de hoje (mesmo range do dashboard) com tags não-vazias
     const { data: waConvsRawAll } = await supabase
       .from("wa_conversations" as any)
@@ -1091,17 +1082,20 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const vars = getPhoneVariations(conv.contact_wa_id ?? "");
       if (vars.length === 0) continue;
 
-      const opNome = conv.operacao_id ? (expertIdToNome.get(String(conv.operacao_id)) ?? null) : null;
+      // operacao_id já é o nome do expert (ex: "caio", "Caio"), não um UUID
+      const opNome = conv.operacao_id && conv.operacao_id !== "__notificador__"
+        ? String(conv.operacao_id).toLowerCase().trim()
+        : null;
 
       for (const v of vars) {
-        // Indexa por operação
+        // Indexa por operação (chave = "caio::5511999...")
         if (opNome) {
-          const opKey = `${opNome.toLowerCase()}::${v}`;
+          const opKey = `${opNome}::${v}`;
           const list = phoneToWaTagsByOp.get(opKey) || [];
           for (const t of rawTags) if (t && !list.includes(String(t))) list.push(String(t));
           phoneToWaTagsByOp.set(opKey, list);
         }
-        // Indexa sem filtro (para leads sem operação definida)
+        // Indexa sem filtro de operação (fallback)
         const listAll = phoneToWaTagsAll.get(v) || [];
         for (const t of rawTags) if (t && !listAll.includes(String(t))) listAll.push(String(t));
         phoneToWaTagsAll.set(v, listAll);
@@ -1111,10 +1105,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const getWaTagsForPhone = (rawPhone: string, opNome?: string): string[] => {
       const vars = getPhoneVariations(rawPhone);
       const tagsSet = new Set<string>();
-      if (opNome) {
-        for (const v of vars) {
+      for (const v of vars) {
+        if (opNome) {
+          // Prioriza tags da operação correta (sem contaminação)
           const opTags = phoneToWaTagsByOp.get(`${opNome.toLowerCase()}::${v}`);
           if (opTags) { for (const t of opTags) if (t) tagsSet.add(String(t).toUpperCase()); }
+        } else {
+          // Fallback: todas as operações
+          const allTags = phoneToWaTagsAll.get(v);
+          if (allTags) { for (const t of allTags) if (t) tagsSet.add(String(t).toUpperCase()); }
         }
       }
       return Array.from(tagsSet);
