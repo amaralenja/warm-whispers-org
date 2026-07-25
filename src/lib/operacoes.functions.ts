@@ -872,6 +872,9 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       expertFilter = expertFilter ?? allowedWorkspaces[0];
     }
 
+    const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
+    const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
+
     const inRange = (raw: unknown) => inRangeSp(raw, data.from, data.to);
 
     const PAGE = 1000;
