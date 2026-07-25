@@ -442,6 +442,17 @@ function getLeadAttributionBadge(lead: any) {
   const src = String(lead.utm_source || lead.origem || "").toLowerCase().trim();
   const med = String(lead.utm_medium || "").toLowerCase().trim();
   const camp = String(lead.utm_campaign || "").toLowerCase().trim();
+  const cont = String(lead.utm_content || "").toLowerCase().trim();
+
+  // Se for link da bio (link_in_bio, bio_instagram, ig_bio, etc.), é orgânico!
+  const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(src)
+    || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(med)
+    || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(camp)
+    || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(cont);
+
+  if (isLinkInBio) {
+    return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
+  }
 
   // 1. Criar SaaS
   if (src === "criar_saas" || lead.origem === "criar_saas") {
@@ -458,15 +469,16 @@ function getLeadAttributionBadge(lead: any) {
     return { text: "Google Ads", class: "bg-amber-500/15 text-amber-300 border-amber-500/30", textShort: "GAds" };
   }
 
-  // 4. Tráfego Pago / Meta Ads (fb, ig, facebook, instagram, meta, ads, cpc, cpm, paid, etc.)
-  const isPaidSrc = src.includes("fb") || src.includes("ig") || src.includes("facebook") || src.includes("instagram") || src.includes("meta") || src.includes("ads") || src === "fb" || src === "ig";
+  // 4. Tráfego Pago / Meta Ads (fb, facebook, meta, ads, cpc, cpm, paid, etc.)
+  const isPaidSrc = /\b(fb|facebook|meta|ads?|google|tiktok|gads|patrocinado)\b/.test(src) || src === "fb";
   const isPaidMed = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+  const isPaidCamp = !!camp && !/organic|organico|whatsapp|direct|direto|referral|email|sms|none|bio/i.test(camp);
 
-  if (isPaidSrc || isPaidMed || !!camp || !!lead.fbclid || !!lead.fbc) {
+  if (isPaidSrc || isPaidMed || isPaidCamp || !!lead.fbclid || !!lead.fbc) {
     return { text: "Tráfego Pago", class: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30", textShort: "Tráfego Pago" };
   }
 
-  return null;
+  return { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", textShort: "Orgânico" };
 }
 
 function StatusTick({ status, onClickFailed }: { status: string | null; onClickFailed?: () => void }) {
@@ -1838,9 +1850,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   async function downloadMedia(msg: Msg) {
     if (!msg.media_id) throw new Error("Mídia sem ID");
     const res = await downloadMediaFn({ data: { channelId: msg.channel_id, conversationId: msg.conversation_id, mediaId: msg.media_id } });
+    const cleanMime = res.mime?.split(";")[0]?.trim() || "application/octet-stream";
     return {
-      url: `data:${res.mime};base64,${res.base64}`,
-      mime: res.mime,
+      url: `data:${cleanMime};base64,${res.base64}`,
+      mime: cleanMime,
     };
   }
 
@@ -2203,18 +2216,26 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                 const gclid = String(lead.gclid || sub?.gclid || "").trim();
                                 const origem = String(lead.origem || "").toLowerCase();
 
+                                const isLinkInBio =
+                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmSrc) ||
+                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmMed) ||
+                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmCamp) ||
+                                  /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(utmCont);
+
                                 const isPago =
-                                  !!fbclid ||
-                                  !!gclid ||
-                                  !!fbp ||
-                                  /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(utmSrc) ||
-                                  /\b(cpc|cpm|paid|ads?|social.paid|patrocinado|anuncio)\b/.test(utmMed) ||
-                                  /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmCont) ||
-                                  (origem === "criar_saas" ? false : (
-                                    !!utmCamp &&
-                                    !/organic|organico|whatsapp|direct|referral|email|sms|none/i.test(utmCamp) &&
-                                    !/organic|organico|whatsapp|direct|referral|link_?in_?bio/i.test(utmSrc)
-                                  ));
+                                  !isLinkInBio && (
+                                    !!fbclid ||
+                                    !!gclid ||
+                                    !!fbp ||
+                                    /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(utmSrc) ||
+                                    /\b(cpc|cpm|paid|ads?|social.paid|patrocinado|anuncio)\b/.test(utmMed) ||
+                                    /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(utmCont) ||
+                                    (origem === "criar_saas" ? false : (
+                                      !!utmCamp &&
+                                      !/organic|organico|whatsapp|direct|direto|referral|email|sms|none|bio/i.test(utmCamp) &&
+                                      !/organic|organico|whatsapp|direct|direto|referral|bio/i.test(utmSrc)
+                                    ))
+                                  );
 
                                 return (
                                   <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] font-bold uppercase ${
@@ -2223,16 +2244,6 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                                       : "bg-amber-500/10 text-amber-400 border-amber-500/40"
                                   }`}>
                                     {isPago ? "💰 Tráfego Pago" : "🌱 Orgânico"}
-                                  </Badge>
-                                );
-                              })()}
-
-                              {leadForConv && (() => {
-                                const attr = getLeadAttributionBadge(leadForConv);
-                                if (!attr) return null;
-                                return (
-                                  <Badge variant="outline" className={`shrink-0 h-4 px-1.5 text-[9px] ${attr.class} font-semibold uppercase`}>
-                                    {attr.textShort}
                                   </Badge>
                                 );
                               })()}
@@ -2522,9 +2533,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                       {(() => {
                         const lead = findLeadForConv(active.contact_wa_id);
                         const attr = getLeadAttributionBadge(lead);
-                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-amber-500/15 text-amber-300 border-amber-500/30" };
+                        const badgeObj = attr ?? { text: "Orgânico", class: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
                         const campaign = (lead as any)?.utm_campaign ? ` · Campanha: ${(lead as any).utm_campaign}` : "";
-                        const adContent = (lead as any)?.utm_content ? ` · Anúncio: ${(lead as any).utm_content}` : "";
+                        const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(String((lead as any)?.utm_content || "")) || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(String((lead as any)?.utm_source || ""));
+                        const adContent = (lead as any)?.utm_content && !isLinkInBio ? ` · Anúncio: ${(lead as any).utm_content}` : "";
 
                         return (
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${badgeObj.class}`} title={`Atribuição: ${badgeObj.text}${campaign}${adContent}`}>

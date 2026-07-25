@@ -513,15 +513,21 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
           const src = String(lead.utm_source || "").toLowerCase();
           const med = String(lead.utm_medium || "").toLowerCase();
           const cp = String(lead.utm_campaign || "").toLowerCase();
+          const cont = String(lead.utm_content || "").toLowerCase();
           const fbclid = String(lead.fbclid || "").trim();
           const fbp = String(lead.fbp || "").trim();
           const gclid = String(lead.gclid || "").trim();
 
-          const isInstagram = src.includes("ig") || src.includes("instagram");
-          const isFacebook = src.includes("fb") || src.includes("facebook") || src.includes("meta");
-          const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med);
-          const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src);
-          const hasFbTracking = !!fbclid || !!fbp || isPaidMedium || isAdsSource || isInstagram || isFacebook || src.includes("ads") || (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
+          const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(src)
+            || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(med)
+            || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(cp)
+            || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(cont);
+
+          const isInstagram = (src.includes("ig") || src.includes("instagram")) && !isLinkInBio;
+          const isFacebook = (src.includes("fb") || src.includes("facebook") || src.includes("meta")) && !isLinkInBio;
+          const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) && !isLinkInBio;
+          const isAdsSource = /(-ads|_ads|ads-|patrocinado)/i.test(src) && !isLinkInBio;
+          const hasFbTracking = !isLinkInBio && (!!fbclid || !!fbp || isPaidMedium || isAdsSource || isInstagram || isFacebook || src.includes("ads") || (!!cp && !/organic|organico|whatsapp|direct|bio/.test(cp)));
 
           if (src === "criar_saas" || src === "criar_saas_hub") {
             fonte = "Criar SaaS";
@@ -537,6 +543,10 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
         } else if (vUtm) {
           if (vUtm.includes("criar_saas")) {
             fonte = "Criar SaaS";
+          } else if (
+            vUtm.includes("link_in_bio") || vUtm.includes("linkinbio") || vUtm.includes("bio")
+          ) {
+            fonte = "Orgânico Direto";
           } else if (
             vUtm.includes("fb") || vUtm.includes("ig") || vUtm.includes("facebook") ||
             vUtm.includes("instagram") || vUtm.includes("cpc") || vUtm.includes("cpm") ||
@@ -623,14 +633,22 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
           const src = String(lead.utm_source || "").toLowerCase();
           const med = String(lead.utm_medium || "").toLowerCase();
           const cp = String(lead.utm_campaign || "").toLowerCase();
+          const cont = String(lead.utm_content || "").toLowerCase();
           const fbclid = String(lead.fbclid || "").trim();
           const fbp = String(lead.fbp || "").trim();
           const gclid = String(lead.gclid || "").trim();
 
-          const isPaid = !!fbclid || !!fbp || !!gclid ||
+          const isLinkInBio = /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(src)
+            || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(med)
+            || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(cp)
+            || /link_?in_?bio|link_?bio|ig_?bio|bio_?instagram|instagram_?bio|\bbio\b/i.test(cont);
+
+          const isPaid = !isLinkInBio && (
+            !!fbclid || !!fbp || !!gclid ||
             /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) ||
-            /\b(fb|facebook|meta|ig|instagram|ads?|google|tiktok|cpc|cpm|paid|gads)\b/.test(src) ||
-            (!!cp && !/organic|organico|whatsapp|direct/.test(cp));
+            /\b(fb|facebook|meta|ads?|google|tiktok|cpc|cpm|paid|gads|patrocinado)\b/.test(src) ||
+            (!!cp && !/organic|organico|whatsapp|direct|bio/.test(cp))
+          );
 
           if (src === "sdr-manual" || med === "sdr-manual") fonte = "SDR Manual";
           else if (isPaid) fonte = "Tráfego Pago";

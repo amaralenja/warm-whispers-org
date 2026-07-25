@@ -111,7 +111,6 @@ export function AudioPlayerProvider({ children }: { children?: ReactNode }) {
     setError(null);
     if (track?.id !== t.id || a.src !== t.url) {
       a.src = t.url;
-      a.setAttribute("type", t.mime || detectAudioMime(t.url));
       setCurrent(0);
       setDuration(0);
       setTrack(t);
@@ -121,8 +120,16 @@ export function AudioPlayerProvider({ children }: { children?: ReactNode }) {
     try {
       await a.play();
       setPlaying(true);
-    } catch (e: any) {
-      setError(e?.message || "Falha ao reproduzir");
+    } catch {
+      const err = a.error;
+      const code = err?.code ?? 0;
+      setError(
+        code === 1 ? "Reprodução bloqueada pelo navegador"
+        : code === 2 ? "Falha na rede ao carregar áudio"
+        : code === 3 ? "Formato de áudio não suportado pelo navegador"
+        : code === 4 ? "Áudio indisponível ou URL expirada"
+        : "Falha ao reproduzir áudio"
+      );
     } finally {
       setLoading(false);
     }
@@ -136,7 +143,20 @@ export function AudioPlayerProvider({ children }: { children?: ReactNode }) {
   const resume = useCallback(async () => {
     const a = audioRef.current;
     if (!a) return;
-    try { await a.play(); setPlaying(true); } catch (e: any) { setError(e?.message || "Falha ao reproduzir"); }
+    try {
+      await a.play();
+      setPlaying(true);
+    } catch {
+      const err = a.error;
+      const code = err?.code ?? 0;
+      setError(
+        code === 1 ? "Reprodução bloqueada pelo navegador"
+        : code === 2 ? "Falha na rede ao carregar áudio"
+        : code === 3 ? "Formato de áudio não suportado pelo navegador"
+        : code === 4 ? "Áudio indisponível ou URL expirada"
+        : "Falha ao reproduzir áudio"
+      );
+    }
   }, []);
 
   const toggle = useCallback(async (t?: AudioTrack) => {
