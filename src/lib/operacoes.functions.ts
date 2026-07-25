@@ -928,13 +928,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         ? supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").order("data", { ascending: false }).limit(1000)
         : Promise.resolve({ data: [] }),
       supabase.from("ht_quiz_submissions" as any)
-        .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at, updated_at")
-        .order("received_at", { ascending: false })
-        .limit(2000),
+        .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at, created_at, updated_at")
+        .order("id", { ascending: false })
+        .limit(3000),
       supabase.from("crm_leads" as any)
         .select("id, email, telefone, expert, fonte, responsavel_utm, created_at, updated_at, dados")
         .order("created_at", { ascending: false })
-        .limit(2000),
+        .limit(3000),
     ]);
 
     const vendasAll = (vendasRes.data ?? []) as any[];
@@ -1027,7 +1027,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
     const classifyLeadType = (lead: any, forceTypebot = false): string => {
-      const src = norm(lead.utm_source || lead.origem);
+      const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm);
       const med = norm(lead.utm_medium);
       const rawCp = String(lead.utm_campaign || "").trim();
       const cp = norm(rawCp);
@@ -1047,13 +1047,20 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const fonteStr = norm(lead.fonte || "");
       const origemStr = norm(lead.origem || lead.dados?.origem || "");
+      const emailKey = norm(lead.email);
+      const phoneKey = cleanPhone(lead.whatsapp || lead.telefone);
+      const hasQuizMatch = (!!emailKey && emailToLead.has(emailKey)) || (!!phoneKey && phoneToLead.has(phoneKey));
+
       const isFromTypebot = forceTypebot ||
+        hasQuizMatch ||
         !!(lead.received_at) ||
         !!(lead.respostas) ||
         fonteStr.includes("typebot") ||
         origemStr.includes("typebot") ||
         fonteStr.includes("quiz") ||
-        origemStr.includes("quiz");
+        origemStr.includes("quiz") ||
+        fonteStr.includes("whatsapp") ||
+        origemStr.includes("whatsapp");
 
       if (isFromTypebot) {
         return isPaid ? "Typebot (Tráfego Pago)" : "Typebot (Orgânico)";
