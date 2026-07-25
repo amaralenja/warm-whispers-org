@@ -1330,6 +1330,29 @@ export async function runFlowAdmin(args: {
     const isManual = (args.triggerContext as any)?.manual === true;
 
     if (isManual) {
+      // Previne disparos duplos manuais (duplo clique ou requisições simultâneas nos últimos 5 segundos)
+      const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+      const { data: recentRun } = await db
+        .from("wa_flow_runs" as any)
+        .select("id, created_at")
+        .eq("flow_id", args.flowId)
+        .eq("channel_id", args.channelId)
+        .in("contact_wa_id", contactCandidates.length > 0 ? contactCandidates : [String(args.contactWaId ?? "")])
+        .gte("created_at", fiveSecondsAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recentRun) {
+        console.log("[flow-engine] Disparo manual duplicado bloqueado (janela de 5s)", {
+          flowId: args.flowId,
+          channelId: args.channelId,
+          contactWaId: args.contactWaId,
+          recentRunId: (recentRun as any).id,
+        });
+        return { runId: (recentRun as any).id, deduped: true };
+      }
+
       const { data: activeRuns } = await db
         .from("wa_flow_runs" as any)
         .select("id")

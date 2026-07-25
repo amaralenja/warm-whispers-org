@@ -4166,6 +4166,7 @@ function FlowInlineBar({
   }, [confirm]);
 
   function fire(flowId: string, startNodeId?: string | null) {
+    if (firing) return;
     setFiring(flowId);
     const quotedMsgId = replyTo?.wa_message_id ?? undefined;
     toast.success(
@@ -4595,6 +4596,7 @@ function FlowDispatcher({
   }, [flows, conversation.operacao_id]);
 
   function fire(flowId: string) {
+    if (firing) return;
     setFiring(flowId);
     toast.success("Fluxo disparado, rodando em segundo plano");
     setOpen(false);
