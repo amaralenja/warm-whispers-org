@@ -964,11 +964,10 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // ── 1b. Busca wa_conversations com tags (para cruzar com leads por telefone) ──
     // IMPORTANTE: wa_conversations.operacao_id é o NOME do expert (ex: "Caio"), não um UUID
     // (confirmado em syncConversationTagsToCrmLead onde é comparado com lead.expert por nome)
-    // Busca conversões do WhatsApp apenas de hoje (mesmo range do dashboard) com tags não-vazias
+    // Busca conversões do WhatsApp (sem filtrar por tags vazias, para contar todos os leads de hoje)
     const { data: waConvsRawAll } = await supabase
       .from("wa_conversations" as any)
-      .select("contact_wa_id, tags, operacao_id, updated_at")
-      .not("tags", "eq", "{}")
+      .select("contact_wa_id, tags, operacao_id, created_at, updated_at")
       .order("updated_at", { ascending: false })
       .limit(5000);
     const waConvsRaw = (waConvsRawAll ?? []) as any[];
@@ -1083,14 +1082,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (vars.length === 0) continue;
 
       // operacao_id já é o nome do expert (ex: "caio", "Caio"), não um UUID
-      const opNome = conv.operacao_id && conv.operacao_id !== "__notificador__"
-        ? String(conv.operacao_id).toLowerCase().trim()
+      const rawOp = conv.operacao_id && conv.operacao_id !== "__notificador__"
+        ? String(conv.operacao_id).trim()
         : null;
+      const opNome = rawOp ? canonicalOpName(rawOp) : null;
 
       for (const v of vars) {
         // Indexa por operação (chave = "caio::5511999...")
         if (opNome) {
-          const opKey = `${opNome}::${v}`;
+          const opKey = `${opNome.toLowerCase()}::${v}`;
           const list = phoneToWaTagsByOp.get(opKey) || [];
           for (const t of rawTags) if (t && !list.includes(String(t))) list.push(String(t));
           phoneToWaTagsByOp.set(opKey, list);
@@ -1125,6 +1125,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const phoneToLead = new Map<string, any>();
 
     const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+    const canonicalOpName = (rawOp: string): string => {
+      const n = norm(rawOp);
+      if (n.includes("caio")) return "Caio";
+      if (n.includes("jessica") || n.includes("je")) return "Jessica";
+      if (n.includes("gustavo") || n.includes("gu")) return "Gustavo";
+      if (n.includes("high") || n.includes("ticket") || n.includes("ht")) return "High Ticket";
+      return rawOp.trim();
+    };
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
     const getTagsForLead = (lead: any, opNome?: string): string[] => {
@@ -1246,10 +1255,9 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // Contabiliza conversas do WhatsApp como leads (para operações onde nem todo lead vai pro CRM)
     for (const conv of waConvsRaw) {
       if (!inRange(conv.created_at || conv.updated_at)) continue;
-      const opId = String(conv.operacao_id ?? "").trim();
-      if (!opId || opId === "__notificador__") continue;
-      const op = opId; // operacao_id já é o nome do expert
-      // Só conta operações conhecidas (evita ruído)
+      const rawOp = String(conv.operacao_id ?? "").trim();
+      if (!rawOp || rawOp === "__notificador__") continue;
+      const op = canonicalOpName(rawOp); // Normaliza para "Caio", "Jessica", "Gustavo"
       const opNorm = norm(op);
       if (opNorm !== "caio" && opNorm !== "gustavo" && opNorm !== "jessica") continue;
       const phone = cleanPhone(conv.contact_wa_id ?? "");
@@ -1264,7 +1272,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const fakeLeadForClassify = {
         telefone: conv.contact_wa_id,
         tags: rawTags,
-        expert: opId,
+        expert: op,
       };
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
       const leadType = classifyLeadType(fakeLeadForClassify, false, op);
