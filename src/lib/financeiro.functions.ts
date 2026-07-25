@@ -245,20 +245,78 @@ export const getFinanceiroRelatorio = createServerFn({ method: "POST" })
 // DRE
 // ============================================================
 
-export type DreCustoItem = { id: number; descricao: string; valor: number };
+export type DreCustoItem = { id: number | string; descricao: string; valor: number; date?: string };
 export type DrePayload = {
-  fatCaio: number;     // 100%
-  fatGustavo: number;  // bruto (UI mostra 50%)
-  fatHt: number;       // 100%
-  fatTotal: number;    // caio + (gustavo*0.5) + ht
+  fatCaio: number;
+  fatGustavo: number;
+  fatHt: number;
+  fatTotal: number;
   custos: {
+    trafegoPago: { total: number; itens: DreCustoItem[] };
     devSaas: { total: number; itens: DreCustoItem[] };
     folha: { total: number; itens: DreCustoItem[] };
     comissaoX1: { total: number; itens: DreCustoItem[] };
     comissaoHt: { total: number; itens: DreCustoItem[] };
     imposto: { total: number; itens: DreCustoItem[] };
+    outros: { total: number; itens: DreCustoItem[] };
   };
+  totalCustos: number;
+  lucroLiquido: number;
+  margemLiquida: number;
 };
+
+async function fetchMetaAdsSpendDaily(from: string, to: string, context: any): Promise<{ total: number; itens: DreCustoItem[] }> {
+  const result: { total: number; itens: DreCustoItem[] } = { total: 0, itens: [] };
+  try {
+    const supabase = context.supabase;
+    // Try pv24h_config
+    const { data: pvCfg } = await supabase
+      .from("pv24h_config" as any)
+      .select("access_token, ad_account_id")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    // Try meta_ads_config
+    const { data: metaCfg } = await supabase
+      .from("meta_ads_config" as any)
+      .select("access_token, pixel_id")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    const token = pvCfg?.access_token || metaCfg?.access_token || process.env.META_ADS_TOKEN || process.env.FACEBOOK_ADS_ACCESS_TOKEN;
+    const rawAcc = pvCfg?.ad_account_id || process.env.META_ADS_ACCOUNT_ID || process.env.FACEBOOK_ADS_ACCOUNT_ID;
+
+    if (!token || !rawAcc) return result;
+
+    const acc = String(rawAcc).startsWith("act_") ? rawAcc : `act_${rawAcc}`;
+    const url = new URL(`https://graph.facebook.com/v21.0/${acc}/insights`);
+    url.searchParams.set("access_token", token);
+    url.searchParams.set("time_range", JSON.stringify({ since: from, until: to }));
+    url.searchParams.set("time_increment", "1");
+    url.searchParams.set("fields", "spend,date_start,date_stop");
+
+    const res = await fetch(url.toString());
+    const json: any = await res.json();
+    if (res.ok && Array.isArray(json?.data)) {
+      for (const row of json.data) {
+        const spend = parseFloat(row.spend || 0);
+        if (spend > 0) {
+          result.total += spend;
+          const dia = String(row.date_start || from);
+          result.itens.push({
+            id: `meta_${dia}`,
+            descricao: `Tráfego Pago Meta Ads (${dia.split("-").reverse().join("/")})`,
+            valor: spend,
+            date: dia,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Falha ao buscar custo de Meta Ads na API para DRE", err);
+  }
+  return result;
+}
 
 export const getDRE = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -329,6 +387,9 @@ export const getDRE = createServerFn({ method: "POST" })
       if (list.length < PAGE) break;
     }
 
+    // Busca tráfego pago automático da API do Meta Ads
+    const metaAdsSpend = await fetchMetaAdsSpendDaily(from, to, context);
+
     // custos do financeiro no período
     const { data: fin } = await supabase
       .from("financeiro").select("id,descricao,categoria,valor")
@@ -336,22 +397,43 @@ export const getDRE = createServerFn({ method: "POST" })
       .eq("tipo", "gasto");
 
     const bucket = () => ({ total: 0, itens: [] as DreCustoItem[] });
-    const devSaas = bucket(), folha = bucket(), comX1 = bucket(), comHt = bucket(), imposto = bucket();
+    const devSaas = bucket(), folha = bucket(), comX1 = bucket(), comHt = bucket(), imposto = bucket(), outros = bucket();
+    const trafegoPago = { total: metaAdsSpend.total, itens: [...metaAdsSpend.itens] };
+
     (fin ?? []).forEach((r: any) => {
       const val = parseFloat(r.valor) || 0;
       const item: DreCustoItem = { id: r.id, descricao: r.descricao, valor: val };
-      switch (r.categoria) {
-        case "dev_saas": devSaas.total += val; devSaas.itens.push(item); break;
-        case "salario": folha.total += val; folha.itens.push(item); break;
-        case "comissao_x1": comX1.total += val; comX1.itens.push(item); break;
-        case "comissao_ht": comHt.total += val; comHt.itens.push(item); break;
-        case "imposto": imposto.total += val; imposto.itens.push(item); break;
+      const cat = String(r.categoria || "").toLowerCase().trim();
+
+      if (cat === "marketing" || cat.includes("trafego") || cat.includes("ad")) {
+        trafegoPago.total += val;
+        trafegoPago.itens.push(item);
+      } else if (cat === "dev_saas") {
+        devSaas.total += val; devSaas.itens.push(item);
+      } else if (cat === "salario" || cat === "folha") {
+        folha.total += val; folha.itens.push(item);
+      } else if (cat === "comissao_x1" || cat === "comissao") {
+        comX1.total += val; comX1.itens.push(item);
+      } else if (cat === "comissao_ht") {
+        comHt.total += val; comHt.itens.push(item);
+      } else if (cat === "imposto") {
+        imposto.total += val; imposto.itens.push(item);
+      } else {
+        outros.total += val; outros.itens.push(item);
       }
     });
 
+    const fatTotal = fatCaio + fatGu * 0.5 + fatHt;
+    const totalCustos = trafegoPago.total + devSaas.total + folha.total + comX1.total + comHt.total + imposto.total + outros.total;
+    const lucroLiquido = fatTotal - totalCustos;
+    const margemLiquida = fatTotal > 0 ? (lucroLiquido / fatTotal) * 100 : 0;
+
     return {
       fatCaio, fatGustavo: fatGu, fatHt,
-      fatTotal: fatCaio + fatGu * 0.5 + fatHt,
-      custos: { devSaas, folha, comissaoX1: comX1, comissaoHt: comHt, imposto },
+      fatTotal,
+      custos: { trafegoPago, devSaas, folha, comissaoX1: comX1, comissaoHt: comHt, imposto, outros },
+      totalCustos,
+      lucroLiquido,
+      margemLiquida,
     };
   });

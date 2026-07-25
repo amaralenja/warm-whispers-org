@@ -894,13 +894,14 @@ function RelatoriosTab({ mes }: { mes: string }) {
 }
 
 // ============================================================
-// TAB: DRE
+// TAB: DRE (Demonstração do Resultado do Exercício)
 // ============================================================
 function DreTab({ mes }: { mes: string }) {
   const fetchDre = useServerFn(getDRE);
   const [from, setFrom] = useState(() => mes + "-01");
   const [to, setTo] = useState(() => todayISO());
   const [imposto, setImposto] = useState(0);
+  const [showDailyMeta, setShowDailyMeta] = useState(false);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["financeiro-dre", from, to],
@@ -912,107 +913,225 @@ function DreTab({ mes }: { mes: string }) {
   const fatGu = (data?.fatGustavo ?? 0) * 0.5;
   const fatHt = data?.fatHt ?? 0;
 
-  const custosBase =
-    (data?.custos.devSaas.total ?? 0) +
-    (data?.custos.folha.total ?? 0) +
-    (data?.custos.comissaoX1.total ?? 0) +
-    (data?.custos.comissaoHt.total ?? 0);
+  const trafegoMeta = data?.custos.trafegoPago.total ?? 0;
+  const devSaasTotal = data?.custos.devSaas.total ?? 0;
+  const folhaTotal = data?.custos.folha.total ?? 0;
+  const comX1Total = data?.custos.comissaoX1.total ?? 0;
+  const comHtTotal = data?.custos.comissaoHt.total ?? 0;
+  const outrosTotal = data?.custos.outros.total ?? 0;
+
   const impostoManual = data?.custos.imposto.total ?? 0;
   const impostoPct = fatTotal * (imposto / 100);
   const totalImpostos = impostoManual + impostoPct;
-  const custosTotal = custosBase + totalImpostos;
-  const lucro = fatTotal - custosTotal;
+
+  const totalCustosCalculado = (data?.totalCustos ?? 0) + impostoPct;
+  const lucro = fatTotal - totalCustosCalculado;
   const margem = fatTotal > 0 ? (lucro / fatTotal) * 100 : 0;
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Período */}
-      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card/40 p-4">
-        <Field label="De">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
-        </Field>
-        <Field label="Até">
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
-        </Field>
+      {/* Controles de Período */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card/60 p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <Field label="Período De">
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Até">
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+          </Field>
+
+          {/* Atalhos Rápidos */}
+          <div className="flex items-center gap-1.5 self-end mb-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                setFrom(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`);
+                setTo(todayISO());
+              }}
+              className="rounded-lg border border-border bg-secondary/40 px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              Este Mês
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 30);
+                setFrom(d.toISOString().slice(0, 10));
+                setTo(todayISO());
+              }}
+              className="rounded-lg border border-border bg-secondary/40 px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              Últimos 30d
+            </button>
+          </div>
+        </div>
+
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110 disabled:opacity-50"
+          className="rounded-xl bg-accent px-5 py-2.5 text-xs font-bold text-accent-foreground shadow-md transition hover:brightness-110 disabled:opacity-50 flex items-center gap-2"
         >
-          {isFetching ? "Calculando..." : "Calcular período"}
+          {isFetching ? "Calculando DRE..." : "↺ Atualizar DRE"}
         </button>
       </div>
 
-      {isLoading && <div className="py-20 text-center text-sm text-muted-foreground">Calculando DRE...</div>}
+      {isLoading && (
+        <div className="py-20 text-center text-sm font-semibold text-muted-foreground animate-pulse">
+          Calculando DRE e buscando custos de Tráfego Pago do Meta Ads...
+        </div>
+      )}
 
       {data && (
         <>
-          {/* Faturamento */}
-          <div className="rounded-2xl border-t-2 border-t-emerald-400 border border-border bg-card/40 p-6">
-            <h2 className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-emerald-400">Entrada de Faturamento</h2>
-            <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-3">
+          {/* KPI Summary Banner */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card/50 to-transparent p-5 shadow-sm">
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-emerald-400">Faturamento Bruto</span>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums text-emerald-400">{BRL(fatTotal)}</p>
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">Vendas Aprovadas (Hotmart + Kiwify + HT)</p>
+            </div>
+
+            <div className="rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/10 via-card/50 to-transparent p-5 shadow-sm">
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-rose-400">Total Custos & Operação</span>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums text-rose-400">{BRL(totalCustosCalculado)}</p>
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">Meta Ads + Folha + Comissões + Impostos</p>
+            </div>
+
+            <div className={`rounded-2xl border p-5 shadow-sm ${lucro >= 0 ? "border-emerald-500/40 bg-emerald-500/15" : "border-rose-500/40 bg-rose-500/15"}`}>
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">Lucro Líquido Real</span>
+              <p className={`mt-1 font-mono text-2xl font-black tabular-nums ${lucro >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {lucro >= 0 ? "+" : ""}{BRL(lucro)}
+              </p>
+              <p className="mt-1 text-[0.65rem] font-medium text-muted-foreground">Faturamento − Custos Totais</p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm">
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">Margem Líquida</span>
+              <p className={`mt-1 font-mono text-2xl font-black tabular-nums ${margem >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {margem.toFixed(1)}%
+              </p>
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">Retorno sob o faturamento bruto</p>
+            </div>
+          </div>
+
+          {/* Card Especial: Tráfego Pago Meta Ads Automático */}
+          <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-500/10 via-card/50 to-transparent p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-sky-500/20 pb-4">
+              <div>
+                <h3 className="font-display text-xl font-bold flex items-center gap-2 text-sky-300">
+                  <BarChart3 className="h-5 w-5 text-sky-400" />
+                  Tráfego Pago (Facebook / Meta Ads API)
+                </h3>
+                <p className="text-xs text-muted-foreground">Custo diário puxado automaticamente da conta de anúncios do Meta Ads</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-sky-400/80 block">Investimento Meta Ads</span>
+                  <p className="font-mono text-2xl font-black tabular-nums text-sky-300">{BRL(trafegoMeta)}</p>
+                </div>
+                {data.custos.trafegoPago.itens.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDailyMeta(!showDailyMeta)}
+                    className="rounded-xl border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-sky-500/30 transition-colors"
+                  >
+                    {showDailyMeta ? "▲ Ocultar Diário" : `▼ Ver por Dia (${data.custos.trafegoPago.itens.length})`}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Tabela Diária de Gastos Meta Ads */}
+            {showDailyMeta && (
+              <div className="mt-4 max-h-60 overflow-y-auto rounded-xl border border-sky-500/20 bg-background/50 p-3 space-y-1.5 animate-in fade-in duration-200">
+                <div className="grid grid-cols-3 text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground pb-2 border-b border-border/40 px-2">
+                  <span>Data</span>
+                  <span className="text-center">Descrição</span>
+                  <span className="text-right">Investido</span>
+                </div>
+                {data.custos.trafegoPago.itens.map((it) => (
+                  <div key={it.id} className="grid grid-cols-3 items-center text-xs py-1 px-2 rounded hover:bg-secondary/40">
+                    <span className="font-semibold text-foreground">{it.date ? it.date.split("-").reverse().join("/") : "—"}</span>
+                    <span className="truncate text-center text-muted-foreground" title={it.descricao}>{it.descricao}</span>
+                    <span className="font-mono font-extrabold text-right tabular-nums text-sky-300">{BRL(it.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Faturamento Discriminado */}
+          <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+            <h2 className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-2 mb-4">
+              <TrendingUp className="h-4 w-4" /> Entradas de Faturamento Bruto
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <FatBox label="Operação Caio (100%)" value={BRL(fatCaio)} />
-              <FatBox label="Operação Gustavo (50%)" value={BRL(fatGu)} sub={`Bruto: ${BRL(data.fatGustavo)}`} />
+              <FatBox label="Operação Gustavo (50%)" value={BRL(fatGu)} sub={`Bruto acumulado: ${BRL(data.fatGustavo)}`} />
               <FatBox label="High Ticket (100%)" value={BRL(fatHt)} />
             </div>
-            <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Faturamento Base Total</p>
+            <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Faturamento Total do Período</p>
               <p className="font-mono text-2xl font-black tabular-nums text-emerald-400">{BRL(fatTotal)}</p>
             </div>
           </div>
 
-          {/* Custos operacionais + comissões */}
+          {/* Custos Discriminados */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <CustoBox
               title="Custos Operacionais" tone="violet"
               groups={[
-                { label: "Construção SaaS (Dev)", total: data.custos.devSaas.total, itens: data.custos.devSaas.itens },
-                { label: "Folha de Pagamento", total: data.custos.folha.total, itens: data.custos.folha.itens },
+                { label: "Tráfego Pago (Meta Ads)", total: trafegoMeta, itens: data.custos.trafegoPago.itens },
+                { label: "Construção SaaS (Dev)", total: devSaasTotal, itens: data.custos.devSaas.itens },
+                { label: "Folha de Pagamento", total: folhaTotal, itens: data.custos.folha.itens },
+                { label: "Outras Despesas", total: outrosTotal, itens: data.custos.outros.itens },
               ]}
             />
             <CustoBox
               title="Comissões Pagas" tone="amber"
               groups={[
-                { label: "Vendedores X1", total: data.custos.comissaoX1.total, itens: data.custos.comissaoX1.itens },
-                { label: "High Ticket", total: data.custos.comissaoHt.total, itens: data.custos.comissaoHt.itens },
+                { label: "Comissão Vendedores X1", total: comX1Total, itens: data.custos.comissaoX1.itens },
+                { label: "Comissão High Ticket", total: comHtTotal, itens: data.custos.comissaoHt.itens },
               ]}
             />
           </div>
 
-          {/* Impostos + Lucro */}
+          {/* Impostos + DRE Final */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="rounded-2xl border border-red-400/30 border-t-2 border-t-red-400 bg-red-400/[0.03] p-5">
+            <div className="rounded-2xl border border-rose-500/30 border-t-2 border-t-rose-500 bg-rose-500/[0.03] p-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-red-400">Impostos</h2>
+                <h2 className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-rose-400">Impostos Alíquota</h2>
                 <div className="flex items-center gap-1">
                   <Percent className="h-3 w-3 text-muted-foreground" />
                   <input
                     type="number" min={0} step={0.1} value={imposto}
                     onChange={(e) => setImposto(Number(e.target.value) || 0)}
-                    className="w-14 rounded border border-border bg-background px-1.5 py-0.5 text-right text-xs"
+                    className="w-14 rounded border border-border bg-background px-1.5 py-0.5 text-right text-xs font-bold"
                     title="% sobre faturamento"
                   />
                 </div>
               </div>
-              <p className="mt-2 font-mono text-xl font-black tabular-nums text-white">{BRL(totalImpostos)}</p>
+              <p className="mt-2 font-mono text-xl font-black tabular-nums text-foreground">{BRL(totalImpostos)}</p>
               <p className="text-[0.65rem] text-muted-foreground">
                 Manual: {BRL(impostoManual)} + {imposto}%: {BRL(impostoPct)}
               </p>
             </div>
 
-            <div className={`md:col-span-2 rounded-2xl border-t-2 p-6 ${lucro >= 0 ? "border-t-emerald-400 border-emerald-400/30 bg-emerald-400/[0.04]" : "border-t-red-400 border-red-400/30 bg-red-400/[0.04]"} border`}>
+            <div className={`md:col-span-2 rounded-2xl border-t-4 p-6 shadow-md ${lucro >= 0 ? "border-t-emerald-400 border-emerald-500/30 bg-emerald-500/10" : "border-t-rose-500 border-rose-500/30 bg-rose-500/10"} border`}>
               <p className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-muted-foreground">
-                {lucro >= 0 ? "Lucro Líquido" : "Prejuízo"}
+                {lucro >= 0 ? "(=) Lucro Líquido Consolidado" : "(=) Prejuízo do Período"}
               </p>
-              <p className={`mt-2 font-mono text-4xl font-black tabular-nums ${lucro >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              <p className={`mt-2 font-mono text-4xl font-black tabular-nums ${lucro >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                 {BRL(lucro)}
               </p>
-              <div className="mt-3 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">
-                  Faturamento {BRL(fatTotal)} − Custos {BRL(custosTotal)}
+              <div className="mt-3 flex items-center justify-between text-xs border-t border-border/40 pt-3">
+                <span className="text-muted-foreground font-medium">
+                  Faturamento {BRL(fatTotal)} − Custos {BRL(totalCustosCalculado)}
                 </span>
-                <span className={`font-mono font-bold tabular-nums ${lucro >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-                  Margem: {margem.toFixed(1)}%
+                <span className={`font-mono font-extrabold tabular-nums px-2.5 py-1 rounded-md ${lucro >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"}`}>
+                  Margem Líquida: {margem.toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -1025,10 +1144,10 @@ function DreTab({ mes }: { mes: string }) {
 
 function FatBox({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div>
-      <p className="text-[0.6rem] font-semibold uppercase tracking-[0.25em] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-mono text-2xl font-black tabular-nums">{value}</p>
-      {sub && <p className="text-[0.65rem] text-muted-foreground">{sub}</p>}
+    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
+      <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">{label}</p>
+      <p className="mt-1 font-mono text-2xl font-black tabular-nums text-foreground">{value}</p>
+      {sub && <p className="mt-1 text-[0.65rem] text-muted-foreground">{sub}</p>}
     </div>
   );
 }
@@ -1038,27 +1157,27 @@ function CustoBox({
 }: {
   title: string;
   tone: "violet" | "amber";
-  groups: { label: string; total: number; itens: { id: number; descricao: string; valor: number }[] }[];
+  groups: { label: string; total: number; itens: { id: number | string; descricao: string; valor: number; date?: string }[] }[];
 }) {
   const cls = tone === "violet"
-    ? "border-violet-400/30 border-t-violet-400 text-violet-400"
-    : "border-amber-400/30 border-t-amber-400 text-amber-400";
+    ? "border-violet-500/30 border-t-violet-400 text-violet-400"
+    : "border-amber-500/30 border-t-amber-400 text-amber-400";
   return (
-    <div className={`rounded-2xl border border-t-2 bg-card/40 p-5 ${cls.split(" ").slice(0, 2).join(" ")}`}>
+    <div className={`rounded-2xl border border-t-2 bg-card/60 p-5 shadow-sm ${cls.split(" ").slice(0, 2).join(" ")}`}>
       <h2 className={`text-[0.65rem] font-black uppercase tracking-[0.3em] ${cls.split(" ")[2]}`}>{title}</h2>
       <div className="mt-4 space-y-4">
         {groups.map((g) => (
           <div key={g.label} className="border-t border-border/50 pt-3 first:border-t-0 first:pt-0">
             <div className="flex items-center justify-between">
               <p className="text-[0.65rem] font-bold uppercase text-muted-foreground">{g.label}</p>
-              <p className="font-mono font-black tabular-nums">{BRL(g.total)}</p>
+              <p className="font-mono font-black tabular-nums text-foreground">{BRL(g.total)}</p>
             </div>
-            <div className="mt-2 max-h-24 space-y-0.5 overflow-y-auto pr-1">
-              {g.itens.length === 0 && <p className="text-[0.65rem] text-muted-foreground">Sem lançamentos</p>}
+            <div className="mt-2 max-h-28 space-y-0.5 overflow-y-auto pr-1">
+              {g.itens.length === 0 && <p className="text-[0.65rem] text-muted-foreground py-1">Sem lançamentos</p>}
               {g.itens.map((it) => (
                 <div key={it.id} className="flex items-center justify-between border-b border-border/30 py-1 text-[0.7rem]">
                   <span className="truncate text-muted-foreground" title={it.descricao}>{it.descricao}</span>
-                  <span className="font-mono font-bold tabular-nums">{BRL(it.valor)}</span>
+                  <span className="font-mono font-bold tabular-nums text-foreground">{BRL(it.valor)}</span>
                 </div>
               ))}
             </div>
