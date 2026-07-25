@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -94,12 +94,11 @@ function Financeiro() {
     const gastos = rowsMes.filter((r) => r.tipo === "gasto");
     const receitas = rowsMes.filter((r) => r.tipo === "receita");
     const totalReceita = receitas.reduce((s, x) => s + (+x.valor || 0), 0);
+    const totalGasto = gastos.reduce((s, x) => s + (+x.valor || 0), 0);
 
-    // Only count "pago" items as realized gastos
     const gastosRealizados = gastos.filter((r) => r.status === "pago");
     const totalGastoRealizado = gastosRealizados.reduce((s, x) => s + (+x.valor || 0), 0);
 
-    // Unconfirmed recurring = atrasado or pendente from virtual rows
     const gastosPendentes = gastos.filter((r) => r.status === "pendente" || r.status === "atrasado");
     const totalPendente = gastosPendentes.reduce((s, x) => s + (+x.valor || 0), 0);
 
@@ -110,7 +109,7 @@ function Financeiro() {
     return {
       gasto: totalGastoRealizado, gastoCount: gastosRealizados.length,
       receita: totalReceita, receitaCount: receitas.length,
-      saldo: totalReceita - totalGastoRealizado,
+      saldo: totalReceita - totalGasto,
       pendente: totalPendente, pendenteCount: gastosPendentes.length,
       fixos,
     };
@@ -681,6 +680,148 @@ atrasado: { label: "Atrasado", icon: AlertCircle, cls: "text-red-400 bg-red-400/
   );
 }
 
+function CustomDatePicker({
+  value, onChange, required, label,
+}: {
+  value: string; onChange: (v: string) => void; required?: boolean; label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => {
+    const d = value ? new Date(value + "T00:00:00") : new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const monthName = viewDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  const prev = () => setViewDate(new Date(year, month - 1, 1));
+  const next = () => setViewDate(new Date(year, month + 1, 1));
+
+  const selectDay = (d: number) => {
+    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    onChange(iso);
+    setOpen(false);
+  };
+
+  const display = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    : "Selecionar...";
+
+  return (
+    <div className="relative">
+      <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+        {label} {required && <span className="text-red-400">*</span>}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-left text-sm font-medium flex items-center justify-between hover:border-accent/50 transition-colors"
+      >
+        <span className={value ? "text-foreground" : "text-muted-foreground"}>{display}</span>
+        <span className="text-muted-foreground text-xs">📅</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl p-3 animate-in fade-in duration-100">
+          <div className="flex items-center justify-between mb-2">
+            <button type="button" onClick={prev} className="rounded-lg px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary transition-colors">←</button>
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground">{monthName}</span>
+            <button type="button" onClick={next} className="rounded-lg px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary transition-colors">→</button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 text-center text-[0.55rem] font-bold text-muted-foreground mb-1">
+            {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => <span key={i}>{d}</span>)}
+          </div>
+          <div className="grid grid-cols-7 gap-0.5">
+            {Array.from({ length: firstDayOfWeek }).map((_, i) => <span key={`e${i}`} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const isSelected = iso === value;
+              const isToday = iso === todayISO();
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => selectDay(day)}
+                  className={`h-7 w-full rounded-lg text-[0.7rem] font-semibold transition-all ${
+                    isSelected
+                      ? "bg-accent text-accent-foreground shadow-sm"
+                      : isToday
+                        ? "bg-accent/15 text-accent font-bold"
+                        : "text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomSelect({
+  value, onChange, options, label,
+}: {
+  value: string; onChange: (v: string) => void;
+  options: { value: string; label: string; emoji?: string }[];
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-left text-sm font-medium flex items-center justify-between hover:border-accent/50 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          {selected?.emoji && <span>{selected.emoji}</span>}
+          <span>{selected?.label ?? value}</span>
+        </span>
+        <span className={`text-xs transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl py-1 animate-in fade-in duration-100">
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => { onChange(o.value); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors ${
+                o.value === value
+                  ? "bg-accent/10 text-accent font-semibold"
+                  : "text-foreground hover:bg-secondary/60"
+              }`}
+            >
+              {o.emoji && <span>{o.emoji}</span>}
+              <span>{o.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LancamentoModal({
   initial,
   onClose,
@@ -843,58 +984,71 @@ function LancamentoModal({
 
           {/* Data & Status */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
-                Data de Referência
-              </label>
-              <input
-                required
-                type="date"
-                value={form.data_ref || todayISO()}
-                onChange={(e) => update("data_ref", e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-            <div>
-              <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
-                Status
-              </label>
-              <select
-                value={form.status || "pago"}
-                onChange={(e) => {
-                  const st = e.target.value as Lancamento["status"];
-                  update("status", st);
-                  if (st === "pago" && !form.data_pagamento) {
-                    update("data_pagamento", todayISO());
-                  }
-                }}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="pago">✅ Pago (Concluído)</option>
-                <option value="pendente">⏳ Pendente</option>
-                <option value="atrasado">🔴 Atrasado</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Recorrência (Custo Fixo Mensal) */}
-          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-violet-500/20 text-violet-300">
-                <Repeat className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-foreground">Lançamento Recorrente (Custo Fixo)</p>
-                <p className="text-[0.65rem] text-muted-foreground">Repete automaticamente todos os meses no financeiro e no dashboard</p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={!!form.recorrente}
-              onChange={(e) => update("recorrente", e.target.checked)}
-              className="h-4 w-4 accent-violet-500 cursor-pointer rounded"
+            <CustomDatePicker
+              value={form.data_ref || todayISO()}
+              onChange={(v) => update("data_ref", v)}
+              required
+              label="Data de Referência"
+            />
+            <CustomSelect
+              value={form.status || "pago"}
+              onChange={(v) => {
+                update("status", v);
+                if (v === "pago" && !form.data_pagamento) update("data_pagamento", todayISO());
+              }}
+              label="Status"
+              options={[
+                { value: "pago", label: "Pago (Concluído)", emoji: "✅" },
+                { value: "pendente", label: "Pendente", emoji: "⏳" },
+                { value: "atrasado", label: "Atrasado", emoji: "🔴" },
+              ]}
             />
           </div>
+
+          {/* Recorrência — diferente para gasto vs receita */}
+          {isGasto ? (
+            <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-violet-500/20 text-violet-300">
+                    <Repeat className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-foreground">Custo Fixo Mensal</p>
+                    <p className="text-[0.65rem] text-muted-foreground">Repete todo mês como despesa no financeiro e dashboard</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => update("recorrente", !form.recorrente)}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${form.recorrente ? "bg-violet-500" : "bg-muted"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.recorrente ? "translate-x-5" : ""}`} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300">
+                    <Repeat className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-foreground">Receita Recorrente</p>
+                    <p className="text-[0.65rem] text-muted-foreground">Repete todo mês como entrada no financeiro</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => update("recorrente", !form.recorrente)}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${form.recorrente ? "bg-emerald-500" : "bg-muted"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.recorrente ? "translate-x-5" : ""}`} />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Opções Avançadas */}
           <div>
@@ -907,17 +1061,11 @@ function LancamentoModal({
             </button>
             {showAdvanced && (
               <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in duration-150">
-                <div>
-                  <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
-                    Vencimento
-                  </label>
-                  <input
-                    type="date"
-                    value={form.data_vencimento || ""}
-                    onChange={(e) => update("data_vencimento", e.target.value || null)}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
-                  />
-                </div>
+                <CustomDatePicker
+                  value={form.data_vencimento || ""}
+                  onChange={(v) => update("data_vencimento", v || null)}
+                  label="Vencimento"
+                />
                 <div>
                   <label className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block mb-1">
                     Responsável
@@ -927,7 +1075,7 @@ function LancamentoModal({
                     placeholder="Ex: Caio, Gustavo, Jessica"
                     value={form.responsavel || ""}
                     onChange={(e) => update("responsavel", e.target.value)}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                    className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent transition-colors placeholder:text-muted-foreground/50"
                   />
                 </div>
                 <div className="col-span-2">
@@ -940,7 +1088,7 @@ function LancamentoModal({
                     placeholder="Detalhes adicionais..."
                     value={form.obs || ""}
                     onChange={(e) => update("obs", e.target.value)}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                    className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent transition-colors placeholder:text-muted-foreground/50 resize-none"
                   />
                 </div>
               </div>
@@ -1186,10 +1334,10 @@ function DreTab({ mes }: { mes: string }) {
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card/60 p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <Field label="Período De">
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+            <CustomDatePicker value={from} onChange={setFrom} label="" />
           </Field>
           <Field label="Até">
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+            <CustomDatePicker value={to} onChange={setTo} label="" />
           </Field>
 
           {/* Atalhos Rápidos */}
