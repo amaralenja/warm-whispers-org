@@ -1040,18 +1040,41 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // ── 5. Classifica leads por operação e constrói Maps por email/phone ──
     const cleanPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
 
+    const getPhoneVariations = (rawPhone: string): string[] => {
+      const digits = String(rawPhone ?? "").replace(/\D+/g, "");
+      if (!digits) return [];
+      const set = new Set<string>([digits]);
+      if (digits.length >= 8) set.add(digits.slice(-8));
+
+      const local = digits.startsWith("55") && digits.length > 10 ? digits.slice(2) : digits;
+      set.add(local);
+      set.add("55" + local);
+
+      if (local.length === 11 && local[2] === "9") {
+        const without9 = local.slice(0, 2) + local.slice(3);
+        set.add(without9);
+        set.add("55" + without9);
+      } else if (local.length === 10) {
+        const with9 = local.slice(0, 2) + "9" + local.slice(2);
+        set.add(with9);
+        set.add("55" + with9);
+      }
+      return Array.from(set);
+    };
+
     const phoneToWaTags = new Map<string, string[]>();
     for (const conv of waConvsRaw) {
-      const waId = cleanPhone(conv.contact_wa_id ?? "");
-      if (!waId) continue;
+      const vars = getPhoneVariations(conv.contact_wa_id ?? "");
+      if (vars.length === 0) continue;
       const rawTags = Array.isArray(conv.tags) ? conv.tags : [];
       if (rawTags.length === 0) continue;
-      const list = phoneToWaTags.get(waId) || [];
-      for (const t of rawTags) {
-        if (t && !list.includes(String(t))) list.push(String(t));
+      for (const v of vars) {
+        const list = phoneToWaTags.get(v) || [];
+        for (const t of rawTags) {
+          if (t && !list.includes(String(t))) list.push(String(t));
+        }
+        phoneToWaTags.set(v, list);
       }
-      phoneToWaTags.set(waId, list);
-      if (waId.length >= 8) phoneToWaTags.set(waId.slice(-8), list);
     }
 
     const leadsByOp = new Map<string, number>();
@@ -1062,7 +1085,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const norm = (s: any) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const organicPattern = /organic|organico|direto|direct|link_?in_?bio|whatsapp|referral|email|sms|none/i;
 
-    const getTagsForLead = (lead: any, phoneKey?: string): string[] => {
+    const getTagsForLead = (lead: any, rawPhone?: string): string[] => {
       const tagsSet = new Set<string>();
       if (Array.isArray(lead?.tags)) {
         for (const t of lead.tags) if (t) tagsSet.add(String(t).toUpperCase());
@@ -1073,8 +1096,9 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (typeof lead?.tags === "string") {
         tagsSet.add(String(lead.tags).toUpperCase());
       }
-      if (phoneKey) {
-        const waTags = phoneToWaTags.get(phoneKey) || (phoneKey.length >= 8 ? phoneToWaTags.get(phoneKey.slice(-8)) : undefined);
+      const vars = getPhoneVariations(rawPhone || lead?.whatsapp || lead?.telefone || "");
+      for (const v of vars) {
+        const waTags = phoneToWaTags.get(v);
         if (waTags) {
           for (const t of waTags) if (t) tagsSet.add(String(t).toUpperCase());
         }
@@ -1103,8 +1127,30 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
 
-      const hasPaidTag = leadTags.some((t) => t.includes("PAGO") || t.includes("ADS") || t.includes("PATROCINADO") || t.includes("CPC"));
-      const hasOrganicTag = leadTags.some((t) => t.includes("ORGANICO") || t.includes("ORGÂNICO") || t.includes("DIRETO"));
+      const hasTypebotTag = leadTags.some((t) =>
+        t.includes("TYPEBOT") ||
+        t.includes("SALVE") ||
+        t.includes("QUIZ") ||
+        t.includes("FLORESTA") ||
+        t.includes("BOT") ||
+        t.includes("MINICHAT") ||
+        t.includes("MANYCHAT")
+      );
+
+      const hasPaidTag = leadTags.some((t) =>
+        t.includes("TRAFEGO PAGO") ||
+        t.includes("TRÁFEGO PAGO") ||
+        t.includes("PAGO") ||
+        t.includes("ADS") ||
+        t.includes("PATROCINADO") ||
+        t.includes("CPC")
+      );
+
+      const hasOrganicTag = leadTags.some((t) =>
+        t.includes("ORGANICO") ||
+        t.includes("ORGÂNICO") ||
+        t.includes("DIRETO")
+      );
 
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
@@ -1120,16 +1166,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const emailKey = norm(lead.email);
       const hasQuizMatch = (!!emailKey && emailToLead.has(emailKey)) || (!!phoneKey && phoneToLead.has(phoneKey));
 
-      const hasTypebotTag = leadTags.some((t) =>
-        t.includes("TYPEBOT") ||
-        t.includes("SALVE") ||
-        t.includes("QUIZ") ||
-        t.includes("FLORESTA") ||
-        t.includes("BOT") ||
-        t.includes("MINICHAT") ||
-        t.includes("MANYCHAT")
-      );
-
       const isFromTypebot = forceTypebot ||
         hasQuizMatch ||
         hasTypebotTag ||
@@ -1140,9 +1176,16 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         fonteStr.includes("quiz") ||
         origemStr.includes("quiz");
 
-      if (isFromTypebot) {
-        return isPaid ? "Typebot (Tráfego Pago)" : "Typebot (Orgânico)";
+      // Regras explícitas do Caio:
+      // 1) Typebot + Tráfego Pago -> "Typebot (Tráfego Pago)"
+      if (isFromTypebot && (hasPaidTag || isPaid)) {
+        return "Typebot (Tráfego Pago)";
       }
+      // 2) Typebot + Orgânico (ou apenas Typebot) -> "Typebot (Orgânico)"
+      if (isFromTypebot) {
+        return "Typebot (Orgânico)";
+      }
+      // 3) Orgânico Apenas (sem Typebot) -> "Orgânico Direto"
       return "Orgânico Direto";
     };
 
