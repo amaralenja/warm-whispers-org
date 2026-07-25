@@ -121,13 +121,13 @@ function Dashboard() {
           <TabsContent value="operacoes" className="mt-6 space-y-6">
 
             {/* ── KPIs Globais ── */}
-            <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border lg:grid-cols-6">
-              <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Faturamento" value={isLoading ? "—" : BRL(totalFat)} accent="text-emerald-400" />
-              <Kpi icon={<ShoppingBag className="h-4 w-4" />} label="Vendas" value={isLoading ? "—" : totalVendas.toLocaleString("pt-BR")} />
-              <Kpi icon={<UserCheck className="h-4 w-4" />} label="Leads" value={isLoading ? "—" : totalLeads.toLocaleString("pt-BR")} accent="text-sky-400" />
-              <Kpi icon={<Percent className="h-4 w-4" />} label="Conversão" value={isLoading ? "—" : `${conversaoGeral.toFixed(1)}%`} accent="text-violet-400" />
-              <Kpi icon={<Receipt className="h-4 w-4" />} label="Ticket Médio" value={isLoading ? "—" : BRL(tmGeral)} accent="text-amber-400" />
-              <Kpi icon={<AlertTriangle className="h-4 w-4" />} label="Reembolsos" value={isLoading ? "—" : String(totalReemb)} accent={totalReemb > 0 ? "text-rose-400" : "text-foreground"} />
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <Kpi icon={<TrendingUp className="h-4 w-4 text-emerald-400" />} label="Faturamento" value={isLoading ? "—" : BRL(totalFat)} accent="text-emerald-400" bgGlow="bg-gradient-to-br from-emerald-500/5 to-transparent" />
+              <Kpi icon={<ShoppingBag className="h-4 w-4 text-amber-400" />} label="Vendas" value={isLoading ? "—" : totalVendas.toLocaleString("pt-BR")} accent="text-amber-400" bgGlow="bg-gradient-to-br from-amber-500/5 to-transparent" />
+              <Kpi icon={<UserCheck className="h-4 w-4 text-sky-400" />} label="Leads Únicos" value={isLoading ? "—" : totalLeads.toLocaleString("pt-BR")} accent="text-sky-400" bgGlow="bg-gradient-to-br from-sky-500/5 to-transparent" />
+              <Kpi icon={<Percent className="h-4 w-4 text-violet-400" />} label="Conversão" value={isLoading ? "—" : `${conversaoGeral.toFixed(1)}%`} accent="text-violet-400" bgGlow="bg-gradient-to-br from-violet-500/5 to-transparent" />
+              <Kpi icon={<Receipt className="h-4 w-4 text-indigo-400" />} label="Ticket Médio" value={isLoading ? "—" : BRL(tmGeral)} accent="text-indigo-400" bgGlow="bg-gradient-to-br from-indigo-500/5 to-transparent" />
+              <Kpi icon={<AlertTriangle className="h-4 w-4 text-rose-400" />} label="Reembolsos" value={isLoading ? "—" : String(totalReemb)} accent={totalReemb > 0 ? "text-rose-400" : "text-foreground"} bgGlow={totalReemb > 0 ? "bg-gradient-to-br from-rose-500/5 to-transparent" : ""} />
             </section>
 
             {/* ── Nossa Parte ── */}
@@ -443,14 +443,16 @@ function Dashboard() {
 
 /* ── Componentes auxiliares ── */
 
-function Kpi({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: string }) {
+function Kpi({ icon, label, value, accent, bgGlow }: { icon: React.ReactNode; label: string; value: string; accent?: string; bgGlow?: string }) {
   return (
-    <div className="bg-card p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">{label}</span>
+    <div className={`group relative overflow-hidden rounded-xl border border-border/60 bg-card/60 p-4 transition-all duration-200 hover:border-border hover:bg-card/90 hover:shadow-lg hover:shadow-emerald-500/5 ${bgGlow ?? ""}`}>
+      <div className="flex items-center justify-between text-muted-foreground">
+        <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] opacity-80 group-hover:opacity-100 transition-opacity">{label}</span>
+        <div className={`p-1.5 rounded-lg bg-secondary/50 text-foreground group-hover:scale-110 transition-transform ${accent ?? ""}`}>
+          {icon}
+        </div>
       </div>
-      <div className={`mt-3 text-3xl ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
+      <div className={`mt-3 text-2xl md:text-3xl font-extrabold tracking-tight ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
     </div>
   );
 }

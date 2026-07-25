@@ -820,24 +820,18 @@ export const getDashboardStats = createServerFn({ method: "POST" })
           supabase.from("ht_vendas").select("valor_total, data, status, lead_id, cliente").neq("status", "reembolso").range(from, to)
         )
         : Promise.resolve([] as any[]),
-      // Quiz leads
-      (async (): Promise<any[]> => {
-        try {
-          const { data: qData } = await supabase.from("ht_quiz_submissions" as any)
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at")
-            .order("updated_at", { ascending: false }).limit(3000);
-          return qData ?? [];
-        } catch { return []; }
-      })(),
-      // CRM leads
-      (async (): Promise<any[]> => {
-        try {
-          const { data: cData } = await supabase.from("crm_leads" as any)
-            .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
-            .order("created_at", { ascending: false }).limit(3000);
-          return cData ?? [];
-        } catch { return []; }
-      })(),
+      // Quiz leads (sem limite de 3000)
+      fetchAll<any>((from, to) =>
+        supabase.from("ht_quiz_submissions" as any)
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at, updated_at")
+          .range(from, to)
+      ).catch(() => []),
+      // CRM leads (sem limite de 3000)
+      fetchAll<any>((from, to) =>
+        supabase.from("crm_leads" as any)
+          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at, origem")
+          .range(from, to)
+      ).catch(() => []),
     ]);
 
     // ── 2. Maps de lookup (O(1) em vez de O(N)) ──
@@ -1232,6 +1226,8 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // totalLeads = leads únicos — usa id/email/phone pra dedup entre quiz e CRM
     const allLeadKeys = new Set<string>();
     for (const l of quizLeadsRaw) {
+      const leadDate = parseDataField(l.received_at || l.updated_at || l.created_at);
+      if (!inRange(leadDate)) continue;
       const id = String(l.id ?? "");
       const email = String(l.email ?? "").trim().toLowerCase();
       const phone = cleanPhone(l.whatsapp ?? "");
@@ -1240,6 +1236,8 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       else if (phone) allLeadKeys.add(`p:${phone}`);
     }
     for (const l of crmLeadsRaw) {
+      const leadDate = parseDataField(l.created_at || l.received_at || l.updated_at);
+      if (!inRange(leadDate)) continue;
       const id = String(l.id ?? "");
       const email = String(l.email ?? "").trim().toLowerCase();
       const phone = cleanPhone(l.whatsapp ?? "");
