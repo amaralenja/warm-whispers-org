@@ -776,11 +776,36 @@ const EMPTY_DASHBOARD: DashboardPayload = {
 };
 
 function classifyLeadOp(lead: any): string | null {
-  const src = String(lead.utm_source || lead.origem || "").trim().toUpperCase();
-  if (!src) return null;
-  if (CAIO_UTMS.some((p) => src.startsWith(p))) return "Caio";
-  if (GUSTAVO_UTMS.some((p) => src.startsWith(p))) return "Gustavo";
-  return null;
+  if (!lead) return null;
+  // 1. Expert explícito do lead (Ex: "Caio", "Gustavo", "Jessica", "High Ticket")
+  const exp = String(lead.expert ?? "").trim();
+  if (exp) {
+    const normExp = exp.toLowerCase();
+    if (normExp.includes("caio")) return "Caio";
+    if (normExp.includes("gustavo") || normExp.includes("gu")) return "Gustavo";
+    if (normExp.includes("jessica") || normExp.includes("je")) return "Jessica";
+    if (normExp.includes("high") || normExp.includes("ticket") || normExp.includes("ht")) return "High Ticket";
+  }
+
+  // 2. Submissão de quiz sem expert -> High Ticket
+  if (lead.received_at && !lead.expert) {
+    return "High Ticket";
+  }
+
+  // 3. Verifica parâmetros de UTM, origem e fonte
+  const fields = [
+    lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_content, lead.origem, lead.fonte
+  ].map((f) => String(f ?? "").trim().toUpperCase());
+
+  for (const src of fields) {
+    if (!src) continue;
+    if (CAIO_UTMS.some((p) => src.includes(p)) || src.includes("CAIO")) return "Caio";
+    if (GUSTAVO_UTMS.some((p) => src.includes(p)) || src.includes("GUSTAVO")) return "Gustavo";
+    if (src.includes("GM") || src.includes("JESSICA")) return "Jessica";
+    if (src.includes("HT") || src.includes("HIGH")) return "High Ticket";
+  }
+
+  return "Caio";
 }
 
 export const getDashboardStats = createServerFn({ method: "POST" })
@@ -943,36 +968,36 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     };
 
     for (const l of quizLeadsRaw) {
+      const ts = parseDataField(l.received_at || l.created_at || l.updated_at);
+      if (!inRange(ts)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
       if (email) emailToLead.set(email, l);
-      const phone = cleanPhone(l.whatsapp ?? "");
+      const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
       if (phone) phoneToLead.set(phone, l);
-      const op = classifyLeadOp(l);
-      if (op) {
-        leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-        const leadType = classifyLeadType(l);
-        if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
-        const typeMap = leadBreakdownByOp.get(op)!;
-        const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
-        entry.leads += 1;
-        typeMap.set(leadType, entry);
-      }
+      const op = classifyLeadOp(l) || "Caio";
+      leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+      const leadType = classifyLeadType(l);
+      if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
+      const typeMap = leadBreakdownByOp.get(op)!;
+      const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
+      entry.leads += 1;
+      typeMap.set(leadType, entry);
     }
     for (const l of crmLeadsRaw) {
+      const ts = parseDataField(l.created_at || l.updated_at || l.received_at);
+      if (!inRange(ts)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
       if (email && !emailToLead.has(email)) emailToLead.set(email, l);
-      const phone = cleanPhone(l.whatsapp ?? "");
+      const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
-      const op = classifyLeadOp(l);
-      if (op) {
-        leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-        const leadType = classifyLeadType(l);
-        if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
-        const typeMap = leadBreakdownByOp.get(op)!;
-        const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
-        entry.leads += 1;
-        typeMap.set(leadType, entry);
-      }
+      const op = classifyLeadOp(l) || "Caio";
+      leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
+      const leadType = classifyLeadType(l);
+      if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
+      const typeMap = leadBreakdownByOp.get(op)!;
+      const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
+      entry.leads += 1;
+      typeMap.set(leadType, entry);
     }
 
     const matchLead = (vEmail: string, vTel: string) => {

@@ -27,6 +27,7 @@ export type DiaComissao = {
   rate: number;
   milhares: number;
   comissao: number;
+  isSaturday?: boolean;
 };
 
 export type ComissaoRow = {
@@ -157,7 +158,10 @@ export const getComissoes = createServerFn({ method: "POST" })
 
             cumulativo += day.faturamento;
             const isGustavo = String(v.expert ?? "").toLowerCase().trim() === "gustavo";
-            const rate = isGustavo ? 30 : tierRate(cumulativo);
+            const baseRate = isGustavo ? 30 : tierRate(cumulativo);
+            const isSaturday = current.getUTCDay() === 6;
+            const rate = (isSaturday && !isGustavo) ? baseRate * 2 : baseRate;
+
             let milhares = 0;
             if (day.faturamento >= 991) {
               milhares = 1;
@@ -180,6 +184,7 @@ export const getComissoes = createServerFn({ method: "POST" })
               rate,
               milhares,
               comissao: valor,
+              isSaturday,
             });
 
             faturamento += day.faturamento;

@@ -224,6 +224,26 @@ function Dashboard() {
                             </div>
                           </button>
 
+                          {/* Lead Breakdown (Typebot Org/Pago, Orgânico Direto) */}
+                          {(op.nome === "Caio" || isExpanded) && op.leadBreakdown.length > 0 && (
+                            <div className="border-t border-border/50 bg-secondary/15 px-5 py-3.5 space-y-2">
+                              <div className="flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                                <span>📊 Detalhamento de Origem dos Leads — {op.nome}</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {op.leadBreakdown.map((lb) => (
+                                  <div key={lb.tipo} className="rounded-xl border border-border/60 bg-card/80 p-3.5 flex flex-col justify-between shadow-sm">
+                                    <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">{lb.tipo}</div>
+                                    <div className={`mt-2 font-mono text-2xl font-black tabular-nums ${ac.text}`}>{lb.leads.toLocaleString("pt-BR")}</div>
+                                    <div className="mt-1 text-[0.65rem] text-muted-foreground font-medium">
+                                      {lb.vendas} {lb.vendas === 1 ? "venda" : "vendas"} · {lb.conversao}% conversão
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Fontes de tráfego (expandível) */}
                           {isExpanded && op.fontes.length > 0 && (
                             <div className="border-t border-border/50 bg-secondary/10 px-5 py-3">
@@ -236,26 +256,6 @@ function Dashboard() {
                                     <span className="text-xs font-medium text-foreground">{f.fonte}</span>
                                     <span className={`text-xs font-semibold tabular-nums ${ac.text}`}>{f.vendas} vendas</span>
                                     <span className="text-xs tabular-nums text-muted-foreground">{BRL(f.faturamento)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Lead Breakdown (Typebot Org/Pago, Orgânico Direto) */}
-                          {isExpanded && op.leadBreakdown.length > 0 && (
-                            <div className="border-t border-border/50 bg-secondary/10 px-5 py-3">
-                              <div className="mb-2 text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                                Detalhamento de Leads
-                              </div>
-                              <div className="grid grid-cols-3 gap-3">
-                                {op.leadBreakdown.map((lb) => (
-                                  <div key={lb.tipo} className="rounded-lg border border-border/40 bg-card/60 p-3">
-                                    <div className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{lb.tipo}</div>
-                                    <div className={`mt-1 text-lg ${NUM} ${ac.text}`}>{lb.leads.toLocaleString("pt-BR")}</div>
-                                    <div className="mt-0.5 text-[0.6rem] text-muted-foreground">
-                                      {lb.vendas} {lb.vendas === 1 ? "venda" : "vendas"} · {lb.conversao}% conversão
-                                    </div>
                                   </div>
                                 ))}
                               </div>
