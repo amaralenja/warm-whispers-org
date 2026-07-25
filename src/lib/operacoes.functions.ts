@@ -29,20 +29,28 @@ function parseTicket(raw: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Aceita "YYYY-MM-DD", "DD-MM-YYYY", "DD/MM/YYYY" → epoch ms (UTC) ou null. */
-function parseDataField(raw: unknown): number | null {
+/** Converte qualquer ISO/Timestamp ou string de data para YYYY-MM-DD no fuso de São Paulo (America/Sao_Paulo) */
+function toSpDateString(raw: unknown): string | null {
   if (!raw) return null;
   const s = String(raw).trim();
-  let y = 0, m = 0, d = 0;
-  let match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) { y = +match[1]; m = +match[2]; d = +match[3]; }
-  else {
-    match = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
-    if (match) { d = +match[1]; m = +match[2]; y = +match[3]; }
-    else return null;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   }
-  const t = Date.UTC(y, m - 1, d);
-  return Number.isFinite(t) ? t : null;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const m2 = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+  return null;
+}
+
+function inRangeSp(raw: unknown, fromStr?: string | null, toStr?: string | null): boolean {
+  if (!fromStr && !toStr) return true;
+  const isoSp = toSpDateString(raw);
+  if (!isoSp) return false;
+  if (fromStr && isoSp < fromStr) return false;
+  if (toStr && isoSp > toStr) return false;
+  return true;
 }
 
 export type ExpertStats = {
@@ -825,16 +833,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       expertFilter = expertFilter ?? allowedWorkspaces[0];
     }
 
-    const fromTs = data.from ? Date.UTC(+data.from.slice(0, 4), +data.from.slice(5, 7) - 1, +data.from.slice(8, 10)) : null;
-    const toTs = data.to ? Date.UTC(+data.to.slice(0, 4), +data.to.slice(5, 7) - 1, +data.to.slice(8, 10)) : null;
-
-    const inRange = (t: number | null) => {
-      if (fromTs == null && toTs == null) return true;
-      if (t == null) return false;
-      if (fromTs != null && t < fromTs) return false;
-      if (toTs != null && t > toTs) return false;
-      return true;
-    };
+    const inRange = (raw: unknown) => inRangeSp(raw, data.from, data.to);
 
     const PAGE = 1000;
     async function fetchAll<T = any>(build: (from: number, to: number) => any): Promise<T[]> {
@@ -915,7 +914,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
     // ── 3. Filtra e atribui expert via produtos_map ──
     const vendasPeriodo = vendasAll
-      .filter((v: any) => inRange(parseDataField(v.Data)))
+      .filter((v: any) => inRange(v.Data))
       .map((v: any) => {
         const m = produtoMap.get(asStr(v.Produto).trim().toLowerCase());
         if (!m) return null;
@@ -971,8 +970,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     };
 
     for (const l of quizLeadsRaw) {
-      const ts = parseDataField(l.received_at || l.created_at || l.updated_at);
-      if (!inRange(ts)) continue;
+      if (!inRange(l.received_at || l.created_at || l.updated_at)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
       if (email) emailToLead.set(email, l);
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
@@ -987,8 +985,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       typeMap.set(leadType, entry);
     }
     for (const l of crmLeadsRaw) {
-      const ts = parseDataField(l.created_at || l.updated_at || l.received_at);
-      if (!inRange(ts)) continue;
+      if (!inRange(l.created_at || l.updated_at || l.received_at)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
       if (email && !emailToLead.has(email)) emailToLead.set(email, l);
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
