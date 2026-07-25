@@ -928,7 +928,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       })
       .filter((v: any): v is any => v !== null);
 
-    const vendasScoped = expertFilter ? vendasPeriodo.filter((v: any) => v._expert === expertFilter) : vendasPeriodo;
+    const sameExpert = (a?: string | null, b?: string | null) => {
+      if (!a || !b) return false;
+      return a.trim().toLowerCase() === b.trim().toLowerCase();
+    };
+
+    const vendasScoped = expertFilter ? vendasPeriodo.filter((v: any) => sameExpert(v._expert, expertFilter)) : vendasPeriodo;
 
     // ── 4. Pré-agrupa vendas por expert (O(V) em vez de O(E*V)) ──
     const vendasByExpert = new Map<string, any[]>();
@@ -1110,7 +1115,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const opStats: DashboardOpStats[] = [];
     for (const eName of allExpertNames) {
       const vds = vendasByExpert.get(eName) || [];
-      const scopedVds = expertFilter ? vds.filter((v) => v._expert === expertFilter) : vds;
+      const scopedVds = expertFilter ? vds.filter((v) => sameExpert(v._expert, expertFilter)) : vds;
       const faturamento = scopedVds.reduce((a: number, v: any) => a + parseTicket(v.Ticket), 0);
       const vendasCount = scopedVds.length;
       const vdsTm = scopedVds.filter((v: any) => parseTicket(v.Ticket) >= 97);

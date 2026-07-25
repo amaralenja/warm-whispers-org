@@ -60,7 +60,9 @@ function Dashboard() {
   });
 
   const ops = data?.ops ?? [];
-  const visibleOps = workspace.id === "all" ? ops : ops.filter((o) => o.nome === workspace.id);
+  const visibleOps = workspace.id === "all"
+    ? ops
+    : ops.filter((o) => o.nome.toLowerCase().replace(/[\s-_]+/g, "").includes(workspace.id.toLowerCase().replace(/[\s-_]+/g, "")) || workspace.id.toLowerCase().includes(o.nome.toLowerCase()));
   const totalFat = data?.totalFat ?? 0;
   const totalVendas = data?.totalVendas ?? 0;
   const totalLeads = data?.totalLeads ?? 0;
