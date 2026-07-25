@@ -1171,139 +1171,88 @@ function RelatoriosTab({ mes }: { mes: string }) {
     queryKey: ["financeiro-relatorio", mes],
     queryFn: () => fetchRel({ data: { mes } }),
   });
+  const [subTab, setSubTab] = useState<"resumo" | "meta">("resumo");
 
   if (isLoading || !data) {
-    return <div className="py-20 text-center text-sm text-muted-foreground animate-pulse">Carregando relatórios financeiros...</div>;
+    return <div className="py-20 text-center text-sm text-muted-foreground animate-pulse">Carregando relatórios...</div>;
   }
 
-  const maxTrend = Math.max(1, ...data.trend.map((t) => Math.max(t.receita, t.gasto)));
   const { mesAtual: ma, mesAnterior: mp } = data;
+  const maxTrend = Math.max(1, ...data.trend.map((t) => Math.max(t.receita, t.gasto)));
 
-  const deltaReceita = mp.receita > 0 ? ((ma.receita - mp.receita) / mp.receita) * 100 : 0;
-  const deltaGasto = mp.gasto > 0 ? ((ma.gasto - mp.gasto) / mp.gasto) * 100 : 0;
-  const deltaLucro = mp.lucro !== 0 ? ((ma.lucro - mp.lucro) / Math.abs(mp.lucro)) * 100 : 0;
+  const deltaR = mp.receita > 0 ? ((ma.receita - mp.receita) / mp.receita) * 100 : 0;
+  const deltaG = mp.gasto > 0 ? ((ma.gasto - mp.gasto) / mp.gasto) * 100 : 0;
+  const deltaL = mp.lucro !== 0 ? ((ma.lucro - mp.lucro) / Math.abs(mp.lucro)) * 100 : 0;
 
-  const Delta = ({ value, invert }: { value: number; invert?: boolean }) => {
-    if (Math.abs(value) < 0.1) return <span className="text-[0.6rem] text-muted-foreground">=</span>;
-    const positive = invert ? value < 0 : value > 0;
-    return (
-      <span className={`text-[0.6rem] font-bold ${positive ? "text-emerald-400" : "text-red-400"}`}>
-        {positive ? "↑" : "↓"} {Math.abs(value).toFixed(1)}%
-      </span>
-    );
+  const Pct = ({ v, inv }: { v: number; inv?: boolean }) => {
+    if (Math.abs(v) < 0.1) return <span className="text-muted-foreground">—</span>;
+    const ok = inv ? v < 0 : v > 0;
+    return <span className={`text-xs font-bold ${ok ? "text-emerald-400" : "text-red-400"}`}>{ok ? "↑" : "↓"} {Math.abs(v).toFixed(1)}%</span>;
   };
+
+  const COLORS = ["bg-rose-500", "bg-violet-500", "bg-blue-500", "bg-amber-500", "bg-emerald-500", "bg-indigo-500", "bg-pink-500"];
+  const DONUT_COLORS = ["#f43f5e", "#a855f7", "#3b82f6", "#f59e0b", "#10b981", "#6366f1", "#ec4899"];
 
   return (
     <div className="mt-6 space-y-6">
-
-      {/* KPI Resumo do Mês */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-5">
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Receita Total</p>
-          <p className="mt-2 text-2xl font-black tabular-nums text-emerald-400">{BRL(ma.receita)}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <Delta value={deltaReceita} />
-            <span className="text-[0.55rem] text-muted-foreground">vs mês anterior</span>
-          </div>
-          <div className="mt-2.5 flex items-center gap-2 text-[0.6rem] text-muted-foreground">
-            <span>🛒 Vendas: <b className="text-foreground">{BRL(ma.receitaVendas)}</b></span>
-            <span>📝 Manual: <b className="text-foreground">{BRL(ma.receitaMan)}</b></span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-red-500/25 bg-gradient-to-br from-red-500/[0.08] to-transparent p-5">
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Gastos Total</p>
-          <p className="mt-2 text-2xl font-black tabular-nums text-red-400">{BRL(ma.gasto)}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <Delta value={deltaGasto} invert />
-            <span className="text-[0.55rem] text-muted-foreground">vs mês anterior</span>
-          </div>
-          <div className="mt-2.5 flex items-center gap-2 text-[0.6rem] text-muted-foreground">
-            <span>📌 Fixos: <b className="text-foreground">{BRL(ma.gastoFixo)}</b></span>
-            <span>🔄 Variável: <b className="text-foreground">{BRL(ma.gastoVariavel)}</b></span>
-          </div>
-        </div>
-
-        <div className={`rounded-2xl border p-5 ${ma.lucro >= 0 ? "border-emerald-500/30 bg-emerald-500/15" : "border-red-500/30 bg-red-500/15"}`}>
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Lucro Líquido</p>
-          <p className={`mt-2 text-2xl font-black tabular-nums ${ma.lucro >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {ma.lucro >= 0 ? "+" : ""}{BRL(ma.lucro)}
-          </p>
-          <div className="mt-1 flex items-center gap-2">
-            <Delta value={deltaLucro} />
-            <span className="text-[0.55rem] text-muted-foreground">vs mês anterior</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card/60 p-5">
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Margem</p>
-          <p className={`mt-2 text-2xl font-black tabular-nums ${ma.margem >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {ma.margem.toFixed(1)}%
-          </p>
-          <p className="mt-1 text-[0.55rem] text-muted-foreground">
-            Mês anterior: {mp.margem.toFixed(1)}%
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card/60 p-5">
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Fixo / Variável</p>
-          <p className="mt-2 text-2xl font-black tabular-nums text-foreground">
-            {ma.gasto > 0 ? ((ma.gastoFixo / ma.gasto) * 100).toFixed(0) : 0}%
-          </p>
-          <p className="mt-1 text-[0.55rem] text-muted-foreground">
-            fixo de {BRL(ma.gasto)} total
-          </p>
-          <div className="mt-2 h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-violet-400 transition-all"
-              style={{ width: `${ma.gasto > 0 ? Math.max(2, (ma.gastoFixo / ma.gasto) * 100) : 0}%` }}
-            />
-          </div>
-        </div>
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-border/60">
+        {[
+          { id: "resumo" as const, label: "Resumo" },
+          { id: "meta" as const, label: "Tráfego Pago" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`relative px-5 py-3 text-sm font-semibold transition ${subTab === t.id ? "text-accent" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {t.label}
+            {subTab === t.id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />}
+          </button>
+        ))}
       </div>
 
-      {/* Comparativo Mês Anterior vs Atual */}
-      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
-        <h3 className="font-display text-lg font-bold flex items-center gap-2 mb-4">
-          📊 Comparativo Mensal
-        </h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      {subTab === "resumo" && (<>
+        {/* KPIs */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <KpiCard label="Receita" value={BRL(ma.receita)} sub={`${BRL(ma.receitaVendas)} vendas`} icon={<TrendingUp className="h-4 w-4" />} trend="up" />
+          <KpiCard label="Gastos" value={BRL(ma.gasto)} sub={`${BRL(ma.gastoFixo)} fixo`} icon={<TrendingDown className="h-4 w-4" />} trend="down" />
+          <KpiCard label="Lucro Líquido" value={`${ma.lucro >= 0 ? "+" : ""}${BRL(ma.lucro)}`} sub={ma.lucro >= 0 ? "positivo" : "negativo"} icon={<Wallet className="h-4 w-4" />} trend={ma.lucro >= 0 ? "up" : "down"} />
+          <KpiCard label="Margem" value={`${ma.margem.toFixed(1)}%`} sub={`anterior: ${mp.margem.toFixed(1)}%`} icon={<Percent className="h-4 w-4" />} trend={ma.margem >= 0 ? "up" : "down"} />
+          <KpiCard label="Fixo / Variável" value={`${ma.gasto > 0 ? ((ma.gastoFixo / ma.gasto) * 100).toFixed(0) : 0}%`} sub={`${data.fixos.length} itens`} icon={<Repeat className="h-4 w-4" />} trend="neutral" />
+        </div>
+
+        {/* Delta cards */}
+        <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Receita", atual: ma.receita, anterior: mp.receita, color: "emerald" },
-            { label: "Gastos", atual: ma.gasto, anterior: mp.gasto, color: "red" },
-            { label: "Lucro", atual: ma.lucro, anterior: mp.lucro, color: ma.lucro >= 0 ? "emerald" : "red" },
+            { label: "Receita", atual: ma.receita, anterior: mp.receita, color: "emerald", delta: deltaR },
+            { label: "Gastos", atual: ma.gasto, anterior: mp.gasto, color: "red", delta: deltaG },
+            { label: "Lucro", atual: ma.lucro, anterior: mp.lucro, color: ma.lucro >= 0 ? "emerald" : "red", delta: deltaL },
           ].map((item) => {
-            const maxVal = Math.max(item.atual, item.anterior, 1);
+            const maxVal = Math.max(Math.abs(item.atual), Math.abs(item.anterior), 1);
             return (
-              <div key={item.label} className="rounded-xl border border-border/50 bg-background/50 p-4">
-                <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-3">{item.label}</p>
+              <div key={item.label} className="rounded-xl border border-border bg-card/60 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-muted-foreground">{item.label}</span>
+                  <Pct v={item.delta} inv={item.label === "Gastos"} />
+                </div>
                 <div className="space-y-2">
                   <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Este mês</span>
-                      <span className={`font-mono font-bold tabular-nums ${item.color === "emerald" ? "text-emerald-400" : "text-red-400"}`}>
-                        {BRL(item.atual)}
-                      </span>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Atual</span>
+                      <span className={`font-mono font-bold tabular-nums ${item.color === "emerald" ? "text-emerald-400" : "text-red-400"}`}>{BRL(item.atual)}</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${item.color === "emerald" ? "bg-emerald-400" : "bg-red-400"}`}
-                        style={{ width: `${Math.max(2, (item.atual / maxVal) * 100)}%` }}
-                      />
+                      <div className={`h-full rounded-full ${item.color === "emerald" ? "bg-emerald-400" : "bg-red-400"}`} style={{ width: `${Math.max(2, (Math.abs(item.atual) / maxVal) * 100)}%` }} />
                     </div>
                   </div>
                   <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Mês anterior</span>
-                      <span className="font-mono font-semibold tabular-nums text-muted-foreground">
-                        {BRL(item.anterior)}
-                      </span>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Anterior</span>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">{BRL(item.anterior)}</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-muted-foreground/30"
-                        style={{ width: `${Math.max(2, (item.anterior / maxVal) * 100)}%` }}
-                      />
+                      <div className="h-full rounded-full bg-muted-foreground/30" style={{ width: `${Math.max(2, (Math.abs(item.anterior) / maxVal) * 100)}%` }} />
                     </div>
                   </div>
                 </div>
@@ -1311,256 +1260,256 @@ function RelatoriosTab({ mes }: { mes: string }) {
             );
           })}
         </div>
-      </div>
 
-      {/* Evolução Mensal — enhanced */}
-      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
-          <div>
-            <h3 className="font-display text-xl font-bold flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-emerald-400" />
-              Evolução Mensal
-            </h3>
-            <p className="text-xs text-muted-foreground">Receita vs Gastos vs Lucro nos últimos 6 meses</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-400" /> Receita</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-rose-500" /> Gasto</span>
-            <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-accent" /> Lucro</span>
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-6 gap-2 sm:gap-4 h-72 items-end pt-4">
-          {data.trend.map((t) => {
-            const hR = t.receita > 0 ? Math.max(6, (t.receita / maxTrend) * 100) : 0;
-            const hG = t.gasto > 0 ? Math.max(6, (t.gasto / maxTrend) * 100) : 0;
-            const positive = t.saldo >= 0;
-            const mesNome = new Date(t.mes + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
-            const hL = Math.abs(t.saldo) > 0 ? Math.max(4, (Math.abs(t.saldo) / maxTrend) * 100) : 0;
-
-            return (
-              <div key={t.mes} className="flex flex-col items-center justify-end h-full gap-2 group">
-                {/* Lucro line indicator */}
-                {hL > 0 && (
-                  <div className="w-full flex justify-center">
-                    <div
-                      className={`h-0.5 rounded-full ${positive ? "bg-accent" : "bg-red-400"}`}
-                      style={{ width: "60%", marginTop: `${100 - Math.max(hR, hG) - hL / 2}%` }}
-                      title={`Lucro (${t.mes}): ${BRL(t.saldo)}`}
-                    />
-                  </div>
-                )}
-                <div className="w-full flex items-end justify-center gap-1 h-full px-1">
-                  <div
-                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-emerald-600/40 to-emerald-400 group-hover:brightness-125 transition-all duration-300"
-                    style={{ height: `${hR}%` }}
-                    title={`Receita: ${BRL(t.receita)}`}
-                  />
-                  <div
-                    className="w-1/2 rounded-t-lg bg-gradient-to-t from-rose-600/40 to-rose-400 group-hover:brightness-125 transition-all duration-300"
-                    style={{ height: `${hG}%` }}
-                    title={`Gasto: ${BRL(t.gasto)}`}
-                  />
-                </div>
-                <div className="w-full text-center border-t border-border/50 pt-2">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">{mesNome}</p>
-                  <p className={`mt-0.5 text-xs font-extrabold tabular-nums ${positive ? "text-emerald-400" : "text-rose-400"}`}>
-                    {positive ? "+" : ""}{BRL(t.saldo)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Top 5 Gastos + Breakdown lado a lado */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        {/* Top 5 Maiores Gastos */}
+        {/* Evolução Mensal */}
         <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2 mb-4">
-            🔥 Top 5 Maiores Gastos
-          </h3>
-          {data.topGastos.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">Nenhum gasto registrado.</div>
-          ) : (
-            <div className="space-y-3">
-              {data.topGastos.map((g, i) => {
-                const cat = getCatMeta(g.categoria);
-                const pct = ma.gasto > 0 ? (g.valor / ma.gasto) * 100 : 0;
-                return (
-                  <div key={i} className="group">
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-secondary/60 text-[0.6rem] font-black text-muted-foreground">
-                          {i + 1}
-                        </span>
-                        <span className="font-semibold">{g.descricao}</span>
-                        {g.recorrente && (
-                          <span className="rounded bg-violet-500/15 px-1 py-0.5 text-[0.5rem] font-bold text-violet-400 uppercase">fixo</span>
-                        )}
-                        <span className="text-xs text-muted-foreground">{cat.emoji} {cat.label}</span>
-                      </span>
-                      <span className="font-mono text-sm font-extrabold tabular-nums text-red-400">−{BRL(g.valor)}</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400 transition-all group-hover:brightness-110"
-                        style={{ width: `${Math.max(2, pct)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Breakdown por Categoria */}
-        <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2 mb-1">
-            📦 Breakdown por Categoria
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">Distribuição dos custos do mês</p>
-
-          {/* Mini donut visual via CSS */}
-          <div className="flex items-center gap-6">
-            <div className="relative h-32 w-32 shrink-0">
-              <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
-                {(() => {
-                  let offset = 0;
-                  const colors = ["#f43f5e", "#a855f7", "#3b82f6", "#f59e0b", "#10b981", "#6366f1", "#ec4899"];
-                  return data.breakdown.slice(0, 7).map((b, i) => {
-                    const pct = b.pct;
-                    const dash = pct;
-                    const gap = 100 - pct;
-                    const el = (
-                      <circle
-                        key={b.categoria}
-                        cx="18" cy="18" r="15.915"
-                        fill="none"
-                        stroke={colors[i % colors.length]}
-                        strokeWidth="3.5"
-                        strokeDasharray={`${dash} ${gap}`}
-                        strokeDashoffset={`${-offset}`}
-                        className="transition-all duration-500"
-                      />
-                    );
-                    offset += pct;
-                    return el;
-                  });
-                })()}
-                <circle cx="18" cy="18" r="12" fill="var(--card, #1a1a1a)" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-lg font-black tabular-nums">{BRL(ma.gasto)}</p>
-                <p className="text-[0.55rem] text-muted-foreground">total</p>
-              </div>
-            </div>
-            <div className="flex-1 space-y-2">
-              {data.breakdown.slice(0, 5).map((b, i) => {
-                const cat = getCatMeta(b.categoria);
-                const colors = ["bg-rose-500", "bg-violet-500", "bg-blue-500", "bg-amber-500", "bg-emerald-500"];
-                return (
-                  <div key={b.categoria} className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-sm ${colors[i % colors.length]}`} />
-                      <span className="text-muted-foreground">{cat.emoji} {cat.label}</span>
-                    </span>
-                    <span className="font-mono font-bold tabular-nums">{BRL(b.total)} <span className="text-muted-foreground">({b.pct.toFixed(0)}%)</span></span>
-                  </div>
-                );
-              })}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold flex items-center gap-2"><BarChart3 className="h-4 w-4 text-accent" /> Evolução Mensal</h3>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-emerald-400" /> Receita</span>
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-rose-500" /> Gasto</span>
+              <span className="flex items-center gap-1.5"><span className="h-0.5 w-3 rounded bg-accent" /> Lucro</span>
             </div>
           </div>
-
-          {/* Lista completa */}
-          <div className="mt-5 space-y-3">
-            {data.breakdown.map((b) => {
-              const cat = getCatMeta(b.categoria);
+          <div className="grid grid-cols-6 gap-2 sm:gap-4 h-64 items-end">
+            {data.trend.map((t) => {
+              const hR = t.receita > 0 ? Math.max(6, (t.receita / maxTrend) * 100) : 0;
+              const hG = t.gasto > 0 ? Math.max(6, (t.gasto / maxTrend) * 100) : 0;
+              const ok = t.saldo >= 0;
+              const nome = new Date(t.mes + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
               return (
-                <div key={b.categoria} className="group">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="flex items-center gap-2 font-bold">
-                      <span className="p-1 rounded bg-secondary/60 text-base">{cat.emoji}</span>
-                      <span>{cat.label}</span>
-                      <span className="text-xs font-normal text-muted-foreground">· {b.count} lanç.</span>
-                    </span>
-                    <span className="font-mono tabular-nums font-extrabold text-rose-400">
-                      {BRL(b.total)} <span className="text-xs text-muted-foreground font-normal">({b.pct.toFixed(1)}%)</span>
-                    </span>
+                <div key={t.mes} className="flex flex-col items-center justify-end h-full gap-1 group">
+                  <div className="w-full flex items-end justify-center gap-1 h-full px-1">
+                    <div className="w-1/2 rounded-t bg-emerald-400/80 group-hover:brightness-125 transition" style={{ height: `${hR}%` }} title={`Receita: ${BRL(t.receita)}`} />
+                    <div className="w-1/2 rounded-t bg-rose-400/80 group-hover:brightness-125 transition" style={{ height: `${hG}%` }} title={`Gasto: ${BRL(t.gasto)}`} />
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/60 p-0.5">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400 transition-all duration-300 group-hover:brightness-110"
-                      style={{ width: `${Math.max(2, b.pct)}%` }}
-                    />
+                  <div className="w-full text-center border-t border-border/40 pt-1.5">
+                    <p className="text-[0.6rem] font-semibold text-muted-foreground">{nome}</p>
+                    <p className={`text-xs font-bold tabular-nums ${ok ? "text-emerald-400" : "text-rose-400"}`}>{ok ? "+" : ""}{BRL(t.saldo)}</p>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
 
-      {/* Gastos Fixos Recorrentes */}
-      <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-card/50 to-transparent p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-violet-500/20 pb-4">
-          <div>
-            <h3 className="font-display text-xl font-bold flex items-center gap-2 text-violet-300">
-              <Repeat className="h-5 w-5 text-violet-400" /> Gastos Fixos Recorrentes
-            </h3>
-            <p className="text-xs text-muted-foreground">Despesas mensais que se repetem</p>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-violet-400/80 block">Total Fixo Mensal</span>
-              <p className="font-mono text-2xl font-black tabular-nums text-violet-300">{BRL(data.totalFixos)}</p>
+        {/* Breakdown + Top 5 */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Breakdown */}
+          <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+            <h3 className="text-sm font-bold mb-4">Breakdown por Categoria</h3>
+            <div className="flex items-center gap-6 mb-5">
+              <div className="relative h-28 w-28 shrink-0">
+                <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+                  {(() => {
+                    let offset = 0;
+                    return data.breakdown.slice(0, 7).map((b) => {
+                      const dash = b.pct;
+                      const gap = 100 - b.pct;
+                      const el = (
+                        <circle key={b.categoria} cx="18" cy="18" r="15.915" fill="none" stroke={DONUT_COLORS[data.breakdown.indexOf(b) % DONUT_COLORS.length]} strokeWidth="3.5" strokeDasharray={`${dash} ${gap}`} strokeDashoffset={`${-offset}`} />
+                      );
+                      offset += b.pct;
+                      return el;
+                    });
+                  })()}
+                  <circle cx="18" cy="18" r="12" fill="var(--card, #1a1a1a)" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="text-base font-black tabular-nums">{BRL(ma.gasto)}</p>
+                  <p className="text-[0.5rem] text-muted-foreground">total</p>
+                </div>
+              </div>
+              <div className="flex-1 space-y-1.5">
+                {data.breakdown.slice(0, 5).map((b, i) => {
+                  const cat = getCatMeta(b.categoria);
+                  return (
+                    <div key={b.categoria} className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-sm ${COLORS[i % COLORS.length]}`} />
+                        <span className="text-muted-foreground">{cat.emoji} {cat.label}</span>
+                      </span>
+                      <span className="font-mono font-bold tabular-nums">{BRL(b.total)} <span className="text-muted-foreground">({b.pct.toFixed(0)}%)</span></span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            {ma.gasto > 0 && (
-              <div className="text-right">
-                <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground block">% do Total</span>
-                <p className="font-mono text-2xl font-black tabular-nums text-foreground">
-                  {((data.totalFixos / ma.gasto) * 100).toFixed(0)}%
-                </p>
+            <div className="space-y-2.5">
+              {data.breakdown.map((b, i) => {
+                const cat = getCatMeta(b.categoria);
+                return (
+                  <div key={b.categoria}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-semibold">{cat.emoji} {cat.label} <span className="text-muted-foreground font-normal">· {b.count}</span></span>
+                      <span className="font-mono font-bold tabular-nums text-red-400">{BRL(b.total)} <span className="text-muted-foreground font-normal">({b.pct.toFixed(0)}%)</span></span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400" style={{ width: `${Math.max(2, b.pct)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Top 5 */}
+          <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+            <h3 className="text-sm font-bold mb-4">Top 5 Maiores Gastos</h3>
+            {data.topGastos.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">Nenhum gasto registrado.</div>
+            ) : (
+              <div className="space-y-3">
+                {data.topGastos.map((g, i) => {
+                  const cat = getCatMeta(g.categoria);
+                  const pct = ma.gasto > 0 ? (g.valor / ma.gasto) * 100 : 0;
+                  return (
+                    <div key={i}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded bg-secondary/60 text-[0.6rem] font-black text-muted-foreground">{i + 1}</span>
+                          <span className="font-semibold truncate max-w-[180px]">{g.descricao}</span>
+                          {g.recorrente && <span className="rounded bg-violet-500/15 px-1 py-0.5 text-[0.5rem] font-bold text-violet-400 uppercase">fixo</span>}
+                        </span>
+                        <span className="font-mono font-bold tabular-nums text-red-400">−{BRL(g.valor)}</span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400" style={{ width: `${Math.max(2, pct)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-          {data.fixos.length === 0 ? (
-            <div className="col-span-2 py-8 text-center text-sm text-muted-foreground bg-secondary/20 rounded-xl">
-              Nenhum gasto fixo cadastrado.
+        {/* Fixos */}
+        {data.fixos.length > 0 && (
+          <div className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold flex items-center gap-2 text-violet-300"><Repeat className="h-4 w-4" /> Gastos Fixos</h3>
+              <span className="font-mono text-lg font-black tabular-nums text-violet-300">{BRL(data.totalFixos)}</span>
             </div>
-          ) : (
-            data.fixos.map((f) => {
-              const cat = getCatMeta(f.categoria);
-              const pct = data.totalFixos > 0 ? (f.valor / data.totalFixos) * 100 : 0;
-              return (
-                <div key={f.id} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/80 p-3.5 hover:border-violet-500/40 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="p-2 rounded-lg bg-secondary/60 text-lg shrink-0">{cat.emoji}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{f.descricao}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[0.6rem] uppercase tracking-widest text-muted-foreground font-semibold">{cat.label}</p>
-                        <div className="h-1 flex-1 max-w-[60px] rounded-full bg-secondary/60 overflow-hidden">
-                          <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.max(2, pct)}%` }} />
-                        </div>
-                        <span className="text-[0.55rem] text-muted-foreground">{pct.toFixed(0)}%</span>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {data.fixos.map((f) => {
+                const cat = getCatMeta(f.categoria);
+                const pct = data.totalFixos > 0 ? (f.valor / data.totalFixos) * 100 : 0;
+                return (
+                  <div key={f.id} className="flex items-center justify-between rounded-xl border border-border/40 bg-card/60 p-3 hover:border-violet-500/30 transition">
+                    <span className="flex items-center gap-2 text-xs min-w-0 flex-1">
+                      <span>{cat.emoji}</span>
+                      <span className="truncate font-semibold">{f.descricao}</span>
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="h-1 w-12 rounded-full bg-secondary/60 overflow-hidden">
+                        <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.max(2, pct)}%` }} />
                       </div>
+                      <span className="font-mono text-xs font-bold tabular-nums text-violet-300">{BRL(f.valor)}</span>
                     </div>
                   </div>
-                  <p className="font-mono text-sm font-extrabold tabular-nums text-violet-300 pl-3 shrink-0">{BRL(f.valor)}</p>
-                </div>
-              );
-            })
-          )}
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </>)}
+
+      {subTab === "meta" && <MetaAdsTab days={data.metaAdsDays} total={data.metaAdsTotal} gastoMes={ma.gasto} />}
+    </div>
+  );
+}
+
+// ============================================================
+// SUB-TAB: TRÁFEGO PAGO (META ADS)
+// ============================================================
+function MetaAdsTab({ days, total, gastoMes }: { days: { date: string; spend: number }[]; total: number; gastoMes: number }) {
+  const pctDoGasto = gastoMes > 0 ? (total / gastoMes) * 100 : 0;
+  const maxDay = Math.max(1, ...days.map((d) => d.spend));
+  const daysSorted = [...days].sort((a, b) => b.spend - a.spend);
+  const avgPerDay = days.length > 0 ? total / days.length : 0;
+  const daysWithSpend = days.filter((d) => d.spend > 0).length;
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.08] to-transparent p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Total Investido</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-amber-400">{BRL(total)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{daysWithSpend} dias com investimento</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card/60 p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Média / Dia</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-foreground">{BRL(avgPerDay)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">em {daysWithSpend} dias</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card/60 p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">Maior Gasto</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-foreground">{daysSorted.length > 0 ? BRL(daysSorted[0].spend) : "—"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{daysSorted.length > 0 ? new Date(daysSorted[0].date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : ""}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card/60 p-5">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-muted-foreground">% do Gasto Total</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-foreground">{pctDoGasto.toFixed(1)}%</p>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-secondary/60 overflow-hidden">
+            <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, pctDoGasto)}%` }} />
+          </div>
         </div>
       </div>
 
+      {/* Bar chart diário */}
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+        <h3 className="text-sm font-bold mb-4">Gasto Diário</h3>
+        {days.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Nenhum dado de investimento encontrado.</div>
+        ) : (
+          <div className="flex items-end gap-1 h-48">
+            {days.map((d) => {
+              const h = d.spend > 0 ? Math.max(4, (d.spend / maxDay) * 100) : 0;
+              const dayNum = new Date(d.date + "T00:00:00").getDate();
+              return (
+                <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full group" title={`${dayNum}/${d.date.slice(5,7)}: ${BRL(d.spend)}`}>
+                  <div className="w-full rounded-t bg-amber-400/80 group-hover:brightness-125 transition" style={{ height: `${h}%` }} />
+                  {dayNum % 5 === 1 || dayNum === 1 && (
+                    <p className="text-[0.5rem] text-muted-foreground mt-1">{dayNum}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Lista de dias com maior gasto */}
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-sm">
+        <h3 className="text-sm font-bold mb-4">Maiores Dias de Investimento</h3>
+        {daysSorted.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Sem dados.</div>
+        ) : (
+          <div className="space-y-2">
+            {daysSorted.slice(0, 10).map((d, i) => {
+              const pct = total > 0 ? (d.spend / total) * 100 : 0;
+              const nome = new Date(d.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+              return (
+                <div key={d.date} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-secondary/60 text-[0.6rem] font-black text-muted-foreground">{i + 1}</span>
+                    <span className="font-semibold">{nome}</span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-1.5 w-24 rounded-full bg-secondary/60 overflow-hidden">
+                      <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.max(2, (d.spend / maxDay) * 100)}%` }} />
+                    </div>
+                    <span className="font-mono font-bold tabular-nums w-20 text-right">{BRL(d.spend)}</span>
+                    <span className="text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
