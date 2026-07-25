@@ -50,6 +50,35 @@ function toSpDateString(raw: unknown): string | null {
   return null;
 }
 
+/**
+ * Converte campo de data (string ou número) para timestamp UTC em ms.
+ * Datas simples "YYYY-MM-DD" são tratadas como meia-noite em São Paulo.
+ * Retorna null se inválido.
+ */
+function parseDataField(raw: unknown): number | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  // Plain date "YYYY-MM-DD" — treat as SP midnight (UTC-3 = +3h offset)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    // SP midnight = UTC 03:00 of same day
+    return Date.UTC(y, m - 1, d, 3, 0, 0);
+  }
+
+  // Full ISO or any other string
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.getTime();
+
+  // Brazilian format "DD/MM/YYYY"
+  const m2 = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (m2) return Date.UTC(+m2[3], +m2[2] - 1, +m2[1], 3, 0, 0);
+
+  return null;
+}
+
+
 function inRangeSp(raw: unknown, fromStr?: string | null, toStr?: string | null): boolean {
   if (!fromStr && !toStr) return true;
   const isoSp = toSpDateString(raw);
