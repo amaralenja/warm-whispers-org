@@ -1519,21 +1519,31 @@ function MetaAdsTab({ days, total, gastoMes }: { days: { date: string; spend: nu
 // TAB: DRE (Demonstração do Resultado do Exercício)
 // ============================================================
 function DreTab({ mes }: { mes: string }) {
+  const { getShare } = useDashboardConfig();
   const fetchDre = useServerFn(getDRE);
   const [from, setFrom] = useState(() => mes + "-01");
   const [to, setTo] = useState(() => todayISO());
   const [imposto, setImposto] = useState(0);
   const [showDailyMeta, setShowDailyMeta] = useState(false);
 
+  const sharePct = useMemo(() => ({
+    caio: getShare("Caio"),
+    gustavo: getShare("Gustavo"),
+    ht: getShare("HT"),
+  }), [getShare]);
+
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["financeiro-dre", from, to],
-    queryFn: () => fetchDre({ data: { from, to } }),
+    queryKey: ["financeiro-dre", from, to, sharePct],
+    queryFn: () => fetchDre({ data: { from, to, sharePct } }),
   });
 
   const fatTotal = data?.fatTotal ?? 0;
   const fatCaio = data?.fatCaio ?? 0;
-  const fatGu = (data?.fatGustavo ?? 0) * 0.5;
+  const fatGu = data?.fatGustavo ?? 0;
   const fatHt = data?.fatHt ?? 0;
+  const pctCaio = data?.sharePct?.caio ?? 100;
+  const pctGu = data?.sharePct?.gustavo ?? 100;
+  const pctHt = data?.sharePct?.ht ?? 100;
 
   const trafegoMeta = data?.custos.trafegoPago.total ?? 0;
   const devSaasTotal = data?.custos.devSaas.total ?? 0;
@@ -1690,9 +1700,9 @@ function DreTab({ mes }: { mes: string }) {
               <TrendingUp className="h-4 w-4" /> Entradas de Faturamento Bruto
             </h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <FatBox label="Operação Caio (100%)" value={BRL(fatCaio)} />
-              <FatBox label="Operação Gustavo (50%)" value={BRL(fatGu)} sub={`Bruto acumulado: ${BRL(data.fatGustavo)}`} />
-              <FatBox label="High Ticket (100%)" value={BRL(fatHt)} />
+              <FatBox label={`Operação Caio (${pctCaio}%)`} value={BRL(fatCaio * pctCaio / 100)} sub={`Bruto: ${BRL(fatCaio)}`} />
+              <FatBox label={`Operação Gustavo (${pctGu}%)`} value={BRL(fatGu * pctGu / 100)} sub={`Bruto: ${BRL(fatGu)}`} />
+              <FatBox label={`High Ticket (${pctHt}%)`} value={BRL(fatHt * pctHt / 100)} sub={`Bruto: ${BRL(fatHt)}`} />
             </div>
             <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-4">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Faturamento Total do Período</p>
