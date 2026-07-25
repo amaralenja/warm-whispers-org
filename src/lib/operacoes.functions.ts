@@ -624,7 +624,7 @@ export const getOperacoesStats = createServerFn({ method: "POST" })
 
         const { data: crmLeadsData } = await supabase
           .from("crm_leads" as any)
-          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at")
+          .select("id, email, telefone, expert, fonte, responsavel_utm, created_at, updated_at, dados")
           .order("created_at", { ascending: false })
           .limit(3000);
         if (crmLeadsData) quizLeadsHt.push(...crmLeadsData);
@@ -877,9 +877,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       // CRM leads (sem limite de 3000)
       fetchAll<any>((from, to) =>
         supabase.from("crm_leads" as any)
-          .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, created_at, origem")
+          .select("id, email, telefone, expert, fonte, responsavel_utm, created_at, updated_at, dados")
           .range(from, to)
-      ).catch(() => []),
+      ).catch((err) => {
+        console.warn("Erro ao buscar crm_leads:", err);
+        return [];
+      }),
     ]);
 
     // ── 2. Maps de lookup (O(1) em vez de O(N)) ──
