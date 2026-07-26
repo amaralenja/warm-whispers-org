@@ -1319,23 +1319,9 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return null;
     };
 
-    // ── 5b. Complementa leads por operação via match venda→lead (email/phone) ──
-    // Leads que não foram classificados por UTM mas têm venda associada são contabilizados aqui
-    const countedLeadsByOp = new Map<string, Set<string>>();
-    for (const v of vendasPeriodo) {
-      const vEmail = String(v.Email ?? "").trim().toLowerCase();
-      const vTel = cleanPhone(v.Telefone ?? "");
-      const lead = matchLead(vEmail, vTel);
-      if (!lead) continue;
-      const leadId = String(lead.id ?? lead.email ?? lead.whatsapp ?? "");
-      const op = v._expert;
-      if (!countedLeadsByOp.has(op)) countedLeadsByOp.set(op, new Set());
-      countedLeadsByOp.get(op)!.add(leadId);
-    }
-    for (const [op, ids] of countedLeadsByOp) {
-      const existing = leadsByOp.get(op) || 0;
-      if (ids.size > existing) leadsByOp.set(op, ids.size);
-    }
+    // (5b removido) O registro unificado acima já contabiliza todos os leads de quiz,
+    // CRM e conversas do WhatsApp — sobrescrever por vendas casadas inflava os números.
+
 
     const classifyFonte = (lead: any): string => {
       const src = norm(lead.utm_source || lead.origem);
