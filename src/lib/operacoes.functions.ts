@@ -1223,13 +1223,20 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const isDefinitelyTypebot = forceTypebot || hasTypebotTag;
 
-      // Regra 2: Etiqueta de Typebot + Tráfego Pago -> "Typebot (Tráfego Pago)"
-      if (isDefinitelyTypebot && isPaid) {
+      // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
+      const rawText = norm(
+        `${lead.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
+      );
+      const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
+      const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
+
+      // Regra 2: Etiqueta de Typebot + Tráfego Pago OU mensagem de formulário -> "Typebot (Tráfego Pago)"
+      if ((isDefinitelyTypebot && isPaid) || isTextFormulario || (hasPaidTag && hasTypebotTag)) {
         return "Typebot (Tráfego Pago)";
       }
 
-      // Regra 3: Etiqueta de Typebot + Orgânico -> "Typebot (Orgânico)"
-      if (hasTypebotTag || (forceTypebot && (hasOrganicTag || hasTypebotTag))) {
+      // Regra 3: Etiqueta de Typebot + Orgânico OU mensagem do Youtube/Instagram -> "Typebot (Orgânico)"
+      if (hasTypebotTag || isTextYoutube || (forceTypebot && (hasOrganicTag || hasTypebotTag))) {
         return "Typebot (Orgânico)";
       }
 
@@ -1238,7 +1245,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return "Orgânico Direto";
       }
 
-      // Padrão para leads não etiquetados
+      // Padrão para leads não etiquetados e sem texto de formulário/Youtube
       return "Orgânico Direto";
     };
 
@@ -1261,24 +1268,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     }
 
     const waOpForPhone = (rawPhone: string): string | null => {
-      for (const v of getPhoneVariations(rawPhone)) {
-        const op = phoneToWaOp.get(v);
-        if (op) return op;
+      const phone = cleanPhone(rawPhone);
+      if (!phone) return null;
+      for (const v of getPhoneVariations(phone)) {
+        if (phoneToWaOp.has(v)) return phoneToWaOp.get(v)!;
       }
       return null;
-    };
-
-    /** Retorna a chave única do lead, ou null se já foi contabilizado. */
-    const registerLead = (rawPhone: string, rawEmail: string, fallbackKey: string): string | null => {
-      const email = String(rawEmail ?? "").trim().toLowerCase();
-      const vars = getPhoneVariations(rawPhone);
-      if (vars.some((v) => seenPhoneKeys.has(v))) return null;
-      if (email && seenEmailKeys.has(email)) return null;
-      for (const v of vars) seenPhoneKeys.add(v);
-      if (email) seenEmailKeys.add(email);
-      const key = vars[0] ? `p:${vars[0]}` : email ? `e:${email}` : fallbackKey;
-      uniqueLeadKeys.add(key);
-      return key;
     };
 
     const countLead = (op: string, leadType: string) => {
@@ -1288,6 +1283,24 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
       entry.leads += 1;
       typeMap.set(leadType, entry);
+    };
+
+    const registerLead = (phone: string, email: string, leadId: string): boolean => {
+      let isDuplicate = false;
+      if (email) {
+        if (seenEmailKeys.has(email)) isDuplicate = true;
+        else seenEmailKeys.add(email);
+      }
+      if (phone) {
+        const vars = getPhoneVariations(phone);
+        if (vars.some((v) => seenPhoneKeys.has(v))) isDuplicate = true;
+        for (const v of vars) seenPhoneKeys.add(v);
+      }
+      if (!email && !phone) {
+        if (uniqueLeadKeys.has(leadId)) isDuplicate = true;
+        else uniqueLeadKeys.add(leadId);
+      }
+      return !isDuplicate;
     };
 
     for (const l of quizLeadsRaw) {
@@ -1328,6 +1341,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const fakeLeadForClassify = {
         telefone: conv.contact_wa_id,
         tags: Array.isArray(conv.tags) ? conv.tags : [],
+        last_message_preview: conv.last_message_preview,
         expert: op,
       };
       countLead(op, classifyLeadType(fakeLeadForClassify, false, op));
