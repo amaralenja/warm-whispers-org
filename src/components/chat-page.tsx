@@ -1425,28 +1425,26 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
     const attr = getLeadAttributionBadge(lead, sub);
 
-    const rawText = String(c.last_message_preview || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
-    const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
+    const isTypebotLead = (d && (typebotPhonesSet.has(d) || (d.length >= 8 && typebotPhonesSet.has(d.slice(-8))))) || (() => {
+      const l: any = lead ?? {};
+      const convTags: string[] = Array.isArray(c.tags) ? c.tags : [];
+      const hay = [
+        l.fonte, l.origem, l.utm_source, l.utm_medium, l.utm_campaign,
+        ...(Array.isArray(l.tags) ? l.tags : []),
+        ...convTags,
+      ].filter(Boolean).join(" ").toLowerCase();
+      const rawText = String(c.last_message_preview || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      return /typebot|quiz|form(ul[aá]rio)?/.test(hay) || rawText.includes("formulario") || rawText.includes("formulari") || rawText.includes("youtube") || !!sub;
+    })();
 
-    const convTags: string[] = Array.isArray(c.tags) ? c.tags.map((t: any) => String(t).toUpperCase()) : [];
-    const leadTags: string[] = Array.isArray((lead as any)?.tags) ? (lead as any).tags.map((t: any) => String(t).toUpperCase()) : [];
-    const allTags = [...convTags, ...leadTags];
+    const isPago = Boolean(attr?.isPago);
 
-    const hasTypebotTag = (d && (typebotPhonesSet.has(d) || (d.length >= 8 && typebotPhonesSet.has(d.slice(-8))))) ||
-      allTags.some((t) => t.includes("TYPEBOT") || t.includes("BOT") || t.includes("QUIZ") || t.includes("SALVE")) ||
-      isTextFormulario || isTextYoutube || !!sub;
-
-    const hasPaidTag = allTags.some((t) => t.includes("TRAFEGO PAGO") || t.includes("TRÁFEGO PAGO") || t.includes("PAGO") || t.includes("ADS") || t.includes("PATROCINADO"));
-
-    const isPaid = (attr?.isPago ?? false) || hasPaidTag || isTextFormulario;
-
-    if (hasTypebotTag) {
-      if (isPaid) return "typebot_paid";
+    if (isTypebotLead) {
+      if (isPago) return "typebot_paid";
       return "typebot_organic";
     }
 
-    if (isPaid) return "typebot_paid";
+    if (isPago) return "typebot_paid";
     return "organic_direct";
   }, [findLeadForConv, typebotByPhone, typebotPhonesSet]);
 
