@@ -1258,22 +1258,17 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
 
-      const isTypebotLead = hasTypebotTag || forceTypebot || isTextFormulario || isTextYoutube || !!matched;
+      // 1. Leads de Formulário de Anúncios ("Vim do formulário") OU UTM/tag de anúncio -> Typebot (Tráfego Pago)
+      if (isTextFormulario || isPaid || hasPaidTag) {
+        return "Typebot (Tráfego Pago)";
+      }
 
-      // 1. Se é um lead de Typebot (tem tag de Typebot/Quiz, ou mensagem de formulário/YouTube/Quiz)
-      if (isTypebotLead) {
-        // Se a atribuição calculada (ou etiqueta) for de anúncio pago -> Typebot (Tráfego Pago)
-        if (isPaid || hasPaidTag) {
-          return "Typebot (Tráfego Pago)";
-        }
-        // Se a atribuição (ou etiqueta) for orgânica -> Typebot (Orgânico) (Badge TYPEBOT + ORGÂNICO)
+      // 2. Leads do YouTube ("Vim do Youtube") OU com etiqueta de Typebot/Quiz -> Typebot (Orgânico)
+      if (isTextYoutube || hasTypebotTag || (forceTypebot && !hasOrganicTag) || !!matched) {
         return "Typebot (Orgânico)";
       }
 
-      // 2. Se NÃO é um lead de Typebot (mensagens diretas de contato no WhatsApp)
-      if (isPaid || hasPaidTag) {
-        return "Tráfego Pago";
-      }
+      // 3. Mensagens diretas no WhatsApp -> Orgânico Direto
       return "Orgânico Direto";
     };
 
