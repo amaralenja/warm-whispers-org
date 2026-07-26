@@ -1211,22 +1211,26 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return isPaid ? "Tráfego Pago" : "Orgânico";
       }
 
-      const isDefinitelyTypebot = forceTypebot || hasTypebotTag;
+      // Regras da Operação do Caio:
+      const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
+      const cleanCp = isCampEmpty ? "" : cp;
+      const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
+      const hasClickId = !!fbclid || !!gclid || !!fbp;
+      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
+      const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
+      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord;
 
-      if (isDefinitelyTypebot) {
-        const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
-        const cleanCp = isCampEmpty ? "" : cp;
-        const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
-        const hasClickId = !!fbclid || !!gclid || !!fbp;
-        const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
-        const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
-        const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
-        const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
-        if (isPaid) return "Typebot (Tráfego Pago)";
-        return "Typebot (Orgânico)";
+      if (isPaid) return "Typebot (Tráfego Pago)";
+
+      // Se tiver APENAS etiqueta explícita de "DIRETO" (sem Typebot nem WA flow)
+      const hasDiretoTag = leadTags.some((t) => t.includes("DIRETO"));
+      if (hasDiretoTag && !hasTypebotTag && !forceTypebot) {
+        return "Orgânico Direto";
       }
 
-      return "Orgânico Direto";
+      // Por padrão na operação do Caio (WhatsApp, Typebot, Quiz ou sem etiqueta): é Typebot (Orgânico)
+      return "Typebot (Orgânico)";
     };
 
     // ── Registro unificado de leads (quiz + CRM + conversas do WhatsApp) ──
