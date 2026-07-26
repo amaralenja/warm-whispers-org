@@ -1221,71 +1221,97 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return "Orgânico Direto";
     };
 
-    for (const l of quizLeadsRaw) {
-      if (!inRange(l.received_at || l.created_at)) continue;
-      const email = String(l.email ?? "").trim().toLowerCase();
-      if (email) emailToLead.set(email, l);
-      const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
-      if (phone) phoneToLead.set(phone, l);
-      const op = classifyLeadOp(l) || "Caio";
+    // ── Registro unificado de leads (quiz + CRM + conversas do WhatsApp) ──
+    // Dedup real por telefone (com variações do 9º dígito) e e-mail — nunca por id,
+    // porque ids de tabelas diferentes nunca colidem e inflavam o total.
+    const seenPhoneKeys = new Set<string>();
+    const seenEmailKeys = new Set<string>();
+    const uniqueLeadKeys = new Set<string>();
+
+    // Mapa telefone → operação da conversa (fonte de verdade do "Chat ao vivo")
+    const phoneToWaOp = new Map<string, string>();
+    for (const conv of waConvsRaw) {
+      const rawOp = String(conv.operacao_id ?? "").trim();
+      if (!rawOp || rawOp === "__notificador__") continue;
+      const op = canonicalOpName(rawOp);
+      for (const v of getPhoneVariations(conv.contact_wa_id ?? "")) {
+        if (!phoneToWaOp.has(v)) phoneToWaOp.set(v, op);
+      }
+    }
+
+    const waOpForPhone = (rawPhone: string): string | null => {
+      for (const v of getPhoneVariations(rawPhone)) {
+        const op = phoneToWaOp.get(v);
+        if (op) return op;
+      }
+      return null;
+    };
+
+    /** Retorna a chave única do lead, ou null se já foi contabilizado. */
+    const registerLead = (rawPhone: string, rawEmail: string, fallbackKey: string): string | null => {
+      const email = String(rawEmail ?? "").trim().toLowerCase();
+      const vars = getPhoneVariations(rawPhone);
+      if (vars.some((v) => seenPhoneKeys.has(v))) return null;
+      if (email && seenEmailKeys.has(email)) return null;
+      for (const v of vars) seenPhoneKeys.add(v);
+      if (email) seenEmailKeys.add(email);
+      const key = vars[0] ? `p:${vars[0]}` : email ? `e:${email}` : fallbackKey;
+      uniqueLeadKeys.add(key);
+      return key;
+    };
+
+    const countLead = (op: string, leadType: string) => {
       leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(l, true, op);
       if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
       const typeMap = leadBreakdownByOp.get(op)!;
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
       entry.leads += 1;
       typeMap.set(leadType, entry);
+    };
+
+    for (const l of quizLeadsRaw) {
+      const email = String(l.email ?? "").trim().toLowerCase();
+      const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
+      if (email) emailToLead.set(email, l);
+      if (phone) phoneToLead.set(phone, l);
+      if (!inRange(l.received_at || l.created_at)) continue;
+      if (!registerLead(phone, email, `quiz:${l.id}`)) continue;
+      const op = classifyLeadOp(l, phoneToWaTagsAll) || waOpForPhone(phone) || "Caio";
+      countLead(op, classifyLeadType(l, true, op));
     }
+
     for (const l of crmLeadsRaw) {
       // Usa APENAS created_at para o filtro de data — updated_at muda quando tags são alteradas
-      // e causaria leads antigos (com tags atualizadas hoje) aparecerem como leads de hoje
-      if (!inRange(l.created_at)) continue;
       const email = String(l.email ?? "").trim().toLowerCase();
-      const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
-      // Deduplicar: se já existe no quiz, não conta novamente
-      const alreadyCounted = (email && emailToLead.has(email)) || (phone && phoneToLead.has(phone));
+      const phone = cleanPhone(l.telefone ?? l.whatsapp ?? "");
       if (email && !emailToLead.has(email)) emailToLead.set(email, l);
       if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
-      if (alreadyCounted) continue; // já contado no quiz
-      const op = classifyLeadOp(l) || "Caio";
-      leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(l, false, op);
-      if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
-      const typeMap = leadBreakdownByOp.get(op)!;
-      const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
-      entry.leads += 1;
-      typeMap.set(leadType, entry);
+      if (!inRange(l.created_at)) continue;
+      if (!registerLead(phone, email, `crm:${l.id}`)) continue;
+      const op = classifyLeadOp(l, phoneToWaTagsAll) || waOpForPhone(phone) || "Caio";
+      countLead(op, classifyLeadType(l, false, op));
     }
-    // Contabiliza conversas do WhatsApp como leads (para operações onde nem todo lead vai pro CRM)
+
+    // Conversas do WhatsApp que ainda não existem como lead (nem quiz nem CRM)
     for (const conv of waConvsRaw) {
       if (!inRange(conv.created_at || conv.updated_at)) continue;
       const rawOp = String(conv.operacao_id ?? "").trim();
       if (!rawOp || rawOp === "__notificador__") continue;
-      const op = canonicalOpName(rawOp); // Normaliza para "Caio", "Jessica", "Gustavo"
+      const op = canonicalOpName(rawOp);
       const opNorm = norm(op);
       if (opNorm !== "caio" && opNorm !== "gustavo" && opNorm !== "jessica") continue;
       const phone = cleanPhone(conv.contact_wa_id ?? "");
       if (!phone) continue;
-      // Deduplicar: não conta se já existe como lead do CRM ou quiz
-      if (phoneToLead.has(phone)) continue;
-      const vars = getPhoneVariations(phone);
-      if (vars.some((v) => phoneToLead.has(v))) continue;
-      // Lead novo — registra e conta
-      phoneToLead.set(phone, conv);
-      const rawTags = Array.isArray(conv.tags) ? conv.tags : [];
+      if (!registerLead(phone, "", `wa:${phone}`)) continue;
+      if (!phoneToLead.has(phone)) phoneToLead.set(phone, conv);
       const fakeLeadForClassify = {
         telefone: conv.contact_wa_id,
-        tags: rawTags,
+        tags: Array.isArray(conv.tags) ? conv.tags : [],
         expert: op,
       };
-      leadsByOp.set(op, (leadsByOp.get(op) || 0) + 1);
-      const leadType = classifyLeadType(fakeLeadForClassify, false, op);
-      if (!leadBreakdownByOp.has(op)) leadBreakdownByOp.set(op, new Map());
-      const typeMap = leadBreakdownByOp.get(op)!;
-      const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
-      entry.leads += 1;
-      typeMap.set(leadType, entry);
+      countLead(op, classifyLeadType(fakeLeadForClassify, false, op));
     }
+
 
     const matchLead = (vEmail: string, vTel: string) => {
       if (vEmail && emailToLead.has(vEmail)) return emailToLead.get(vEmail);
