@@ -1221,16 +1221,25 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord;
 
-      if (isPaid) return "Typebot (Tráfego Pago)";
+      const isDefinitelyTypebot = forceTypebot || hasTypebotTag;
 
-      // Se tiver APENAS etiqueta explícita de "DIRETO" (sem Typebot nem WA flow)
-      const hasDiretoTag = leadTags.some((t) => t.includes("DIRETO"));
-      if (hasDiretoTag && !hasTypebotTag && !forceTypebot) {
+      // Regra 2: Etiqueta de Typebot + Tráfego Pago -> "Typebot (Tráfego Pago)"
+      if (isDefinitelyTypebot && isPaid) {
+        return "Typebot (Tráfego Pago)";
+      }
+
+      // Regra 3: Etiqueta de Typebot + Orgânico -> "Typebot (Orgânico)"
+      if (hasTypebotTag || (forceTypebot && (hasOrganicTag || hasTypebotTag))) {
+        return "Typebot (Orgânico)";
+      }
+
+      // Regra 1: Etiqueta de Orgânico (sem Typebot) -> "Orgânico Direto"
+      if (hasOrganicTag && !hasTypebotTag) {
         return "Orgânico Direto";
       }
 
-      // Por padrão na operação do Caio (WhatsApp, Typebot, Quiz ou sem etiqueta): é Typebot (Orgânico)
-      return "Typebot (Orgânico)";
+      // Padrão para leads não etiquetados
+      return "Orgânico Direto";
     };
 
     // ── Registro unificado de leads (quiz + CRM + conversas do WhatsApp) ──
