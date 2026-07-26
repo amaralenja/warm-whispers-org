@@ -1251,6 +1251,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
+      // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
+      const rawText = norm(
+        `${lead.last_message_preview || matchedConv?.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
+      );
+      const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
+      const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
+
       const isTypebotLead = hasTypebotTag || forceTypebot || isTextFormulario || isTextYoutube || !!matched;
 
       // 1. Se é um lead de Typebot (tem tag de Typebot/Quiz, ou mensagem de formulário/YouTube/Quiz)
