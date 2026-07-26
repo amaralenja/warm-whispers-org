@@ -27,7 +27,7 @@ import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 import { KanbanLeadCard, useIgProfileMap } from "@/components/kanban-lead-card";
 import { DragScroll } from "@/components/drag-scroll";
 import { getHtTeamSession, matchesHtCloser } from "@/lib/ht-team-session";
-import { getKanbanLocalData } from "@/lib/ht-api.functions";
+import { getKanbanLocalData, listAllKanbanSubmissions } from "@/lib/ht-api.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { createEvent } from "@/lib/google-calendar.functions";
 import {
@@ -155,6 +155,7 @@ const SCORE_GROUPS: { id: string; label: string; letras: string[] }[] = [
 
 export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab } = {}) {
   const getLocalDataFn = useServerFn(getKanbanLocalData);
+  const listSubmissionsFn = useServerFn(listAllKanbanSubmissions);
   const [period, setPeriod] = useState<Period>("30d");
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -326,11 +327,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         if (data.length < pageSize) break;
       }
       try {
-        const { data: qzData } = await supabase
-          .from("ht_quiz_submissions" as any)
-          .select("id, received_at, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas")
-          .order("received_at", { ascending: false })
-          .limit(10000);
+        const serverData = await listSubmissionsFn();
+        const qzData = serverData?.submissions || [];
+        const crmData = serverData?.crmLeads || [];
+
         for (const s of (qzData as any[]) || []) {
           let r: Record<string, any> = {};
           if (typeof s.respostas === "string") {
@@ -365,14 +365,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             respostas: r,
           } as QLead);
         }
-      } catch { }
 
-      try {
-        const { data: crmData } = await supabase
-          .from("crm_leads" as any)
-          .select("id, created_at, nome, email, whatsapp, telefone, instagram, expert, metadata")
-          .order("created_at", { ascending: false })
-          .limit(5000);
         for (const c of (crmData as any[]) || []) {
           const phone = c.whatsapp || c.telefone || null;
           let meta: Record<string, any> = {};

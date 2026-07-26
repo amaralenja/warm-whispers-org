@@ -390,3 +390,42 @@ export const getKanbanLocalData = createServerFn({ method: "POST" })
     };
   });
 
+export const listAllKanbanSubmissions = createServerFn({ method: "POST" })
+  .handler(async () => {
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                process.env.SUPASUPABASE_SERVICE_ROLE_KEY || 
+                process.env.SUPABASE_SECRET_KEY || 
+                process.env.SUPABASE_SECRET_KEYS || 
+                process.env.SUPABASE_SERVICE_KEY ||
+                process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+                process.env.SUPABASE_PUBLISHABLE_KEY ||
+                process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!url || !key) {
+      throw new Error("Credenciais do Supabase não configuradas no servidor.");
+    }
+    const { createClient } = await import("@supabase/supabase-js");
+    const client = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
+    const [qzRes, crmRes] = await Promise.all([
+      client
+        .from("ht_quiz_submissions" as any)
+        .select("id, received_at, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas")
+        .order("received_at", { ascending: false })
+        .limit(10000),
+      client
+        .from("crm_leads" as any)
+        .select("id, created_at, nome, email, whatsapp, telefone, instagram, expert, metadata")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+    ]);
+
+    return {
+      submissions: qzRes.data || [],
+      crmLeads: crmRes.data || [],
+    };
+  });
+
