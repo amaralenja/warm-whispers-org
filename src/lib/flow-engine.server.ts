@@ -14,6 +14,7 @@ type Ctx = {
   variables: Record<string, any>;
   lastInput?: { text?: string | null; buttonId?: string | null; messageType?: string | null };
   vendor?: VendorRunContext | null;
+  executorId?: string | null;
 };
 
 type Node = { id: string; type: string; data: any };
@@ -712,7 +713,34 @@ async function hasRecentManualCancellation(ctx: Ctx): Promise<boolean> {
   return Boolean(data);
 }
 
+// Fencing token: se outro processo (worker de retomada, novo claim) assumiu esta
+// execução, este executor precisa parar imediatamente — senão os dois enviam as
+// mesmas mensagens e o lead recebe tudo duplicado.
+async function hasLostLease(ctx: Ctx): Promise<boolean> {
+  if (!ctx.executorId) return false;
+  try {
+    const { data } = await ctx.db
+      .from("wa_flow_runs" as any)
+      .select("executor_id")
+      .eq("id", ctx.runId)
+      .maybeSingle();
+    if (!data) return false;
+    const current = (data as any).executor_id ?? null;
+    return current !== ctx.executorId;
+  } catch {
+    return false;
+  }
+}
+
+async function takeFlowRunLease(ctx: Ctx): Promise<void> {
+  try {
+    const { data } = await ctx.db.rpc("flow_run_take_lease" as any, { _run_id: ctx.runId });
+    if (data) ctx.executorId = String(data);
+  } catch {}
+}
+
 async function shouldStopFlowRun(ctx: Ctx): Promise<boolean> {
+  if (await hasLostLease(ctx)) return true;
   const isCancelled = await isFlowRunCancelled(ctx);
   if (isCancelled) return true;
   // Se o disparo foi feito manualmente pelo vendedor, ignora cancelamentos anteriores
@@ -1446,6 +1474,7 @@ export async function runFlowAdmin(args: {
     await updateFlowRun(ctx, { status: "completed" });
     return { runId: ctx.runId, completed: true, reason: "no_next_node" };
   }
+  await takeFlowRunLease(ctx);
   await executeFrom(ctx, startId);
   return { runId: ctx.runId };
 }
@@ -1469,6 +1498,7 @@ export async function processQueuedFlowRuns(limit = 20) {
         db,
         variables: run.context && typeof run.context === "object" ? { ...run.context, trigger: (run.context as any).trigger ?? {} } : { trigger: {} },
         vendor: null,
+        executorId: run.executor_id ? String(run.executor_id) : null,
       };
       const startId = run.current_node_id ? String(run.current_node_id) : null;
       if (!startId) {
@@ -1514,6 +1544,7 @@ export async function processExpiredTimerRuns(limit = 20) {
         db,
         variables: run.context && typeof run.context === "object" ? { ...run.context, trigger: (run.context as any).trigger ?? {} } : { trigger: {} },
         vendor: null,
+        executorId: run.executor_id ? String(run.executor_id) : null,
       };
       if (!nextId) {
         await updateFlowRun(ctx, { status: "completed" });
@@ -1592,6 +1623,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
         db,
         variables: (run.context as any) ?? {},
         vendor: null,
+        executorId: run.executor_id ? String(run.executor_id) : null,
       };
       try {
         const flow = await loadFlow(ctx.flowId, db);
