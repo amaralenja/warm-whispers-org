@@ -1251,24 +1251,22 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
-      // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
-      const rawText = norm(
-        `${lead.last_message_preview || matchedConv?.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
-      );
-      const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
-      const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
+      const isTypebotLead = hasTypebotTag || forceTypebot || isTextFormulario || isTextYoutube || !!matched;
 
-      // 1. Leads de Anúncios Pagos ("Vim do formulário" / UTMs pagas / Tag de anúncio) -> Typebot (Tráfego Pago)
-      if (isTextFormulario || isPaid || hasPaidTag) {
-        return "Typebot (Tráfego Pago)";
-      }
-
-      // 2. Leads do YouTube / Redes Sociais com fluxo de Minicurso/Typebot ("Vim do Youtube") OU tags de Typebot/Quiz -> Typebot (Orgânico)
-      if (isTextYoutube || hasTypebotTag || forceTypebot || !!matched) {
+      // 1. Se é um lead de Typebot (tem tag de Typebot/Quiz, ou mensagem de formulário/YouTube/Quiz)
+      if (isTypebotLead) {
+        // Se a atribuição calculada (ou etiqueta) for de anúncio pago -> Typebot (Tráfego Pago)
+        if (isPaid || hasPaidTag) {
+          return "Typebot (Tráfego Pago)";
+        }
+        // Se a atribuição (ou etiqueta) for orgânica -> Typebot (Orgânico) (Badge TYPEBOT + ORGÂNICO)
         return "Typebot (Orgânico)";
       }
 
-      // 3. Mensagens diretas no WhatsApp (sem formulário, YouTube ou Typebot) -> Orgânico Direto
+      // 2. Se NÃO é um lead de Typebot (mensagens diretas de contato no WhatsApp)
+      if (isPaid || hasPaidTag) {
+        return "Tráfego Pago";
+      }
       return "Orgânico Direto";
     };
 
