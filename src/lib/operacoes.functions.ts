@@ -1245,19 +1245,17 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return "Orgânico Direto";
       }
 
-      // 2. Leads que vieram do Formulário (mensagem "Vim do formulário" ou tag de Typebot ou Quiz)
-      if (isTextFormulario || hasTypebotTag || !!matched) {
-        if (isPaid || hasPaidTag) {
-          return "Typebot (Tráfego Pago)";
-        }
-        return "Typebot (Orgânico)";
-      }
-
-      // 3. Demais casos (mensagens diretas sem formulário/YouTube)
-      if (isPaid || hasPaidTag) {
+      // 2. Leads que vieram do Formulário de Anúncios ("Vim do formulário" / Typebot Ads / Paid UTMs) -> Typebot (Tráfego Pago)
+      if (isTextFormulario || isPaid || hasPaidTag) {
         return "Typebot (Tráfego Pago)";
       }
 
+      // 3. Leads com tag/dados de Typebot sem formulário explícito -> Typebot (Orgânico)
+      if (hasTypebotTag || forceTypebot) {
+        return "Typebot (Orgânico)";
+      }
+
+      // 4. Demais casos (mensagens diretas sem formulário/YouTube)
       return "Orgânico Direto";
     };
 
