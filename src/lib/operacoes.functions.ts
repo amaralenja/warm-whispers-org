@@ -1258,22 +1258,17 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
 
-      // 1. YouTube / Redes Sociais -> Orgânico Direto
-      if (isTextYoutube) {
-        return "Orgânico Direto";
-      }
-
-      // 2. Se veio do Formulário de Anúncios ("Vim do formulário") OU possui dados/tags de Tráfego Pago -> Typebot (Tráfego Pago)
+      // 1. Leads de Anúncios Pagos ("Vim do formulário" / UTMs pagas / Tag de anúncio) -> Typebot (Tráfego Pago)
       if (isTextFormulario || isPaid || hasPaidTag) {
         return "Typebot (Tráfego Pago)";
       }
 
-      // 3. Se possui etiqueta de Typebot ou Quiz (sem formulário nem tag de anúncio) -> Typebot (Orgânico)
-      if (hasTypebotTag || forceTypebot || !!matched) {
+      // 2. Leads do YouTube / Redes Sociais com fluxo de Minicurso/Typebot ("Vim do Youtube") OU tags de Typebot/Quiz -> Typebot (Orgânico)
+      if (isTextYoutube || hasTypebotTag || forceTypebot || !!matched) {
         return "Typebot (Orgânico)";
       }
 
-      // 4. Demais casos -> Orgânico Direto
+      // 3. Mensagens diretas no WhatsApp (sem formulário, YouTube ou Typebot) -> Orgânico Direto
       return "Orgânico Direto";
     };
 
