@@ -1161,16 +1161,28 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     };
 
     const classifyLeadType = (lead: any, forceTypebot = false, targetOp?: string): string => {
-      const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem);
-      const med = norm(lead.utm_medium || lead.dados?.utm_medium);
-      const rawCp = String(lead.utm_campaign || lead.dados?.utm_campaign || "").trim();
+      const phone = cleanPhone(lead.telefone ?? lead.whatsapp ?? lead.contact_wa_id ?? "");
+      let matched: any = null;
+      if (phone) {
+        for (const v of getPhoneVariations(phone)) {
+          if (phoneToLead.has(v)) { matched = phoneToLead.get(v); break; }
+        }
+      }
+
+      const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem || matched?.utm_source || matched?.origem);
+      const med = norm(lead.utm_medium || lead.dados?.utm_medium || matched?.utm_medium);
+      const rawCp = String(lead.utm_campaign || lead.dados?.utm_campaign || matched?.utm_campaign || "").trim();
       const cp = norm(rawCp);
-      const cont = norm(lead.utm_content || lead.dados?.utm_content);
-      const fbclid = String(lead.fbclid || lead.dados?.fbclid || "").trim();
-      const gclid = String(lead.gclid || lead.dados?.gclid || "").trim();
-      const fbp = String(lead.fbp || lead.dados?.fbp || "").trim();
+      const cont = norm(lead.utm_content || lead.dados?.utm_content || matched?.utm_content);
+      const fbclid = String(lead.fbclid || lead.dados?.fbclid || matched?.fbclid || "").trim();
+      const gclid = String(lead.gclid || lead.dados?.gclid || matched?.gclid || "").trim();
+      const fbp = String(lead.fbp || lead.dados?.fbp || matched?.fbp || "").trim();
 
       const leadTags = getTagsForLead(lead, targetOp);
+      if (matched) {
+        const matchedTags = getTagsForLead(matched, targetOp);
+        for (const mt of matchedTags) { if (!leadTags.includes(mt)) leadTags.push(mt); }
+      }
 
       const hasTypebotTag = leadTags.some((t) =>
         t.includes("TYPEBOT") ||
@@ -1233,8 +1245,8 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return "Orgânico Direto";
       }
 
-      // 2. Leads que vieram do Formulário (mensagem "Vim do formulário" ou tag de Typebot)
-      if (isTextFormulario || hasTypebotTag) {
+      // 2. Leads que vieram do Formulário (mensagem "Vim do formulário" ou tag de Typebot ou Quiz)
+      if (isTextFormulario || hasTypebotTag || !!matched) {
         if (isPaid || hasPaidTag) {
           return "Typebot (Tráfego Pago)";
         }
@@ -1249,9 +1261,29 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return "Orgânico Direto";
     };
 
+    // Pré-popula telefone → Quiz/CRM lead para cruzamento total de atribuição
+    for (const l of quizLeadsRaw) {
+      const email = String(l.email ?? "").trim().toLowerCase();
+      const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
+      if (email) emailToLead.set(email, l);
+      if (phone) {
+        for (const v of getPhoneVariations(phone)) {
+          if (!phoneToLead.has(v)) phoneToLead.set(v, l);
+        }
+      }
+    }
+    for (const l of crmLeadsRaw) {
+      const email = String(l.email ?? "").trim().toLowerCase();
+      const phone = cleanPhone(l.telefone ?? l.whatsapp ?? "");
+      if (email && !emailToLead.has(email)) emailToLead.set(email, l);
+      if (phone) {
+        for (const v of getPhoneVariations(phone)) {
+          if (!phoneToLead.has(v)) phoneToLead.set(v, l);
+        }
+      }
+    }
+
     // ── Registro unificado de leads (quiz + CRM + conversas do WhatsApp) ──
-    // Dedup real por telefone (com variações do 9º dígito) e e-mail — nunca por id,
-    // porque ids de tabelas diferentes nunca colidem e inflavam o total.
     const seenPhoneKeys = new Set<string>();
     const seenEmailKeys = new Set<string>();
     const uniqueLeadKeys = new Set<string>();
@@ -1306,8 +1338,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     for (const l of quizLeadsRaw) {
       const email = String(l.email ?? "").trim().toLowerCase();
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
-      if (email) emailToLead.set(email, l);
-      if (phone) phoneToLead.set(phone, l);
       if (!inRange(l.received_at || l.created_at)) continue;
       if (!registerLead(phone, email, `quiz:${l.id}`)) continue;
       const op = classifyLeadOp(l, phoneToWaTagsAll) || waOpForPhone(phone) || "Caio";
@@ -1315,11 +1345,8 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     }
 
     for (const l of crmLeadsRaw) {
-      // Usa APENAS created_at para o filtro de data — updated_at muda quando tags são alteradas
       const email = String(l.email ?? "").trim().toLowerCase();
       const phone = cleanPhone(l.telefone ?? l.whatsapp ?? "");
-      if (email && !emailToLead.has(email)) emailToLead.set(email, l);
-      if (phone && !phoneToLead.has(phone)) phoneToLead.set(phone, l);
       if (!inRange(l.created_at)) continue;
       if (!registerLead(phone, email, `crm:${l.id}`)) continue;
       const op = classifyLeadOp(l, phoneToWaTagsAll) || waOpForPhone(phone) || "Caio";
@@ -1337,10 +1364,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const phone = cleanPhone(conv.contact_wa_id ?? "");
       if (!phone) continue;
       if (!registerLead(phone, "", `wa:${phone}`)) continue;
-      if (!phoneToLead.has(phone)) phoneToLead.set(phone, conv);
+      const matchedLead = phoneToLead.get(phone);
       const fakeLeadForClassify = {
+        ...(matchedLead ?? {}),
         telefone: conv.contact_wa_id,
-        tags: Array.isArray(conv.tags) ? conv.tags : [],
+        contact_wa_id: conv.contact_wa_id,
+        tags: Array.isArray(conv.tags) ? conv.tags : (matchedLead?.tags ?? []),
         last_message_preview: conv.last_message_preview,
         expert: op,
       };
