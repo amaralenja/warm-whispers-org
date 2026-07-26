@@ -968,7 +968,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // Busca conversões do WhatsApp (sem filtrar por tags vazias, para contar todos os leads de hoje)
     const { data: waConvsRawAll } = await supabase
       .from("wa_conversations" as any)
-      .select("contact_wa_id, tags, operacao_id, created_at, updated_at")
+      .select("contact_wa_id, tags, operacao_id, created_at, updated_at, last_message_preview")
       .order("updated_at", { ascending: false })
       .limit(12000);
     const waConvsRaw = (waConvsRawAll ?? []) as any[];
@@ -1245,13 +1245,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return "Orgânico Direto";
       }
 
-      // 2. Se a atribuição calculada (igual ao Chat ao Vivo) for Tráfego Pago -> Typebot (Tráfego Pago)
-      if (isPaid) {
+      // 2. Se veio do Formulário de Anúncios ("Vim do formulário") OU possui dados/tags de Tráfego Pago -> Typebot (Tráfego Pago)
+      if (isTextFormulario || isPaid || hasPaidTag) {
         return "Typebot (Tráfego Pago)";
       }
 
-      // 3. Se veio do Formulário ou tem etiqueta do Typebot ou Quiz -> Typebot (Orgânico)
-      if (isTextFormulario || hasTypebotTag || forceTypebot || !!matched) {
+      // 3. Se possui etiqueta de Typebot ou Quiz (sem formulário nem tag de anúncio) -> Typebot (Orgânico)
+      if (hasTypebotTag || forceTypebot || !!matched) {
         return "Typebot (Orgânico)";
       }
 
