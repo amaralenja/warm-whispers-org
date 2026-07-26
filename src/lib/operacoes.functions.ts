@@ -1204,7 +1204,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const hasTypebotTag = leadTags.some((t) =>
         t.includes("TYPEBOT") ||
-        t.includes("SALVE") ||
         t.includes("QUIZ") ||
         t.includes("FLORESTA") ||
         t.includes("BOT") ||
