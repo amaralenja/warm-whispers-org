@@ -885,7 +885,7 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
 
     const { processExpiredTimerRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
     void processExpiredTimerRuns(20).catch(() => undefined);
-    void processStaleRunningSendRuns(60, 20).catch(() => undefined);
+    void processStaleRunningSendRuns(180, 20).catch(() => undefined);
 
     const rpcArgs = vendorRpcArgs(context);
     if (rpcArgs) {

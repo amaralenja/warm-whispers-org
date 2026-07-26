@@ -2495,6 +2495,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -2510,6 +2511,7 @@ export type Database = {
           created_at?: string
           current_node_id?: string | null
           error?: string | null
+          executor_id?: string | null
           expires_at?: string | null
           flow_id: string
           id?: string
@@ -2525,6 +2527,7 @@ export type Database = {
           created_at?: string
           current_node_id?: string | null
           error?: string | null
+          executor_id?: string | null
           expires_at?: string | null
           flow_id?: string
           id?: string
@@ -2994,6 +2997,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3018,6 +3022,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3042,6 +3047,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3066,6 +3072,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3090,6 +3097,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3104,6 +3112,11 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      flow_run_owns: {
+        Args: { _executor: string; _run_id: string }
+        Returns: boolean
+      }
+      flow_run_take_lease: { Args: { _run_id: string }; Returns: string }
       generate_ht_team_codigo: { Args: never; Returns: string }
       generate_vendedor_codigo: { Args: never; Returns: string }
       get_hall_of_fame_mes: { Args: never; Returns: Json }
@@ -3273,6 +3286,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
