@@ -681,6 +681,41 @@ export type Database = {
         }
         Relationships: []
       }
+      financeiro_confirmacoes: {
+        Row: {
+          confirmado: boolean
+          confirmado_em: string | null
+          confirmado_por: string | null
+          id: number
+          lancamento_id: number
+          mes: string
+        }
+        Insert: {
+          confirmado?: boolean
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          id?: never
+          lancamento_id: number
+          mes: string
+        }
+        Update: {
+          confirmado?: boolean
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          id?: never
+          lancamento_id?: number
+          mes?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_confirmacoes_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ht_alunos: {
         Row: {
           created_at: string | null
