@@ -1240,22 +1240,25 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
 
-      // 1. Leads que vieram do YouTube / redes sociais (mensagem "Vim do Youtube") -> Orgânico Direto
+      // 1. YouTube / Redes Sociais -> Orgânico Direto
       if (isTextYoutube) {
         return "Orgânico Direto";
       }
 
-      // 2. Leads que vieram do Formulário de Anúncios ("Vim do formulário" / Typebot Ads / Paid UTMs) -> Typebot (Tráfego Pago)
-      if (isTextFormulario || isPaid || hasPaidTag) {
+      // 2. Se possui etiqueta / dados explícitos de Tráfego Pago ou UTM paga de anúncio -> Typebot (Tráfego Pago)
+      if (isPaid || hasPaidTag) {
         return "Typebot (Tráfego Pago)";
       }
 
-      // 3. Leads com tag/dados de Typebot sem formulário explícito -> Typebot (Orgânico)
-      if (hasTypebotTag || forceTypebot) {
+      // 3. Se veio do Formulário ou tem etiqueta do Typebot (sem tag paga) -> Typebot (Orgânico)
+      if (isTextFormulario || hasTypebotTag || forceTypebot) {
+        if (hasOrganicTag && !hasTypebotTag) {
+          return "Orgânico Direto";
+        }
         return "Typebot (Orgânico)";
       }
 
-      // 4. Demais casos (mensagens diretas sem formulário/YouTube)
+      // 4. Etiqueta ou mensagens diretas de Orgânico Direto
       return "Orgânico Direto";
     };
 
