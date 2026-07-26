@@ -1160,12 +1160,24 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       return Array.from(tagsSet);
     };
 
+    const phoneToWaConv = new Map<string, any>();
+    for (const conv of waConvsRaw) {
+      const phone = cleanPhone(conv.contact_wa_id ?? "");
+      if (phone) {
+        for (const v of getPhoneVariations(phone)) {
+          if (!phoneToWaConv.has(v)) phoneToWaConv.set(v, conv);
+        }
+      }
+    }
+
     const classifyLeadType = (lead: any, forceTypebot = false, targetOp?: string): string => {
       const phone = cleanPhone(lead.telefone ?? lead.whatsapp ?? lead.contact_wa_id ?? "");
       let matched: any = null;
+      let matchedConv: any = null;
       if (phone) {
         for (const v of getPhoneVariations(phone)) {
-          if (phoneToLead.has(v)) { matched = phoneToLead.get(v); break; }
+          if (!matched && phoneToLead.has(v)) matched = phoneToLead.get(v);
+          if (!matchedConv && phoneToWaConv.has(v)) matchedConv = phoneToWaConv.get(v);
         }
       }
 
@@ -1182,6 +1194,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (matched) {
         const matchedTags = getTagsForLead(matched, targetOp);
         for (const mt of matchedTags) { if (!leadTags.includes(mt)) leadTags.push(mt); }
+      }
+      if (matchedConv && Array.isArray(matchedConv.tags)) {
+        for (const mt of matchedConv.tags) {
+          const u = String(mt).toUpperCase();
+          if (!leadTags.includes(u)) leadTags.push(u);
+        }
       }
 
       const hasTypebotTag = leadTags.some((t) =>
@@ -1235,7 +1253,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
       const rawText = norm(
-        `${lead.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
+        `${lead.last_message_preview || matchedConv?.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
       );
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
