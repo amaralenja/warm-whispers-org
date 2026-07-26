@@ -863,7 +863,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
   const navigate = useNavigate();
   const autoOpenedRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
-  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned" | "archived">("all");
+  const [listFilter, setListFilter] = useState<"all" | "unread" | "flow" | "assigned" | "archived" | "typebot_paid" | "typebot_organic" | "organic_direct">("all");
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
 
   const [editingNameConv, setEditingNameConv] = useState<Conv | null>(null);
@@ -1418,6 +1418,50 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome));
   }, [allCrmTags, conversationList, leadByPhone]);
 
+  const getConvLeadCategory = useCallback((c: any) => {
+    const contactWaId = c.contact_wa_id;
+    const lead = findLeadForConv(contactWaId);
+    const d = String(contactWaId ?? "").replace(/\D+/g, "");
+    const sub = typebotByPhone.get(d) || (d.length >= 8 ? typebotByPhone.get(d.slice(-8)) : null);
+    const attr = getLeadAttributionBadge(lead, sub);
+
+    const rawText = String(c.last_message_preview || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
+    const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
+
+    const convTags: string[] = Array.isArray(c.tags) ? c.tags.map((t: any) => String(t).toUpperCase()) : [];
+    const leadTags: string[] = Array.isArray((lead as any)?.tags) ? (lead as any).tags.map((t: any) => String(t).toUpperCase()) : [];
+    const allTags = [...convTags, ...leadTags];
+
+    const hasTypebotTag = (d && (typebotPhonesSet.has(d) || (d.length >= 8 && typebotPhonesSet.has(d.slice(-8))))) ||
+      allTags.some((t) => t.includes("TYPEBOT") || t.includes("BOT") || t.includes("QUIZ") || t.includes("SALVE")) ||
+      isTextFormulario || isTextYoutube || !!sub;
+
+    const hasPaidTag = allTags.some((t) => t.includes("TRAFEGO PAGO") || t.includes("TRÁFEGO PAGO") || t.includes("PAGO") || t.includes("ADS") || t.includes("PATROCINADO"));
+
+    const isPaid = (attr?.isPago ?? false) || hasPaidTag || isTextFormulario;
+
+    if (hasTypebotTag) {
+      if (isPaid) return "typebot_paid";
+      return "typebot_organic";
+    }
+
+    if (isPaid) return "typebot_paid";
+    return "organic_direct";
+  }, [findLeadForConv, typebotByPhone, typebotPhonesSet]);
+
+  const typebotPaidCount = useMemo(() => {
+    return conversationList.filter((c) => !(c as any).archived_at && getConvLeadCategory(c) === "typebot_paid").length;
+  }, [conversationList, getConvLeadCategory]);
+
+  const typebotOrganicCount = useMemo(() => {
+    return conversationList.filter((c) => !(c as any).archived_at && getConvLeadCategory(c) === "typebot_organic").length;
+  }, [conversationList, getConvLeadCategory]);
+
+  const organicDirectCount = useMemo(() => {
+    return conversationList.filter((c) => !(c as any).archived_at && getConvLeadCategory(c) === "organic_direct").length;
+  }, [conversationList, getConvLeadCategory]);
+
   const filtered = useMemo(() => {
     const rawQ = search.trim();
     const q = normalizeText(rawQ);
@@ -1449,6 +1493,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
       if (listFilter === "unread") list = list.filter((c) => Number((c as any).unread_count ?? 0) > 0);
       else if (listFilter === "flow") list = list.filter((c) => activeFlowConvIds.has(String(c.id)));
       else if (listFilter === "assigned") list = list.filter((c) => (c as any).assigned_vendor_id != null);
+      else if (listFilter === "typebot_paid") list = list.filter((c) => getConvLeadCategory(c) === "typebot_paid");
+      else if (listFilter === "typebot_organic") list = list.filter((c) => getConvLeadCategory(c) === "typebot_organic");
+      else if (listFilter === "organic_direct") list = list.filter((c) => getConvLeadCategory(c) === "organic_direct");
     }
 
     if (selectedTagFilter) {
@@ -1947,7 +1994,10 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {([
-                { id: "all", label: "Todos", count: conversationList.length },
+                { id: "all", label: "Todos", count: conversationList.filter((c) => !(c as any).archived_at).length },
+                { id: "typebot_paid", label: "Typebot (Tráfego Pago)", count: typebotPaidCount },
+                { id: "typebot_organic", label: "Typebot (Orgânico)", count: typebotOrganicCount },
+                { id: "organic_direct", label: "Somente Orgânico", count: organicDirectCount },
                 { id: "unread", label: "Não visualizados", count: unreadTotal },
                 { id: "flow", label: "Com fluxo", count: activeFlowConvIds.size },
                 { id: "assigned", label: "Atribuídos", count: conversationList.filter((c) => (c as any).assigned_vendor_id != null && !(c as any).archived_at).length },
