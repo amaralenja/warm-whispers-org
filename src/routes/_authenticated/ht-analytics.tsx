@@ -119,19 +119,22 @@ const isQuente = (l: QLead) => {
   return "DEFG".includes(c) && /(sim|compromet)/i.test(l.comprometimento ?? "");
 };
 
-const isSdrQualifiedLead = (l: QLead): boolean => {
+const isSdrQualifiedLead = (l: QLead, stageMap?: Record<string, string>): boolean => {
   if (!l) return false;
+  // Lead que possui estágio salvo no Kanban SDR nunca deve ser ocultado
+  if (stageMap && stageMap[l.id]) return true;
+
   // Leads manuais criados pelo SDR sempre são válidos do SDR
-  if (l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual") return true;
+  if (l.utm_source === "sdr-manual" || l.utm_medium === "sdr-manual" || (l as any).is_manual) return true;
 
   // Preserva qualquer lead com agendamento ou status relevante no CRM
-  if (l.crm_data_agendamento || (l.crm_status && ["agendado", "fechado", "ganho", "followup", "sinal"].includes(l.crm_status.toLowerCase()))) return true;
+  if (l.crm_data_agendamento || (l.crm_status && ["agendado", "fechado", "ganho", "followup", "sinal", "no_show", "descartado"].includes(l.crm_status.toLowerCase()))) return true;
 
   const c = (l.caixa_letra ?? "").toUpperCase().trim();
-  // Caixa A (Menos de R$ 1.000) ou sem Caixa não é lead do SDR
-  if (!c || c === "A" || !"BCDEFG".includes(c)) return false;
+  // Se é Caixa A explícita (menos de R$ 1.000), oculta para direcionar ao Minicurso
+  if (c === "A") return false;
 
-  // Leads Caixa B+ que completaram o quiz (step 11) são leads válidos do SDR
+  // Aceita todos os leads de Caixa B, C, D, E, F, G ou leads cadastrados sem caixa definida
   return true;
 };
 
@@ -322,7 +325,6 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         allK.push(...(mapped as QLead[]));
         if (data.length < pageSize) break;
       }
-      // ht_quiz_submissions — sem filtro de data
       try {
         const { data: qzData } = await supabase
           .from("ht_quiz_submissions" as any)
@@ -330,7 +332,12 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           .order("received_at", { ascending: false })
           .limit(10000);
         for (const s of (qzData as any[]) || []) {
-          const r = (s.respostas ?? {}) as Record<string, any>;
+          let r: Record<string, any> = {};
+          if (typeof s.respostas === "string") {
+            try { r = JSON.parse(s.respostas); } catch { r = {}; }
+          } else if (s.respostas && typeof s.respostas === "object") {
+            r = s.respostas;
+          }
           allK.push({
             id: `htq:${s.id}`,
             data_criacao: s.received_at,
@@ -358,7 +365,50 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             respostas: r,
           } as QLead);
         }
-      } catch { /* silencioso */ }
+      } catch { }
+
+      try {
+        const { data: crmData } = await supabase
+          .from("crm_leads" as any)
+          .select("id, created_at, nome, email, whatsapp, telefone, instagram, expert, metadata")
+          .order("created_at", { ascending: false })
+          .limit(5000);
+        for (const c of (crmData as any[]) || []) {
+          const phone = c.whatsapp || c.telefone || null;
+          let meta: Record<string, any> = {};
+          if (typeof c.metadata === "string") {
+            try { meta = JSON.parse(c.metadata); } catch { meta = {}; }
+          } else if (c.metadata && typeof c.metadata === "object") {
+            meta = c.metadata;
+          }
+          allK.push({
+            id: `crm:${c.id}`,
+            data_criacao: c.created_at,
+            nome: c.nome ?? null,
+            email: c.email ?? null,
+            whatsapp: phone,
+            instagram: c.instagram ?? null,
+            caixa_letra: meta.caixa_letra ?? "B",
+            caixa_label: meta.caixa_label ?? null,
+            faturamento: meta.faturamento ?? null,
+            momento: meta.momento ?? null,
+            objetivo: meta.objetivo ?? null,
+            investir: meta.investir ?? null,
+            minicurso: meta.minicurso ?? null,
+            socio: meta.socio ?? null,
+            comprometimento: meta.comprometimento ?? null,
+            last_step: "finish",
+            funil: null,
+            utm_source: c.expert ? `crm-${c.expert}` : "crm-manual",
+            utm_medium: "crm",
+            utm_campaign: null,
+            crm_status: null,
+            crm_valor: null,
+            crm_data_agendamento: null,
+            respostas: meta,
+          } as QLead);
+        }
+      } catch { }
 
       if (cancel) return;
       allK.sort((a, b) => String(b.data_criacao || "").localeCompare(String(a.data_criacao || "")));
