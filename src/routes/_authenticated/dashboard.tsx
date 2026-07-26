@@ -230,11 +230,12 @@ function Dashboard() {
                 ) : (
                   <div className="divide-y divide-border">
                     {/* Header row */}
-                    <div className="grid grid-cols-[1fr_80px_90px_80px_80px_100px_100px] gap-2 px-5 py-2.5 text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
+                    <div className="grid grid-cols-[1fr_75px_90px_80px_90px_75px_90px_85px] gap-2 px-5 py-2.5 text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
                       <div>Operação</div>
                       <div className="text-right">Vendas</div>
                       <div className="text-right">Faturamento</div>
-                      <div className="text-right">Leads</div>
+                      <div className="text-right">Leads Novos</div>
+                      <div className="text-right">Chats Ativos</div>
                       <div className="text-right">Conversão</div>
                       <div className="text-right">Ticket Médio</div>
                       <div className="text-right">Reembolsos</div>
@@ -250,7 +251,7 @@ function Dashboard() {
                             onClick={() => setExpandedOp(isExpanded ? null : op.nome)}
                             className="w-full text-left transition-colors hover:bg-secondary/30"
                           >
-                            <div className="grid grid-cols-[1fr_80px_90px_80px_80px_100px_100px] items-center gap-2 px-5 py-4">
+                            <div className="grid grid-cols-[1fr_75px_90px_80px_90px_75px_90px_85px] items-center gap-2 px-5 py-4">
                               <div className="flex items-center gap-3">
                                 <span className={`h-2.5 w-2.5 rounded-full ${ac.bar}`} />
                                 <div>
@@ -266,6 +267,7 @@ function Dashboard() {
                               <div className={`text-right text-sm ${NUM}`}>{op.vendas}</div>
                               <div className={`text-right text-sm ${NUM} text-foreground`}>{BRL(op.faturamento)}</div>
                               <div className={`text-right text-sm ${NUM} text-sky-400`}>{op.leads.toLocaleString("pt-BR")}</div>
+                              <div className={`text-right text-sm ${NUM} text-purple-400 font-medium`}>{(op.conversasAtivas || op.leads).toLocaleString("pt-BR")}</div>
                               <div className="text-right">
                                 <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
                                   op.conversao >= 5 ? "bg-emerald-500/15 text-emerald-400"
@@ -286,7 +288,7 @@ function Dashboard() {
                           {(op.nome === "Caio" || isExpanded) && op.leadBreakdown.length > 0 && (
                             <div className="border-t border-border/50 bg-secondary/15 px-5 py-3.5 space-y-2">
                               <div className="flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                                <span>📊 Detalhamento de Origem dos Leads — {op.nome}</span>
+                                <span>📊 Detalhamento de Origem dos Leads — {op.nome} (Novos: {op.leads} · Chats Ativos: {op.conversasAtivas || op.leads})</span>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 {op.leadBreakdown.map((lb) => (
@@ -331,7 +333,7 @@ function Dashboard() {
 
                     {/* Total row */}
                     {visibleOps.length > 1 && (
-                      <div className="grid grid-cols-[1fr_80px_90px_80px_80px_100px_100px] items-center gap-2 bg-emerald-500/5 px-5 py-4">
+                      <div className="grid grid-cols-[1fr_75px_90px_80px_90px_75px_90px_85px] items-center gap-2 bg-emerald-500/5 px-5 py-4">
                         <div className="flex items-center gap-2 text-sm font-bold text-emerald-400">
                           <TrendingUp className="h-3.5 w-3.5" />
                           Total
@@ -339,6 +341,7 @@ function Dashboard() {
                         <div className={`text-right text-sm font-bold ${NUM}`}>{totalVendas}</div>
                         <div className={`text-right text-sm font-bold ${NUM} text-emerald-400`}>{BRL(totalFat)}</div>
                         <div className={`text-right text-sm font-bold ${NUM} text-sky-400`}>{totalLeads.toLocaleString("pt-BR")}</div>
+                        <div className={`text-right text-sm font-bold ${NUM} text-purple-400`}>{visibleOps.reduce((a, o) => a + (o.conversasAtivas || o.leads), 0).toLocaleString("pt-BR")}</div>
                         <div className="text-right">
                           <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-xs font-bold tabular-nums text-emerald-400">
                             {conversaoGeral.toFixed(1)}%

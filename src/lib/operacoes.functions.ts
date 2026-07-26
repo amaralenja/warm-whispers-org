@@ -802,6 +802,7 @@ export type DashboardOpStats = {
   ticketMedio: number;
   reembolsos: number;
   leads: number;
+  conversasAtivas: number;
   conversao: number;
   vendedoresCount: number;
   pctTotal: number;
@@ -1213,11 +1214,18 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isDefinitelyTypebot = forceTypebot || hasTypebotTag;
 
       if (isDefinitelyTypebot) {
-        if (hasPaidTag) return "Typebot (Tráfego Pago)";
+        const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
+        const cleanCp = isCampEmpty ? "" : cp;
+        const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
+        const hasClickId = !!fbclid || !!gclid || !!fbp;
+        const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
+        const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
+        const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
+        const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
+        if (isPaid) return "Typebot (Tráfego Pago)";
         return "Typebot (Orgânico)";
       }
 
-      // (mesmo que tenha chegado via algum UTM orgânico — sem a etiqueta TYPEBOT é Orgânico Direto)
       return "Orgânico Direto";
     };
 
@@ -1285,6 +1293,19 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const entry = typeMap.get(leadType) || { leads: 0, vendas: 0 };
       entry.leads += 1;
       typeMap.set(leadType, entry);
+    }
+
+    // Mapeia conversas ativas no Chat (qualquer conversa com mensagem/interação no período)
+    const conversasAtivasByOp = new Map<string, Set<string>>();
+    for (const conv of waConvsRaw) {
+      if (!inRange(conv.created_at || conv.updated_at || conv.last_message_at)) continue;
+      const rawOp = String(conv.operacao_id ?? "").trim();
+      if (!rawOp || rawOp === "__notificador__") continue;
+      const op = canonicalOpName(rawOp);
+      const phone = cleanPhone(conv.contact_wa_id ?? "");
+      if (!phone) continue;
+      if (!conversasAtivasByOp.has(op)) conversasAtivasByOp.set(op, new Set());
+      conversasAtivasByOp.get(op)!.add(phone);
     }
 
     const matchLead = (vEmail: string, vTel: string) => {
@@ -1449,7 +1470,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       opStats.push({
         id: eId, nome: eName, foto_url: eFoto,
         faturamento, vendas: vendasCount, ticketMedio,
-        reembolsos: reembCount, leads, conversao: Math.round(conversao * 10) / 10,
+        reembolsos: reembCount, leads, conversasAtivas: conversasAtivasByOp.get(eName)?.size || 0, conversao: Math.round(conversao * 10) / 10,
         vendedoresCount: vdsCount, pctTotal: 0, fontes: fontesArr, leadBreakdown: leadBreakdownArr,
       });
     }
