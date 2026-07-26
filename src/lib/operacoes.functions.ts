@@ -1221,8 +1221,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord;
 
-      const isDefinitelyTypebot = forceTypebot || hasTypebotTag;
-
       // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
       const rawText = norm(
         `${lead.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
@@ -1230,22 +1228,24 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
 
-      // Regra 2: Etiqueta de Typebot + Tráfego Pago OU mensagem de formulário -> "Typebot (Tráfego Pago)"
-      if ((isDefinitelyTypebot && isPaid) || isTextFormulario || (hasPaidTag && hasTypebotTag)) {
-        return "Typebot (Tráfego Pago)";
-      }
-
-      // Regra 3: Etiqueta de Typebot + Orgânico OU mensagem do Youtube/Instagram -> "Typebot (Orgânico)"
-      if (hasTypebotTag || isTextYoutube || (forceTypebot && (hasOrganicTag || hasTypebotTag))) {
-        return "Typebot (Orgânico)";
-      }
-
-      // Regra 1: Etiqueta de Orgânico (sem Typebot) -> "Orgânico Direto"
-      if (hasOrganicTag && !hasTypebotTag) {
+      // 1. Leads que vieram do YouTube / redes sociais (mensagem "Vim do Youtube") -> Orgânico Direto
+      if (isTextYoutube) {
         return "Orgânico Direto";
       }
 
-      // Padrão para leads não etiquetados e sem texto de formulário/Youtube
+      // 2. Leads que vieram do Formulário (mensagem "Vim do formulário" ou tag de Typebot)
+      if (isTextFormulario || hasTypebotTag) {
+        if (isPaid || hasPaidTag) {
+          return "Typebot (Tráfego Pago)";
+        }
+        return "Typebot (Orgânico)";
+      }
+
+      // 3. Demais casos (mensagens diretas sem formulário/YouTube)
+      if (isPaid || hasPaidTag) {
+        return "Typebot (Tráfego Pago)";
+      }
+
       return "Orgânico Direto";
     };
 
