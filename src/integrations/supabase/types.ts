@@ -681,6 +681,41 @@ export type Database = {
         }
         Relationships: []
       }
+      financeiro_confirmacoes: {
+        Row: {
+          confirmado: boolean
+          confirmado_em: string | null
+          confirmado_por: string | null
+          id: number
+          lancamento_id: number
+          mes: string
+        }
+        Insert: {
+          confirmado?: boolean
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          id?: never
+          lancamento_id: number
+          mes: string
+        }
+        Update: {
+          confirmado?: boolean
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          id?: never
+          lancamento_id?: number
+          mes?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_confirmacoes_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ht_alunos: {
         Row: {
           created_at: string | null
@@ -2460,6 +2495,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -2475,6 +2511,7 @@ export type Database = {
           created_at?: string
           current_node_id?: string | null
           error?: string | null
+          executor_id?: string | null
           expires_at?: string | null
           flow_id: string
           id?: string
@@ -2490,6 +2527,7 @@ export type Database = {
           created_at?: string
           current_node_id?: string | null
           error?: string | null
+          executor_id?: string | null
           expires_at?: string | null
           flow_id?: string
           id?: string
@@ -2959,6 +2997,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -2983,6 +3022,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3007,6 +3047,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3031,6 +3072,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3055,6 +3097,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
@@ -3069,6 +3112,11 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      flow_run_owns: {
+        Args: { _executor: string; _run_id: string }
+        Returns: boolean
+      }
+      flow_run_take_lease: { Args: { _run_id: string }; Returns: string }
       generate_ht_team_codigo: { Args: never; Returns: string }
       generate_vendedor_codigo: { Args: never; Returns: string }
       get_hall_of_fame_mes: { Args: never; Returns: Json }
@@ -3238,6 +3286,7 @@ export type Database = {
           created_at: string
           current_node_id: string | null
           error: string | null
+          executor_id: string | null
           expires_at: string | null
           flow_id: string
           id: string
