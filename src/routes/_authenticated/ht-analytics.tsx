@@ -2975,7 +2975,7 @@ function SalesFunnelView({
   const [openLevel, setOpenLevel] = useState<number | null>(null);
   const { start: pStart, end: pEnd } = useMemo(() => periodRange(period), [period]);
 
-  const leads = useMemo(() => (rawLeads || []).filter(isSdrQualifiedLead), [rawLeads]);
+  const leads = useMemo(() => (rawLeads || []).filter((l) => isSdrQualifiedLead(l)), [rawLeads]);
 
   const periodVendas = useMemo(() => {
     return (vendas || []).filter((v: any) => {
