@@ -1223,7 +1223,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return isPaid ? "Tráfego Pago" : "Orgânico";
       }
 
-      // Regras da Operação do Caio:
+      // Regras da Operação do Caio: (Idêntico ao cálculo da tag no Chat ao Vivo)
       const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
       const cleanCp = isCampEmpty ? "" : cp;
       const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
@@ -1231,34 +1231,31 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
       const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
-      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord;
+      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
       // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
       const rawText = norm(
         `${lead.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
       );
-      const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
+      const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
 
       // 1. YouTube / Redes Sociais -> Orgânico Direto
       if (isTextYoutube) {
         return "Orgânico Direto";
       }
 
-      // 2. Se possui etiqueta / dados explícitos de Tráfego Pago ou UTM paga de anúncio -> Typebot (Tráfego Pago)
-      if (isPaid || hasPaidTag) {
+      // 2. Se a atribuição calculada (igual ao Chat ao Vivo) for Tráfego Pago -> Typebot (Tráfego Pago)
+      if (isPaid) {
         return "Typebot (Tráfego Pago)";
       }
 
-      // 3. Se veio do Formulário ou tem etiqueta do Typebot (sem tag paga) -> Typebot (Orgânico)
-      if (isTextFormulario || hasTypebotTag || forceTypebot) {
-        if (hasOrganicTag && !hasTypebotTag) {
-          return "Orgânico Direto";
-        }
+      // 3. Se veio do Formulário ou tem etiqueta do Typebot ou Quiz -> Typebot (Orgânico)
+      if (isTextFormulario || hasTypebotTag || forceTypebot || !!matched) {
         return "Typebot (Orgânico)";
       }
 
-      // 4. Etiqueta ou mensagens diretas de Orgânico Direto
+      // 4. Demais casos -> Orgânico Direto
       return "Orgânico Direto";
     };
 
