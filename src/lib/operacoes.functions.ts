@@ -1598,31 +1598,11 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     }
 
     const totalReembolsos = reembolsosList.length;
-    // totalLeads = leads únicos — usa id/email/phone pra dedup entre quiz e CRM
-    const allLeadKeys = new Set<string>();
-    for (const l of quizLeadsRaw) {
-      const leadDate = parseDataField(l.received_at || l.updated_at || l.created_at);
-      if (!inRange(leadDate)) continue;
-      const id = String(l.id ?? "");
-      const email = String(l.email ?? "").trim().toLowerCase();
-      const phone = cleanPhone(l.whatsapp ?? "");
-      if (id) allLeadKeys.add(`id:${id}`);
-      else if (email) allLeadKeys.add(`e:${email}`);
-      else if (phone) allLeadKeys.add(`p:${phone}`);
-    }
-    for (const l of crmLeadsRaw) {
-      const leadDate = parseDataField(l.created_at || l.received_at || l.updated_at);
-      if (!inRange(leadDate)) continue;
-      const id = String(l.id ?? "");
-      const email = String(l.email ?? "").trim().toLowerCase();
-      const phone = cleanPhone(l.whatsapp ?? "");
-      if (id) allLeadKeys.add(`id:${id}`);
-      else if (email) allLeadKeys.add(`e:${email}`);
-      else if (phone) allLeadKeys.add(`p:${phone}`);
-    }
-    const totalLeadsCalculated = allLeadKeys.size;
+    // totalLeads = leads únicos do registro unificado (quiz + CRM + conversas), já deduplicados por telefone/e-mail
+    const totalLeadsCalculated = uniqueLeadKeys.size;
     const totalLeadsFromOps = opStats.reduce((a, o) => a + o.leads, 0);
     const totalLeads = totalLeadsCalculated > 0 ? totalLeadsCalculated : totalLeadsFromOps;
+
 
     const debug = {
       timestamp: new Date().toISOString(),
