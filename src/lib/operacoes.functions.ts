@@ -946,11 +946,11 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       supabase.from("ht_quiz_submissions" as any)
         .select("id, email, whatsapp, utm_source, utm_medium, utm_campaign, utm_content, fbclid, fbp, gclid, received_at, created_at, updated_at")
         .order("id", { ascending: false })
-        .limit(3000),
+        .limit(8000),
       supabase.from("crm_leads" as any)
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(3000),
+        .limit(8000),
     ]);
 
     const vendasAll = (vendasRes.data ?? []) as any[];
@@ -969,7 +969,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       .from("wa_conversations" as any)
       .select("contact_wa_id, tags, operacao_id, created_at, updated_at")
       .order("updated_at", { ascending: false })
-      .limit(5000);
+      .limit(12000);
     const waConvsRaw = (waConvsRawAll ?? []) as any[];
 
     console.log(`[getDashboardStats] wa_conversations carregadas: ${waConvsRaw.length}`);
