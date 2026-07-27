@@ -1225,18 +1225,18 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         }
       }
 
-      const src = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem || matched?.utm_source || matched?.origem);
-      const med = norm(lead.utm_medium || lead.dados?.utm_medium || matched?.utm_medium);
-      const rawCp = String(lead.utm_campaign || lead.dados?.utm_campaign || matched?.utm_campaign || "").trim();
+      const leadSrc = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem || matchedQuiz?.utm_source || matchedQuiz?.origem);
+      const leadMed = norm(lead.utm_medium || lead.dados?.utm_medium || matchedQuiz?.utm_medium);
+      const rawCp = String(lead.utm_campaign || lead.dados?.utm_campaign || matchedQuiz?.utm_campaign || "").trim();
       const cp = norm(rawCp);
-      const cont = norm(lead.utm_content || lead.dados?.utm_content || matched?.utm_content);
-      const fbclid = String(lead.fbclid || lead.dados?.fbclid || matched?.fbclid || "").trim();
-      const gclid = String(lead.gclid || lead.dados?.gclid || matched?.gclid || "").trim();
-      const fbp = String(lead.fbp || lead.dados?.fbp || matched?.fbp || "").trim();
+      const cont = norm(lead.utm_content || lead.dados?.utm_content || matchedQuiz?.utm_content);
+      const fbclid = String(lead.fbclid || lead.dados?.fbclid || matchedQuiz?.fbclid || "").trim();
+      const gclid = String(lead.gclid || lead.dados?.gclid || matchedQuiz?.gclid || "").trim();
+      const fbp = String(lead.fbp || lead.dados?.fbp || matchedQuiz?.fbp || "").trim();
 
       const leadTags = getTagsForLead(lead, targetOp);
-      if (matched) {
-        const matchedTags = getTagsForLead(matched, targetOp);
+      if (matchedQuiz) {
+        const matchedTags = getTagsForLead(matchedQuiz, targetOp);
         for (const mt of matchedTags) { if (!leadTags.includes(mt)) leadTags.push(mt); }
       }
       if (matchedConv && Array.isArray(matchedConv.tags)) {
@@ -1272,25 +1272,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const isCaioOp = targetOp ? norm(targetOp) === "caio" : true;
 
-      if (!isCaioOp) {
-        const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
-        const cleanCp = isCampEmpty ? "" : cp;
-        const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
-        const hasClickId = !!fbclid || !!gclid || !!fbp;
-        const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
-        const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
-        const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
-        const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
-        return isPaid ? "Tráfego Pago" : "Orgânico";
-      }
-
       // Regras da Operação do Caio:
       const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
       const cleanCp = isCampEmpty ? "" : cp;
-      const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
+      const isOrganicWord = organicPattern.test(leadSrc) || organicPattern.test(leadMed) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
       const hasClickId = !!fbclid || !!gclid || !!fbp;
-      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado|stories|feed|reels|traffic|trafego)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid") || med.includes("ads") || med.includes("anuncio");
-      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado|facebook|fb|meta|ig|instagram_ads|google_ads|tiktok_ads|kwai_ads)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src) || src === "fb" || src === "ig" || src === "meta" || src === "facebook";
+      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado|stories|feed|reels|traffic|trafego)$/i.test(leadMed) || leadMed.includes("cpc") || leadMed.includes("cpm") || leadMed.includes("paid") || leadMed.includes("ads") || leadMed.includes("anuncio");
+      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado|facebook|fb|meta|ig|instagram_ads|google_ads|tiktok_ads|kwai_ads)\b/i.test(leadSrc) || /(-ads|_ads|ads-|patrocinado)/i.test(leadSrc) || leadSrc === "fb" || leadSrc === "ig" || leadSrc === "meta" || leadSrc === "facebook";
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
@@ -1301,7 +1289,17 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
 
-      const isFromQuizOrTypebot = !!matchedQuiz || hasTypebotTag || (forceTypebot && !hasOrganicTag) || isTextFormulario || isTextYoutube;
+      const isTypebotOrigin =
+        leadSrc.includes("typebot") ||
+        leadSrc.includes("quiz") ||
+        (lead.origem && String(lead.origem).toLowerCase().includes("typebot")) ||
+        (lead.origem && String(lead.origem).toLowerCase().includes("quiz"));
+
+      const isFromQuizOrTypebot = !!matchedQuiz || hasTypebotTag || (forceTypebot && !hasOrganicTag) || isTextFormulario || isTextYoutube || isTypebotOrigin;
+
+      if (!isCaioOp) {
+        return isPaid ? "Tráfego Pago" : "Orgânico";
+      }
 
       if (isPaid || hasPaidTag) {
         return "Typebot (Tráfego Pago)";
