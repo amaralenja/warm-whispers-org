@@ -818,6 +818,9 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
     const started = Date.now();
 
     try {
+      // Save pointer BEFORE executing — prevents re-send if Vercel kills
+      // the function between sendWA succeeding and updateFlowRun being called.
+      await updateFlowRun(ctx, { current_node_id: node.id });
       const result = await runNode(node, ctx);
       if (await shouldStopFlowRun(ctx)) return;
 
