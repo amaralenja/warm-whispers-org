@@ -10,7 +10,7 @@ import MonetizationOnTwoTone from "@mui/icons-material/MonetizationOnTwoTone";
 import PeopleTwoTone from "@mui/icons-material/PeopleTwoTone";
 import SettingsTwoTone from "@mui/icons-material/SettingsTwoTone";
 import AssessmentTwoTone from "@mui/icons-material/AssessmentTwoTone";
-import PersonCheckTwoTone from "@mui/icons-material/PersonCheckTwoTone";
+import HowToRegTwoTone from "@mui/icons-material/HowToRegTwoTone";
 import PercentTwoTone from "@mui/icons-material/PercentTwoTone";
 import EmojiEventsTwoTone from "@mui/icons-material/EmojiEventsTwoTone";
 import AutoAwesomeTwoTone from "@mui/icons-material/AutoAwesomeTwoTone";
@@ -206,7 +206,7 @@ function Dashboard() {
                 bgGlow="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent"
               />
               <Kpi
-                icon={<PersonCheckTwoTone className="!h-6 !w-6 text-sky-400" />}
+                icon={<HowToRegTwoTone className="!h-6 !w-6 text-sky-400" />}
                 label="Leads Únicos"
                 value={isLoading ? "—" : totalLeads.toLocaleString("pt-BR")}
                 subtitle="Novos contatos no funil"
