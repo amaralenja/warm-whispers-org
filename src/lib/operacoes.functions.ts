@@ -216,9 +216,22 @@ const EMPTY_OPERACOES: OperacoesPayload = {
 function classifyOpByUtm(raw: unknown): string | null {
   const utm = String(raw ?? "").trim().toUpperCase();
   if (!utm) return null;
-  if (CAIO_UTMS.some((prefix) => utm.startsWith(prefix))) return "Caio";
-  if (GUSTAVO_UTMS.some((prefix) => utm.startsWith(prefix))) return "Gustavo";
+  if (utm.includes("CAIO") || CAIO_UTMS.some((prefix) => utm.startsWith(prefix))) return "Caio";
+  if (utm.includes("GUSTAVO") || GUSTAVO_UTMS.some((prefix) => utm.startsWith(prefix))) return "Gustavo";
+  if (utm.includes("JESSICA") || utm.includes("JÉSSICA")) return "Jessica";
   return null;
+}
+
+function normalizeOpName(rawOp: unknown, rawUtm?: unknown): string {
+  const utmClass = classifyOpByUtm(rawUtm);
+  if (utmClass) return utmClass;
+
+  const str = String(rawOp ?? "").trim().toLowerCase();
+  if (str.includes("caio") || str.includes("gc") || str.includes("bp")) return "Caio";
+  if (str.includes("gustavo") || str.includes("ls") || str.includes("lf")) return "Gustavo";
+  if (str.includes("jessica") || str.includes("jéssica") || str.includes("je")) return "Jessica";
+
+  return "Caio";
 }
 
 export const getOperacoesStats = createServerFn({ method: "POST" })
@@ -1875,7 +1888,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     opLeadsMap.set("Jessica", 0);
 
     for (const l of leadsToday) {
-      const op = classifyOpByUtm(l.utm_source) || (l.expert ? String(l.expert) : "Caio");
+      const op = normalizeOpName(l.expert || l.vendedor, l.utm_source);
       opLeadsMap.set(op, (opLeadsMap.get(op) || 0) + 1);
     }
     const leadsByOp = Array.from(opLeadsMap.entries()).map(([nome, count]) => ({ nome, count }));
@@ -1898,7 +1911,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         unattendedLeadsCount++;
         const createdAtMs = lead.created_at ? new Date(lead.created_at).getTime() : nowMs;
         const tempoEsperaMin = Math.max(1, Math.floor((nowMs - createdAtMs) / 60000));
-        const opName = lead.expert || classifyOpByUtm(lead.utm_source) || "Caio";
+        const opName = normalizeOpName(lead.expert || lead.vendedor, lead.utm_source);
 
         unattendedList.push({
           id: String(lead.id || Math.random()),
