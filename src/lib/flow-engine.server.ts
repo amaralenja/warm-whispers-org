@@ -1636,6 +1636,13 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
         vendor: null,
         executorId: run.executor_id ? String(run.executor_id) : null,
       };
+
+      const isManualRun = ctx.variables?.trigger?.manual === true;
+      if (isManualRun) {
+        console.log(`[flow-engine] stale send run ${ctx.runId} skipped (disparo manual ativo)`);
+        return { runId: ctx.runId, skipped: true, reason: "manual" };
+      }
+
       try {
         const flow = await loadFlow(ctx.flowId, db);
         const nodes: Node[] = jsonArray<Node>(flow.nodes);
