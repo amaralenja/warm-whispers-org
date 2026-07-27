@@ -2315,16 +2315,18 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
 
 
   function moveTo(id: string, stage: string) {
-    const card = filtered.find((c) => c.id === id);
-    const quizId = card?.lead?.id;
+    const cleanId = id.replace(/^qlead-/, "").replace(/^venda-/, "").replace(/^htq:/, "");
+    const card = filtered.find((c) => c.id === id || c.id === cleanId || c.id === `qlead-${cleanId}`);
+    const quizId = card?.lead?.id || cleanId;
     if (quizId) {
       setFake(quizId, stage === "fake");
       if (stage === "descartado" || stage === "no_show") {
         dbSetSdrStage(quizId, stage);
       }
     }
+    dbSetCloserStage(cleanId, stage);
     dbSetCloserStage(id, stage);
-    setStageMap((prev) => ({ ...prev, [id]: stage }));
+    setStageMap((prev) => ({ ...prev, [id]: stage, [cleanId]: stage }));
   }
 
 

@@ -244,6 +244,7 @@ export function HtLeadDetailDialog({
     
     if (!error) {
       try {
+        const nowIso = new Date().toISOString();
         const { data: existingVenda } = (await supabase
           .from("ht_vendas" as any)
           .select("id")
@@ -256,9 +257,11 @@ export function HtLeadDetailDialog({
           closer: closerEmail || authorName || "",
           valor_total: total,
           valor_liquido: total * 0.9,
-          data: new Date().toISOString(),
+          data: nowIso,
           status: saleType === "sinal" ? "sinal" : "completed",
-          produto: "High Ticket"
+          produto: "High Ticket",
+          utm_source: lead.utm_source || "manual",
+          origem: lead.utm_source || "manual",
         };
 
         if (existingVenda?.id) {
@@ -271,8 +274,33 @@ export function HtLeadDetailDialog({
             .from("ht_vendas" as any)
             .insert([vendaPayload]);
         }
+
+        // Salva também na tabela global 'vendas' (Aba de Início / Dashboard Global)
+        const globalVendaPayload = {
+          Ticket: total,
+          nome_expert: closerEmail || authorName || "High Ticket",
+          Data: nowIso,
+          "ID de Referência": cleanId,
+          UTM: lead.utm_source || "manual",
+          Produto: "High Ticket",
+          Evento: "purchase_approved",
+          Email: lead.email || "",
+          Telefone: lead.whatsapp || "",
+        };
+
+        await supabase
+          .from("vendas" as any)
+          .insert([globalVendaPayload]);
+
+        // Atualiza o estágio do Closer para 'fechado' no Supabase
+        setCloserStage(cleanId, "fechado");
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("ht-closer-updated"));
+          window.dispatchEvent(new Event("calendar-showup-updated"));
+        }
       } catch (err) {
-        console.error("Erro ao sincronizar com ht_vendas local:", err);
+        console.error("Erro ao sincronizar venda com banco Supabase:", err);
       }
     }
 
