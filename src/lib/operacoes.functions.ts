@@ -1994,8 +1994,35 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     addQuizList(htLeadsAll);
     addQuizList(extQuizLeadsAll);
 
-    const quizToday = allQuizCombined.filter((q) => toSpDateString(q.created_at) === todayStr);
-    const qualifiedLeadsToday = quizToday.length;
+    // Leads Qualificados High Ticket de HOJE (Quiz + HT Leads + SDR Kanban)
+    const seenHtLeadIds = new Set<string>();
+    let qualifiedLeadsCount = 0;
+
+    const quizToday = allQuizCombined.filter((q) => {
+      const dStr = toSpDateString(q.created_at || q.received_at);
+      return dStr === todayStr;
+    });
+
+    for (const q of quizToday) {
+      const idStr = String(q.id || q.user_id || q.whatsapp || q.email || "").trim();
+      if (idStr && !seenHtLeadIds.has(idStr)) {
+        seenHtLeadIds.add(idStr);
+        qualifiedLeadsCount++;
+      }
+    }
+
+    for (const kb of htKanbanAll) {
+      const isUpdatedToday = toSpDateString(kb.updated_at) === todayStr;
+      if (isUpdatedToday && kb.lead_id) {
+        const idStr = String(kb.lead_id).trim();
+        if (idStr && !seenHtLeadIds.has(idStr)) {
+          seenHtLeadIds.add(idStr);
+          qualifiedLeadsCount++;
+        }
+      }
+    }
+
+    const qualifiedLeadsToday = Math.max(qualifiedLeadsCount, scheduledCount);
 
     // Estágios Kanban do SDR movimentados/arrastados HOJE
     let contact1Count = 0;
