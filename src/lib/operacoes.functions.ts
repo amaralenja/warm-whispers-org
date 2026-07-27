@@ -1365,7 +1365,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
     // Conversas do WhatsApp que ainda não existem como lead (nem quiz nem CRM)
     for (const conv of waConvsRaw) {
-      if (!inRange(conv.created_at || conv.updated_at)) continue;
+      if (!inRange(conv.created_at) && !inRange(conv.updated_at) && !inRange(conv.last_message_at)) continue;
       const rawOp = String(conv.operacao_id ?? "").trim();
       if (!rawOp || rawOp === "__notificador__") continue;
       const op = canonicalOpName(rawOp);
@@ -1389,7 +1389,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // Mapeia conversas ativas no Chat (qualquer conversa com mensagem/interação no período)
     const conversasAtivasByOp = new Map<string, Set<string>>();
     for (const conv of waConvsRaw) {
-      if (!inRange(conv.created_at || conv.updated_at || conv.last_message_at)) continue;
+      if (!inRange(conv.created_at) && !inRange(conv.updated_at) && !inRange(conv.last_message_at)) continue;
       const rawOp = String(conv.operacao_id ?? "").trim();
       if (!rawOp || rawOp === "__notificador__") continue;
       const op = canonicalOpName(rawOp);
