@@ -1814,7 +1814,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     const todayStr = toSpDateString(new Date()) || new Date().toISOString().slice(0, 10);
 
-    const [vendasRes, crmLeadsRes, htVendasRes, htKanbanRes, quizRes, financeiroRes, waConvRes, waMessagesRes] = await Promise.all([
+    const [vendasRes, crmLeadsRes, htVendasRes, htKanbanRes, quizRes, financeiroRes, waConvRes, waMessagesRes, htQuizRes, htLeadsRes] = await Promise.all([
       supabase
         .from("vendas")
         .select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
@@ -1852,8 +1852,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(2000),
       supabase
         .from("wa_messages" as any)
-        .select("id, conversation_id, direction, from_me, created_at")
-        .or("direction.eq.outbound,from_me.eq.true,direction.eq.sent")
+        .select("id, conversation_id, direction, created_at")
+        .eq("direction", "out")
         .limit(3000),
       supabase
         .from("ht_quiz_submissions" as any)
@@ -1874,8 +1874,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const quizAll = (quizRes.data ?? []) as any[];
     const waConvsAll = (waConvRes.data ?? []) as any[];
     const waMessagesAll = (waMessagesRes.data ?? []) as any[];
-    const htQuizAll = ((opts as any)?.htQuizRes?.data ?? (await supabase.from("ht_quiz_submissions" as any).select("id, received_at, updated_at, status, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas").order("updated_at", { ascending: false }).limit(1000)).data ?? []) as any[];
-    const htLeadsAll = ((opts as any)?.htLeadsRes?.data ?? (await supabase.from("ht_leads" as any).select("*").limit(1000)).data ?? []) as any[];
+    const htQuizAll = (htQuizRes.data ?? []) as any[];
+    const htLeadsAll = (htLeadsRes.data ?? []) as any[];
 
     // Fetch external Quiz Supabase leads if available (with timeout to avoid hanging)
     let extQuizLeadsAll: any[] = [];

@@ -79,7 +79,6 @@ const operacaoX1Items: Item[] = [
   { title: "WhatsApp", url: "/whatsapp", icon: ChatTwoTone },
   { title: "Chat ao Vivo", url: "/chat", icon: ForumTwoTone },
   { title: "Fluxos", url: "/flows", icon: AccountTreeTwoTone },
-  { title: "Remarketing 24h", url: "/remarketing", icon: BoltTwoTone },
 ];
 
 const highTicketItems: Item[] = [
@@ -122,7 +121,6 @@ const URL_TO_KEY: Record<string, string> = {
   "/tasks": "tasks",
   "/x1-analytics": "x1-analytics",
   "/comissoes": "comissoes",
-  "/remarketing": "remarketing",
 };
 const keyFromUrl = (u: string) => URL_TO_KEY[u] ?? u.replace(/^\//, "");
 

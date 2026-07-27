@@ -1637,27 +1637,30 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
         executorId: run.executor_id ? String(run.executor_id) : null,
       };
 
-      const isManualRun = ctx.variables?.trigger?.manual === true;
-      if (isManualRun) {
-        console.log(`[flow-engine] stale send run ${ctx.runId} skipped (disparo manual ativo)`);
-        return { runId: ctx.runId, skipped: true, reason: "manual" };
-      }
-
       try {
         const flow = await loadFlow(ctx.flowId, db);
         const nodes: Node[] = jsonArray<Node>(flow.nodes);
         const edges: Edge[] = jsonArray<Edge>(flow.edges);
         const currentNode = nodes.find((n) => n.id === String(run.current_node_id));
 
-        // Se estava num nó de envio e o worker morreu: o envio pode ter falhado.
-        // Marca como failed para parar o fluxo e evitar envios duplicados ao retomar.
+        // Se estava num nó de envio e o worker morreu: o envio pode ter sido
+        // enviado ou não. Avança pro próximo nó em vez de marcar failed —
+        // melhor arriscar duplicar uma mensagem do que travar o fluxo inteiro.
         if (currentNode && SEND_NODE_TYPES.has(currentNode.type)) {
+          const nextId = nextNodeId(edges, String(run.current_node_id));
+          if (!nextId) {
+            await updateFlowRun(ctx, { status: "completed", waiting_for: null, expires_at: null });
+            return { runId: ctx.runId, completed: true };
+          }
           await updateFlowRun(ctx, {
-            status: "failed",
-            error: `Envio de ${currentNode.type} travado (worker timeout após ${olderThanSeconds}s)`,
+            status: "running",
+            waiting_for: null,
+            expires_at: null,
+            current_node_id: nextId,
           });
-          console.warn(`[flow-engine] stale send run ${ctx.runId} marked failed (node: ${currentNode.type})`);
-          return { runId: ctx.runId, failed: true, nodeType: currentNode.type };
+          await executeFrom(ctx, nextId);
+          console.warn(`[flow-engine] stale send run ${ctx.runId} recovered past ${currentNode.type}, resumed from ${nextId}`);
+          return { runId: ctx.runId, ok: true, recoveredPast: currentNode.type };
         }
 
         // Para outros nós (ação, condição, etc.): avança pro próximo nó

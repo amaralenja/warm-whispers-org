@@ -815,7 +815,7 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       vendor: vendorCtx,
       triggerContext: { manual: true, initial_quoted_msg_id: data.initial_quoted_msg_id || null },
       startNodeId: data.start_node_id ?? null,
-      queueOnly: false,
+      queueOnly: true,
     });
 
     return res;
@@ -885,9 +885,8 @@ export const listActiveFlowRuns = createServerFn({ method: "GET" })
       return [];
     }
 
-    const { processExpiredTimerRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
+    const { processExpiredTimerRuns } = await import("@/lib/flow-engine.server");
     void processExpiredTimerRuns(20).catch(() => undefined);
-    void processStaleRunningSendRuns(180, 20).catch(() => undefined);
 
     const rpcArgs = vendorRpcArgs(context);
     if (rpcArgs) {
