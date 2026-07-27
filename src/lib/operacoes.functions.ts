@@ -1739,6 +1739,8 @@ export type LiveMonitoringTodayPayload = {
     recentEvents: Array<{ id: string; timestamp: string; tipo: string; titulo: string; descricao: string; operacao?: string; valor?: number; vendedor?: string }>;
   };
   ht: {
+    totalQuizSubmissionsToday: number;
+    pctQualifiedToday: number;
     qualifiedLeadsToday: number;
     contact1Count: number;
     contact2Count: number;
@@ -2382,6 +2384,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         recentEvents: x1Events,
       },
       ht: {
+        totalQuizSubmissionsToday: quizToday.length,
+        pctQualifiedToday: quizToday.length > 0 ? Math.min(100, Math.round((qualifiedLeadsToday / quizToday.length) * 100)) : 0,
         qualifiedLeadsToday,
         contact1Count,
         contact2Count,

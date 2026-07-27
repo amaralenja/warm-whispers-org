@@ -620,10 +620,19 @@ function LiveMonitoringPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/30 text-[0.65rem] font-bold text-sky-200">1</span>
-                      Leads Qualificados (Quiz Hoje)
+                      Leads Qualificados (Quiz/Formulário Hoje)
                     </span>
                     <span className="font-mono text-xl font-black text-white">
                       {isLoading ? "—" : (serverStats?.ht?.qualifiedLeadsToday ?? 0)}
+                    </span>
+                  </div>
+                  {/* Detailed Breakdown: Total Quiz Answers & % Qualified */}
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-sky-500/20 text-[0.65rem] font-bold">
+                    <span className="rounded-lg bg-sky-500/20 border border-sky-500/30 px-2.5 py-1 text-sky-200">
+                      📝 Total Respostas Quiz/Typebot: <strong className="text-white font-mono">{serverStats?.ht?.totalQuizSubmissionsToday ?? 0}</strong>
+                    </span>
+                    <span className="rounded-lg bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1 text-emerald-300">
+                      ⚡ Taxa de Qualificação: <strong className="text-white font-mono">{serverStats?.ht?.pctQualifiedToday ?? 0}%</strong>
                     </span>
                   </div>
                 </div>
