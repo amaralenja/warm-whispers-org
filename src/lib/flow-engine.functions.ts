@@ -797,33 +797,31 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       });
       if (conv?.id) data.conversation_id = String(conv.id);
     }
-    const { runFlowAdmin, processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
+    const { runFlowAdmin, processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningSendRuns, getAdminDb } = await import("@/lib/flow-engine.server");
 
+    const adminDb = await getAdminDb();
     const vendorCtx = (context as any).vendor
       ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
       : null;
 
-    // Dispara a execução assíncrona em background para que a vendedora possa
-    // disparar o fluxo em múltiplos leads simultaneamente sem bloqueio de HTTP.
-    void runFlowAdmin({
+    // Garante a criação e disparo com adminDb para contornar bloqueios de RLS em sessões de vendedores
+    const res = await runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
       contactWaId: data.contact_wa_id,
       conversationId: data.conversation_id ?? null,
-      db,
+      db: adminDb,
       vendor: vendorCtx,
       triggerContext: { manual: true, initial_quoted_msg_id: data.initial_quoted_msg_id || null },
       startNodeId: data.start_node_id ?? null,
       queueOnly: false,
-    }).then(() => {
-      void processQueuedFlowRuns(20).catch(() => undefined);
-      void processExpiredTimerRuns(20).catch(() => undefined);
-      void processStaleRunningSendRuns(60, 20).catch(() => undefined);
-    }).catch((err) => {
-      console.error("[triggerFlowManually] background execution error:", err);
     });
 
-    return { ok: true, status: "started" };
+    void processQueuedFlowRuns(20).catch(() => undefined);
+    void processExpiredTimerRuns(20).catch(() => undefined);
+    void processStaleRunningSendRuns(60, 20).catch(() => undefined);
+
+    return res;
   });
 
 export const triggerFlowBulk = createServerFn({ method: "POST" })
