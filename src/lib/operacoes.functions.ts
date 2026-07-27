@@ -1809,7 +1809,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
   .handler(async (opts): Promise<LiveMonitoringTodayPayload> => {
     const context = opts?.context;
     if (!context?.supabase) throw new Error("Sessão Supabase indisponível");
-    const supabase = await dbFor(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabase = supabaseAdmin ?? (await dbFor(context));
 
     const todayStr = toSpDateString(new Date()) || new Date().toISOString().slice(0, 10);
 
