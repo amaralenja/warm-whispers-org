@@ -1387,10 +1387,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       countLead(op, classifyLeadType(fakeLeadForClassify, false, op));
     }
 
-    // Mapeia conversas ativas no Chat (qualquer conversa com mensagem/interação no período)
+    // Mapeia conversas ativas no Chat (janela de 24h aberta = last_message_at nas �ltimas 24 horas)
     const conversasAtivasByOp = new Map<string, Set<string>>();
+    const cutoff24h = Date.now() - 24 * 60 * 60 * 1000;
     for (const conv of waConvsRaw) {
-      if (!inRange(conv.created_at) && !inRange(conv.updated_at) && !inRange(conv.last_message_at)) continue;
+      const lastMsg = conv.last_message_at || conv.updated_at;
+      if (!lastMsg) continue;
+      if (new Date(lastMsg).getTime() < cutoff24h) continue;
       const rawOp = String(conv.operacao_id ?? "").trim();
       if (!rawOp || rawOp === "__notificador__") continue;
       const op = canonicalOpName(rawOp);
