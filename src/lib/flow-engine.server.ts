@@ -989,12 +989,10 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       }
 
       const inner: any = { link: mirroredUrl };
-      let isVoice = false;
       if (mediaType === "audio") {
         const audioInfo = getAudioFileInfo(mirroredUrl, filename);
         if (audioInfo.isOggOpus) {
           inner.voice = true;
-          isVoice = true;
         }
       }
       if (mediaType !== "sticker" && caption) inner.caption = caption;
@@ -1012,77 +1010,21 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       let sendResult: { waMsgId: string | null; phoneNumberId: string; toNormalized: string } | null = null;
 
       try {
-        // Envia com a URL espelhada/otimizada
         sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
       } catch (firstSendErr: any) {
+        // Fallback único: se audio com voice:true falhou, tenta sem voice
         if (mediaType === "audio" && inner.voice) {
-          console.warn("[flow-engine] Meta rejeitou voice: true na URL, tentando sem voice: true...", firstSendErr?.message);
+          console.warn("[flow-engine] Meta rejeitou voice:true, tentando sem voice...", firstSendErr?.message);
           delete inner.voice;
           body[mediaType] = inner;
           try {
             sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
           } catch (retryNoVoiceErr: any) {
-            firstSendErr = retryNoVoiceErr;
+            // Ambos falharam — deixa executeFrom re-enfileirar com retry counter
+            throw retryNoVoiceErr;
           }
-        }
-
-        if (!sendResult) {
-          console.warn(`[flow-engine] Envio de ${mediaType} por URL falhou (${firstSendErr?.message}). Executando FALLBACK: Upload Direto do Binário no Meta (media_id)...`);
-
-          // 3) TENTATIVA 2 (FALLBACK): Upload direto do binário para a API de Mídia da Meta (retorna media_id)
-          try {
-            const { token, phoneNumberId } = await fetchChannelToken(ctx.channelId, ctx.db);
-            let mime = "application/octet-stream";
-            let ext = "file";
-
-            if (mediaType === "image") {
-              mime = "image/jpeg";
-              ext = "jpg";
-            } else if (mediaType === "video") {
-              mime = "video/mp4";
-              ext = "mp4";
-            } else if (mediaType === "audio") {
-              const audioInfo = getAudioFileInfo(mirroredUrl, filename);
-              mime = audioInfo.mime;
-              ext = audioInfo.ext;
-              isVoice = audioInfo.isOggOpus;
-            } else {
-              mime = "application/pdf";
-              ext = "pdf";
-            }
-
-            const safeFilename = filename || `arquivo.${ext}`;
-
-            const mediaId = await uploadMediaToMeta(token, phoneNumberId, mirroredUrl, mime, safeFilename);
-
-            const mediaIdInner: any = { id: mediaId };
-            if (mediaType === "audio" && isVoice) mediaIdInner.voice = true;
-            if (mediaType !== "sticker" && caption) mediaIdInner.caption = caption;
-            if (mediaType === "document" && filename) mediaIdInner.filename = filename;
-
-            body = {
-              type: mediaType,
-              [mediaType]: mediaIdInner,
-              ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}),
-            };
-
-            try {
-              sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-            } catch (mErr: any) {
-              if (mediaType === "audio" && mediaIdInner.voice) {
-                console.warn("[flow-engine] Meta rejeitou voice: true no media_id, tentando sem voice: true...");
-                delete mediaIdInner.voice;
-                body[mediaType] = mediaIdInner;
-                sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-              } else {
-                throw mErr;
-              }
-            }
-            console.log(`[flow-engine] SUCESSO no envio de ${mediaType} usando media_id (${mediaId})!`);
-          } catch (secondSendErr: any) {
-            console.error(`[flow-engine] Fallback de mídia via media_id também falhou:`, secondSendErr);
-            throw firstSendErr;
-          }
+        } else {
+          throw firstSendErr;
         }
       }
 
