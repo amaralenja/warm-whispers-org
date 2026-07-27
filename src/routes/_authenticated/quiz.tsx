@@ -479,12 +479,45 @@ function QuizPage() {
       if (toIso && t >= toIso) return false;
       return true;
     });
-    // dedupe por email/whatsapp (API tem prioridade — é o novo canal)
-    const seen = new Set<string>();
-    const keyOf = (l: Lead) => `${(l.email ?? "").toLowerCase()}|${(l.whatsapp ?? "").replace(/\D/g, "")}`;
+
+    const seenIds = new Set<string>();
+    const seenEmails = new Set<string>();
+    const seenPhones = new Set<string>();
+
+    const isDuplicate = (l: Lead) => {
+      const id = String(l.id || "").trim();
+      const email = (l.email || "").toLowerCase().trim();
+      const phone = (l.whatsapp || "").replace(/\D/g, "");
+
+      if (id && seenIds.has(id)) return true;
+      if (email && seenEmails.has(email)) return true;
+      if (phone && phone.length >= 8 && seenPhones.has(phone)) return true;
+      return false;
+    };
+
+    const markSeen = (l: Lead) => {
+      const id = String(l.id || "").trim();
+      const email = (l.email || "").toLowerCase().trim();
+      const phone = (l.whatsapp || "").replace(/\D/g, "");
+
+      if (id) seenIds.add(id);
+      if (email) seenEmails.add(email);
+      if (phone && phone.length >= 8) seenPhones.add(phone);
+    };
+
     const out: Lead[] = [];
-    for (const l of api) { const k = keyOf(l); if (k !== "|") seen.add(k); out.push(l); }
-    for (const l of extLeads) { const k = keyOf(l); if (k === "|" || !seen.has(k)) out.push(l); }
+    for (const l of api) {
+      if (!isDuplicate(l)) {
+        markSeen(l);
+        out.push(l);
+      }
+    }
+    for (const l of extLeads) {
+      if (!isDuplicate(l)) {
+        markSeen(l);
+        out.push(l);
+      }
+    }
     return out.sort((a, b) => (b.data_criacao || "").localeCompare(a.data_criacao || ""));
   }, [extLeads, apiSubsRes, fromIso, toIso]);
 
