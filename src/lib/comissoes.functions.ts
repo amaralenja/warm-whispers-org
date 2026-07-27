@@ -287,7 +287,21 @@ export const getHtComissoes = createServerFn({ method: "POST" })
     const QUIZ_SB_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
     const QUIZ_ANON =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
-    const COMPARECEU_STAGES = ["followup", "remarcada", "sinal", "fechado"];
+    const COMPARECEU_STAGES = [
+      "compareceu",
+      "showup",
+      "show_up",
+      "show-up",
+      "realizada",
+      "reuniao_realizada",
+      "followup",
+      "follow_up",
+      "remarcada",
+      "sinal",
+      "fechado",
+      "won",
+      "ganho",
+    ];
     const FECHADO_STAGES = ["fechado"];
     const FECHADO_CRM = ["fechado", "ganho"];
     function getDefaultRegra(tipo: string): Record<string, any> {
@@ -418,16 +432,13 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           if (sdrActionTs < sdrTodayTs) continue;
           const fmtD = sdrActionDate.slice(0, 10);
 
-          // Call Marcada / Comparecimento check (SDR marcou reunião ou closer atendeu)
-          const isCallMarcada =
-            sdrStage === "scheduled" ||
-            sdrStage === "agendado" ||
-            sdrStage === "won" ||
-            !!ks.scheduled_at ||
-            !!lead.crm_data_agendamento ||
-            COMPARECEU_STAGES.includes(closerStage);
+          // Comparecimento / Show Up check (R$ 30 fixo APENAS se o lead compareceu à reunião)
+          const isShowUp =
+            COMPARECEU_STAGES.includes(closerStage) ||
+            COMPARECEU_STAGES.includes(sdrStage) ||
+            COMPARECEU_STAGES.includes(crmStatus);
 
-          if (isCallMarcada) {
+          if (isShowUp) {
             comparecimentos++;
             detalhes.push({
               leadNome: lead.nome || lead.whatsapp || "Sem nome",
