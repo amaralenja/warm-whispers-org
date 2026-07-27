@@ -410,6 +410,18 @@ export const listAllKanbanSubmissions = createServerFn({ method: "POST" })
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
+    try {
+      await syncQuizLeadsInternal(client);
+    } catch (err) {
+      console.error("Falha ao sincronizar leads do Quiz em listAllKanbanSubmissions:", err);
+    }
+
+    try {
+      await syncCriarSaasLeadsInternal(client);
+    } catch (err) {
+      console.error("Falha ao sincronizar leads do Criar SaaS em listAllKanbanSubmissions:", err);
+    }
+
     const [qzRes, crmRes] = await Promise.all([
       client
         .from("ht_quiz_submissions" as any)
