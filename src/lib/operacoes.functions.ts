@@ -1791,7 +1791,6 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       supabase
         .from("vendas")
         .select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
-        .or('Evento.eq.purchase_approved,Evento.ilike.*aprov*')
         .order("id", { ascending: false })
         .limit(2000),
       supabase
@@ -1821,7 +1820,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(200),
       supabase
         .from("wa_conversations" as any)
-        .select("id, contact_wa_id, assigned_vendor_id, updated_at, created_at, contact_name, utm_source")
+        .select("id, contact_wa_id, assigned_vendor_id, operacao_id, updated_at, created_at, contact_name, utm_source")
         .order("updated_at", { ascending: false })
         .limit(2000),
       supabase
@@ -1840,7 +1839,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(1000),
     ]);
 
-    const vendasAll = (vendasRes.data ?? []) as any[];
+    const vendasRaw = (vendasRes.data ?? []) as any[];
+    const vendasAll = vendasRaw.filter((v) => !v.Evento || /aprov|approved|purchase/i.test(String(v.Evento)));
     const crmLeadsAll = (crmLeadsRes.data ?? []) as any[];
     const htVendasAll = (htVendasRes.data ?? []) as any[];
     const htKanbanAll = (htKanbanRes.data ?? []) as any[];
@@ -1907,7 +1907,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
             created_at: conv.created_at || conv.updated_at,
             nome: conv.contact_name || conv.name || `WhatsApp ${phoneDigits.slice(-4)}`,
             telefone: conv.contact_wa_id,
-            expert: conv.assigned_vendor_id || "Caio",
+            expert: conv.operacao_id || conv.assigned_vendor_id || "Caio",
             vendedor: conv.assigned_vendor_id || "Pendente",
             utm_source: conv.utm_source || "wa-direct",
           });
@@ -1924,7 +1924,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     opLeadsMap.set("Jessica", 0);
 
     for (const l of leadsToday) {
-      const op = normalizeOpName(l.expert || l.vendedor, l.utm_source);
+      const op = normalizeOpName(l.expert || l.vendedor || l.operacao_id, l.utm_source);
       opLeadsMap.set(op, (opLeadsMap.get(op) || 0) + 1);
     }
     const leadsByOp = Array.from(opLeadsMap.entries()).map(([nome, count]) => ({ nome, count }));
@@ -1945,9 +1945,9 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         inProgressCount++;
       } else {
         unattendedLeadsCount++;
-        const createdAtMs = lead.created_at ? new Date(lead.created_at).getTime() : nowMs;
+        const createdAtMs = parseDataField(lead.created_at || lead.data_criacao || lead.updated_at) || nowMs;
         const tempoEsperaMin = Math.max(1, Math.floor((nowMs - createdAtMs) / 60000));
-        const opName = normalizeOpName(lead.expert || lead.vendedor, lead.utm_source);
+        const opName = normalizeOpName(lead.expert || lead.vendedor || lead.operacao_id, lead.utm_source);
 
         unattendedList.push({
           id: String(lead.id || Math.random()),
@@ -1955,7 +1955,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
           telefone: lead.telefone || "(WhatsApp)",
           operacao: opName,
           vendedor: lead.vendedor || "Pendente",
-          tempoEsperaMin,
+          tempoEsperaMin: isNaN(tempoEsperaMin) ? 1 : tempoEsperaMin,
         });
       }
     }
@@ -1968,7 +1968,10 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     for (const v of vendasToday.slice(0, 10)) {
       const d = v.Data ? new Date(v.Data) : new Date();
-      const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const isValidDate = !isNaN(d.getTime());
+      const timeStr = isValidDate
+        ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
+        : "00:00";
       const val = parseTicket(v.Ticket);
       const opName = v.nome_expert || classifyOpByUtm(v.UTM) || "X1";
       x1Events.push({
@@ -1983,9 +1986,12 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     }
 
     for (const l of leadsToday.slice(0, 10)) {
-      const d = l.created_at ? new Date(l.created_at) : new Date();
-      const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      const opName = l.expert || classifyOpByUtm(l.utm_source) || "Caio";
+      const d = l.created_at || l.data_criacao ? new Date(l.created_at || l.data_criacao) : new Date();
+      const isValidDate = !isNaN(d.getTime());
+      const timeStr = isValidDate
+        ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
+        : "00:00";
+      const opName = normalizeOpName(l.expert || l.vendedor || l.operacao_id, l.utm_source);
       x1Events.push({
         id: `lead-${l.id || Math.random()}`,
         timestamp: timeStr,
@@ -1996,8 +2002,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       });
     }
 
-    // Sort X1 events by timestamp descending
-    x1Events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    // Sort X1 events by timestamp descending safely
+    x1Events.sort((a, b) => String(b.timestamp || "").localeCompare(String(a.timestamp || "")));
 
     // ── 2. Filtra Operação High Ticket de HOJE ──
     const htVendasToday = htVendasAll.filter((v) => isRecordFromToday(v.data, todayStr));
