@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listAccountAds } from "@/lib/meta-ads-manager.functions";
 import { getVendorSession } from "@/lib/vendor-session";
+import { setCloserStage } from "@/lib/ht-kanban-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalPicker } from "@/components/ui/calendar";
 import { format } from "date-fns";

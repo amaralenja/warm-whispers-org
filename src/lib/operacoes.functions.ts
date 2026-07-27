@@ -32,6 +32,12 @@ function parseTicket(raw: unknown): number {
 /** Converte qualquer ISO/Timestamp ou string de data para YYYY-MM-DD no fuso de São Paulo (America/Sao_Paulo) */
 function toSpDateString(raw: unknown): string | null {
   if (!raw) return null;
+  if (raw instanceof Date) {
+    if (!isNaN(raw.getTime())) {
+      return raw.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    }
+    return null;
+  }
   if (typeof raw === "number") {
     const d = new Date(raw);
     if (!isNaN(d.getTime())) {
@@ -76,6 +82,16 @@ function toSpDateString(raw: unknown): string | null {
   if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
 
   return null;
+}
+
+/** Verifica resiliência de pertencimento à data de HOJE no fuso SP (aceita prefixo YYYY-MM-DD direto ou conversão SP) */
+function isRecordFromToday(raw: unknown, todayStr: string): boolean {
+  if (!raw) return false;
+  const s = String(raw).trim();
+  if (!s) return false;
+  if (s.startsWith(todayStr)) return true;
+  const spDate = toSpDateString(raw);
+  return spDate === todayStr;
 }
 
 /**
@@ -1748,8 +1764,8 @@ export type LiveMonitoringTodayPayload = {
     scheduledCount: number;
     vendasHtCount: number;
     revenueToday: number;
-    closersSummary: Array<{ closer: string; calls: number; showUps: number; noShows: number; followups: number; reschedules: number; discards: number }>;
-    scheduledCallsToday: Array<{ id: string; leadNome: string; horario: string; closer: string; expert: string }>;
+    closersSummary: Array<{ name: string; callsToday: number; pendingToday: number; showUpsToday: number; noShowsToday: number; followupToday: number; remarcadaToday: number; descartadoToday: number }>;
+    scheduledCallsToday: Array<{ id: string; horario: string; leadName: string; closerName: string; status: string; stageRaw?: string; leadData?: any }>;
     showUpsCountToday: number;
     noShowsCountToday: number;
     salesOriginBreakdown: { paidCount: number; organicCount: number; paidRevenue: number; organicRevenue: number };
@@ -1861,7 +1877,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     }
 
     // ── 1. Filtra Vendas X1 de HOJE ──
-    const vendasToday = vendasAll.filter((v) => toSpDateString(v.Data) === todayStr);
+    const vendasToday = vendasAll.filter((v) => isRecordFromToday(v.Data, todayStr));
     const approvedSalesCount = vendasToday.length;
     const totalRevenueToday = vendasToday.reduce((a, v) => a + parseTicket(v.Ticket), 0);
 
@@ -1870,8 +1886,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const leadsToday: any[] = [];
 
     for (const l of crmLeadsAll) {
-      const dStr = toSpDateString(l.created_at || l.data_criacao || l.updated_at);
-      if (dStr === todayStr) {
+      if (isRecordFromToday(l.created_at || l.data_criacao || l.updated_at, todayStr)) {
         const phoneDigits = String(l.telefone || "").replace(/\D/g, "");
         if (phoneDigits) seenX1Phones.add(phoneDigits);
         leadsToday.push(l);
@@ -1879,8 +1894,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     }
 
     for (const conv of waConvsAll) {
-      const dStr = toSpDateString(conv.created_at || conv.updated_at);
-      if (dStr === todayStr && conv.contact_wa_id) {
+      if (isRecordFromToday(conv.created_at || conv.updated_at, todayStr) && conv.contact_wa_id) {
         const phoneDigits = String(conv.contact_wa_id).replace(/\D/g, "");
         if (phoneDigits && !seenX1Phones.has(phoneDigits)) {
           seenX1Phones.add(phoneDigits);
@@ -1982,7 +1996,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     x1Events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
     // ── 2. Filtra Operação High Ticket de HOJE ──
-    const htVendasToday = htVendasAll.filter((v) => toSpDateString(v.data) === todayStr);
+    const htVendasToday = htVendasAll.filter((v) => isRecordFromToday(v.data, todayStr));
     const vendasHtCount = htVendasToday.length;
     const htRevenueToday = htVendasToday.reduce((a, v) => a + (parseFloat(v.valor_total) || 0), 0);
 
@@ -2009,10 +2023,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const seenHtLeadIds = new Set<string>();
     let qualifiedLeadsCount = 0;
 
-    const quizToday = allQuizCombined.filter((q) => {
-      const dStr = toSpDateString(q.created_at || q.received_at);
-      return dStr === todayStr;
-    });
+    const quizToday = allQuizCombined.filter((q) => isRecordFromToday(q.created_at || q.received_at, todayStr));
 
     for (const q of quizToday) {
       const idStr = String(q.id || q.user_id || q.whatsapp || q.email || "").trim();
@@ -2023,8 +2034,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     }
 
     for (const kb of htKanbanAll) {
-      const isUpdatedToday = toSpDateString(kb.updated_at) === todayStr;
-      if (isUpdatedToday && kb.lead_id) {
+      if (isRecordFromToday(kb.updated_at, todayStr) && kb.lead_id) {
         const idStr = String(kb.lead_id).trim();
         if (idStr && !seenHtLeadIds.has(idStr)) {
           seenHtLeadIds.add(idStr);
@@ -2033,8 +2043,6 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       }
     }
 
-    const qualifiedLeadsToday = Math.max(qualifiedLeadsCount, scheduledCount);
-
     // Estágios Kanban do SDR movimentados/arrastados HOJE
     let contact1Count = 0;
     let contact2Count = 0;
@@ -2042,8 +2050,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     let scheduledCount = 0;
 
     for (const kb of htKanbanAll) {
-      const isUpdatedToday = toSpDateString(kb.updated_at) === todayStr;
-      const isScheduledToday = toSpDateString(kb.scheduled_at) === todayStr;
+      const isUpdatedToday = isRecordFromToday(kb.updated_at, todayStr);
+      const isScheduledToday = isRecordFromToday(kb.scheduled_at, todayStr);
 
       // Agendamentos: Reunião agendada HOJE pelo SDR
       if ((isUpdatedToday || isScheduledToday) && kb.scheduled_at) {
@@ -2061,6 +2069,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         }
       }
     }
+
+    const qualifiedLeadsToday = Math.max(qualifiedLeadsCount, scheduledCount);
 
     // Real HT Events & Sales Origin (Paid vs Organic)
     let paidSalesCount = 0;
