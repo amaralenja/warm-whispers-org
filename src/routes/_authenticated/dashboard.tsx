@@ -15,6 +15,7 @@ import PercentTwoTone from "@mui/icons-material/PercentTwoTone";
 import EmojiEventsTwoTone from "@mui/icons-material/EmojiEventsTwoTone";
 import AutoAwesomeTwoTone from "@mui/icons-material/AutoAwesomeTwoTone";
 import ShowChartTwoTone from "@mui/icons-material/ShowChartTwoTone";
+import AccountBalanceWalletTwoTone from "@mui/icons-material/AccountBalanceWalletTwoTone";
 import {
   Crown,
   Trophy,
