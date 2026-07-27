@@ -1734,7 +1734,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     const todayStr = toSpDateString(new Date()) || new Date().toISOString().slice(0, 10);
 
-    const [vendasRes, crmLeadsRes, htVendasRes, htKanbanRes, quizRes, financeiroRes] = await Promise.all([
+    const [vendasRes, crmLeadsRes, htVendasRes, htKanbanRes, quizRes, financeiroRes, waConvRes, waMessagesRes] = await Promise.all([
       supabase
         .from("vendas")
         .select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
@@ -1748,7 +1748,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(2000),
       supabase
         .from("ht_vendas" as any)
-        .select("id, valor_total, data, status, cliente, closer")
+        .select("id, valor_total, data, status, cliente, closer, utm_source, origem, utm")
         .neq("status", "reembolso")
         .order("data", { ascending: false })
         .limit(500),
@@ -1766,6 +1766,15 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .select("valor, tipo, data_ref")
         .order("data_ref", { ascending: false })
         .limit(200),
+      supabase
+        .from("wa_conversations" as any)
+        .select("id, contact_wa_id, assigned_vendor_id, updated_at")
+        .limit(2000),
+      supabase
+        .from("wa_messages" as any)
+        .select("id, conversation_id, direction, from_me, created_at")
+        .or("direction.eq.outbound,from_me.eq.true,direction.eq.sent")
+        .limit(3000),
     ]);
 
     const vendasAll = (vendasRes.data ?? []) as any[];
@@ -1773,6 +1782,23 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const htVendasAll = (htVendasRes.data ?? []) as any[];
     const htKanbanAll = (htKanbanRes.data ?? []) as any[];
     const quizAll = (quizRes.data ?? []) as any[];
+    const waConvsAll = (waConvRes.data ?? []) as any[];
+    const waMessagesAll = (waMessagesRes.data ?? []) as any[];
+
+    // Map conversation IDs that have outbound vendor messages
+    const convsWithOutbound = new Set<string>();
+    for (const msg of waMessagesAll) {
+      if (msg.conversation_id) convsWithOutbound.add(String(msg.conversation_id));
+    }
+
+    // Map contact phone digits to conversation ID
+    const contactToConvMap = new Map<string, string>();
+    for (const conv of waConvsAll) {
+      if (conv.contact_wa_id) {
+        const digits = String(conv.contact_wa_id).replace(/\D/g, "");
+        if (digits) contactToConvMap.set(digits, String(conv.id));
+      }
+    }
 
     // ── 1. Filtra Vendas X1 de HOJE ──
     const vendasToday = vendasAll.filter((v) => toSpDateString(v.Data) === todayStr);
@@ -1794,6 +1820,40 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       opLeadsMap.set(op, (opLeadsMap.get(op) || 0) + 1);
     }
     const leadsByOp = Array.from(opLeadsMap.entries()).map(([nome, count]) => ({ nome, count }));
+
+    // STRICT CHECK: Detect if vendor actually started chatting with the lead today
+    let inProgressCount = 0;
+    let unattendedLeadsCount = 0;
+    const unattendedList: Array<{ id: string; nome: string; telefone: string; operacao: string; vendedor: string; tempoEsperaMin: number }> = [];
+
+    const nowMs = Date.now();
+
+    for (const lead of leadsToday) {
+      const rawPhone = String(lead.telefone || "").replace(/\D/g, "");
+      const convId = rawPhone ? contactToConvMap.get(rawPhone) : null;
+      const hasVendorChatted = convId ? convsWithOutbound.has(convId) : false;
+
+      if (hasVendorChatted) {
+        inProgressCount++;
+      } else {
+        unattendedLeadsCount++;
+        const createdAtMs = lead.created_at ? new Date(lead.created_at).getTime() : nowMs;
+        const tempoEsperaMin = Math.max(1, Math.floor((nowMs - createdAtMs) / 60000));
+        const opName = lead.expert || classifyOpByUtm(lead.utm_source) || "Caio";
+
+        unattendedList.push({
+          id: String(lead.id || Math.random()),
+          nome: lead.nome || "Lead Sem Nome",
+          telefone: lead.telefone || "(WhatsApp)",
+          operacao: opName,
+          vendedor: lead.vendedor || "Pendente",
+          tempoEsperaMin,
+        });
+      }
+    }
+
+    // Sort unattended leads by longest wait time
+    unattendedList.sort((a, b) => b.tempoEsperaMin - a.tempoEsperaMin);
 
     // Real X1 Events from today's DB records
     const x1Events: Array<{ id: string; timestamp: string; tipo: string; titulo: string; descricao: string; operacao?: string; valor?: number; vendedor?: string }> = [];
@@ -1940,11 +2000,11 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       x1: {
         totalLeadsToday,
         leadsByOp,
-        unattendedLeadsCount: 0,
-        inProgressCount: Math.max(0, totalLeadsToday - approvedSalesCount),
+        unattendedLeadsCount,
+        inProgressCount,
         approvedSalesCount,
         totalRevenueToday,
-        unattendedList: [],
+        unattendedList,
         recentEvents: x1Events,
       },
       ht: {
