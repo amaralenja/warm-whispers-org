@@ -51,6 +51,7 @@
     "@types/pg": "^8.20.0",
     "@xyflow/react": "^12.11.1",
     "class-variance-authority": "^0.7.1",
+    "cheerio": "^1.0.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",

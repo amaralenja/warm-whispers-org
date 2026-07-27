@@ -2193,7 +2193,7 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
                           isActive
                             ? { borderLeft: `3px solid var(--chat-accent, #3b82f6)` }
                             : checkIsComprador(contactWaId)
-                              ? { borderLeft: "3px solid #d4a03a" }
+                              ? { borderLeft: "3px solid #84cc16" }
                               : leadStage
                                 ? { borderLeft: `3px solid ${leadStage.cor}` }
                                 : isTypebotLead

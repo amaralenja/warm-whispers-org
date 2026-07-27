@@ -47,7 +47,7 @@ export function WorkspaceSwitcher() {
     setOpen(false);
   }
 
-  const hex = workspace?.accent?.hex ?? "#e94560";
+  const hex = workspace?.accent?.hex ?? "#84cc16";
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -80,7 +80,7 @@ export function WorkspaceSwitcher() {
           {workspaces.map((w) => {
             const active = w.id === workspace?.id;
             const isEditing = editingId === w.id;
-            const wHex = w.accent?.hex ?? "#e94560";
+            const wHex = w.accent?.hex ?? "#84cc16";
             return (
               <div key={w.id} style={{ ["--ws-accent" as any]: wHex }} className={`rounded-md ${active ? "bg-[color:var(--ws-accent)]/[0.08]" : ""}`}>
                 <div className="group/item flex items-center gap-2 px-1 transition-colors hover:bg-[color:var(--ws-accent)]/[0.07] rounded-md">

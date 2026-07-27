@@ -883,8 +883,8 @@ function RelatoriosTab({ range }: { range: DateRangeValue }) {
               <AreaChart data={data.serieDaily}>
                 <defs>
                   <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#d4a03a" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#d4a03a" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#84cc16" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#84cc16" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -895,7 +895,7 @@ function RelatoriosTab({ range }: { range: DateRangeValue }) {
                   formatter={(v: number) => [BRL(v), "Faturamento"]}
                   labelFormatter={(l: string) => l}
                 />
-                <Area type="monotone" dataKey="total" stroke="#d4a03a" fill="url(#gradFat)" strokeWidth={2} />
+                <Area type="monotone" dataKey="total" stroke="#84cc16" fill="url(#gradFat)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -906,7 +906,7 @@ function RelatoriosTab({ range }: { range: DateRangeValue }) {
       {data && data.topVendedores.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-border bg-card/40 p-5">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            <Sparkles className="h-3.5 w-3.5 text-lime-400" />
             <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Top Vendedores</span>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-8">
@@ -915,7 +915,7 @@ function RelatoriosTab({ range }: { range: DateRangeValue }) {
                 <PieChart>
                   <Pie data={data.topVendedores.slice(0, 6)} dataKey="total" nameKey="utm" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={2}>
                     {data.topVendedores.slice(0, 6).map((_, i) => (
-                      <Cell key={i} fill={["#d4a03a", "#8b5cf6", "#06b6d4", "#f43f5e", "#22c55e", "#f97316"][i % 6]} />
+                      <Cell key={i} fill={["#84cc16", "#22c55e", "#06b6d4", "#10b981", "#8b5cf6", "#f97316"][i % 6]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(v: number) => BRL(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }} />
@@ -925,7 +925,7 @@ function RelatoriosTab({ range }: { range: DateRangeValue }) {
             <div className="flex-1 space-y-2">
               {data.topVendedores.slice(0, 6).map((v, i) => (
                 <div key={v.utm} className="flex items-center gap-3">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: ["#d4a03a", "#8b5cf6", "#06b6d4", "#f43f5e", "#22c55e", "#f97316"][i % 6] }} />
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: ["#84cc16", "#22c55e", "#06b6d4", "#10b981", "#8b5cf6", "#f97316"][i % 6] }} />
                   <span className="flex-1 text-sm">{v.utm}</span>
                   <span className={`${NUM} text-sm`}>{BRL(v.total)}</span>
                   <span className="text-xs text-muted-foreground">{v.pct.toFixed(1)}%</span>

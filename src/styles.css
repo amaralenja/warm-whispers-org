@@ -32,6 +32,9 @@
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
   --color-success: var(--success);
+  --color-sidebar: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
   --color-chat-shell: var(--chat-shell);
   --color-chat-sidebar: var(--chat-sidebar);
   --color-chat-thread: var(--chat-thread);
@@ -48,111 +51,123 @@
   --font-sans: "Inter", system-ui, -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
 }
 
-/* Premium dark — editorial, monocromático com acento âmbar quente */
+/* MULTIUM Design System — Dark Mode (Deep Emerald & Electric Lime) */
 :root {
   --radius: 0.75rem;
 
-  --background: oklch(0.14 0.005 270);
-  --foreground: oklch(0.96 0.005 90);
+  --background: oklch(0.13 0.025 145);
+  --foreground: oklch(0.96 0.008 145);
 
-  --card: oklch(0.17 0.006 270);
-  --card-foreground: oklch(0.96 0.005 90);
+  --card: oklch(0.17 0.03 145);
+  --card-foreground: oklch(0.96 0.008 145);
 
-  --popover: oklch(0.17 0.006 270);
-  --popover-foreground: oklch(0.96 0.005 90);
+  --popover: oklch(0.17 0.03 145);
+  --popover-foreground: oklch(0.96 0.008 145);
 
-  --primary: oklch(0.96 0.005 90);
-  --primary-foreground: oklch(0.14 0.005 270);
+  --primary: oklch(0.96 0.008 145);
+  --primary-foreground: oklch(0.13 0.025 145);
 
-  --secondary: oklch(0.22 0.006 270);
-  --secondary-foreground: oklch(0.96 0.005 90);
+  --secondary: oklch(0.22 0.03 145);
+  --secondary-foreground: oklch(0.96 0.008 145);
 
-  --muted: oklch(0.20 0.006 270);
-  --muted-foreground: oklch(0.62 0.012 90);
+  --muted: oklch(0.20 0.03 145);
+  --muted-foreground: oklch(0.66 0.02 145);
 
-  --accent: oklch(0.78 0.13 75);
-  --accent-foreground: oklch(0.14 0.005 270);
+  --accent: oklch(0.76 0.20 135);
+  --accent-foreground: oklch(0.13 0.025 145);
 
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
 
-  --success: oklch(0.72 0.16 150);
+  --success: oklch(0.74 0.18 150);
 
-  --border: oklch(0.24 0.006 270);
-  --input: oklch(0.20 0.006 270);
-  --ring: oklch(0.78 0.13 75);
+  --border: oklch(0.24 0.03 145);
+  --input: oklch(0.20 0.03 145);
+  --ring: oklch(0.76 0.20 135);
 
-  /* MULTIUM brand — amber/gold accent on dark */
-  --chat-shell: #0d1117;
-  --chat-sidebar: #111b21;
-  --chat-thread: #0a0f14;
-  --chat-panel: #1a2332;
-  --chat-line: #253341;
-  --chat-soft: #1e2d3d;
-  --chat-message-in: #1c2b3a;
-  --chat-message-out: #3d2e00;
-  --chat-message-out-foreground: #f5ead0;
-  --chat-accent: #d4a03a;
-  --chat-accent-foreground: #1a1200;
+  --sidebar-background: #061a0c;
+  --sidebar-foreground: #99c2a0;
+  --sidebar-primary: #84cc16;
+  --sidebar-accent: #84cc16;
+  --sidebar-border: #132d19;
+
+  /* Chat & Subsystems */
+  --chat-shell: #0a150d;
+  --chat-sidebar: #092212;
+  --chat-thread: #0e1b11;
+  --chat-panel: #122417;
+  --chat-line: #1d3523;
+  --chat-soft: #182e1e;
+  --chat-message-in: #172a1b;
+  --chat-message-out: #164e27;
+  --chat-message-out-foreground: #ffffff;
+  --chat-accent: #84cc16;
+  --chat-accent-foreground: #0a150d;
 
   /* Premium FX */
-  --gradient-radial: radial-gradient(ellipse at top, oklch(0.20 0.02 75 / 0.4), transparent 60%);
-  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.04);
-  --shadow-glow: 0 0 60px -10px oklch(0.78 0.13 75 / 0.25);
+  --gradient-radial: radial-gradient(ellipse at top, oklch(0.22 0.05 135 / 0.35), transparent 60%);
+  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.76 0.20 135 / 0.06);
+  --shadow-glow: 0 0 60px -10px oklch(0.76 0.20 135 / 0.25);
 }
 
+/* MULTIUM Design System — Light Mode (Fresh Off-White & Dark Forest Sidebar) */
 [data-theme="light"] {
-  --background: oklch(0.97 0.005 90);
-  --foreground: oklch(0.18 0.005 270);
+  --background: oklch(0.975 0.008 145);
+  --foreground: oklch(0.18 0.03 145);
 
-  --card: oklch(0.99 0 0);
-  --card-foreground: oklch(0.18 0.005 270);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.03 145);
 
-  --popover: oklch(0.99 0 0);
-  --popover-foreground: oklch(0.18 0.005 270);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.03 145);
 
-  --primary: oklch(0.18 0.005 270);
-  --primary-foreground: oklch(0.97 0.005 90);
+  --primary: oklch(0.18 0.03 145);
+  --primary-foreground: oklch(0.975 0.008 145);
 
-  --secondary: oklch(0.90 0.006 270);
-  --secondary-foreground: oklch(0.18 0.005 270);
+  --secondary: oklch(0.92 0.01 145);
+  --secondary-foreground: oklch(0.18 0.03 145);
 
-  --muted: oklch(0.92 0.003 270);
-  --muted-foreground: oklch(0.50 0.01 90);
+  --muted: oklch(0.93 0.008 145);
+  --muted-foreground: oklch(0.48 0.02 145);
 
-  --accent: oklch(0.72 0.15 75);
-  --accent-foreground: oklch(0.97 0.005 90);
+  --accent: oklch(0.72 0.19 135);
+  --accent-foreground: oklch(0.98 0 0);
 
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
 
-  --success: oklch(0.62 0.18 150);
+  --success: oklch(0.65 0.18 150);
 
-  --border: oklch(0.86 0.006 90);
-  --input: oklch(0.88 0.006 90);
-  --ring: oklch(0.72 0.15 75);
+  --border: oklch(0.90 0.01 145);
+  --input: oklch(0.91 0.01 145);
+  --ring: oklch(0.72 0.19 135);
 
-  --chat-shell: #f5f5f0;
-  --chat-sidebar: #eaeae3;
+  --sidebar-background: #07210f;
+  --sidebar-foreground: #a5cdb0;
+  --sidebar-primary: #84cc16;
+  --sidebar-accent: #84cc16;
+  --sidebar-border: #12331c;
+
+  --chat-shell: #f4f6f4;
+  --chat-sidebar: #ebf0ec;
   --chat-thread: #ffffff;
-  --chat-panel: #f0f0eb;
-  --chat-line: #d4d4cc;
-  --chat-soft: #e0e0d8;
-  --chat-message-in: #e8e8e0;
-  --chat-message-out: #d4a03a;
-  --chat-message-out-foreground: #ffffff;
-  --chat-accent: #c4942e;
+  --chat-panel: #f4f7f4;
+  --chat-line: #dce4dd;
+  --chat-soft: #e6ede7;
+  --chat-message-in: #edf4ee;
+  --chat-message-out: #84cc16;
+  --chat-message-out-foreground: #0b1b0e;
+  --chat-accent: #74c01a;
   --chat-accent-foreground: #ffffff;
 
-  --gradient-radial: radial-gradient(ellipse at top, oklch(0.95 0.02 75 / 0.5), transparent 60%);
-  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.1), 0 0 0 1px oklch(0 0 0 / 0.04);
-  --shadow-glow: 0 0 60px -10px oklch(0.72 0.15 75 / 0.2);
+  --gradient-radial: radial-gradient(ellipse at top, oklch(0.94 0.03 135 / 0.4), transparent 60%);
+  --shadow-elegant: 0 30px 80px -20px oklch(0.18 0.03 145 / 0.08), 0 0 0 1px oklch(0 0 0 / 0.04);
+  --shadow-glow: 0 0 60px -10px oklch(0.72 0.19 135 / 0.2);
 }
 
 .dark {
-  /* Mesma paleta — já é dark by default */
-  --background: oklch(0.14 0.005 270);
-  --foreground: oklch(0.96 0.005 90);
+  --background: oklch(0.13 0.025 145);
+  --foreground: oklch(0.96 0.008 145);
 }
 
 @layer base {

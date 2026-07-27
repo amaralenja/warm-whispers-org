@@ -27,7 +27,7 @@ const BRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const NUM = "font-sans tabular-nums tracking-tight font-semibold";
 
-const PALETTE = ["#e94560", "#f59e0b", "#10b981", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#94a3b8"];
+const PALETTE = ["#84cc16", "#22c55e", "#10b981", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#94a3b8"];
 
 function Relatorios() {
   const { workspace } = useWorkspace();
@@ -162,8 +162,8 @@ function Relatorios() {
                   <AreaChart data={data.serieDaily}>
                     <defs>
                       <linearGradient id="gFat" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#e94560" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#e94560" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#84cc16" stopOpacity={0.45} />
+                        <stop offset="100%" stopColor="#84cc16" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -193,7 +193,7 @@ function Relatorios() {
                       labelFormatter={(v: string) => v.split("-").reverse().join("/")}
                       formatter={(v: number) => [BRL(v), "Faturamento"]}
                     />
-                    <Area type="monotone" dataKey="total" stroke="#e94560" strokeWidth={2} fill="url(#gFat)" />
+                    <Area type="monotone" dataKey="total" stroke="#84cc16" strokeWidth={2} fill="url(#gFat)" />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
