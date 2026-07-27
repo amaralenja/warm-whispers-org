@@ -2170,7 +2170,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     for (const v of htVendasToday.slice(0, 15)) {
       const d = v.data ? new Date(v.data) : new Date();
-      const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
       const val = parseFloat(v.valor_total) || 0;
       const rawUtm = String(v.utm_source || v.origem || v.utm || "").toLowerCase();
       const isPaid = rawUtm.includes("fb") || rawUtm.includes("meta") || rawUtm.includes("ig") || rawUtm.includes("google") || rawUtm.includes("cpc") || rawUtm.includes("ads") || rawUtm.includes("pago");
@@ -2199,7 +2199,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     for (const q of quizToday.filter((q) => isHtQuizQualified(q)).slice(0, 10)) {
       const d = q.created_at ? new Date(q.created_at) : new Date();
-      const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
       htEvents.push({
         id: `quiz-${q.id || Math.random()}`,
         timestamp: timeStr,

@@ -36,6 +36,7 @@ function LiveMonitoringPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [unattendedModalOpen, setUnattendedModalOpen] = useState(false);
   const [trafficCountdown, setTrafficCountdown] = useState(300);
+  const [activeTab, setActiveTab] = useState<"x1" | "ht">("x1");
 
   // Full Lead Detail Dialog state
   const [selectedLeadForDetail, setSelectedLeadForDetail] = useState<any>(null);
@@ -220,12 +221,37 @@ function LiveMonitoringPage() {
         </div>
       </div>
 
-      {/* ── Split Screen Container (Left X1 Gold | Right High Ticket Diamond/Emerald) ── */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* ========================================================================= */}
-        {/* 👈 LEFT COLUMN: OPERAÇÃO X1 (Gold & Amber Theme)                        */}
-        {/* ========================================================================= */}
-        <div className="space-y-6">
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 p-1 rounded-2xl bg-card/60 border border-border/60 backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setActiveTab("x1")}
+          className={`flex-1 py-3 px-6 rounded-xl text-sm font-bold transition-all ${
+            activeTab === "x1"
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+              : "text-muted-foreground hover:text-white"
+          }`}
+        >
+          <ElectricBoltTwoTone className="inline !h-4 !w-4 mr-2" />
+          OPERAÇÃO X1
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("ht")}
+          className={`flex-1 py-3 px-6 rounded-xl text-sm font-bold transition-all ${
+            activeTab === "ht"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+              : "text-muted-foreground hover:text-white"
+          }`}
+        >
+          <WorkspacePremiumTwoTone className="inline !h-4 !w-4 mr-2" />
+          OPERAÇÃO HIGH TICKET
+        </button>
+      </div>
+
+      {/* ── X1 Tab Content ── */}
+      {activeTab === "x1" && (
+      <div className="space-y-6">
           {/* Card Header X1 */}
           <div className="flex items-center justify-between rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-card/70 p-5 shadow-2xl backdrop-blur-xl">
             <div className="flex items-center gap-3.5">
@@ -405,10 +431,10 @@ function LiveMonitoringPage() {
             </div>
           </div>
         </div>
+      )}
 
-        {/* ========================================================================= */}
-        {/* 👉 RIGHT COLUMN: OPERAÇÃO HIGH TICKET (Emerald & Violet Theme)             */}
-        {/* ========================================================================= */}
+      {/* ── High Ticket Tab Content ── */}
+      {activeTab === "ht" && (
         <div className="space-y-6">
           {/* Card Header HT */}
           <div className="flex items-center justify-between rounded-3xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/20 via-violet-500/10 to-card/70 p-5 shadow-2xl backdrop-blur-xl">
@@ -774,7 +800,7 @@ function LiveMonitoringPage() {
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Modal de Leads Não Atendidos (Interactive Dialog) ── */}
       {unattendedModalOpen && (
