@@ -797,29 +797,33 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       });
       if (conv?.id) data.conversation_id = String(conv.id);
     }
-    const { runFlowAdmin, processQueuedFlowRuns } = await import("@/lib/flow-engine.server");
-    // Executa o fluxo diretamente (maxDuration=60s no vercel.json permite mídia pesada).
-    // queueOnly:false = inicia imediatamente sem depender do dispatch-worker.
-    const res = await runFlowAdmin({
+    const { runFlowAdmin, processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
+
+    const vendorCtx = (context as any).vendor
+      ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
+      : null;
+
+    // Dispara a execução assíncrona em background para que a vendedora possa
+    // disparar o fluxo em múltiplos leads simultaneamente sem bloqueio de HTTP.
+    void runFlowAdmin({
       flowId: data.flow_id,
       channelId: data.channel_id,
       contactWaId: data.contact_wa_id,
       conversationId: data.conversation_id ?? null,
       db,
-      vendor: (context as any).vendor
-        ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
-        : null,
+      vendor: vendorCtx,
       triggerContext: { manual: true, initial_quoted_msg_id: data.initial_quoted_msg_id || null },
       startNodeId: data.start_node_id ?? null,
       queueOnly: false,
+    }).then(() => {
+      void processQueuedFlowRuns(20).catch(() => undefined);
+      void processExpiredTimerRuns(20).catch(() => undefined);
+      void processStaleRunningSendRuns(60, 20).catch(() => undefined);
+    }).catch((err) => {
+      console.error("[triggerFlowManually] background execution error:", err);
     });
 
-    // Processa qualquer run na fila, timers e de recuperação em background
-    const { processExpiredTimerRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
-    void processQueuedFlowRuns(20).catch(() => undefined);
-    void processExpiredTimerRuns(20).catch(() => undefined);
-    void processStaleRunningSendRuns(60, 20).catch(() => undefined);
-    return res;
+    return { ok: true, status: "started" };
   });
 
 export const triggerFlowBulk = createServerFn({ method: "POST" })
