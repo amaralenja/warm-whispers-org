@@ -1225,14 +1225,28 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         }
       }
 
-      const leadSrc = norm(lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem || matchedQuiz?.utm_source || matchedQuiz?.origem);
-      const leadMed = norm(lead.utm_medium || lead.dados?.utm_medium || matchedQuiz?.utm_medium);
-      const rawCp = String(lead.utm_campaign || lead.dados?.utm_campaign || matchedQuiz?.utm_campaign || "").trim();
+      const leadSrc = norm(
+        lead.utm_source || lead.origem || lead.responsavel_utm || lead.dados?.utm_source || lead.dados?.origem || matchedQuiz?.utm_source || matchedQuiz?.origem || matchedConv?.utm_source
+      );
+      const leadMed = norm(
+        lead.utm_medium || lead.dados?.utm_medium || matchedQuiz?.utm_medium || matchedConv?.utm_medium
+      );
+      const rawCp = String(
+        lead.utm_campaign || lead.dados?.utm_campaign || matchedQuiz?.utm_campaign || matchedConv?.utm_campaign || ""
+      ).trim();
       const cp = norm(rawCp);
-      const cont = norm(lead.utm_content || lead.dados?.utm_content || matchedQuiz?.utm_content);
-      const fbclid = String(lead.fbclid || lead.dados?.fbclid || matchedQuiz?.fbclid || "").trim();
-      const gclid = String(lead.gclid || lead.dados?.gclid || matchedQuiz?.gclid || "").trim();
-      const fbp = String(lead.fbp || lead.dados?.fbp || matchedQuiz?.fbp || "").trim();
+      const cont = norm(
+        lead.utm_content || lead.dados?.utm_content || matchedQuiz?.utm_content || matchedConv?.utm_content
+      );
+      const fbclid = String(
+        lead.fbclid || lead.dados?.fbclid || matchedQuiz?.fbclid || matchedConv?.fbclid || ""
+      ).trim();
+      const gclid = String(
+        lead.gclid || lead.dados?.gclid || matchedQuiz?.gclid || matchedConv?.gclid || ""
+      ).trim();
+      const fbp = String(
+        lead.fbp || lead.dados?.fbp || matchedQuiz?.fbp || matchedConv?.fbp || ""
+      ).trim();
 
       const leadTags = getTagsForLead(lead, targetOp);
       if (matchedQuiz) {
@@ -1283,7 +1297,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isOrganicBio = leadSrc.includes("link_in_bio") || leadSrc.includes("ig_bio") || leadSrc.includes("instagram_bio") || leadSrc.includes("link_bio") || leadMed.includes("bio");
       const hasExplicitPaidSignal = hasClickId || isPaidSource || isPaidMedium || hasPaidTag || (hasRealCampaign && !leadSrc.includes("bio"));
 
-      const isPaid = (hasExplicitPaidSignal || hasRealCampaign) && !isOrganicBio && !hasOrganicTag;
+      const isPaid = (hasExplicitPaidSignal || hasRealCampaign) && !isOrganicBio;
 
       // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
       const rawText = norm(
