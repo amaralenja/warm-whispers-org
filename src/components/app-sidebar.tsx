@@ -58,10 +58,13 @@ import logoMultium from "@/assets/logo-multium.webp";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { useTheme } from "@/lib/theme-context";
 
-type Item = { title: string; url: string; icon: any };
+import RadioButtonCheckedTwoTone from "@mui/icons-material/RadioButtonCheckedTwoTone";
+
+type Item = { title: string; url: string; icon: any; isLive?: boolean; adminOnly?: boolean };
 
 const mainItems: Item[] = [
   { title: "Início", url: "/dashboard", icon: DashboardTwoTone },
+  { title: "Monitoramento ao VIVO", url: "/live-monitoring", icon: RadioButtonCheckedTwoTone, isLive: true, adminOnly: true },
   { title: "Ranking TV", url: "/ranking-tv", icon: TvTwoTone },
   { title: "Financeiro", url: "/financeiro", icon: AccountBalanceWalletTwoTone },
   { title: "Tarefas", url: "/tasks", icon: AssignmentTurnedInTwoTone },
@@ -246,7 +249,12 @@ export function AppSidebar() {
   });
   const hasPendingTasks = (pendingTasksQ.data ?? 0) > 0;
 
-  const visibleMain = mainItems.filter((i) => i.url === "/tasks" || canSee(perm, keyFromUrl(i.url)));
+  const isUserAdmin = perm === null || (typeof perm === "object" && Object.keys(perm).length === 0 && !localStorage.getItem("vendor_session") && !localStorage.getItem("ht_team_session"));
+
+  const visibleMain = mainItems.filter((i) => {
+    if (i.adminOnly && !isUserAdmin) return false;
+    return i.url === "/tasks" || canSee(perm, keyFromUrl(i.url));
+  });
   const visibleOpX1 = operacaoX1Items.filter((i) => canSee(perm, "operacao-x1", keyFromUrl(i.url)));
   const visibleHT = highTicketItems.filter((i) => canSee(perm, "high-ticket", keyFromUrl(i.url)));
   const showOpX1Group = canSee(perm, "operacao-x1") && visibleOpX1.length > 0;
@@ -292,14 +300,30 @@ export function AppSidebar() {
               <item.icon
                 className={[
                   "!h-5 !w-5 shrink-0 transition-transform group-hover/menu:scale-110",
-                  active ? "text-accent" : "",
+                  active ? "text-accent" : item.isLive ? "text-rose-400" : "",
                 ].join(" ")}
               />
               {showDot && (
                 <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
               )}
+              {item.isLive && collapsed && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                </span>
+              )}
             </span>
-            {!collapsed && <span className="truncate flex-1">{item.title}</span>}
+            {!collapsed && (
+              <span className="truncate flex-1 flex items-center justify-between">
+                <span>{item.title}</span>
+                {item.isLive && (
+                  <span className="relative flex h-2.5 w-2.5 shrink-0 ml-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                  </span>
+                )}
+              </span>
+            )}
             {showDot && !collapsed && (
               <span className="ml-auto rounded-full bg-red-500/20 px-1.5 py-0.5 text-[0.6rem] font-bold text-red-400">
                 {pendingTasksQ.data}
