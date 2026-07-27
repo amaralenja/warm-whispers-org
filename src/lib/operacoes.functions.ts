@@ -1215,10 +1215,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     const classifyLeadType = (lead: any, forceTypebot = false, targetOp?: string): string => {
       const phone = cleanPhone(lead.telefone ?? lead.whatsapp ?? lead.contact_wa_id ?? "");
       let matched: any = null;
+      let matchedQuiz: any = null;
       let matchedConv: any = null;
       if (phone) {
         for (const v of getPhoneVariations(phone)) {
           if (!matched && phoneToLead.has(v)) matched = phoneToLead.get(v);
+          if (!matchedQuiz && phoneToQuiz.has(v)) matchedQuiz = phoneToQuiz.get(v);
           if (!matchedConv && phoneToWaConv.has(v)) matchedConv = phoneToWaConv.get(v);
         }
       }
@@ -1282,7 +1284,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         return isPaid ? "Tráfego Pago" : "Orgânico";
       }
 
-      // Regras da Operação do Caio: (Idêntico ao cálculo da tag no Chat ao Vivo)
+      // Regras da Operação do Caio:
       const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
       const cleanCp = isCampEmpty ? "" : cp;
       const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
@@ -1299,21 +1301,24 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
 
-      // 1. Leads de Formulário de Anúncios ("Vim do formulário") OU UTM/tag de anúncio -> Typebot (Tráfego Pago)
-      if (isTextFormulario || isPaid || hasPaidTag) {
-        return "Typebot (Tráfego Pago)";
-      }
+      const isFromQuizOrTypebot = !!matchedQuiz || hasTypebotTag || (forceTypebot && !hasOrganicTag) || isTextFormulario || isTextYoutube;
 
-      // 2. Leads do YouTube ("Vim do Youtube") OU com etiqueta de Typebot/Quiz -> Typebot (Orgânico)
-      if (isTextYoutube || hasTypebotTag || (forceTypebot && !hasOrganicTag) || !!matched) {
+      if (isFromQuizOrTypebot) {
+        if (isPaid || hasPaidTag) {
+          return "Typebot (Tráfego Pago)";
+        }
         return "Typebot (Orgânico)";
       }
 
-      // 3. Mensagens diretas no WhatsApp -> Orgânico Direto
+      if (isPaid || hasPaidTag) {
+        return "Tráfego Pago";
+      }
+
       return "Orgânico Direto";
     };
 
     // Pré-popula telefone → Quiz/CRM lead para cruzamento total de atribuição
+    const phoneToQuiz = new Map<string, any>();
     for (const l of quizLeadsRaw) {
       const email = String(l.email ?? "").trim().toLowerCase();
       const phone = cleanPhone(l.whatsapp ?? l.telefone ?? "");
@@ -1321,6 +1326,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       if (phone) {
         for (const v of getPhoneVariations(phone)) {
           if (!phoneToLead.has(v)) phoneToLead.set(v, l);
+          if (!phoneToQuiz.has(v)) phoneToQuiz.set(v, l);
         }
       }
     }
