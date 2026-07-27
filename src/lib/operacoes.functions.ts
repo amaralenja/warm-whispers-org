@@ -1322,11 +1322,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const isFromQuizOrTypebot = !!matchedQuiz || hasTypebotTag || (forceTypebot && !hasOrganicTag) || isTextFormulario || isTextYoutube || isTypebotOrigin;
 
+      // Explicit override for Edso (Paid Traffic lead)
+      const leadNameNorm = norm(`${lead.nome || ""} ${lead.contact_name || ""} ${matchedConv?.contact_name || ""}`);
+      const isEdsoLead = phone.includes("6293727459") || leadNameNorm.includes("edso");
+
       if (!isCaioOp) {
-        return isPaid ? "Tráfego Pago" : "Orgânico";
+        return (isPaid || isEdsoLead) ? "Tráfego Pago" : "Orgânico";
       }
 
-      if (isPaid || hasPaidTag) {
+      if (isPaid || hasPaidTag || isEdsoLead) {
         return "Typebot (Tráfego Pago)";
       }
 
