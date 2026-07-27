@@ -505,15 +505,22 @@ function QuizPage() {
       if (phone && phone.length >= 8) seenPhones.add(phone);
     };
 
+    const isCakto = (l: Lead) => {
+      const src = (l.utm_source || "").toLowerCase();
+      const med = (l.utm_medium || "").toLowerCase();
+      const orig = (l.origem || "").toLowerCase();
+      return src.includes("cakto") || med.includes("cakto") || orig.includes("cakto");
+    };
+
     const out: Lead[] = [];
     for (const l of api) {
-      if (!isDuplicate(l)) {
+      if (!isCakto(l) && !isDuplicate(l)) {
         markSeen(l);
         out.push(l);
       }
     }
     for (const l of extLeads) {
-      if (!isDuplicate(l)) {
+      if (!isCakto(l) && !isDuplicate(l)) {
         markSeen(l);
         out.push(l);
       }
