@@ -252,6 +252,7 @@ export type HtComissaoMembro = {
   tipo: "sdr" | "closer";
   email: string | null;
   fotoUrl: string | null;
+  pixChave: string | null;
   regra: Record<string, any>;
   comparecimentos: number;
   vendas: number;
@@ -536,6 +537,7 @@ export const getHtComissoes = createServerFn({ method: "POST" })
         tipo: m.tipo as "sdr" | "closer",
         email: m.email ?? null,
         fotoUrl: m.foto_url ?? null,
+        pixChave: (m.permissoes as any)?.pix_chave ?? null,
         regra,
         comparecimentos,
         vendas,
@@ -575,6 +577,38 @@ export const updateComissaoRegra = createServerFn({ method: "POST" })
 
     const currentPerm = (row?.permissoes as Record<string, any>) ?? {};
     const newPerm = { ...currentPerm, comissao_regra: opts.data.regra };
+
+    const { error } = await supabase
+      .from("ht_team")
+      .update({ permissoes: newPerm })
+      .eq("id", opts.data.memberId);
+    if (error) throw error;
+
+    return { ok: true };
+  });
+
+export const setHtTeamPixChave = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { memberId: number; pix: string }) => ({
+    memberId: Number(input.memberId),
+    pix: String(input.pix ?? "").trim().slice(0, 200),
+  }))
+  .handler(async (opts) => {
+    const context = opts?.context;
+    assertAdmin(context);
+    const supabase = context.vendor
+      ? await getAdminClient().catch(() => context.supabase)
+      : context.supabase;
+
+    const { data: row, error: readErr } = await supabase
+      .from("ht_team")
+      .select("permissoes")
+      .eq("id", opts.data.memberId)
+      .single();
+    if (readErr) throw readErr;
+
+    const currentPerm = (row?.permissoes as Record<string, any>) ?? {};
+    const newPerm = { ...currentPerm, pix_chave: opts.data.pix || null };
 
     const { error } = await supabase
       .from("ht_team")

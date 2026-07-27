@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { getVendorSession } from "@/lib/vendor-session";
 import {
-  getComissoes, setPixChave, getHtComissoes, updateComissaoRegra,
+  getComissoes, setPixChave, getHtComissoes, updateComissaoRegra, setHtTeamPixChave,
   type HtComissaoMembro,
 } from "@/lib/comissoes.functions";
 
@@ -75,6 +75,7 @@ function ComissoesPage() {
   const qc = useQueryClient();
   const savePix = useServerFn(setPixChave);
   const saveRegra = useServerFn(updateComissaoRegra);
+  const saveHtPix = useServerFn(setHtTeamPixChave);
 
   const handleSavePix = async (id: number) => {
     const pix = (pixDraft[id] ?? "").trim();
@@ -517,6 +518,10 @@ function ComissoesPage() {
           setExpanded={setExpanded}
           onEditRegra={setEditingMembro}
           tipoLabel="sdr"
+          from={from}
+          to={to}
+          saveHtPix={saveHtPix}
+          qc={qc}
         />
       )}
 
@@ -531,6 +536,10 @@ function ComissoesPage() {
           setExpanded={setExpanded}
           onEditRegra={setEditingMembro}
           tipoLabel="closer"
+          from={from}
+          to={to}
+          saveHtPix={saveHtPix}
+          qc={qc}
         />
       )}
 
@@ -558,7 +567,7 @@ function ComissoesPage() {
 // ─── HT Member Section (SDR or Closer) ────────────────────────────────
 
 function HtMembroSection({
-  titulo, subtitulo, membros, loading, expanded, setExpanded, onEditRegra, tipoLabel,
+  titulo, subtitulo, membros, loading, expanded, setExpanded, onEditRegra, tipoLabel, from, to, saveHtPix, qc,
 }: {
   titulo: string;
   subtitulo: string;
@@ -568,11 +577,99 @@ function HtMembroSection({
   setExpanded: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
   onEditRegra: (m: HtComissaoMembro) => void;
   tipoLabel: "sdr" | "closer";
+  from: string;
+  to: string;
+  saveHtPix: (opts: { data: { memberId: number; pix: string } }) => Promise<any>;
+  qc: ReturnType<typeof useQueryClient>;
 }) {
   const totalComissao = membros.reduce((s, m) => s + m.comissaoTotal, 0);
   const totalVendas = membros.reduce((s, m) => s + m.vendas, 0);
   const totalValor = membros.reduce((s, m) => s + m.valorVendas, 0);
   const totalComparec = membros.reduce((s, m) => s + m.comparecimentos, 0);
+
+  const [pixDraft, setPixDraft] = useState<Record<number, string>>({});
+  const [selectedItems, setSelectedItems] = useState<Record<number, Record<number, boolean>>>({});
+
+  const handleSavePix = async (id: number, currentPix: string | null) => {
+    const pix = (pixDraft[id] ?? (currentPix ?? "")).trim();
+    try {
+      await saveHtPix({ data: { memberId: id, pix } });
+      toast.success("Chave PIX salva com sucesso!");
+      setPixDraft((s) => { const n = { ...s }; delete n[id]; return n; });
+      qc.invalidateQueries({ queryKey: ["ht-comissoes"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar PIX");
+    }
+  };
+
+  const toggleItem = (membroId: number, index: number) => {
+    setSelectedItems((s) => {
+      const cur = { ...(s[membroId] ?? {}) };
+      if (cur[index]) delete cur[index];
+      else cur[index] = true;
+      return { ...s, [membroId]: cur };
+    });
+  };
+
+  const setAllItems = (membroId: number, count: number, on: boolean) => {
+    setSelectedItems((s) => {
+      if (!on) return { ...s, [membroId]: {} };
+      const obj: Record<number, boolean> = {};
+      for (let i = 0; i < count; i++) obj[i] = true;
+      return { ...s, [membroId]: obj };
+    });
+  };
+
+  const copyHtReport = async (m: HtComissaoMembro) => {
+    const selMap = selectedItems[m.id] ?? {};
+    const selectedIndices = Object.keys(selMap).filter((k) => selMap[Number(k)]).map(Number);
+    const base = selectedIndices.length > 0
+      ? m.detalhes.filter((_, idx) => selMap[idx])
+      : m.detalhes;
+
+    if (base.length === 0) {
+      toast.error("Nenhum atendimento selecionado para o relatório");
+      return;
+    }
+
+    const periodo = `${fmtDate(from)} até ${fmtDate(to)}`;
+    const pix = m.pixChave?.trim();
+    const BR = "\u200B";
+
+    const totalComp = base.filter((d) => d.tipo === "comparecimento").length;
+    const totalVds = base.filter((d) => d.tipo === "venda").length;
+    const totalValor = base.reduce((a, d) => a + (d.valor || 0), 0);
+    const totalCom = base.reduce((a, d) => a + (d.comissao || 0), 0);
+
+    const isSdr = m.tipo === "sdr";
+
+    const lines = [
+      `💰 *Relatório de Comissão — ${isSdr ? "SDR" : "Closer"}*`,
+      BR,
+      `👤 *Nome:* ${m.nome}`,
+      m.email ? `📧 *E-mail:* ${m.email}` : null,
+      `📅 *Período:* ${periodo}`,
+      BR,
+      `📊 *Detalhamento por atendimento:*`,
+      ...base.map((d) => {
+        const tipoText = d.tipo === "venda" ? `Venda ${fmtBRL(d.valor)}` : "Call Marcada / Comparecimento";
+        return `• ${d.data ? fmtDate(d.data) : "—"} — Lead: ${d.leadNome} (${tipoText}) → *${fmtBRL(d.comissao)}*`;
+      }),
+      BR,
+      isSdr ? `📞 *Calls Marcadas / Comparecimentos:* ${totalComp}` : null,
+      totalVds > 0 ? `💵 *Vendas Convertidas (${totalVds}):* ${fmtBRL(totalValor)}` : null,
+      `✅ *Comissão Total a Receber:* *${fmtBRL(totalCom)}*`,
+      BR,
+      pix ? `🔑 *Chave PIX:* ${pix}` : `⚠️ _Chave PIX não cadastrada_`,
+    ].filter(Boolean).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(lines);
+      toast.success("Relatório de comissão copiado!");
+    } catch {
+      toast.error("Falha ao copiar relatório");
+    }
+  };
 
   return (
     <>
@@ -589,7 +686,7 @@ function HtMembroSection({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Phone className="h-4 w-4" /> Comparecimentos
+                <Phone className="h-4 w-4" /> Comparecimentos / Calls
               </CardTitle>
             </CardHeader>
             <CardContent><div className="text-2xl font-bold">{totalComparec}</div></CardContent>
@@ -629,7 +726,7 @@ function HtMembroSection({
                   <tr>
                     <th className="w-8 px-2 py-2"></th>
                     <th className="px-3 py-2 text-left">Nome</th>
-                    {tipoLabel === "sdr" && <th className="px-3 py-2 text-right">Comparec.</th>}
+                    {tipoLabel === "sdr" && <th className="px-3 py-2 text-right">Comparec. / Calls</th>}
                     <th className="px-3 py-2 text-right">Vendas</th>
                     <th className="px-3 py-2 text-right">Valor vendas</th>
                     {tipoLabel === "sdr" && <th className="px-3 py-2 text-right">Fixo</th>}
@@ -641,6 +738,21 @@ function HtMembroSection({
                 <tbody>
                   {membros.map((m) => {
                     const open = !!expanded[m.id];
+                    const selMap = selectedItems[m.id] ?? {};
+                    const selIndices = Object.keys(selMap).filter((k) => selMap[Number(k)]).map(Number);
+                    const allOn = m.detalhes.length > 0 && selIndices.length === m.detalhes.length;
+
+                    const pixValue = pixDraft[m.id] ?? (m.pixChave ?? "");
+                    const pixDirty = pixDraft[m.id] !== undefined && pixDraft[m.id] !== (m.pixChave ?? "");
+
+                    const selectedBase = selIndices.length > 0
+                      ? m.detalhes.filter((_, idx) => selMap[idx])
+                      : m.detalhes;
+                    const selComp = selectedBase.filter((d) => d.tipo === "comparecimento").length;
+                    const selVds = selectedBase.filter((d) => d.tipo === "venda").length;
+                    const selValor = selectedBase.reduce((a, d) => a + (d.valor || 0), 0);
+                    const selCom = selectedBase.reduce((a, d) => a + (d.comissao || 0), 0);
+
                     return (
                       <>
                         <tr
@@ -678,21 +790,68 @@ function HtMembroSection({
                         </tr>
                         {open && (
                           <tr key={`${m.id}-detail`} className="border-b bg-muted/10">
-                            <td colSpan={tipoLabel === "sdr" ? 9 : 7} className="p-3">
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap gap-2 text-xs">
-                                  <Badge variant="outline">
-                                    Regra: {tipoLabel === "sdr"
-                                      ? `R$ ${m.regra.fixo_comparecimento ?? 30}/comparec. + ${m.regra.percentual_venda ?? 2}% vendas${m.comparecimentos >= (m.regra.meta_comparecimento ?? 50) ? ` → ${m.regra.percentual_venda_meta ?? 4}% (meta atingida!)` : ` (meta: ${m.regra.meta_comparecimento ?? 50} comparec.)`}`
-                                      : `${m.regra.percentual_venda ?? 4}% sobre vendas`}
-                                  </Badge>
+                            <td colSpan={tipoLabel === "sdr" ? 9 : 7} className="p-4">
+                              <div className="space-y-4">
+                                {/* Section 1: PIX Key Edit */}
+                                <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border/50 bg-background/60 p-3">
+                                  <div className="flex-1 space-y-1 min-w-[220px]">
+                                    <Label className="flex items-center gap-1 text-xs"><KeyRound className="h-3 w-3" /> Chave PIX — {m.nome}</Label>
+                                    <Input
+                                      placeholder="CPF, e-mail, telefone ou chave aleatória"
+                                      value={pixValue}
+                                      onChange={(e) => setPixDraft((s) => ({ ...s, [m.id]: e.target.value }))}
+                                      className="h-8 text-xs"
+                                      maxLength={200}
+                                    />
+                                  </div>
+                                  <Button size="sm" variant={pixDirty ? "default" : "outline"} disabled={!pixDirty} onClick={() => handleSavePix(m.id, m.pixChave)}>
+                                    <Save className="mr-1 h-3.5 w-3.5" /> Salvar PIX
+                                  </Button>
                                 </div>
+
+                                {/* Section 2: Rule Badge & Actions */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/30 pt-3">
+                                  <div className="flex flex-wrap gap-2 text-xs">
+                                    <Badge variant="outline">
+                                      Regra: {tipoLabel === "sdr"
+                                        ? `R$ ${m.regra.fixo_comparecimento ?? 30}/comparec. + ${m.regra.percentual_venda ?? 2}% vendas${m.comparecimentos >= (m.regra.meta_comparecimento ?? 50) ? ` → ${m.regra.percentual_venda_meta ?? 4}% (meta atingida!)` : ` (meta: ${m.regra.meta_comparecimento ?? 50} comparec.)`}`
+                                        : `${m.regra.percentual_venda ?? 4}% sobre vendas`}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {m.detalhes.length > 0 && (
+                                      <>
+                                        <Button size="sm" variant="outline" onClick={() => setAllItems(m.id, m.detalhes.length, !allOn)}>
+                                          {allOn ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>}
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => copyHtReport(m)}>
+                                          <Copy className="mr-1 h-3.5 w-3.5" /> Copiar relatório
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Section 3: Summary Bar of Selected Items */}
+                                {selIndices.length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent/10 px-3 py-2 text-xs border border-accent/20">
+                                    <span><span className="text-muted-foreground">Selecionados:</span> <b>{selIndices.length}</b></span>
+                                    {tipoLabel === "sdr" && <span><span className="text-muted-foreground">Calls:</span> <b>{selComp}</b></span>}
+                                    <span><span className="text-muted-foreground">Vendas:</span> <b>{selVds}</b></span>
+                                    {selValor > 0 && <span><span className="text-muted-foreground">Valor vendas:</span> <b>{fmtBRL(selValor)}</b></span>}
+                                    <span><span className="text-muted-foreground">Comissão:</span> <b className="text-accent">{fmtBRL(selCom)}</b></span>
+                                  </div>
+                                )}
+
+                                {/* Section 4: Details Table with Checkboxes */}
                                 {m.detalhes.length === 0 ? (
                                   <div className="text-xs text-muted-foreground">Nenhum detalhe no período.</div>
                                 ) : (
                                   <table className="w-full text-xs">
                                     <thead className="text-muted-foreground">
                                       <tr>
+                                        <th className="w-8 px-2 py-1"></th>
                                         <th className="px-2 py-1 text-left">Lead</th>
                                         <th className="px-2 py-1 text-left">Tipo</th>
                                         <th className="px-2 py-1 text-right">Valor</th>
@@ -701,19 +860,31 @@ function HtMembroSection({
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {m.detalhes.map((d, i) => (
-                                        <tr key={i} className="border-t border-border/40">
-                                          <td className="px-2 py-1">{d.leadNome}</td>
-                                          <td className="px-2 py-1">
-                                            <Badge variant={d.tipo === "venda" ? "default" : "secondary"} className="text-[10px]">
-                                              {d.tipo === "venda" ? "Venda" : "Comparecimento"}
-                                            </Badge>
-                                          </td>
-                                          <td className="px-2 py-1 text-right">{d.valor > 0 ? fmtBRL(d.valor) : "—"}</td>
-                                          <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
-                                          <td className="px-2 py-1 text-right">{d.data ? fmtDate(d.data) : "—"}</td>
-                                        </tr>
-                                      ))}
+                                      {m.detalhes.map((d, idx) => {
+                                        const checked = !!selMap[idx];
+                                        return (
+                                          <tr
+                                            key={idx}
+                                            className={`cursor-pointer border-t border-border/40 transition-colors ${
+                                              checked ? "bg-accent/10 hover:bg-accent/15" : "hover:bg-muted/20"
+                                            }`}
+                                            onClick={() => toggleItem(m.id, idx)}
+                                          >
+                                            <td className="px-2 py-1" onClick={(e) => e.stopPropagation()}>
+                                              <Checkbox checked={checked} onCheckedChange={() => toggleItem(m.id, idx)} />
+                                            </td>
+                                            <td className="px-2 py-1 font-medium">{d.leadNome}</td>
+                                            <td className="px-2 py-1">
+                                              <Badge variant={d.tipo === "venda" ? "default" : "secondary"} className="text-[10px]">
+                                                {d.tipo === "venda" ? "Venda" : "Call Marcada"}
+                                              </Badge>
+                                            </td>
+                                            <td className="px-2 py-1 text-right">{d.valor > 0 ? fmtBRL(d.valor) : "—"}</td>
+                                            <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
+                                            <td className="px-2 py-1 text-right">{d.data ? fmtDate(d.data) : "—"}</td>
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
                                 )}
