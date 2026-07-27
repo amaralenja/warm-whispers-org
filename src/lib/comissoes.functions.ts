@@ -318,7 +318,7 @@ export const getHtComissoes = createServerFn({ method: "POST" })
       supabase
         .from("ht_kanban_state")
         .select(
-          "lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake"
+          "lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake, updated_at"
         ),
       supabase
         .from("ht_vendas")
@@ -398,6 +398,7 @@ export const getHtComissoes = createServerFn({ method: "POST" })
 
       if (m.tipo === "sdr") {
         // SDR: count comparecimentos from quiz leads that have scheduled_at in range
+        // date grouping uses ks.updated_at (when SDR agendou/interagiu), not scheduled_at (data futura)
         for (const lead of quizLeads) {
           const ks = kanbanMap.get(lead.id);
           if (!ks) continue;
@@ -408,8 +409,9 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           const closerStage = (ks.closer_stage || "").toLowerCase();
           const sdrStage = (ks.sdr_stage || "").toLowerCase();
           const crmStatus = (lead.crm_status || "").toLowerCase().trim();
-          const detDate = schedDate || lead.data_criacao || "";
-          const fmtD = detDate.slice(0, 10);
+          // action date = when SDR trabalhou no lead (updated_at do kanban), não a data futura do agendamento
+          const sdrActionDate = ks.updated_at || lead.data_criacao || "";
+          const fmtD = sdrActionDate.slice(0, 10);
 
           // Call Marcada / Comparecimento check (SDR marcou reunião ou closer atendeu)
           const isCallMarcada =
@@ -468,12 +470,13 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           ) {
             const val = Number(lead.crm_valor || 0);
             if (val > 0) {
+              const sdrActionDate = ks.updated_at || lead.data_criacao || "";
               detalhes.push({
                 leadNome: lead.nome || lead.whatsapp || "Sem nome",
                 tipo: "venda",
                 valor: val,
                 comissao: val * (pctVenda / 100),
-                data: (schedDate || lead.data_criacao || "").slice(0, 10),
+                data: sdrActionDate.slice(0, 10),
               });
             }
           }
