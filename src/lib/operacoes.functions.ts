@@ -1748,6 +1748,11 @@ export type LiveMonitoringTodayPayload = {
     scheduledCount: number;
     vendasHtCount: number;
     revenueToday: number;
+    closersSummary: Array<{ closer: string; calls: number; showUps: number; noShows: number; followups: number; reschedules: number; discards: number }>;
+    scheduledCallsToday: Array<{ id: string; leadNome: string; horario: string; closer: string; expert: string }>;
+    showUpsCountToday: number;
+    noShowsCountToday: number;
+    salesOriginBreakdown: { paidCount: number; organicCount: number; paidRevenue: number; organicRevenue: number };
     trafficSpendToday: { gastoTotal: number; cpl: number; costPerMeeting: number; roas: number };
     recentEvents: Array<{ id: string; timestamp: string; tipo: string; titulo: string; descricao: string; sdr?: string; closer?: string; valor?: number; horario?: string }>;
   };
@@ -1825,16 +1830,20 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const htQuizAll = ((opts as any)?.htQuizRes?.data ?? (await supabase.from("ht_quiz_submissions" as any).select("id, received_at, updated_at, status, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas").order("updated_at", { ascending: false }).limit(1000)).data ?? []) as any[];
     const htLeadsAll = ((opts as any)?.htLeadsRes?.data ?? (await supabase.from("ht_leads" as any).select("*").limit(1000)).data ?? []) as any[];
 
-    // Fetch external Quiz Supabase leads if available
+    // Fetch external Quiz Supabase leads if available (with timeout to avoid hanging)
     let extQuizLeadsAll: any[] = [];
     try {
       const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
       const QUIZ_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
       const { createClient } = await import("@supabase/supabase-js");
       const quizSbClient = createClient(QUIZ_URL, QUIZ_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-      const { data: extLeads } = await quizSbClient.from("leads").select("*").order("data_criacao", { ascending: false }).limit(500);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000));
+      const fetchPromise = quizSbClient.from("leads").select("*").order("data_criacao", { ascending: false }).limit(500);
+      const { data: extLeads } = await Promise.race([fetchPromise, timeoutPromise]) as any;
       if (extLeads) extQuizLeadsAll = extLeads;
-    } catch {}
+    } catch (e) {
+      console.warn("[operacoes] external quiz fetch failed/timeout", e);
+    }
 
     // Map conversation IDs that have outbound vendor messages
     const convsWithOutbound = new Set<string>();
