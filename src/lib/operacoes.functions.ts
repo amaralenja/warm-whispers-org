@@ -40,9 +40,12 @@ function toSpDateString(raw: unknown): string | null {
     return null;
   }
   const s = String(raw).trim();
+  if (!s) return null;
 
-  // Plain date "YYYY-MM-DD" — not a timestamp, return as-is (no timezone shift)
+  // Plain date "YYYY-MM-DD"
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const ymdMatch = s.match(/^(\d{4}-\d{2}-\d{2})/);
 
   // Numeric timestamp string "1784955079138"
   if (/^\d{10,13}$/.test(s)) {
@@ -52,11 +55,15 @@ function toSpDateString(raw: unknown): string | null {
     }
   }
 
-  // Full ISO timestamp — convert to SP local date
-  const d = new Date(s);
+  // Normalize space separated timestamp "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
+  const normalizedIso = s.replace(/^(\d{4}-\d{2}-\d{2})\s+/, "$1T");
+  const d = new Date(normalizedIso);
   if (!isNaN(d.getTime())) {
     return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   }
+
+  // Fallback to YYYY-MM-DD match if JS date constructor failed
+  if (ymdMatch) return ymdMatch[1];
 
   // Brazilian format "DD/MM/YYYY" or "DD-MM-YYYY"
   const m2 = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
@@ -1743,8 +1750,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(2000),
       supabase
         .from("crm_leads" as any)
-        .select("id, created_at, expert, utm_source, nome, telefone, vendedor")
-        .order("created_at", { ascending: false })
+        .select("id, created_at, data_criacao, updated_at, expert, utm_source, nome, telefone, vendedor")
+        .order("id", { ascending: false })
         .limit(2000),
       supabase
         .from("ht_vendas" as any)
@@ -1768,7 +1775,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(200),
       supabase
         .from("wa_conversations" as any)
-        .select("id, contact_wa_id, assigned_vendor_id, updated_at")
+        .select("id, contact_wa_id, assigned_vendor_id, updated_at, created_at, contact_name, utm_source")
         .limit(2000),
       supabase
         .from("wa_messages" as any)
@@ -1827,8 +1834,38 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const approvedSalesCount = vendasToday.length;
     const totalRevenueToday = vendasToday.reduce((a, v) => a + parseTicket(v.Ticket), 0);
 
-    // X1 Leads de Hoje
-    const leadsToday = crmLeadsAll.filter((l) => toSpDateString(l.created_at) === todayStr);
+    // X1 Leads de Hoje (combina crm_leads + wa_conversations de hoje)
+    const seenX1Phones = new Set<string>();
+    const leadsToday: any[] = [];
+
+    for (const l of crmLeadsAll) {
+      const dStr = toSpDateString(l.created_at || l.data_criacao || l.updated_at);
+      if (dStr === todayStr) {
+        const phoneDigits = String(l.telefone || "").replace(/\D/g, "");
+        if (phoneDigits) seenX1Phones.add(phoneDigits);
+        leadsToday.push(l);
+      }
+    }
+
+    for (const conv of waConvsAll) {
+      const dStr = toSpDateString(conv.created_at || conv.updated_at);
+      if (dStr === todayStr && conv.contact_wa_id) {
+        const phoneDigits = String(conv.contact_wa_id).replace(/\D/g, "");
+        if (phoneDigits && !seenX1Phones.has(phoneDigits)) {
+          seenX1Phones.add(phoneDigits);
+          leadsToday.push({
+            id: conv.id,
+            created_at: conv.created_at || conv.updated_at,
+            nome: conv.contact_name || conv.name || `WhatsApp ${phoneDigits.slice(-4)}`,
+            telefone: conv.contact_wa_id,
+            expert: conv.assigned_vendor_id || "Caio",
+            vendedor: conv.assigned_vendor_id || "Pendente",
+            utm_source: conv.utm_source || "wa-direct",
+          });
+        }
+      }
+    }
+
     const totalLeadsToday = leadsToday.length;
 
     // Contagem de Leads por Operação X1
