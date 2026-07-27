@@ -394,12 +394,21 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           if (!inRange(schedDate) && !inRange(lead.data_criacao)) continue;
 
           const closerStage = (ks.closer_stage || "").toLowerCase();
+          const sdrStage = (ks.sdr_stage || "").toLowerCase();
           const crmStatus = (lead.crm_status || "").toLowerCase().trim();
           const detDate = schedDate || lead.data_criacao || "";
           const fmtD = detDate.slice(0, 10);
 
-          // Comparecimento check
-          if (COMPARECEU_STAGES.includes(closerStage)) {
+          // Call Marcada / Comparecimento check (SDR marcou reunião ou closer atendeu)
+          const isCallMarcada =
+            sdrStage === "scheduled" ||
+            sdrStage === "agendado" ||
+            sdrStage === "won" ||
+            !!ks.scheduled_at ||
+            !!lead.crm_data_agendamento ||
+            COMPARECEU_STAGES.includes(closerStage);
+
+          if (isCallMarcada) {
             comparecimentos++;
             detalhes.push({
               leadNome: lead.nome || lead.whatsapp || "Sem nome",
