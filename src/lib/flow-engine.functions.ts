@@ -797,9 +797,10 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       });
       if (conv?.id) data.conversation_id = String(conv.id);
     }
-    const { runFlowAdmin, processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningSendRuns, getAdminDb } = await import("@/lib/flow-engine.server");
+    const { runFlowAdmin } = await import("@/lib/flow-engine.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const adminDb = await getAdminDb();
+    const adminDb = supabaseAdmin;
     const vendorCtx = (context as any).vendor
       ? { id: Number((context as any).vendor.id), codigo: String((context as any).vendor.codigo ?? "") }
       : null;
@@ -816,10 +817,6 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       startNodeId: data.start_node_id ?? null,
       queueOnly: false,
     });
-
-    void processQueuedFlowRuns(20).catch(() => undefined);
-    void processExpiredTimerRuns(20).catch(() => undefined);
-    void processStaleRunningSendRuns(60, 20).catch(() => undefined);
 
     return res;
   });

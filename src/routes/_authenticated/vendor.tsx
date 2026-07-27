@@ -165,7 +165,7 @@ function VendorPortal() {
         if (vUuid && assignees.includes(vUuid)) return true;
         if (assignees.includes(vId1) || assignees.includes(vId2)) return true;
         if (htId && (assignees.includes(htId) || assignees.includes(tmId))) return true;
-        if (vName && assignees.some((a) => a.toLowerCase().includes(vName) || (vFirstName.length > 2 && a.toLowerCase().includes(vFirstName)))) return true;
+        if (vName && assignees.some((a: string) => a.toLowerCase().includes(vName) || (vFirstName.length > 2 && a.toLowerCase().includes(vFirstName)))) return true;
         return false;
       });
     },

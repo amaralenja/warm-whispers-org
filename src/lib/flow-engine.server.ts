@@ -1394,6 +1394,7 @@ export async function runFlowAdmin(args: {
       const { data: activeRuns } = await db
         .from("wa_flow_runs" as any)
         .select("id")
+        .eq("flow_id", args.flowId)
         .eq("channel_id", args.channelId)
         .in("contact_wa_id", contactCandidates.length > 0 ? contactCandidates : [String(args.contactWaId ?? "")])
         .in("status", ["queued", "running", "waiting"]);
@@ -1404,7 +1405,7 @@ export async function runFlowAdmin(args: {
           status: "cancelled",
           waiting_for: null,
           expires_at: null,
-          error: "Substituído por novo disparo manual",
+          error: "Substituído por novo disparo manual do mesmo fluxo",
           updated_at: new Date().toISOString(),
         }).in("id", idsToCancel);
       }
@@ -1787,6 +1788,31 @@ export async function dispatchIncomingForFlows(args: {
     db,
   });
   if (advanced) return advanced;
+
+  // 1b. Se já existe um run ativo (manual ou automático) pra esta conversa,
+  //     NÃO dispara novos fluxos automáticos — evita que um trigger "any_message"
+  //     ou keyword inicie um segundo fluxo em paralelo ao que o vendedor já disparou.
+  if (args.conversationId) {
+    const { data: activeRun } = await db
+      .from("wa_flow_runs" as any)
+      .select("id, status, context")
+      .eq("conversation_id", args.conversationId)
+      .in("status", ["queued", "running", "waiting"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (activeRun) {
+      const ctx = (activeRun as any).context;
+      const isManualRun = ctx && typeof ctx === "object" && ctx.trigger?.manual === true;
+      if (isManualRun) {
+        console.log("[flow-engine] dispatchIncoming bloqueado: run manual ativo para conversa", {
+          conversationId: args.conversationId,
+          activeRunId: (activeRun as any).id,
+        });
+        return null;
+      }
+    }
+  }
 
   // 2. Look up active triggers
   const { data: triggers } = await db
