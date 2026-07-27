@@ -51,123 +51,63 @@
   --font-sans: "Inter", system-ui, -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
 }
 
-/* MULTIUM Design System — Dark Mode (Deep Emerald & Electric Lime) */
-:root {
+/* MULTIUM Design System — Dark Emerald Theme (Sleek, Premium, Dark Mode Default) */
+:root, .dark, [data-theme="light"] {
   --radius: 0.75rem;
 
-  --background: oklch(0.13 0.025 145);
-  --foreground: oklch(0.96 0.008 145);
+  --background: oklch(0.12 0.01 160);
+  --foreground: oklch(0.96 0.005 160);
 
-  --card: oklch(0.17 0.03 145);
-  --card-foreground: oklch(0.96 0.008 145);
+  --card: oklch(0.15 0.012 160);
+  --card-foreground: oklch(0.96 0.005 160);
 
-  --popover: oklch(0.17 0.03 145);
-  --popover-foreground: oklch(0.96 0.008 145);
+  --popover: oklch(0.15 0.012 160);
+  --popover-foreground: oklch(0.96 0.005 160);
 
-  --primary: oklch(0.96 0.008 145);
-  --primary-foreground: oklch(0.13 0.025 145);
+  --primary: oklch(0.96 0.005 160);
+  --primary-foreground: oklch(0.12 0.01 160);
 
-  --secondary: oklch(0.22 0.03 145);
-  --secondary-foreground: oklch(0.96 0.008 145);
+  --secondary: oklch(0.20 0.015 160);
+  --secondary-foreground: oklch(0.96 0.005 160);
 
-  --muted: oklch(0.20 0.03 145);
-  --muted-foreground: oklch(0.66 0.02 145);
+  --muted: oklch(0.18 0.012 160);
+  --muted-foreground: oklch(0.62 0.015 160);
 
-  --accent: oklch(0.76 0.20 135);
-  --accent-foreground: oklch(0.13 0.025 145);
+  --accent: oklch(0.70 0.17 160);
+  --accent-foreground: oklch(0.12 0.01 160);
 
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
 
-  --success: oklch(0.74 0.18 150);
+  --success: oklch(0.70 0.17 160);
 
-  --border: oklch(0.24 0.03 145);
-  --input: oklch(0.20 0.03 145);
-  --ring: oklch(0.76 0.20 135);
+  --border: oklch(0.22 0.015 160);
+  --input: oklch(0.18 0.015 160);
+  --ring: oklch(0.70 0.17 160);
 
-  --sidebar-background: #061a0c;
-  --sidebar-foreground: #99c2a0;
-  --sidebar-primary: #84cc16;
-  --sidebar-accent: #84cc16;
-  --sidebar-border: #132d19;
+  --sidebar-background: #070b08;
+  --sidebar-foreground: #8b9e91;
+  --sidebar-primary: #10b981;
+  --sidebar-accent: #10b981;
+  --sidebar-border: #151f18;
 
   /* Chat & Subsystems */
-  --chat-shell: #0a150d;
-  --chat-sidebar: #092212;
-  --chat-thread: #0e1b11;
-  --chat-panel: #122417;
-  --chat-line: #1d3523;
-  --chat-soft: #182e1e;
-  --chat-message-in: #172a1b;
-  --chat-message-out: #164e27;
+  --chat-shell: #0b0f0d;
+  --chat-sidebar: #0d130f;
+  --chat-thread: #0b0f0d;
+  --chat-panel: #111813;
+  --chat-line: #1a251e;
+  --chat-soft: #151f18;
+  --chat-message-in: #141d17;
+  --chat-message-out: #065f46;
   --chat-message-out-foreground: #ffffff;
-  --chat-accent: #84cc16;
-  --chat-accent-foreground: #0a150d;
+  --chat-accent: #10b981;
+  --chat-accent-foreground: #070b08;
 
   /* Premium FX */
-  --gradient-radial: radial-gradient(ellipse at top, oklch(0.22 0.05 135 / 0.35), transparent 60%);
-  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.76 0.20 135 / 0.06);
-  --shadow-glow: 0 0 60px -10px oklch(0.76 0.20 135 / 0.25);
-}
-
-/* MULTIUM Design System — Light Mode (Fresh Off-White & Dark Forest Sidebar) */
-[data-theme="light"] {
-  --background: oklch(0.975 0.008 145);
-  --foreground: oklch(0.18 0.03 145);
-
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 145);
-
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 145);
-
-  --primary: oklch(0.18 0.03 145);
-  --primary-foreground: oklch(0.975 0.008 145);
-
-  --secondary: oklch(0.92 0.01 145);
-  --secondary-foreground: oklch(0.18 0.03 145);
-
-  --muted: oklch(0.93 0.008 145);
-  --muted-foreground: oklch(0.48 0.02 145);
-
-  --accent: oklch(0.72 0.19 135);
-  --accent-foreground: oklch(0.98 0 0);
-
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-
-  --success: oklch(0.65 0.18 150);
-
-  --border: oklch(0.90 0.01 145);
-  --input: oklch(0.91 0.01 145);
-  --ring: oklch(0.72 0.19 135);
-
-  --sidebar-background: #07210f;
-  --sidebar-foreground: #a5cdb0;
-  --sidebar-primary: #84cc16;
-  --sidebar-accent: #84cc16;
-  --sidebar-border: #12331c;
-
-  --chat-shell: #f4f6f4;
-  --chat-sidebar: #ebf0ec;
-  --chat-thread: #ffffff;
-  --chat-panel: #f4f7f4;
-  --chat-line: #dce4dd;
-  --chat-soft: #e6ede7;
-  --chat-message-in: #edf4ee;
-  --chat-message-out: #84cc16;
-  --chat-message-out-foreground: #0b1b0e;
-  --chat-accent: #74c01a;
-  --chat-accent-foreground: #ffffff;
-
-  --gradient-radial: radial-gradient(ellipse at top, oklch(0.94 0.03 135 / 0.4), transparent 60%);
-  --shadow-elegant: 0 30px 80px -20px oklch(0.18 0.03 145 / 0.08), 0 0 0 1px oklch(0 0 0 / 0.04);
-  --shadow-glow: 0 0 60px -10px oklch(0.72 0.19 135 / 0.2);
-}
-
-.dark {
-  --background: oklch(0.13 0.025 145);
-  --foreground: oklch(0.96 0.008 145);
+  --gradient-radial: radial-gradient(ellipse at top, oklch(0.20 0.04 160 / 0.3), transparent 60%);
+  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.7), 0 0 0 1px oklch(0.70 0.17 160 / 0.05);
+  --shadow-glow: 0 0 60px -10px oklch(0.70 0.17 160 / 0.2);
 }
 
 @layer base {

@@ -496,20 +496,6 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() => toggle()}
-              tooltip={theme === "dark" ? "Tema claro" : "Tema escuro"}
-              className="group/menu h-12 rounded-lg px-3 text-[0.95rem] font-medium text-muted-foreground transition-all hover:bg-accent/10 hover:text-foreground"
-            >
-              {theme === "dark" ? (
-                <WbSunnyTwoTone className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
-              ) : (
-                <NightsStayTwoTone className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
-              )}
-              {!collapsed && <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
               onClick={handleSignOut}
               tooltip="Sair"
               className="group/menu h-12 rounded-lg px-3 text-[0.95rem] font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
