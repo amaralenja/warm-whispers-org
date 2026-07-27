@@ -50,6 +50,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { notifyTaskCreated } from "@/lib/task-notifications.functions";
 
+export function vendorIdToUuid(rawId: number | string): string {
+  const str = String(rawId).replace(/\D/g, "");
+  if (!str) return "00000000-0000-4000-8000-000000000000";
+  return `00000000-0000-4000-8000-${str.padStart(12, "0")}`;
+}
+
 export const Route = createFileRoute("/_authenticated/tasks")({
   component: TasksPage,
 });
@@ -229,6 +235,7 @@ function TasksPage() {
       if (loggedSession) {
         const sId1 = String(loggedSession.id ?? "");
         const sId2 = loggedSession.member_id ? String(loggedSession.member_id) : "";
+        const vUuid = /^\d+$/.test(sId1) ? vendorIdToUuid(sId1) : (sId1.startsWith("v:") ? vendorIdToUuid(sId1.slice(2)) : sId1);
         const vId = sId1 ? `v:${sId1}` : "";
         const tmId = sId2 ? `tm:${sId2}` : (sId1 ? `tm:${sId1}` : "");
         const sName = String(loggedSession.nome ?? "").toLowerCase().trim();
@@ -237,6 +244,7 @@ function TasksPage() {
         list = list.filter((t) => {
           const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids.map(String) : [];
           if (assignees.length === 0) return false;
+          if (vUuid && assignees.includes(vUuid)) return true;
           if (sId1 && assignees.includes(sId1)) return true;
           if (sId2 && assignees.includes(sId2)) return true;
           if (vId && assignees.includes(vId)) return true;
@@ -262,18 +270,52 @@ function TasksPage() {
       ]);
       if (tmRes.error) throw tmRes.error;
       if (vdRes.error) throw vdRes.error;
-      const tm = ((tmRes.data ?? []) as any[]) as Member[];
-      const vd = ((vdRes.data ?? []) as any[]).map<Member>((v) => ({
-        id: `v:${v.id}`,
-        nome: String(v.nome ?? ""),
-        email: null,
-        telefone: v.telefone ?? null,
-        funcao: v.expert ? `Vendedor · ${v.expert}` : "Vendedor",
-        foto_url: v.foto_url ?? null,
-        cor: "#10b981",
-        ativo: v.ativo !== false,
-      }));
-      return [...tm, ...vd];
+
+      const normName = (s: string) => (s ?? "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+      const memberMap = new Map<string, Member & { aliasUuids?: string[] }>();
+
+      for (const m of (tmRes.data ?? []) as any[]) {
+        const key = normName(m.nome);
+        if (!key) continue;
+        memberMap.set(key, {
+          id: m.id,
+          nome: String(m.nome ?? ""),
+          email: m.email ?? null,
+          telefone: m.telefone ?? null,
+          funcao: m.funcao ?? "Equipe",
+          foto_url: m.foto_url ?? null,
+          cor: m.cor || "#3b82f6",
+          ativo: m.ativo !== false,
+          aliasUuids: [m.id],
+        });
+      }
+
+      for (const v of (vdRes.data ?? []) as any[]) {
+        const key = normName(v.nome);
+        if (!key) continue;
+        const vUuid = vendorIdToUuid(v.id);
+
+        if (memberMap.has(key)) {
+          const existing = memberMap.get(key)!;
+          if (!existing.aliasUuids) existing.aliasUuids = [existing.id];
+          if (!existing.aliasUuids.includes(vUuid)) existing.aliasUuids.push(vUuid);
+          if (!existing.foto_url && v.foto_url) existing.foto_url = v.foto_url;
+        } else {
+          memberMap.set(key, {
+            id: vUuid,
+            nome: String(v.nome ?? ""),
+            email: null,
+            telefone: v.telefone ?? null,
+            funcao: v.expert ? `Vendedor · ${v.expert}` : "Vendedor",
+            foto_url: v.foto_url ?? null,
+            cor: "#10b981",
+            ativo: v.ativo !== false,
+            aliasUuids: [vUuid],
+          });
+        }
+      }
+
+      return Array.from(memberMap.values());
     },
   });
 
@@ -747,13 +789,25 @@ function TaskDialog({
   async function save() {
     if (!titulo.trim()) return toast.error("Título obrigatório");
     setSaving(true);
+
+    const validUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const cleanAssignees = assignees
+      .map((a) => {
+        if (validUuidPattern.test(a)) return a;
+        if (a.startsWith("v:")) return vendorIdToUuid(a.slice(2));
+        if (a.startsWith("tm:")) return validUuidPattern.test(a.slice(3)) ? a.slice(3) : null;
+        if (/^\d+$/.test(a)) return vendorIdToUuid(a);
+        return null;
+      })
+      .filter((a): a is string => !!a);
+
     const payload = {
       titulo: titulo.trim(),
       descricao,
       prioridade,
       prazo: prazo ? prazo.toISOString() : null,
-      assignee_ids: assignees,
-      labels: labels.map((l) => JSON.stringify({ texto: l.texto, cor: l.cor })),
+      assignee_ids: cleanAssignees,
+      labels: labels.map((l) => (typeof l === "object" ? l : { texto: String(l), cor: "#64748b" })),
       checklist: checklists,
       column_id: columnId,
     };
@@ -766,9 +820,9 @@ function TaskDialog({
         .single();
       if (error) {
         setSaving(false);
-        return toast.error(error.message);
+        return toast.error(`Erro ao criar tarefa: ${error.message}`);
       }
-      if (inserted && assignees.length > 0) {
+      if (inserted && cleanAssignees.length > 0) {
         try {
           const result = await notifyTaskCreatedFn({ data: { taskId: (inserted as any).id } });
           if ((result as any)?.sent > 0) {
@@ -787,11 +841,11 @@ function TaskDialog({
       const { error } = await supabase.from("tasks" as any).update(payload).eq("id", task.id);
       if (error) {
         setSaving(false);
-        return toast.error(error.message);
+        return toast.error(`Erro ao atualizar tarefa: ${error.message}`);
       }
     }
     setSaving(false);
-    if (!alreadyToasted) toast.success("Salvo");
+    if (!alreadyToasted) toast.success("Salvo com sucesso! 🎉");
     onSaved();
   }
 
@@ -909,16 +963,25 @@ function TaskDialog({
             </Label>
             <div className="flex flex-wrap gap-2">
               {members.map((m) => {
-                const sel = assignees.includes(m.id);
+                const uuids = [(m as any).id, ...((m as any).aliasUuids || [])];
+                const sel = uuids.some((uid) => assignees.includes(uid));
                 return (
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() =>
-                      setAssignees(sel ? assignees.filter((x) => x !== m.id) : [...assignees, m.id])
-                    }
-                    className={`flex items-center gap-2 rounded-full border px-2 py-1 text-xs transition ${
-                      sel ? "border-accent bg-accent/20" : "border-border hover:border-accent/50"
+                    onClick={() => {
+                      if (sel) {
+                        setAssignees(assignees.filter((x) => !uuids.includes(x)));
+                      } else {
+                        const newAssignees = [...assignees];
+                        for (const uid of uuids) {
+                          if (!newAssignees.includes(uid)) newAssignees.push(uid);
+                        }
+                        setAssignees(newAssignees);
+                      }
+                    }}
+                    className={`flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-xs transition ${
+                      sel ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 font-semibold" : "border-border hover:border-emerald-500/50"
                     }`}
                   >
                     <Avatar className="h-5 w-5">

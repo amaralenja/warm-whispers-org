@@ -145,6 +145,8 @@ function VendorPortal() {
       if (!v?.nome) return [];
       const vId1 = `v:${v.id}`;
       const vId2 = String(v.id);
+      const rawId = String(v.id).replace(/\D/g, "");
+      const vUuid = rawId ? `00000000-0000-4000-8000-${rawId.padStart(12, "0")}` : "";
       const htId = (v as any)?.ht_member_id ? String((v as any).ht_member_id) : "";
       const tmId = htId ? `tm:${htId}` : "";
       const vName = String(v.nome ?? "").toLowerCase().trim();
@@ -160,6 +162,7 @@ function VendorPortal() {
       return ((data ?? []) as any[]).filter((t) => {
         const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids.map(String) : [];
         if (assignees.length === 0) return false;
+        if (vUuid && assignees.includes(vUuid)) return true;
         if (assignees.includes(vId1) || assignees.includes(vId2)) return true;
         if (htId && (assignees.includes(htId) || assignees.includes(tmId))) return true;
         if (vName && assignees.some((a) => a.toLowerCase().includes(vName) || (vFirstName.length > 2 && a.toLowerCase().includes(vFirstName)))) return true;
