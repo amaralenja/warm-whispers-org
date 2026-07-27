@@ -4145,6 +4145,14 @@ function FlowInlineBar({
   const [startFromStep, setStartFromStep] = useState(false);
   const [selectedStartNodeId, setSelectedStartNodeId] = useState<string | null>(null);
   const [reorderOpen, setReorderOpen] = useState(false);
+
+  useEffect(() => {
+    setFiring(null);
+    setConfirm(null);
+    setStartFromStep(false);
+    setSelectedStartNodeId(null);
+  }, [conversation.id]);
+
   const vendorSession = useMemo(() => getVendorSession(), []);
   const vendorKey = vendorSession?.id ?? "admin";
   const opKey = conversation.operacao_id ?? "all";
