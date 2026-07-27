@@ -2,6 +2,17 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import logoMultium from "@/assets/logo-multium.webp";
+import VisibilityTwoTone from "@mui/icons-material/VisibilityTwoTone";
+import VisibilityOffTwoTone from "@mui/icons-material/VisibilityOffTwoTone";
+import EmailTwoTone from "@mui/icons-material/EmailTwoTone";
+import LockTwoTone from "@mui/icons-material/LockTwoTone";
+import VpnKeyTwoTone from "@mui/icons-material/VpnKeyTwoTone";
+import ShieldTwoTone from "@mui/icons-material/ShieldTwoTone";
+import BadgeTwoTone from "@mui/icons-material/BadgeTwoTone";
+import GroupsTwoTone from "@mui/icons-material/GroupsTwoTone";
+import ArrowForwardTwoTone from "@mui/icons-material/ArrowForwardTwoTone";
+import AutoGraphTwoTone from "@mui/icons-material/AutoGraphTwoTone";
+import ElectricBoltTwoTone from "@mui/icons-material/ElectricBoltTwoTone";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -26,6 +37,14 @@ type Role = "admin" | "vendedor" | "ht";
 function AuthPage() {
   const navigate = useNavigate();
   const [role, setRole] = useState<Role>("admin");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [codigo, setCodigo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const scriptId = "rastre-web-loader";
@@ -38,13 +57,6 @@ function AuthPage() {
       document.head.appendChild(script);
     }
   }, []);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -93,165 +105,254 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background bg-grain">
-      <div
-        className="pointer-events-none absolute inset-x-0 -top-40 mx-auto h-[480px] max-w-3xl rounded-full opacity-30 blur-3xl"
-        style={{ background: "radial-gradient(closest-side, var(--accent), transparent)" }}
-      />
+    <main className="relative min-h-screen overflow-hidden bg-[#090d0a] text-foreground flex items-center justify-center p-4 md:p-8">
+      {/* Background Glows & Ambient Gradients */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-emerald-500/10 blur-[130px]" />
+      <div className="pointer-events-none absolute -bottom-40 right-10 h-[400px] w-[400px] rounded-full bg-emerald-600/5 blur-[120px]" />
 
-      <header className="relative z-10 flex items-center justify-end px-8 py-7">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          {role === "admin" ? (mode === "signin" ? "Acesso" : "Cadastro") : role === "ht" ? "SDR / Closer" : "Vendedor"}
-        </div>
-      </header>
+      <div className="relative z-10 w-full max-w-6xl grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
+        {/* Left Side — Brand Showcase & Hero */}
+        <section className="hidden lg:flex lg:col-span-7 flex-col justify-center space-y-8 pr-6">
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 backdrop-blur-md w-fit">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-medium uppercase tracking-[0.2em] text-emerald-400">
+              Plataforma Interna
+            </span>
+          </div>
 
-      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-96px)] max-w-6xl grid-cols-1 items-center gap-16 px-8 lg:grid-cols-2">
-        <section className="hidden lg:block">
-          <p className="text-xs uppercase tracking-[0.25em] text-accent">— Plataforma interna</p>
-          <h1 className="mt-6 font-display text-6xl leading-[1.05] text-balance text-foreground">
-            Onde decisões viram <em className="text-accent">resultado</em>.
-          </h1>
-          <p className="mt-8 max-w-md text-base leading-relaxed text-muted-foreground">
-            Centralize vendas, leads, financeiro e operação num só lugar. Pensado para times de alto rendimento.
-          </p>
+          <div className="space-y-4">
+            <h1 className="font-display text-5xl font-extrabold tracking-tight text-white xl:text-6xl leading-[1.1]">
+              Onde decisões viram{" "}
+              <span className="bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-200 bg-clip-text text-transparent">
+                resultado.
+              </span>
+            </h1>
+            <p className="max-w-lg text-base leading-relaxed text-emerald-100/70">
+              Centralize vendas, leads, financeiro e operação num só ecossistema inteligente. Pensado para times de alto rendimento.
+            </p>
+          </div>
+
+          {/* Feature Badges */}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-emerald-200/80 backdrop-blur-sm">
+              <ElectricBoltTwoTone className="!h-4 !w-4 text-emerald-400" />
+              <span>Operação X1</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-emerald-200/80 backdrop-blur-sm">
+              <AutoGraphTwoTone className="!h-4 !w-4 text-emerald-400" />
+              <span>High Ticket Analytics</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-emerald-200/80 backdrop-blur-sm">
+              <ShieldTwoTone className="!h-4 !w-4 text-emerald-400" />
+              <span>Gestão de Acessos</span>
+            </div>
+          </div>
+
+          {/* Metric Preview Card */}
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 to-card/40 p-5 backdrop-blur-xl max-w-md shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <AutoGraphTwoTone className="!h-6 !w-6" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversões do Mês</div>
+                  <div className="text-xl font-bold text-white">+48.5% <span className="text-xs font-normal text-emerald-400">vs mês anterior</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
-        <section className="w-full">
-          <div
-            className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card/60 p-10 backdrop-blur-xl"
-            style={{ boxShadow: "var(--shadow-elegant)" }}
-          >
+        {/* Right Side — Login Card */}
+        <section className="w-full lg:col-span-5">
+          <div className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-card/80 p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+            {/* Subtle Top Ambient Accent */}
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500/20 via-emerald-400 to-emerald-500/20" />
+
+            {/* Logo */}
             <div className="mb-6 flex justify-center">
-              <img src={logoMultium} alt="MULTIUM" className="h-12 w-auto object-contain" />
+              <img
+                src={logoMultium}
+                alt="MULTIUM"
+                className="h-12 w-auto object-contain drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-transform hover:scale-105"
+              />
             </div>
 
-            {/* Toggle Admin / Vendedor / SDR•Closer */}
-            <div className="mb-6 grid grid-cols-3 gap-1 rounded-full border border-border bg-background/40 p-1">
-              {(["admin", "vendedor", "ht"] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => {
-                    setRole(r);
-                    setError(null);
-                    setInfo(null);
-                  }}
-                  className={`rounded-full py-2 text-[0.65rem] font-semibold uppercase tracking-wider transition-all ${
-                    role === r
-                      ? "bg-foreground text-background shadow"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {r === "admin" ? "Admin" : r === "vendedor" ? "Vendedor" : "SDR/Closer"}
-                </button>
-              ))}
+            {/* Role Switcher Tabs */}
+            <div className="mb-8 grid grid-cols-3 gap-1 rounded-xl border border-border/60 bg-background/60 p-1 backdrop-blur-md">
+              {(["admin", "vendedor", "ht"] as const).map((r) => {
+                const isActive = role === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setRole(r);
+                      setError(null);
+                      setInfo(null);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[0.7rem] font-semibold uppercase tracking-wider transition-all duration-200 ${
+                      isActive
+                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
+                        : "text-muted-foreground hover:bg-emerald-500/10 hover:text-foreground"
+                    }`}
+                  >
+                    {r === "admin" && <ShieldTwoTone className="!h-3.5 !w-3.5" />}
+                    {r === "vendedor" && <BadgeTwoTone className="!h-3.5 !w-3.5" />}
+                    {r === "ht" && <GroupsTwoTone className="!h-3.5 !w-3.5" />}
+                    <span>{r === "admin" ? "Admin" : r === "vendedor" ? "Vendedor" : "SDR/Closer"}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            <h2 className="font-display text-3xl text-foreground">
-              {role === "vendedor"
-                ? "Acesso do vendedor"
-                : role === "ht"
-                ? "Acesso SDR / Closer"
-                : mode === "signin"
-                ? "Bem-vindo de volta"
-                : "Criar conta"}
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {role === "vendedor" || role === "ht"
-                ? "Digite seu código de 6 dígitos para entrar."
-                : mode === "signin"
-                ? "Entre com suas credenciais para continuar."
-                : "Preencha os dados para começar."}
-            </p>
+            {/* Title & Subtitle */}
+            <div className="mb-6 space-y-1">
+              <h2 className="font-display text-2xl font-bold tracking-tight text-white">
+                {role === "vendedor"
+                  ? "Painel do Vendedor"
+                  : role === "ht"
+                  ? "Portal SDR / Closer"
+                  : mode === "signin"
+                  ? "Bem-vindo de volta"
+                  : "Criar conta"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {role === "vendedor" || role === "ht"
+                  ? "Digite seu código de 6 dígitos para continuar."
+                  : mode === "signin"
+                  ? "Insira suas credenciais para acessar."
+                  : "Preencha seus dados para solicitar cadastro."}
+              </p>
+            </div>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
               {role === "vendedor" || role === "ht" ? (
-                <div>
-                  <label className="block text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    Código de acesso
+                <div className="space-y-2">
+                  <label className="block text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Código de Acesso
                   </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    required
-                    value={codigo}
-                    onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
-                    className="mt-2 w-full border-0 border-b border-border bg-transparent py-3 text-center font-mono text-2xl tracking-[0.5em] text-foreground outline-none transition-colors focus:border-accent"
-                    placeholder="••••••"
-                  />
+                  <div className="relative flex items-center">
+                    <div className="pointer-events-none absolute left-3.5 text-muted-foreground">
+                      <VpnKeyTwoTone className="!h-5 !w-5 text-emerald-400" />
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="\d{6}"
+                      maxLength={6}
+                      required
+                      value={codigo}
+                      onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                      className="w-full rounded-xl border border-border/80 bg-background/70 py-3.5 pl-11 pr-4 font-mono text-xl tracking-[0.4em] text-white outline-none transition-all focus:border-emerald-500 focus:bg-background focus:ring-2 focus:ring-emerald-500/30"
+                      placeholder="••••••"
+                    />
+                  </div>
                 </div>
               ) : (
                 <>
-                  <div>
-                    <label className="block text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  {/* Email Field */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                       E-mail
                     </label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="mt-2 w-full border-0 border-b border-border bg-transparent py-3 text-foreground outline-none transition-colors focus:border-accent"
-                      placeholder="voce@multium.com"
-                    />
+                    <div className="relative flex items-center">
+                      <div className="pointer-events-none absolute left-3.5 text-muted-foreground">
+                        <EmailTwoTone className="!h-5 !w-5 text-emerald-400/80" />
+                      </div>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full rounded-xl border border-border/80 bg-background/70 py-3 pl-11 pr-4 text-sm text-white outline-none transition-all focus:border-emerald-500 focus:bg-background focus:ring-2 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
+                        placeholder="admin@multium.com"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-[0.18em] text-muted-foreground">
+
+                  {/* Password Field with Eye Toggle */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                       Senha
                     </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="mt-2 w-full border-0 border-b border-border bg-transparent py-3 text-foreground outline-none transition-colors focus:border-accent"
-                      placeholder="••••••••"
-                    />
+                    <div className="relative flex items-center">
+                      <div className="pointer-events-none absolute left-3.5 text-muted-foreground">
+                        <LockTwoTone className="!h-5 !w-5 text-emerald-400/80" />
+                      </div>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        minLength={6}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-xl border border-border/80 bg-background/70 py-3 pl-11 pr-11 text-sm text-white outline-none transition-all focus:border-emerald-500 focus:bg-background focus:ring-2 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3.5 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-emerald-500/10 hover:text-emerald-400"
+                        aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
+                      >
+                        {showPassword ? (
+                          <VisibilityOffTwoTone className="!h-5 !w-5" />
+                        ) : (
+                          <VisibilityTwoTone className="!h-5 !w-5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
 
+              {/* Feedback messages */}
               {error && (
-                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">
+                <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive-foreground">
                   {error}
-                </p>
+                </div>
               )}
               {info && (
-                <p className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-foreground">
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300">
                   {info}
-                </p>
+                </div>
               )}
 
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative mt-2 inline-flex w-full items-center justify-center overflow-hidden rounded-full bg-foreground px-6 py-3.5 text-sm font-medium text-background transition-all hover:bg-foreground/90 disabled:opacity-60"
-                style={{ boxShadow: "var(--shadow-glow)" }}
+                className="group relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-500 px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-400 hover:shadow-emerald-500/40 disabled:opacity-60 active:scale-[0.99]"
               >
-                {loading
-                  ? "Aguarde…"
-                  : role === "vendedor"
-                  ? "Entrar como vendedor"
-                  : role === "ht"
-                  ? "Entrar SDR / Closer"
-                  : mode === "signin"
-                  ? "Entrar"
-                  : "Criar conta"}
-                <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
+                <span>
+                  {loading
+                    ? "Aguarde…"
+                    : role === "vendedor"
+                    ? "Entrar como vendedor"
+                    : role === "ht"
+                    ? "Entrar como SDR / Closer"
+                    : mode === "signin"
+                    ? "Entrar na plataforma"
+                    : "Criar conta"}
+                </span>
+                {!loading && (
+                  <ArrowForwardTwoTone className="!h-4 !w-4 transition-transform group-hover:translate-x-1" />
+                )}
               </button>
             </form>
 
-            {role === "admin" && (
-              <div className="mt-8 flex items-center justify-end text-sm">
-                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground/60">
-                  MULTIUM ©
-                </span>
-              </div>
-            )}
-
+            {/* Footer Tag */}
+            <div className="mt-6 flex items-center justify-between border-t border-border/40 pt-4 text-xs text-muted-foreground/60">
+              <span className="text-[0.65rem] uppercase tracking-widest">Acesso Seguro</span>
+              <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-emerald-500/70">
+                MULTIUM ©
+              </span>
+            </div>
           </div>
         </section>
       </div>
