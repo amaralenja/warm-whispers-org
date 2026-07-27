@@ -36,11 +36,14 @@ function LiveMonitoringPage() {
   const [unattendedModalOpen, setUnattendedModalOpen] = useState(false);
   const [trafficCountdown, setTrafficCountdown] = useState(300);
 
-  // Fetch REAL TODAY data from server
+  // Fetch REAL TODAY data from server with automatic refetch on mount and window focus
   const { data: serverStats, isLoading, refetch } = useQuery({
     queryKey: ["live-monitoring-today"],
     queryFn: () => fetchLiveStats(),
-    refetchInterval: 15_000, // Refresh real DB stats every 15s
+    refetchInterval: 12_000, // Refresh real DB stats every 12s
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
   });
 
   const [realtimeX1Events, setRealtimeX1Events] = useState<any[]>([]);
@@ -54,7 +57,7 @@ function LiveMonitoringPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Supabase Realtime Subscription for REAL events arriving right now
+  // Supabase Realtime Subscription for REAL events arriving right now (Sales, Leads, Show-Ups, No-Shows)
   useEffect(() => {
     const channel = supabase
       .channel("live-monitoring-realtime")
@@ -101,6 +104,42 @@ function LiveMonitoringPage() {
             valor: val,
           };
           setRealtimeHtEvents((prev) => [evt, ...prev.slice(0, 15)]);
+          refetch();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "ht_kanban_state" },
+        (payload: any) => {
+          const newRow = payload.new;
+          const stageLower = String(newRow.closer_stage || "").toLowerCase();
+          const timeStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+          const rawCloser = String(newRow.closer_email || "Gabriel").split("@")[0];
+          const closerName = rawCloser.charAt(0).toUpperCase() + rawCloser.slice(1);
+
+          if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada")) {
+            const evt = {
+              id: `rt-showup-${newRow.lead_id || Date.now()}`,
+              timestamp: timeStr,
+              tipo: "show_up",
+              titulo: `🟢 Show-Up Confirmado (${closerName})`,
+              descricao: `Lead compareceu à reunião em tempo real com Closer ${closerName}`,
+              closer: closerName,
+            };
+            setRealtimeHtEvents((prev) => [evt, ...prev.slice(0, 15)]);
+            refetch();
+          } else if (stageLower.includes("no_show") || stageLower.includes("falta")) {
+            const evt = {
+              id: `rt-noshow-${newRow.lead_id || Date.now()}`,
+              timestamp: timeStr,
+              tipo: "no_show",
+              titulo: `🔴 No-Show Registrado (${closerName})`,
+              descricao: `Lead faltou à reunião agendada em tempo real com Closer ${closerName}`,
+              closer: closerName,
+            };
+            setRealtimeHtEvents((prev) => [evt, ...prev.slice(0, 15)]);
+            refetch();
+          }
         }
       )
       .subscribe();
@@ -108,7 +147,7 @@ function LiveMonitoringPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled]);
+  }, [soundEnabled, refetch]);
 
   const x1Feed = [...realtimeX1Events, ...(serverStats?.x1?.recentEvents ?? [])];
   const htFeed = [...realtimeHtEvents, ...(serverStats?.ht?.recentEvents ?? [])];
