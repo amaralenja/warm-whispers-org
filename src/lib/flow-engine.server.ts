@@ -1190,13 +1190,13 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      // Para delays curtos (até 60s), faz o aguardo inline com sleep para garantir
-      // que o fluxo execute 100% de ponta a ponta sem parar na metade dependendo de cron externo.
-      if (secs <= 60) {
+      // Delays acima de 8s vão pro DB (timer cron) para não estourar
+      // timeout da Vercel (60s). Delays de 1-8s rodam inline.
+      if (secs <= 8) {
         await new Promise((resolve) => setTimeout(resolve, secs * 1000));
         return {};
       }
-      // Para delays mais longos (>60s), marca como waiting e programa worker em memória
+      // Delays >8s: salva no DB, cron retoma
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
       if (secs <= 600) {
         setTimeout(() => {
