@@ -15,8 +15,18 @@ import PercentTwoTone from "@mui/icons-material/PercentTwoTone";
 import EmojiEventsTwoTone from "@mui/icons-material/EmojiEventsTwoTone";
 import AutoAwesomeTwoTone from "@mui/icons-material/AutoAwesomeTwoTone";
 import ShowChartTwoTone from "@mui/icons-material/ShowChartTwoTone";
-import AccountBalanceWalletTwoTone from "@mui/icons-material/AccountBalanceWalletTwoTone";
-
+import {
+  Crown,
+  Trophy,
+  Medal,
+  TrendingUp,
+  ShoppingBag,
+  Receipt,
+  Activity,
+  LineChart,
+  Sparkles,
+  BarChart3,
+} from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell,
