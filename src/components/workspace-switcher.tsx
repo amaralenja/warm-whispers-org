@@ -1,4 +1,10 @@
-import { Check, ChevronsUpDown, ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import Check from "@mui/icons-material/CheckTwoTone";
+import ChevronsUpDown from "@mui/icons-material/UnfoldMoreTwoTone";
+import ImagePlus from "@mui/icons-material/AddPhotoAlternateTwoTone";
+import Pencil from "@mui/icons-material/EditTwoTone";
+import Plus from "@mui/icons-material/AddTwoTone";
+import Trash2 from "@mui/icons-material/DeleteTwoTone";
+import X from "@mui/icons-material/CloseTwoTone";
 import { useEffect, useRef, useState } from "react";
 import { useWorkspace, ACCENTS, type Workspace } from "@/lib/workspace-context";
 import { getVendorSession } from "@/lib/vendor-session";

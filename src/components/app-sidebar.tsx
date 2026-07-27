@@ -6,38 +6,37 @@ import { canSee, htDefaultPermissoes, mergePermissoes, type Permissoes } from "@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getVendorSession, saveVendorSession, clearVendorSession } from "@/lib/vendor-session";
-import {
-  LayoutDashboard,
-  LineChart,
-  Tv,
-  Wallet,
-  Activity,
-  HelpCircle,
-  Users,
-  Calendar,
-  LogOut,
-  Crown,
-  ChevronDown,
-  MessageCircle,
-  MessagesSquare,
-  Workflow,
-  Briefcase,
-  User,
-  BookOpenText,
-  CheckSquare,
-  BarChart3,
-  KeyRound,
-  Settings2,
-  Kanban,
-  Target,
-  Zap,
-  Percent,
-  Mic,
-  HeartHandshake,
-  Rocket,
-  Sun,
-  Moon,
-} from "lucide-react";
+import AccountCircleTwoTone from "@mui/icons-material/AccountCircleTwoTone";
+import DashboardTwoTone from "@mui/icons-material/DashboardTwoTone";
+import TvTwoTone from "@mui/icons-material/TvTwoTone";
+import AccountBalanceWalletTwoTone from "@mui/icons-material/AccountBalanceWalletTwoTone";
+import AssignmentTurnedInTwoTone from "@mui/icons-material/AssignmentTurnedInTwoTone";
+import PriceCheckTwoTone from "@mui/icons-material/PriceCheckTwoTone";
+import MenuBookTwoTone from "@mui/icons-material/MenuBookTwoTone";
+import AssessmentTwoTone from "@mui/icons-material/AssessmentTwoTone";
+import GroupTwoTone from "@mui/icons-material/GroupTwoTone";
+import BadgeTwoTone from "@mui/icons-material/BadgeTwoTone";
+import ChatTwoTone from "@mui/icons-material/ChatTwoTone";
+import ForumTwoTone from "@mui/icons-material/ForumTwoTone";
+import AccountTreeTwoTone from "@mui/icons-material/AccountTreeTwoTone";
+import BoltTwoTone from "@mui/icons-material/BoltTwoTone";
+import TimelineTwoTone from "@mui/icons-material/TimelineTwoTone";
+import LinkTwoTone from "@mui/icons-material/LinkTwoTone";
+import InsightsTwoTone from "@mui/icons-material/InsightsTwoTone";
+import ViewColumnTwoTone from "@mui/icons-material/ViewColumnTwoTone";
+import TrackChangesTwoTone from "@mui/icons-material/TrackChangesTwoTone";
+import GroupsTwoTone from "@mui/icons-material/GroupsTwoTone";
+import HandshakeTwoTone from "@mui/icons-material/HandshakeTwoTone";
+import QuizTwoTone from "@mui/icons-material/QuizTwoTone";
+import CampaignTwoTone from "@mui/icons-material/CampaignTwoTone";
+import RocketLaunchTwoTone from "@mui/icons-material/RocketLaunchTwoTone";
+import VpnKeyTwoTone from "@mui/icons-material/VpnKeyTwoTone";
+import WorkTwoTone from "@mui/icons-material/WorkTwoTone";
+import WorkspacePremiumTwoTone from "@mui/icons-material/WorkspacePremiumTwoTone";
+import KeyboardArrowDownTwoTone from "@mui/icons-material/KeyboardArrowDownTwoTone";
+import WbSunnyTwoTone from "@mui/icons-material/WbSunnyTwoTone";
+import NightsStayTwoTone from "@mui/icons-material/NightsStayTwoTone";
+import LogoutTwoTone from "@mui/icons-material/LogoutTwoTone";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -62,38 +61,36 @@ import { useTheme } from "@/lib/theme-context";
 type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
-  { title: "Início", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Ranking TV", url: "/ranking-tv", icon: Tv },
-  { title: "Financeiro", url: "/financeiro", icon: Wallet },
-  { title: "Tarefas", url: "/tasks", icon: CheckSquare },
-  { title: "Comissões", url: "/comissoes", icon: Percent },
-  { title: "SOPs / Processos", url: "/sops", icon: BookOpenText },
+  { title: "Início", url: "/dashboard", icon: DashboardTwoTone },
+  { title: "Ranking TV", url: "/ranking-tv", icon: TvTwoTone },
+  { title: "Financeiro", url: "/financeiro", icon: AccountBalanceWalletTwoTone },
+  { title: "Tarefas", url: "/tasks", icon: AssignmentTurnedInTwoTone },
+  { title: "Comissões", url: "/comissoes", icon: PriceCheckTwoTone },
+  { title: "SOPs / Processos", url: "/sops", icon: MenuBookTwoTone },
 ];
 
-
-
 const operacaoX1Items: Item[] = [
-  { title: "Analytics X1", url: "/x1-analytics", icon: BarChart3 },
-  { title: "CRM Leads X1", url: "/crm", icon: Users },
-  { title: "Vendedores", url: "/vendedores", icon: Briefcase },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
-  { title: "Chat ao Vivo", url: "/chat", icon: MessagesSquare },
-  { title: "Fluxos", url: "/flows", icon: Workflow },
-  { title: "Remarketing 24h", url: "/remarketing", icon: Zap },
+  { title: "Analytics X1", url: "/x1-analytics", icon: AssessmentTwoTone },
+  { title: "CRM Leads X1", url: "/crm", icon: GroupTwoTone },
+  { title: "Vendedores", url: "/vendedores", icon: BadgeTwoTone },
+  { title: "WhatsApp", url: "/whatsapp", icon: ChatTwoTone },
+  { title: "Chat ao Vivo", url: "/chat", icon: ForumTwoTone },
+  { title: "Fluxos", url: "/flows", icon: AccountTreeTwoTone },
+  { title: "Remarketing 24h", url: "/remarketing", icon: BoltTwoTone },
 ];
 
 const highTicketItems: Item[] = [
-  { title: "Analytics", url: "/ht-analytics", icon: LineChart },
-  { title: "Gerador de UTM", url: "/ht-utm", icon: Zap },
-  { title: "Métricas SDR", url: "/ht-sdr-metrics", icon: LineChart },
-  { title: "Kanban SDR", url: "/ht-kanban-sdr", icon: Kanban },
-  { title: "Kanban Closer", url: "/ht-kanban-closer", icon: Target },
-  { title: "SDRs & Closers", url: "/ht-team", icon: Briefcase },
-  { title: "Sucesso do Cliente", url: "/ht-customer-success", icon: HeartHandshake },
-  { title: "Quiz", url: "/quiz", icon: HelpCircle },
-  { title: "Facebook Ads", url: "/meta-ads", icon: Activity },
-  { title: "SaaS em Construção", url: "/ht-saas", icon: Rocket },
-  { title: "API", url: "/ht-api", icon: KeyRound },
+  { title: "Analytics", url: "/ht-analytics", icon: TimelineTwoTone },
+  { title: "Gerador de UTM", url: "/ht-utm", icon: LinkTwoTone },
+  { title: "Métricas SDR", url: "/ht-sdr-metrics", icon: InsightsTwoTone },
+  { title: "Kanban SDR", url: "/ht-kanban-sdr", icon: ViewColumnTwoTone },
+  { title: "Kanban Closer", url: "/ht-kanban-closer", icon: TrackChangesTwoTone },
+  { title: "SDRs & Closers", url: "/ht-team", icon: GroupsTwoTone },
+  { title: "Sucesso do Cliente", url: "/ht-customer-success", icon: HandshakeTwoTone },
+  { title: "Quiz", url: "/quiz", icon: QuizTwoTone },
+  { title: "Facebook Ads", url: "/meta-ads", icon: CampaignTwoTone },
+  { title: "SaaS em Construção", url: "/ht-saas", icon: RocketLaunchTwoTone },
+  { title: "API", url: "/ht-api", icon: VpnKeyTwoTone },
 ];
 
 
@@ -338,11 +335,10 @@ export function AppSidebar() {
               {perm !== null && (() => {
                 const isHt = typeof window !== "undefined" && !!localStorage.getItem("ht_team_session");
                 const targetUrl = isHt ? "/ht-analytics" : "/vendor";
-                return renderMenuItem({ title: "Meu Painel", url: targetUrl, icon: User });
+                return renderMenuItem({ title: "Meu Painel", url: targetUrl, icon: AccountCircleTwoTone });
               })()}
               {visibleMain.map(renderMenuItem)}
               
-
 
               {/* Operação X1 — colapsável */}
               {showOpX1Group && (
@@ -367,7 +363,7 @@ export function AppSidebar() {
                   {operacaoX1Active && (
                     <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
                   )}
-                  <Briefcase
+                  <WorkTwoTone
                     className={[
                       "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
                       operacaoX1Active ? "text-accent" : "",
@@ -376,7 +372,7 @@ export function AppSidebar() {
                   {!collapsed && (
                     <>
                       <span className="flex-1 truncate text-left">Operação X1</span>
-                      <ChevronDown
+                      <KeyboardArrowDownTwoTone
                         className={[
                           "h-4 w-4 transition-transform",
                           operacaoX1Open ? "rotate-180" : "",
@@ -440,7 +436,7 @@ export function AppSidebar() {
                   {highTicketActive && (
                     <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
                   )}
-                  <Crown
+                  <WorkspacePremiumTwoTone
                     className={[
                       "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
                       highTicketActive ? "text-accent" : "",
@@ -449,7 +445,7 @@ export function AppSidebar() {
                   {!collapsed && (
                     <>
                       <span className="flex-1 truncate text-left">High Ticket</span>
-                      <ChevronDown
+                      <KeyboardArrowDownTwoTone
                         className={[
                           "h-4 w-4 transition-transform",
                           highTicketOpen ? "rotate-180" : "",
@@ -505,9 +501,9 @@ export function AppSidebar() {
               className="group/menu h-12 rounded-lg px-3 text-[0.95rem] font-medium text-muted-foreground transition-all hover:bg-accent/10 hover:text-foreground"
             >
               {theme === "dark" ? (
-                <Sun className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
+                <WbSunnyTwoTone className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
               ) : (
-                <Moon className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
+                <NightsStayTwoTone className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
               )}
               {!collapsed && <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>}
             </SidebarMenuButton>
@@ -518,7 +514,7 @@ export function AppSidebar() {
               tooltip="Sair"
               className="group/menu h-12 rounded-lg px-3 text-[0.95rem] font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
             >
-              <LogOut className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
+              <LogoutTwoTone className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
               {!collapsed && <span>Sair</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
