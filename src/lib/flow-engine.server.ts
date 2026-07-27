@@ -789,15 +789,28 @@ async function loadFlow(flowId: string, db: any) {
 
 
 
-async function executeFrom(ctx: Ctx, startNodeId: string) {
+async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: number }) {
   const flow = await loadFlow(ctx.flowId, ctx.db);
   const nodes: Node[] = jsonArray<Node>(flow.nodes);
   const edges: Edge[] = jsonArray<Edge>(flow.edges);
+  const maxNodes = opts?.maxNodes ?? 50;
 
   let currentId: string | null = startNodeId;
   let safety = 0;
+  let nodesProcessed = 0;
 
   while (currentId && safety++ < 50) {
+    if (nodesProcessed >= maxNodes) {
+      // Chunk limit: save state and re-queue for next cron tick
+      await updateFlowRun(ctx, {
+        current_node_id: currentId,
+        context: ctx.variables,
+        status: "queued",
+        waiting_for: null,
+        expires_at: null,
+      });
+      return;
+    }
     if (await shouldStopFlowRun(ctx)) return;
     const node = nodes.find((n) => n.id === currentId);
     if (!node) {
@@ -823,6 +836,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string) {
 
       await logExecution(ctx.db, ctx.runId, node, "ok", result.log ?? null, undefined, started, ctx.vendor);
 
+      nodesProcessed++;
       if (result.pause) return;
       if (result.end) {
         await updateFlowRun(ctx, {
@@ -1486,7 +1500,7 @@ export async function runFlowAdmin(args: {
     return { runId: ctx.runId, completed: true, reason: "no_next_node" };
   }
   await takeFlowRunLease(ctx);
-  await executeFrom(ctx, startId);
+  await executeFrom(ctx, startId, { maxNodes: 5 });
   return { runId: ctx.runId };
 }
 
@@ -1517,7 +1531,7 @@ export async function processQueuedFlowRuns(limit = 20) {
         return { runId: ctx.runId, completed: true };
       }
       try {
-        await executeFrom(ctx, startId);
+        await executeFrom(ctx, startId, { maxNodes: 5 });
         return { runId: ctx.runId, ok: true };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
@@ -1571,7 +1585,7 @@ export async function processExpiredTimerRuns(limit = 20) {
           expires_at: null,
           current_node_id: nextId,
         });
-        await executeFrom(ctx, nextId);
+        await executeFrom(ctx, nextId, { maxNodes: 5 });
         return { runId: ctx.runId, ok: true };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
@@ -1658,7 +1672,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
             expires_at: null,
             current_node_id: nextId,
           });
-          await executeFrom(ctx, nextId);
+          await executeFrom(ctx, nextId, { maxNodes: 5 });
           console.warn(`[flow-engine] stale send run ${ctx.runId} recovered past ${currentNode.type}, resumed from ${nextId}`);
           return { runId: ctx.runId, ok: true, recoveredPast: currentNode.type };
         }
@@ -1675,7 +1689,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
           expires_at: null,
           current_node_id: nextId,
         });
-        await executeFrom(ctx, nextId);
+        await executeFrom(ctx, nextId, { maxNodes: 5 });
         return { runId: ctx.runId, ok: true, resumedFrom: nextId };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
@@ -1775,7 +1789,7 @@ export async function advanceWaitingRun(args: {
   }
 
   await updateFlowRun(ctx, { status: "running", waiting_for: null });
-  await executeFrom(ctx, nextId);
+  await executeFrom(ctx, nextId, { maxNodes: 5 });
   return { runId: r.id };
 }
 
