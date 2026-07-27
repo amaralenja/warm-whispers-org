@@ -699,7 +699,7 @@ function ComparativoOps({ ops, totalFat, loading }: { ops: DashboardOpStats[]; t
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card/40 p-5">
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Activity className="h-3.5 w-3.5 text-amber-400" />
+        <AssessmentTwoTone className="!h-4 !w-4 text-amber-400" />
         <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Comparativo de Operações</span>
       </div>
 
