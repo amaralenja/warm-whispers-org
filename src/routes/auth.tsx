@@ -151,17 +151,20 @@ function AuthPage() {
             </div>
           </div>
 
-          {/* Metric Preview Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 to-card/40 p-5 backdrop-blur-xl max-w-md shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
-                  <AutoGraphTwoTone className="!h-6 !w-6" />
+          {/* Security & System Status Badge */}
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 to-card/40 p-4 backdrop-blur-xl max-w-md shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                <ShieldTwoTone className="!h-5 !w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Ambiente Seguro</span>
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversões do Mês</div>
-                  <div className="text-xl font-bold text-white">+48.5% <span className="text-xs font-normal text-emerald-400">vs mês anterior</span></div>
-                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Acesso restrito a colaboradores e parceiros autorizados MULTIUM.
+                </p>
               </div>
             </div>
           </div>
