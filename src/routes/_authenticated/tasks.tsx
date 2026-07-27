@@ -190,27 +190,39 @@ function TasksPage() {
   });
 
   const vendorSession = typeof window !== "undefined" ? getVendorSession() : null;
-  const vendorAssigneeId = vendorSession?.id ? `v:${vendorSession.id}` : null;
 
   const tasksQ = useQuery({
-    queryKey: ["tasks", activeBoardId, vendorAssigneeId],
+    queryKey: ["tasks", activeBoardId, vendorSession?.id, vendorSession?.nome],
     enabled: !!activeBoardId,
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from("tasks" as any)
         .select("*")
         .eq("board_id", activeBoardId!)
         .order("ordem");
-      if (vendorAssigneeId) {
-        q = q.contains("assignee_ids", [vendorAssigneeId]);
-      }
-      const { data, error } = await q;
       if (error) throw error;
-      return ((data ?? []) as any[]).map((t) => ({
+
+      let list = ((data ?? []) as any[]).map((t) => ({
         ...t,
         labels: normalizeLabels(t.labels),
         checklist: normalizeChecklist(t.checklist),
       })) as Task[];
+
+      if (vendorSession?.id) {
+        const vId1 = `v:${vendorSession.id}`;
+        const vId2 = String(vendorSession.id);
+        const vName = String(vendorSession.nome ?? "").toLowerCase().trim();
+
+        list = list.filter((t) => {
+          const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
+          if (assignees.length === 0) return false;
+          if (assignees.includes(vId1) || assignees.includes(vId2)) return true;
+          if (vName && assignees.some((a) => String(a).toLowerCase().includes(vName))) return true;
+          return false;
+        });
+      }
+
+      return list;
     },
   });
 
@@ -222,8 +234,6 @@ function TasksPage() {
         supabase
           .from("vendedores" as any)
           .select("id,nome,telefone,foto_url,ativo,expert")
-          .not("telefone", "is", null)
-          .neq("telefone", "")
           .order("nome"),
       ]);
       if (tmRes.error) throw tmRes.error;

@@ -2,9 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar, Copy, Link2 } from "lucide-react";
+import { LogOut, TrendingUp, ShoppingBag, Target, Trophy, Award, Calendar, Copy, Link2, CheckSquare, Check } from "lucide-react";
 import { toast } from "sonner";
 import logoMultium from "@/assets/logo-multium.webp";
+import { supabase } from "@/integrations/supabase/client";
 import { getVendorStats, getVendorByTeamSession } from "@/lib/vendor.functions";
 import { listVendorLinksPublic } from "@/lib/vendor-links.functions";
 import { DesempenhoDiario } from "@/components/desempenho-diario";
@@ -118,6 +119,45 @@ function VendorPortal() {
     queryFn: () => fetchLinks({ data: { vendorId: v!.id } }),
     enabled: !!v?.id,
   });
+
+  const { data: vendorTasks = [], isLoading: loadingTasks, refetch: refetchTasks } = useQuery({
+    queryKey: ["vendor-assigned-tasks", v?.id, v?.nome],
+    queryFn: async () => {
+      if (!v?.id) return [];
+      const vId1 = `v:${v.id}`;
+      const vId2 = String(v.id);
+      const vName = String(v.nome ?? "").toLowerCase().trim();
+
+      const { data, error } = await supabase
+        .from("tasks" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) return [];
+
+      return ((data ?? []) as any[]).filter((t) => {
+        const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
+        if (assignees.includes(vId1) || assignees.includes(vId2)) return true;
+        if (vName && assignees.some((a: string) => String(a).toLowerCase().includes(vName))) return true;
+        return false;
+      });
+    },
+    enabled: !!v?.id,
+  });
+
+  const toggleTaskDone = async (taskId: string, currentDone: boolean) => {
+    const { error } = await supabase
+      .from("tasks" as any)
+      .update({ concluida: !currentDone })
+      .eq("id", taskId);
+
+    if (error) {
+      toast.error("Erro ao atualizar tarefa");
+    } else {
+      toast.success(currentDone ? "Tarefa reaberta" : "Tarefa concluída! 🎉");
+      refetchTasks();
+    }
+  };
 
   function copyLink(url: string) {
     navigator.clipboard.writeText(url).then(
@@ -291,6 +331,80 @@ function VendorPortal() {
 
 
 
+
+        {/* Minhas Tarefas */}
+        <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <div className="mb-3 flex items-center justify-between gap-2 md:mb-4">
+            <div className="flex items-center gap-2">
+              <div className="rounded-md bg-blue-500/15 p-1.5 text-blue-400">
+                <CheckSquare className="h-4 w-4" />
+              </div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider md:text-sm">Minhas Tarefas</h3>
+            </div>
+            {vendorTasks.length > 0 && (
+              <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
+                {vendorTasks.filter((t) => !t.concluida).length} pendente(s)
+              </span>
+            )}
+          </div>
+
+          {loadingTasks ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-12 animate-pulse rounded-md bg-secondary/30" />
+              ))}
+            </div>
+          ) : vendorTasks.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">Nenhuma tarefa atribuída a você no momento.</div>
+          ) : (
+            <div className="space-y-2">
+              {vendorTasks.map((t) => {
+                const prio = String(t.prioridade || "media");
+                const prioPill =
+                  prio === "urgente" ? "border-red-500/40 bg-red-500/15 text-red-300" :
+                  prio === "alta" ? "border-orange-500/40 bg-orange-500/15 text-orange-300" :
+                  prio === "baixa" ? "border-slate-500/40 bg-slate-500/15 text-slate-300" :
+                  "border-blue-500/40 bg-blue-500/15 text-blue-300";
+
+                return (
+                  <div
+                    key={t.id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 transition ${
+                      t.concluida ? "border-border/50 bg-secondary/10 opacity-60" : "border-border bg-background/50 hover:border-blue-500/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <button
+                        onClick={() => toggleTaskDone(t.id, !!t.concluida)}
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
+                          t.concluida ? "border-emerald-500 bg-emerald-500 text-white" : "border-border hover:border-emerald-500/60"
+                        }`}
+                      >
+                        {t.concluida && <Check className="h-3.5 w-3.5" />}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-sm font-medium ${t.concluida ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                          {t.titulo}
+                        </div>
+                        {t.descricao && <div className="text-xs text-muted-foreground truncate">{t.descricao}</div>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {t.prazo && (
+                        <span className="text-[0.65rem] font-mono text-muted-foreground">
+                          {new Date(t.prazo).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                      <span className={`rounded border px-2 py-0.5 text-[0.65rem] font-semibold uppercase ${prioPill}`}>
+                        {prio}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Últimas vendas */}
         <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
