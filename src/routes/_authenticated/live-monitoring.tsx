@@ -517,17 +517,32 @@ function LiveMonitoringPage() {
                     <div className="flex items-center gap-2">
                       {call.status === "show_up" && (
                         <span className="rounded-md bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-emerald-300 uppercase">
-                          🟢 Show-Up
+                          🟢 Show-Up / Fechada
                         </span>
                       )}
                       {call.status === "no_show" && (
                         <span className="rounded-md bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-rose-300 uppercase">
-                          🔴 No-Show
+                          🔴 No-Show (Falta)
                         </span>
                       )}
                       {call.status === "pendente" && (
                         <span className="rounded-md bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-amber-300 uppercase">
-                          🟡 Agendada
+                          🟡 Agendada (Pendente)
+                        </span>
+                      )}
+                      {call.status === "followup" && (
+                        <span className="rounded-md bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-sky-300 uppercase">
+                          🔵 Follow-Up
+                        </span>
+                      )}
+                      {call.status === "remarcada" && (
+                        <span className="rounded-md bg-amber-600/20 border border-amber-600/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-amber-400 uppercase">
+                          🟠 Remarcada
+                        </span>
+                      )}
+                      {call.status === "descartado" && (
+                        <span className="rounded-md bg-zinc-500/20 border border-zinc-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-zinc-400 uppercase">
+                          ⚪ Descartada / Fake
                         </span>
                       )}
                       <span className="text-[0.65rem] font-semibold text-violet-400 group-hover:translate-x-0.5 transition-transform">

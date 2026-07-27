@@ -2023,13 +2023,14 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     for (const q of extQuizLeadsAll) registerLead(q);
 
     // ── 3. Agregado de Calls por Closer, Show-ups e No-shows de HOJE ──
-    const closersMap = new Map<string, { callsToday: number; showUpsToday: number; noShowsToday: number }>();
+    const closersMap = new Map<string, { callsToday: number; pendingToday: number; showUpsToday: number; noShowsToday: number; followupToday: number; remarcadaToday: number; descartadoToday: number }>();
     const scheduledCallsToday: Array<{
       id: string;
       horario: string;
       leadName: string;
       closerName: string;
-      status: "show_up" | "no_show" | "pendente";
+      status: "show_up" | "no_show" | "pendente" | "followup" | "remarcada" | "descartado";
+      stageRaw?: string;
       leadData?: any;
     }> = [];
 
@@ -2049,19 +2050,19 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       const capitalizedCloser = closerName.charAt(0).toUpperCase() + closerName.slice(1);
 
       if (!closersMap.has(capitalizedCloser)) {
-        closersMap.set(capitalizedCloser, { callsToday: 0, showUpsToday: 0, noShowsToday: 0 });
+        closersMap.set(capitalizedCloser, { callsToday: 0, pendingToday: 0, showUpsToday: 0, noShowsToday: 0, followupToday: 0, remarcadaToday: 0, descartadoToday: 0 });
       }
       const closerStats = closersMap.get(capitalizedCloser)!;
       if (isSchedToday) closerStats.callsToday++;
 
-      const stageLower = String(kb.closer_stage || "").toLowerCase();
-      let callStatus: "show_up" | "no_show" | "pendente" = "pendente";
+      const stageLower = String(kb.closer_stage || kb.sdr_stage || "").toLowerCase();
+      let callStatus: "show_up" | "no_show" | "pendente" | "followup" | "remarcada" | "descartado" = "pendente";
 
       const rawLeadId = String(kb.lead_id || "").trim();
       const quizLead = quizMapById.get(rawLeadId) || quizMapById.get(rawLeadId.replace(/^htq:/i, "")) || quizMapById.get(rawLeadId.slice(0, 8));
       const realLeadName = quizLead?.nome || quizLead?.display_name || quizLead?.respostas?.nome || `Lead ${rawLeadId.slice(0, 8) || "Qualificado"}`;
 
-      if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda")) {
+      if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda") || stageLower.includes("fechado") || stageLower.includes("ganho")) {
         callStatus = "show_up";
         if (isSchedToday || isUpdToday) {
           closerStats.showUpsToday++;
@@ -2099,6 +2100,18 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
             closer: capitalizedCloser,
           });
         }
+      } else if (stageLower.includes("follow") || stageLower.includes("c2")) {
+        callStatus = "followup";
+        if (isSchedToday) closerStats.followupToday++;
+      } else if (stageLower.includes("remarcad") || stageLower.includes("reagend")) {
+        callStatus = "remarcada";
+        if (isSchedToday) closerStats.remarcadaToday++;
+      } else if (stageLower.includes("descartad") || stageLower.includes("fake") || stageLower.includes("lost")) {
+        callStatus = "descartado";
+        if (isSchedToday) closerStats.descartadoToday++;
+      } else {
+        callStatus = "pendente";
+        if (isSchedToday) closerStats.pendingToday++;
       }
 
       // Adiciona à lista detalhada de reuniões de HOJE apenas se agendado para HOJE
@@ -2125,7 +2138,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
           utm_medium: quizLead?.utm_medium || quizLead?.respostas?.utm_medium || null,
           utm_campaign: quizLead?.utm_campaign || quizLead?.respostas?.utm_campaign || null,
           data_criacao: quizLead?.created_at || quizLead?.data_criacao || quizLead?.received_at || kb.scheduled_at || kb.updated_at,
-          crm_status: kb.closer_stage || null,
+          crm_status: kb.closer_stage || kb.sdr_stage || null,
           crm_data_agendamento: kb.scheduled_at || null,
           respostas: quizLead?.respostas || quizLead?.respostas_json || quizLead || null,
         };
@@ -2136,6 +2149,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
           leadName: realLeadName,
           closerName: capitalizedCloser,
           status: callStatus,
+          stageRaw: kb.closer_stage || kb.sdr_stage || "agendado",
           leadData,
         });
       }
