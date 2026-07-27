@@ -1289,8 +1289,8 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const cleanCp = isCampEmpty ? "" : cp;
       const isOrganicWord = organicPattern.test(src) || organicPattern.test(med) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
       const hasClickId = !!fbclid || !!gclid || !!fbp;
-      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid");
-      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src);
+      const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado|stories|feed|reels|traffic|trafego)$/i.test(med) || med.includes("cpc") || med.includes("cpm") || med.includes("paid") || med.includes("ads") || med.includes("anuncio");
+      const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado|facebook|fb|meta|ig|instagram_ads|google_ads|tiktok_ads|kwai_ads)\b/i.test(src) || /(-ads|_ads|ads-|patrocinado)/i.test(src) || src === "fb" || src === "ig" || src === "meta" || src === "facebook";
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
       const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
 
@@ -1303,15 +1303,12 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 
       const isFromQuizOrTypebot = !!matchedQuiz || hasTypebotTag || (forceTypebot && !hasOrganicTag) || isTextFormulario || isTextYoutube;
 
-      if (isFromQuizOrTypebot) {
-        if (isPaid || hasPaidTag) {
-          return "Typebot (Tráfego Pago)";
-        }
-        return "Typebot (Orgânico)";
+      if (isPaid || hasPaidTag) {
+        return "Typebot (Tráfego Pago)";
       }
 
-      if (isPaid || hasPaidTag) {
-        return "Tráfego Pago";
+      if (isFromQuizOrTypebot) {
+        return "Typebot (Orgânico)";
       }
 
       return "Orgânico Direto";
