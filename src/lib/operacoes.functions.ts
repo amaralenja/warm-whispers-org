@@ -802,7 +802,6 @@ export type DashboardOpStats = {
   ticketMedio: number;
   reembolsos: number;
   leads: number;
-  conversasAtivas: number;
   conversao: number;
   vendedoresCount: number;
   pctTotal: number;
@@ -1386,23 +1385,6 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       };
       countLead(op, classifyLeadType(fakeLeadForClassify, false, op));
     }
-
-    // Mapeia conversas ativas no Chat (janela de 24h aberta = last_message_at nas �ltimas 24 horas)
-    const conversasAtivasByOp = new Map<string, Set<string>>();
-    const cutoff24h = Date.now() - 24 * 60 * 60 * 1000;
-    for (const conv of waConvsRaw) {
-      const lastMsg = conv.last_message_at || conv.updated_at;
-      if (!lastMsg) continue;
-      if (new Date(lastMsg).getTime() < cutoff24h) continue;
-      const rawOp = String(conv.operacao_id ?? "").trim();
-      if (!rawOp || rawOp === "__notificador__") continue;
-      const op = canonicalOpName(rawOp);
-      const phone = cleanPhone(conv.contact_wa_id ?? "");
-      if (!phone) continue;
-      if (!conversasAtivasByOp.has(op)) conversasAtivasByOp.set(op, new Set());
-      conversasAtivasByOp.get(op)!.add(phone);
-    }
-
     const matchLead = (vEmail: string, vTel: string) => {
       if (vEmail && emailToLead.has(vEmail)) return emailToLead.get(vEmail);
       if (vTel && phoneToLead.has(vTel)) return phoneToLead.get(vTel);
@@ -1551,7 +1533,7 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       opStats.push({
         id: eId, nome: eName, foto_url: eFoto,
         faturamento, vendas: vendasCount, ticketMedio,
-        reembolsos: reembCount, leads, conversasAtivas: conversasAtivasByOp.get(eName)?.size || 0, conversao: Math.round(conversao * 10) / 10,
+        reembolsos: reembCount, leads, conversao: Math.round(conversao * 10) / 10,
         vendedoresCount: vdsCount, pctTotal: 0, fontes: fontesArr, leadBreakdown: leadBreakdownArr,
       });
     }
