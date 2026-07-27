@@ -2029,6 +2029,51 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     addQuizList(htLeadsAll);
     addQuizList(extQuizLeadsAll);
 
+    // Helper para verificar qualificação real do High Ticket (Kanban SDR + Caixa D/E/F/G + Faturamento)
+    const kanbanLeadIdsSet = new Set<string>();
+    for (const kb of htKanbanAll) {
+      if (kb.lead_id) kanbanLeadIdsSet.add(String(kb.lead_id).trim().toLowerCase());
+    }
+
+    function isHtQuizQualified(q: any): boolean {
+      if (!q) return false;
+
+      // 1. Se o lead está no Kanban do SDR, ele É QUALIFICADO!
+      const rawId = String(q.id || q.user_id || "").trim().toLowerCase();
+      const phone = String(q.whatsapp || q.telefone || "").replace(/\D/g, "");
+      const email = String(q.email || "").trim().toLowerCase();
+
+      if (rawId && (kanbanLeadIdsSet.has(rawId) || kanbanLeadIdsSet.has(`htq:${rawId}`) || kanbanLeadIdsSet.has(rawId.replace(/^htq:/i, "")))) {
+        return true;
+      }
+      if (phone && kanbanLeadIdsSet.has(phone)) return true;
+      if (email && kanbanLeadIdsSet.has(email)) return true;
+
+      // 2. Checa a regra de Caixa (Tier D, E, F, G)
+      const caixaLetra = String(q.caixa_letra || q.respostas?.caixa_letra || q.respostas?.caixa_letra_calculada || "").trim().toUpperCase();
+      if (["D", "E", "F", "G"].includes(caixaLetra)) {
+        return true;
+      }
+
+      // 3. Checa a regra de Faturamento (>= R$ 10k / mês)
+      const fat = String(q.faturamento_mensal || q.faturamento || q.respostas?.faturamento || "").toLowerCase();
+      if (fat) {
+        if (/10k|25k|30k|50k|100k|200k|500k|1m|milhões|milhoes/i.test(fat)) return true;
+        if (/10\.000|25\.000|30\.000|50\.000|100\.000/i.test(fat)) return true;
+        if (fat.includes("acima de") || fat.includes("mais de 10") || fat.includes("50 mil") || fat.includes("100 mil")) return true;
+      }
+
+      // 4. Checa o valor de Investir / Caixa Label
+      const investir = String(q.investir || q.respostas?.investir || q.caixa_label || "").toLowerCase();
+      if (/5k|10k|25k|50k|100k|10\.000|25\.000|50\.000|100\.000/i.test(investir)) {
+        if (!investir.includes("menos de 1.000") && !investir.includes("1.000 a 5.000") && !investir.includes("1k–5k") && !investir.includes("até r$ 1k")) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
     // Leads Qualificados High Ticket de HOJE (Quiz + HT Leads + SDR Kanban)
     const seenHtLeadIds = new Set<string>();
     let qualifiedLeadsCount = 0;
@@ -2036,8 +2081,10 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const quizToday = allQuizCombined.filter((q) => isRecordFromToday(q.created_at || q.received_at, todayStr));
 
     for (const q of quizToday) {
-      const idStr = String(q.id || q.user_id || q.whatsapp || q.email || "").trim();
-      if (idStr && !seenHtLeadIds.has(idStr)) {
+      const idStr = String(q.id || q.user_id || q.whatsapp || q.email || "").trim().toLowerCase();
+      if (!idStr || seenHtLeadIds.has(idStr)) continue;
+
+      if (isHtQuizQualified(q)) {
         seenHtLeadIds.add(idStr);
         qualifiedLeadsCount++;
       }
@@ -2045,7 +2092,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     for (const kb of htKanbanAll) {
       if (isRecordFromToday(kb.updated_at, todayStr) && kb.lead_id) {
-        const idStr = String(kb.lead_id).trim();
+        const idStr = String(kb.lead_id).trim().toLowerCase();
         if (idStr && !seenHtLeadIds.has(idStr)) {
           seenHtLeadIds.add(idStr);
           qualifiedLeadsCount++;
@@ -2119,15 +2166,15 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       });
     }
 
-    for (const q of quizToday.slice(0, 10)) {
+    for (const q of quizToday.filter((q) => isHtQuizQualified(q)).slice(0, 10)) {
       const d = q.created_at ? new Date(q.created_at) : new Date();
       const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       htEvents.push({
         id: `quiz-${q.id || Math.random()}`,
         timestamp: timeStr,
         tipo: "lead_qualificado",
-        titulo: "📋 Formulário HT Preenchido",
-        descricao: `Lead ${q.nome || "Qualificado"} (Fat: ${q.faturamento_mensal || "R$ 50k+"}) preencheu formulário no Quiz`,
+        titulo: "📋 Formulário HT Preenchido (Qualificado)",
+        descricao: `Lead ${q.nome || "Qualificado"} (Fat: ${q.faturamento_mensal || q.faturamento || q.respostas?.faturamento || "R$ 10k+"}) preencheu formulário e foi qualificado`,
       });
     }
 
