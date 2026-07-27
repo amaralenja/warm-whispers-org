@@ -397,6 +397,8 @@ export const getHtComissoes = createServerFn({ method: "POST" })
       let comissaoPercentual = 0;
 
       if (m.tipo === "sdr") {
+        // SDR: só conta calls a partir de hoje (26/07/2026), hist�rico anterior n�o aparece
+        const sdrTodayTs = new Date("2026-07-26").getTime();
         // SDR: count comparecimentos from quiz leads that have scheduled_at in range
         // date grouping uses ks.updated_at (when SDR agendou/interagiu), not scheduled_at (data futura)
         for (const lead of quizLeads) {
@@ -409,8 +411,11 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           const closerStage = (ks.closer_stage || "").toLowerCase();
           const sdrStage = (ks.sdr_stage || "").toLowerCase();
           const crmStatus = (lead.crm_status || "").toLowerCase().trim();
-          // action date = when SDR trabalhou no lead (updated_at do kanban), não a data futura do agendamento
+          // action date = when SDR trabalhou no lead (updated_at do kanban), n�o a data futura do agendamento
           const sdrActionDate = ks.updated_at || lead.data_criacao || "";
+          const sdrActionTs = new Date(sdrActionDate).getTime();
+          // S� conta se a a��o do SDR foi a partir de 26/07/2026
+          if (sdrActionTs < sdrTodayTs) continue;
           const fmtD = sdrActionDate.slice(0, 10);
 
           // Call Marcada / Comparecimento check (SDR marcou reunião ou closer atendeu)
@@ -462,6 +467,9 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           if (ks.is_fake) continue;
           const schedDate = ks.scheduled_at || lead.crm_data_agendamento;
           if (!inRange(schedDate) && !inRange(lead.data_criacao)) continue;
+          const sdrActionDate = ks.updated_at || lead.data_criacao || "";
+          const sdrActionTs = new Date(sdrActionDate).getTime();
+          if (sdrActionTs < sdrTodayTs) continue;
           const closerStage = (ks.closer_stage || "").toLowerCase();
           const crmStatus = (lead.crm_status || "").toLowerCase().trim();
           if (
@@ -470,7 +478,6 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           ) {
             const val = Number(lead.crm_valor || 0);
             if (val > 0) {
-              const sdrActionDate = ks.updated_at || lead.data_criacao || "";
               detalhes.push({
                 leadNome: lead.nome || lead.whatsapp || "Sem nome",
                 tipo: "venda",
