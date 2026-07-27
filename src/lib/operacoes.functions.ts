@@ -1275,12 +1275,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       // Regras da Operação do Caio:
       const isCampEmpty = !rawCp || rawCp === "—" || rawCp === "-" || cp === "none" || cp === "null" || cp === "undefined";
       const cleanCp = isCampEmpty ? "" : cp;
-      const isOrganicWord = organicPattern.test(leadSrc) || organicPattern.test(leadMed) || (!!cleanCp && organicPattern.test(cleanCp)) || organicPattern.test(cont);
       const hasClickId = !!fbclid || !!gclid || !!fbp;
       const isPaidMedium = /^(cpc|cpm|ppc|paid|ads|ad|anuncio|patrocinado|stories|feed|reels|traffic|trafego)$/i.test(leadMed) || leadMed.includes("cpc") || leadMed.includes("cpm") || leadMed.includes("paid") || leadMed.includes("ads") || leadMed.includes("anuncio");
       const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado|facebook|fb|meta|ig|instagram_ads|google_ads|tiktok_ads|kwai_ads)\b/i.test(leadSrc) || /(-ads|_ads|ads-|patrocinado)/i.test(leadSrc) || leadSrc === "fb" || leadSrc === "ig" || leadSrc === "meta" || leadSrc === "facebook";
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
-      const isPaid = (hasClickId || isPaidMedium || isPaidSource || hasRealCampaign || hasPaidTag) && !isOrganicWord && !hasOrganicTag;
+
+      const isOrganicBio = leadSrc.includes("link_in_bio") || leadSrc.includes("ig_bio") || leadSrc.includes("instagram_bio") || leadSrc.includes("link_bio") || leadMed.includes("bio");
+      const hasExplicitPaidSignal = hasClickId || isPaidSource || isPaidMedium || hasPaidTag || (hasRealCampaign && !leadSrc.includes("bio"));
+
+      const isPaid = (hasExplicitPaidSignal || hasRealCampaign) && !isOrganicBio && !hasOrganicTag;
 
       // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
       const rawText = norm(
