@@ -246,6 +246,16 @@ export type HtComissaoDetalhe = {
   data: string;
 };
 
+export type HtDiaComissao = {
+  data: string;
+  comparecimentos: number;
+  vendas: number;
+  valorVendas: number;
+  comissaoFixa: number;
+  comissaoPercentual: number;
+  comissaoTotal: number;
+};
+
 export type HtComissaoMembro = {
   id: number;
   nome: string;
@@ -260,6 +270,7 @@ export type HtComissaoMembro = {
   comissaoFixa: number;
   comissaoPercentual: number;
   comissaoTotal: number;
+  dias: HtDiaComissao[];
   detalhes: HtComissaoDetalhe[];
 };
 
@@ -531,6 +542,37 @@ export const getHtComissoes = createServerFn({ method: "POST" })
 
       const comissaoTotal = comissaoFixa + comissaoPercentual;
 
+      // ── 6. Agrupa detalhes por dia ──
+      const diasMap = new Map<string, { comparecimentos: number; vendas: number; valorVendas: number; comissaoFixa: number; comissaoPercentual: number; comissaoTotal: number; leads: HtComissaoDetalhe[] }>();
+      for (const det of detalhes) {
+        const dateKey = det.data.slice(0, 10);
+        if (!diasMap.has(dateKey)) {
+          diasMap.set(dateKey, { comparecimentos: 0, vendas: 0, valorVendas: 0, comissaoFixa: 0, comissaoPercentual: 0, comissaoTotal: 0, leads: [] });
+        }
+        const day = diasMap.get(dateKey)!;
+        day.leads.push(det);
+        if (det.tipo === "comparecimento") {
+          day.comparecimentos++;
+          day.comissaoFixa += det.comissao;
+        } else if (det.tipo === "venda") {
+          day.vendas++;
+          day.valorVendas += det.valor;
+          day.comissaoPercentual += det.comissao;
+        }
+        day.comissaoTotal += det.comissao;
+      }
+      const dias: HtDiaComissao[] = Array.from(diasMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([data, d]) => ({
+          data,
+          comparecimentos: d.comparecimentos,
+          vendas: d.vendas,
+          valorVendas: d.valorVendas,
+          comissaoFixa: d.comissaoFixa,
+          comissaoPercentual: d.comissaoPercentual,
+          comissaoTotal: d.comissaoTotal,
+        }));
+
       membros.push({
         id: m.id,
         nome: m.nome ?? "Sem nome",
@@ -546,6 +588,7 @@ export const getHtComissoes = createServerFn({ method: "POST" })
         comissaoPercentual,
         comissaoTotal,
         detalhes,
+        dias,
       });
     }
 

@@ -450,7 +450,8 @@ function ComissoesPage() {
                                               const checked = !!sel[d.data];
                                               const isGustavo = String(r.expert ?? "").toLowerCase().trim() === "gustavo";
                                               const showSat = d.isSaturday && !isGustavo && d.vendas > 0;
-                                              return (
+
+                    return (
                                                 <tr
                                                   key={d.data}
                                                   className={`cursor-pointer border-t border-border/40 transition-colors ${
@@ -588,7 +589,8 @@ function HtMembroSection({
   const totalComparec = membros.reduce((s, m) => s + m.comparecimentos, 0);
 
   const [pixDraft, setPixDraft] = useState<Record<number, string>>({});
-  const [selectedItems, setSelectedItems] = useState<Record<number, Record<number, boolean>>>({});
+  const [expandedDay, setExpandedDay] = useState<Record<string, string | null>>({});
+  const [selectedDias, setSelectedDias] = useState<Record<string, Record<string, boolean>>>({});
 
   const handleSavePix = async (id: number, currentPix: string | null) => {
     const pix = (pixDraft[id] ?? (currentPix ?? "")).trim();
@@ -602,33 +604,30 @@ function HtMembroSection({
     }
   };
 
-  const toggleItem = (membroId: number, index: number) => {
-    setSelectedItems((s) => {
-      const cur = { ...(s[membroId] ?? {}) };
-      if (cur[index]) delete cur[index];
-      else cur[index] = true;
-      return { ...s, [membroId]: cur };
+  const toggleDia = (membroId: number, iso: string) =>
+    setSelectedDias((s) => {
+      const key = `${membroId}`;
+      const cur = { ...(s[key] ?? {}) };
+      if (cur[iso]) delete cur[iso]; else cur[iso] = true;
+      return { ...s, [key]: cur };
     });
+
+  const setAllDias = (membroId: number, isos: string[], on: boolean) => {
+    const key = `${membroId}`;
+    setSelectedDias((s) => ({ ...s, [key]: on ? Object.fromEntries(isos.map((i) => [i, true])) : {} }));
   };
 
-  const setAllItems = (membroId: number, count: number, on: boolean) => {
-    setSelectedItems((s) => {
-      if (!on) return { ...s, [membroId]: {} };
-      const obj: Record<number, boolean> = {};
-      for (let i = 0; i < count; i++) obj[i] = true;
-      return { ...s, [membroId]: obj };
-    });
-  };
+  const copyReport = async (m: HtComissaoMembro) => {
+    const key = `${m.id}`;
+    const sel = selectedDias[key] ?? {};
+    const dias = m.dias?.length
+      ? sel && Object.keys(sel).length
+        ? m.dias.filter((d) => sel[d.data])
+        : m.dias
+      : [];
 
-  const copyHtReport = async (m: HtComissaoMembro) => {
-    const selMap = selectedItems[m.id] ?? {};
-    const selectedIndices = Object.keys(selMap).filter((k) => selMap[Number(k)]).map(Number);
-    const base = selectedIndices.length > 0
-      ? m.detalhes.filter((_, idx) => selMap[idx])
-      : m.detalhes;
-
-    if (base.length === 0) {
-      toast.error("Nenhum atendimento selecionado para o relatório");
+    if (dias.length === 0) {
+      toast.error("Nenhum dia selecionado");
       return;
     }
 
@@ -636,39 +635,36 @@ function HtMembroSection({
     const pix = m.pixChave?.trim();
     const BR = "\u200B";
 
-    const totalComp = base.filter((d) => d.tipo === "comparecimento").length;
-    const totalVds = base.filter((d) => d.tipo === "venda").length;
-    const totalValor = base.reduce((a, d) => a + (d.valor || 0), 0);
-    const totalCom = base.reduce((a, d) => a + (d.comissao || 0), 0);
-
-    const isSdr = m.tipo === "sdr";
+    const totalComp = dias.reduce((a, d) => a + d.comparecimentos, 0);
+    const totalVds = dias.reduce((a, d) => a + d.vendas, 0);
+    const totalValor = dias.reduce((a, d) => a + d.valorVendas, 0);
+    const totalCom = dias.reduce((a, d) => a + d.comissaoTotal, 0);
 
     const lines = [
-      `💰 *Relatório de Comissão — ${isSdr ? "SDR" : "Closer"}*`,
+      `💰 *Relatório de Comissão — ${tipoLabel === "sdr" ? "SDR" : "Closer"}*`,
       BR,
       `👤 *Nome:* ${m.nome}`,
       m.email ? `📧 *E-mail:* ${m.email}` : null,
       `📅 *Período:* ${periodo}`,
       BR,
-      `📊 *Detalhamento por atendimento:*`,
-      ...base.map((d) => {
-        const tipoText = d.tipo === "venda" ? `Venda ${fmtBRL(d.valor)}` : "Call Marcada / Comparecimento";
-        return `• ${d.data ? fmtDate(d.data) : "—"} — Lead: ${d.leadNome} (${tipoText}) → *${fmtBRL(d.comissao)}*`;
+      `📊 *Detalhamento por dia:*`,
+      ...dias.map((d) => {
+        const parts = [`• ${fmtDate(d.data)}`];
+        if (tipoLabel === "sdr") parts.push(`📞 Calls: ${d.comparecimentos}`);
+        if (d.vendas > 0) parts.push(`💵 Vendas: ${d.vendas} (${fmtBRL(d.valorVendas)})`);
+        parts.push(`→ Com. Fixa: ${fmtBRL(d.comissaoFixa)} + ${fmtBRL(d.comissaoPercentual)} = *${fmtBRL(d.comissaoTotal)}*`);
+        return parts.join(" — ");
       }),
       BR,
-      isSdr ? `📞 *Calls Marcadas / Comparecimentos:* ${totalComp}` : null,
-      totalVds > 0 ? `💵 *Vendas Convertidas (${totalVds}):* ${fmtBRL(totalValor)}` : null,
+      tipoLabel === "sdr" ? `📞 *Total Calls:* ${totalComp}` : null,
+      totalVds > 0 ? `💵 *Total Vendas (${totalVds}):* ${fmtBRL(totalValor)}` : null,
       `✅ *Comissão Total a Receber:* *${fmtBRL(totalCom)}*`,
       BR,
       pix ? `🔑 *Chave PIX:* ${pix}` : `⚠️ _Chave PIX não cadastrada_`,
     ].filter(Boolean).join("\n");
 
-    try {
-      await navigator.clipboard.writeText(lines);
-      toast.success("Relatório de comissão copiado!");
-    } catch {
-      toast.error("Falha ao copiar relatório");
-    }
+    try { await navigator.clipboard.writeText(lines); toast.success("Relatório copiado"); }
+    catch { toast.error("Falha ao copiar"); }
   };
 
   return (
@@ -738,21 +734,8 @@ function HtMembroSection({
                 <tbody>
                   {membros.map((m) => {
                     const open = !!expanded[m.id];
-                    const selMap = selectedItems[m.id] ?? {};
-                    const selIndices = Object.keys(selMap).filter((k) => selMap[Number(k)]).map(Number);
-                    const allOn = m.detalhes.length > 0 && selIndices.length === m.detalhes.length;
-
                     const pixValue = pixDraft[m.id] ?? (m.pixChave ?? "");
                     const pixDirty = pixDraft[m.id] !== undefined && pixDraft[m.id] !== (m.pixChave ?? "");
-
-                    const selectedBase = selIndices.length > 0
-                      ? m.detalhes.filter((_, idx) => selMap[idx])
-                      : m.detalhes;
-                    const selComp = selectedBase.filter((d) => d.tipo === "comparecimento").length;
-                    const selVds = selectedBase.filter((d) => d.tipo === "venda").length;
-                    const selValor = selectedBase.reduce((a, d) => a + (d.valor || 0), 0);
-                    const selCom = selectedBase.reduce((a, d) => a + (d.comissao || 0), 0);
-
                     return (
                       <>
                         <tr
@@ -820,12 +803,12 @@ function HtMembroSection({
                                   </div>
 
                                   <div className="flex flex-wrap items-center gap-2">
-                                    {m.detalhes.length > 0 && (
+                                    {m.dias && m.dias.length > 0 && (
                                       <>
-                                        <Button size="sm" variant="outline" onClick={() => setAllItems(m.id, m.detalhes.length, !allOn)}>
-                                          {allOn ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>}
+                                        <Button size="sm" variant="outline" onClick={() => { const key = `${m.id}`; const cur = selectedDias[key] ?? {}; const on = Object.keys(cur).length < m.dias.length; setAllDias(m.id, m.dias.map((d) => d.data), on); }}>
+                                          {(() => { const key = `${m.id}`; const cur = selectedDias[key] ?? {}; return Object.keys(cur).length >= m.dias.length ? <><Square className="mr-1 h-3.5 w-3.5" /> Limpar</> : <><CheckSquare className="mr-1 h-3.5 w-3.5" /> Todos</>; })()}
                                         </Button>
-                                        <Button size="sm" variant="outline" onClick={() => copyHtReport(m)}>
+                                        <Button size="sm" variant="outline" onClick={() => copyReport(m)}>
                                           <Copy className="mr-1 h-3.5 w-3.5" /> Copiar relatório
                                         </Button>
                                       </>
@@ -833,60 +816,120 @@ function HtMembroSection({
                                   </div>
                                 </div>
 
-                                {/* Section 3: Summary Bar of Selected Items */}
-                                {selIndices.length > 0 && (
-                                  <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent/10 px-3 py-2 text-xs border border-accent/20">
-                                    <span><span className="text-muted-foreground">Selecionados:</span> <b>{selIndices.length}</b></span>
-                                    {tipoLabel === "sdr" && <span><span className="text-muted-foreground">Calls:</span> <b>{selComp}</b></span>}
-                                    <span><span className="text-muted-foreground">Vendas:</span> <b>{selVds}</b></span>
-                                    {selValor > 0 && <span><span className="text-muted-foreground">Valor vendas:</span> <b>{fmtBRL(selValor)}</b></span>}
-                                    <span><span className="text-muted-foreground">Comissão:</span> <b className="text-accent">{fmtBRL(selCom)}</b></span>
-                                  </div>
-                                )}
-
-                                {/* Section 4: Details Table with Checkboxes */}
-                                {m.detalhes.length === 0 ? (
-                                  <div className="text-xs text-muted-foreground">Nenhum detalhe no período.</div>
+                                {/* Section 3: Per-Day Breakdown Table */}
+                                {!m.dias || m.dias.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground">Nenhum atendimento no período.</div>
                                 ) : (
-                                  <table className="w-full text-xs">
-                                    <thead className="text-muted-foreground">
-                                      <tr>
-                                        <th className="w-8 px-2 py-1"></th>
-                                        <th className="px-2 py-1 text-left">Lead</th>
-                                        <th className="px-2 py-1 text-left">Tipo</th>
-                                        <th className="px-2 py-1 text-right">Valor</th>
-                                        <th className="px-2 py-1 text-right">Comissão</th>
-                                        <th className="px-2 py-1 text-right">Data</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {m.detalhes.map((d, idx) => {
-                                        const checked = !!selMap[idx];
-                                        return (
-                                          <tr
-                                            key={idx}
-                                            className={`cursor-pointer border-t border-border/40 transition-colors ${
-                                              checked ? "bg-accent/10 hover:bg-accent/15" : "hover:bg-muted/20"
-                                            }`}
-                                            onClick={() => toggleItem(m.id, idx)}
-                                          >
-                                            <td className="px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                                              <Checkbox checked={checked} onCheckedChange={() => toggleItem(m.id, idx)} />
-                                            </td>
-                                            <td className="px-2 py-1 font-medium">{d.leadNome}</td>
-                                            <td className="px-2 py-1">
-                                              <Badge variant={d.tipo === "venda" ? "default" : "secondary"} className="text-[10px]">
-                                                {d.tipo === "venda" ? "Venda" : "Call Marcada"}
-                                              </Badge>
-                                            </td>
-                                            <td className="px-2 py-1 text-right">{d.valor > 0 ? fmtBRL(d.valor) : "—"}</td>
-                                            <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissao)}</td>
-                                            <td className="px-2 py-1 text-right">{d.data ? fmtDate(d.data) : "—"}</td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
+                                  <>
+                                    {/* Summary bar for selected days */}
+                                    {(() => {
+                                      const key = `${m.id}`;
+                                      const sel = selectedDias[key] ?? {};
+                                      const selDias = Object.keys(sel).length > 0 ? m.dias.filter((d) => sel[d.data]) : [];
+                                      if (selDias.length === 0) return null;
+                                      const totalComp = selDias.reduce((a, d) => a + d.comparecimentos, 0);
+                                      const totalVds = selDias.reduce((a, d) => a + d.vendas, 0);
+                                      const totalVal = selDias.reduce((a, d) => a + d.valorVendas, 0);
+                                      const totalCom = selDias.reduce((a, d) => a + d.comissaoTotal, 0);
+                                      return (
+                                        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent/10 px-3 py-2 text-xs border border-accent/20">
+                                          <span><span className="text-muted-foreground">Dias:</span> <b>{selDias.length}</b></span>
+                                          {tipoLabel === "sdr" && <span><span className="text-muted-foreground">Calls:</span> <b>{totalComp}</b></span>}
+                                          <span><span className="text-muted-foreground">Vendas:</span> <b>{totalVds}</b></span>
+                                          {totalVal > 0 && <span><span className="text-muted-foreground">Valor:</span> <b>{fmtBRL(totalVal)}</b></span>}
+                                          <span><span className="text-muted-foreground">Comissão:</span> <b className="text-accent">{fmtBRL(totalCom)}</b></span>
+                                        </div>
+                                      );
+                                    })()}
+
+                                    <table className="w-full text-xs">
+                                      <thead className="text-muted-foreground">
+                                        <tr>
+                                          <th className="w-8 px-2 py-1"></th>
+                                          <th className="px-2 py-1 text-left">Dia</th>
+                                          {tipoLabel === "sdr" && <th className="px-2 py-1 text-right">Calls</th>}
+                                          <th className="px-2 py-1 text-right">Vendas</th>
+                                          <th className="px-2 py-1 text-right">Valor</th>
+                                          {tipoLabel === "sdr" && <th className="px-2 py-1 text-right">Com. Fixa</th>}
+                                          <th className="px-2 py-1 text-right">Com. %</th>
+                                          <th className="px-2 py-1 text-right">Total</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {m.dias.map((d) => {
+                                          const key = `${m.id}`;
+                                          const sel = selectedDias[key] ?? {};
+                                          const checked = !!sel[d.data];
+                                          const dayOpen = expandedDay[`${m.id}`] === d.data;
+                                          const dayLeads = m.detalhes.filter((det) => det.data.slice(0, 10) === d.data);
+                                          return (
+                                            <>
+                                              <tr
+                                                key={d.data}
+                                                className={`cursor-pointer border-t border-border/40 transition-colors ${
+                                                  checked ? "bg-accent/5 hover:bg-muted/20" : "hover:bg-muted/20"
+                                                }`}
+                                                onClick={() => toggleDia(m.id, d.data)}
+                                              >
+                                                <td className="px-2 py-1"><Checkbox checked={checked} onCheckedChange={() => toggleDia(m.id, d.data)} onClick={(e) => e.stopPropagation()} /></td>
+                                                <td className="px-2 py-1">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="font-medium">{fmtDate(d.data)}</span>
+                                                    <button
+                                                      className="ml-1 text-muted-foreground hover:text-foreground"
+                                                      onClick={(e) => { e.stopPropagation(); setExpandedDay((s) => ({ ...s, [`${m.id}`]: dayOpen ? null : d.data })); }}
+                                                    >
+                                                      {dayOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                                {tipoLabel === "sdr" && <td className="px-2 py-1 text-right">{d.comparecimentos}</td>}
+                                                <td className="px-2 py-1 text-right">{d.vendas}</td>
+                                                <td className="px-2 py-1 text-right">{fmtBRL(d.valorVendas)}</td>
+                                                {tipoLabel === "sdr" && <td className="px-2 py-1 text-right">{fmtBRL(d.comissaoFixa)}</td>}
+                                                <td className="px-2 py-1 text-right">{fmtBRL(d.comissaoPercentual)}</td>
+                                                <td className="px-2 py-1 text-right font-semibold text-accent">{fmtBRL(d.comissaoTotal)}</td>
+                                              </tr>
+                                              {dayOpen && (
+                                                <tr key={`${d.data}-leads`} className="bg-muted/10">
+                                                  <td colSpan={tipoLabel === "sdr" ? 8 : 7} className="p-2">
+                                                    {dayLeads.length === 0 ? (
+                                                      <div className="text-center text-[10px] text-muted-foreground py-1">Nenhum lead neste dia.</div>
+                                                    ) : (
+                                                      <table className="w-full text-[11px]">
+                                                        <thead className="text-muted-foreground/70">
+                                                          <tr>
+                                                            <th className="px-3 py-0.5 text-left">Lead</th>
+                                                            <th className="px-3 py-0.5 text-left">Tipo</th>
+                                                            <th className="px-3 py-0.5 text-right">Valor</th>
+                                                            <th className="px-3 py-0.5 text-right">Comissão</th>
+                                                          </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                          {dayLeads.map((ld, ldx) => (
+                                                            <tr key={ldx} className="border-t border-border/20">
+                                                              <td className="px-3 py-0.5 font-medium">{ld.leadNome}</td>
+                                                              <td className="px-3 py-0.5">
+                                                                <Badge variant={ld.tipo === "venda" ? "default" : "secondary"} className="text-[9px]">
+                                                                  {ld.tipo === "venda" ? "Venda" : "Call Marcada"}
+                                                                </Badge>
+                                                              </td>
+                                                              <td className="px-3 py-0.5 text-right">{ld.valor > 0 ? fmtBRL(ld.valor) : "—"}</td>
+                                                              <td className="px-3 py-0.5 text-right font-semibold text-accent">{fmtBRL(ld.comissao)}</td>
+                                                            </tr>
+                                                          ))}
+                                                        </tbody>
+                                                      </table>
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                              )}
+                                            </>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </>
                                 )}
                               </div>
                             </td>
