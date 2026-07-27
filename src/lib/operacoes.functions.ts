@@ -1824,7 +1824,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(5000),
       supabase
         .from("crm_leads" as any)
-        .select("id, created_at, data_criacao, updated_at, expert, utm_source, nome, telefone, vendedor")
+        .select("id, nome, telefone, email, expert, fonte, created_at, updated_at")
         .order("created_at", { ascending: false })
         .limit(10000),
       supabase
