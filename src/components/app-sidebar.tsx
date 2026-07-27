@@ -277,25 +277,26 @@ export function AppSidebar() {
           isActive={active}
           tooltip={item.title}
           className={[
-            "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+            "group/menu relative h-11 rounded-xl transition-all",
+            collapsed ? "w-10 h-10 mx-auto justify-center !p-0" : "px-3 w-full text-[0.95rem] font-medium",
             active
               ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
               : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
           ].join(" ")}
         >
-          <Link to={item.url} className="flex items-center gap-3">
-            {active && (
+          <Link to={item.url} className={collapsed ? "flex items-center justify-center w-full h-full" : "flex items-center gap-3 w-full"}>
+            {active && !collapsed && (
               <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
             )}
-            <span className="relative shrink-0">
+            <span className="relative flex items-center justify-center shrink-0">
               <item.icon
                 className={[
-                  "!h-[1.35rem] !w-[1.35rem] transition-transform group-hover/menu:scale-110",
+                  "!h-5 !w-5 shrink-0 transition-transform group-hover/menu:scale-110",
                   active ? "text-accent" : "",
                 ].join(" ")}
               />
               {showDot && (
-                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
               )}
             </span>
             {!collapsed && <span className="truncate flex-1">{item.title}</span>}
@@ -313,7 +314,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarHeader className="border-b border-border px-4 py-5">
+      <SidebarHeader className="border-b border-border px-3 py-4">
         <div className="flex items-center justify-center">
           <img
             src={logoMultium}
@@ -354,18 +355,19 @@ export function AppSidebar() {
                     setOperacaoX1Open((v) => !v);
                   }}
                   className={[
-                    "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+                    "group/menu relative h-11 rounded-xl transition-all",
+                    collapsed ? "w-10 h-10 mx-auto justify-center !p-0" : "px-3 w-full text-[0.95rem] font-medium",
                     operacaoX1Active
                       ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
                       : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
                   ].join(" ")}
                 >
-                  {operacaoX1Active && (
+                  {operacaoX1Active && !collapsed && (
                     <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
                   )}
                   <WorkTwoTone
                     className={[
-                      "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                      "!h-5 !w-5 shrink-0 transition-transform group-hover/menu:scale-110",
                       operacaoX1Active ? "text-accent" : "",
                     ].join(" ")}
                   />
@@ -427,18 +429,19 @@ export function AppSidebar() {
                     setHighTicketOpen((v) => !v);
                   }}
                   className={[
-                    "group/menu relative h-12 rounded-lg px-3 text-[0.95rem] font-medium transition-all",
+                    "group/menu relative h-11 rounded-xl transition-all",
+                    collapsed ? "w-10 h-10 mx-auto justify-center !p-0" : "px-3 w-full text-[0.95rem] font-medium",
                     highTicketActive
                       ? "bg-accent/15 text-accent hover:bg-accent/20 hover:text-accent"
                       : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
                   ].join(" ")}
                 >
-                  {highTicketActive && (
+                  {highTicketActive && !collapsed && (
                     <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
                   )}
                   <WorkspacePremiumTwoTone
                     className={[
-                      "!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110",
+                      "!h-5 !w-5 shrink-0 transition-transform group-hover/menu:scale-110",
                       highTicketActive ? "text-accent" : "",
                     ].join(" ")}
                   />
