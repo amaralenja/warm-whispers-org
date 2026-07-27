@@ -814,8 +814,11 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       queueOnly: false,
     });
 
-    // Processa qualquer run na fila em background (não bloqueia a resposta)
+    // Processa qualquer run na fila, timers e de recuperação em background
+    const { processExpiredTimerRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
     void processQueuedFlowRuns(20).catch(() => undefined);
+    void processExpiredTimerRuns(20).catch(() => undefined);
+    void processStaleRunningSendRuns(60, 20).catch(() => undefined);
     return res;
   });
 

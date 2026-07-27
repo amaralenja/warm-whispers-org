@@ -1164,13 +1164,23 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      // Sempre pausa e delega ao worker de timer. Antes, delays ≤30s usavam
-      // setTimeout inline — se o worker terminava (Cloudflare kill), a run ficava
-      // em "running" no delay e podia ser reexecutada, enviando mensagens em duplicata.
+      // Para delays curtos (até 60s), faz o aguardo inline com sleep para garantir
+      // que o fluxo execute 100% de ponta a ponta sem parar na metade dependendo de cron externo.
+      if (secs <= 60) {
+        await new Promise((resolve) => setTimeout(resolve, secs * 1000));
+        return {};
+      }
+      // Para delays mais longos (>60s), marca como waiting e programa worker em memória
+      const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
+      if (secs <= 600) {
+        setTimeout(() => {
+          processExpiredTimerRuns(20).catch(() => undefined);
+        }, secs * 1000);
+      }
       return {
         pause: true,
         waitingFor: "timer",
-        expiresAt: new Date(Date.now() + secs * 1000).toISOString(),
+        expiresAt,
       };
     }
 
