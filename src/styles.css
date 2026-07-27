@@ -101,6 +101,54 @@
   --shadow-glow: 0 0 60px -10px oklch(0.78 0.13 75 / 0.25);
 }
 
+[data-theme="light"] {
+  --background: oklch(0.97 0.005 90);
+  --foreground: oklch(0.18 0.005 270);
+
+  --card: oklch(0.99 0 0);
+  --card-foreground: oklch(0.18 0.005 270);
+
+  --popover: oklch(0.99 0 0);
+  --popover-foreground: oklch(0.18 0.005 270);
+
+  --primary: oklch(0.18 0.005 270);
+  --primary-foreground: oklch(0.97 0.005 90);
+
+  --secondary: oklch(0.90 0.006 270);
+  --secondary-foreground: oklch(0.18 0.005 270);
+
+  --muted: oklch(0.92 0.003 270);
+  --muted-foreground: oklch(0.50 0.01 90);
+
+  --accent: oklch(0.72 0.15 75);
+  --accent-foreground: oklch(0.97 0.005 90);
+
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --success: oklch(0.62 0.18 150);
+
+  --border: oklch(0.86 0.006 90);
+  --input: oklch(0.88 0.006 90);
+  --ring: oklch(0.72 0.15 75);
+
+  --chat-shell: #f5f5f0;
+  --chat-sidebar: #eaeae3;
+  --chat-thread: #ffffff;
+  --chat-panel: #f0f0eb;
+  --chat-line: #d4d4cc;
+  --chat-soft: #e0e0d8;
+  --chat-message-in: #e8e8e0;
+  --chat-message-out: #d4a03a;
+  --chat-message-out-foreground: #ffffff;
+  --chat-accent: #c4942e;
+  --chat-accent-foreground: #ffffff;
+
+  --gradient-radial: radial-gradient(ellipse at top, oklch(0.95 0.02 75 / 0.5), transparent 60%);
+  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.1), 0 0 0 1px oklch(0 0 0 / 0.04);
+  --shadow-glow: 0 0 60px -10px oklch(0.72 0.15 75 / 0.2);
+}
+
 .dark {
   /* Mesma paleta — já é dark by default */
   --background: oklch(0.14 0.005 270);

@@ -9,6 +9,7 @@ import { Component, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { ThemeProvider } from "@/lib/theme-context";
 
 function safeReportLovableError(error: unknown, context: Record<string, unknown>) {
   try {
@@ -191,11 +192,13 @@ const rootQueryClient = new QueryClient();
 
 function RootComponent() {
   return (
-    <QueryClientProvider client={rootQueryClient}>
-      <RouteBoundary>
-        <Outlet />
-      </RouteBoundary>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={rootQueryClient}>
+        <RouteBoundary>
+          <Outlet />
+        </RouteBoundary>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

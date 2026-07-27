@@ -35,6 +35,8 @@ import {
   Mic,
   HeartHandshake,
   Rocket,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -55,6 +57,7 @@ import {
 } from "@/components/ui/sidebar";
 import logoMultium from "@/assets/logo-multium.webp";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { useTheme } from "@/lib/theme-context";
 
 type Item = { title: string; url: string; icon: any };
 
@@ -129,6 +132,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { theme, toggle } = useTheme();
 
   // Permissões do vendedor (admins: null = vê tudo)
   const [perm, setPerm] = useState<Permissoes | null>(null);
@@ -494,6 +498,20 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-border p-2">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => toggle()}
+              tooltip={theme === "dark" ? "Tema claro" : "Tema escuro"}
+              className="group/menu h-12 rounded-lg px-3 text-[0.95rem] font-medium text-muted-foreground transition-all hover:bg-accent/10 hover:text-foreground"
+            >
+              {theme === "dark" ? (
+                <Sun className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
+              ) : (
+                <Moon className="!h-[1.35rem] !w-[1.35rem] shrink-0 transition-transform group-hover/menu:scale-110" />
+              )}
+              {!collapsed && <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={handleSignOut}
