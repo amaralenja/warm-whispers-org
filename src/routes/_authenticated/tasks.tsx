@@ -189,10 +189,28 @@ function TasksPage() {
     },
   });
 
-  const vendorSession = typeof window !== "undefined" ? getVendorSession() : null;
+  const loggedSession = useMemo(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const vRaw = localStorage.getItem("vendor_session");
+        if (vRaw) {
+          const parsed = JSON.parse(vRaw);
+          if (parsed?.id || parsed?.nome) return parsed;
+        }
+        const htRaw = localStorage.getItem("ht_team_session");
+        if (htRaw) {
+          const parsed = JSON.parse(htRaw);
+          if (parsed?.id || parsed?.member_id || parsed?.nome) return parsed;
+        }
+      } catch {
+        // noop
+      }
+    }
+    return null;
+  }, []);
 
   const tasksQ = useQuery({
-    queryKey: ["tasks", activeBoardId, vendorSession?.id, vendorSession?.nome],
+    queryKey: ["tasks", activeBoardId, loggedSession?.id, loggedSession?.member_id, loggedSession?.nome],
     enabled: !!activeBoardId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -208,16 +226,22 @@ function TasksPage() {
         checklist: normalizeChecklist(t.checklist),
       })) as Task[];
 
-      if (vendorSession?.id) {
-        const vId1 = `v:${vendorSession.id}`;
-        const vId2 = String(vendorSession.id);
-        const vName = String(vendorSession.nome ?? "").toLowerCase().trim();
+      if (loggedSession) {
+        const sId1 = String(loggedSession.id ?? "");
+        const sId2 = loggedSession.member_id ? String(loggedSession.member_id) : "";
+        const vId = sId1 ? `v:${sId1}` : "";
+        const tmId = sId2 ? `tm:${sId2}` : (sId1 ? `tm:${sId1}` : "");
+        const sName = String(loggedSession.nome ?? "").toLowerCase().trim();
+        const sFirstName = sName.split(/\s+/)[0] ?? "";
 
         list = list.filter((t) => {
-          const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
+          const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids.map(String) : [];
           if (assignees.length === 0) return false;
-          if (assignees.includes(vId1) || assignees.includes(vId2)) return true;
-          if (vName && assignees.some((a) => String(a).toLowerCase().includes(vName))) return true;
+          if (sId1 && assignees.includes(sId1)) return true;
+          if (sId2 && assignees.includes(sId2)) return true;
+          if (vId && assignees.includes(vId)) return true;
+          if (tmId && assignees.includes(tmId)) return true;
+          if (sName && assignees.some((a) => a.toLowerCase().includes(sName) || (sFirstName.length > 2 && a.toLowerCase().includes(sFirstName)))) return true;
           return false;
         });
       }

@@ -84,16 +84,35 @@ function VendorPortal() {
                   codigo: vendorRow.codigo,
                   wa_channel_ids: vendorRow.wa_channel_ids,
                   workspace_ids: vendorRow.workspace_ids,
+                  ht_member_id: ht.id || ht.member_id || null,
                 };
                 localStorage.setItem("vendor_session", JSON.stringify(session));
                 window.dispatchEvent(new Event("vendor-session-updated"));
                 setV(session);
               } else {
-                navigate({ to: "/auth" });
+                const fallbackSession = {
+                  id: ht.id || ht.member_id || 9999,
+                  nome: ht.nome,
+                  utm: ht.utm || ht.nome.toLowerCase().replace(/\s+/g, "_"),
+                  expert: ht.expert || ht.tipo || "Equipe",
+                  foto_url: ht.foto_url || null,
+                  codigo: ht.codigo || null,
+                  ht_member_id: ht.id || ht.member_id || null,
+                };
+                setV(fallbackSession as any);
               }
             })
             .catch(() => {
-              navigate({ to: "/auth" });
+              const fallbackSession = {
+                id: ht.id || ht.member_id || 9999,
+                nome: ht.nome,
+                utm: ht.utm || ht.nome.toLowerCase().replace(/\s+/g, "_"),
+                expert: ht.expert || ht.tipo || "Equipe",
+                foto_url: ht.foto_url || null,
+                codigo: ht.codigo || null,
+                ht_member_id: ht.id || ht.member_id || null,
+              };
+              setV(fallbackSession as any);
             });
           return;
         }
@@ -121,12 +140,15 @@ function VendorPortal() {
   });
 
   const { data: vendorTasks = [], isLoading: loadingTasks, refetch: refetchTasks } = useQuery({
-    queryKey: ["vendor-assigned-tasks", v?.id, v?.nome],
+    queryKey: ["vendor-assigned-tasks", v?.id, v?.nome, (v as any)?.ht_member_id],
     queryFn: async () => {
-      if (!v?.id) return [];
+      if (!v?.nome) return [];
       const vId1 = `v:${v.id}`;
       const vId2 = String(v.id);
+      const htId = (v as any)?.ht_member_id ? String((v as any).ht_member_id) : "";
+      const tmId = htId ? `tm:${htId}` : "";
       const vName = String(v.nome ?? "").toLowerCase().trim();
+      const vFirstName = vName.split(/\s+/)[0] ?? "";
 
       const { data, error } = await supabase
         .from("tasks" as any)
@@ -136,13 +158,15 @@ function VendorPortal() {
       if (error) return [];
 
       return ((data ?? []) as any[]).filter((t) => {
-        const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
+        const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids.map(String) : [];
+        if (assignees.length === 0) return false;
         if (assignees.includes(vId1) || assignees.includes(vId2)) return true;
-        if (vName && assignees.some((a: string) => String(a).toLowerCase().includes(vName))) return true;
+        if (htId && (assignees.includes(htId) || assignees.includes(tmId))) return true;
+        if (vName && assignees.some((a) => a.toLowerCase().includes(vName) || (vFirstName.length > 2 && a.toLowerCase().includes(vFirstName)))) return true;
         return false;
       });
     },
-    enabled: !!v?.id,
+    enabled: !!v?.nome,
   });
 
   const toggleTaskDone = async (taskId: string, currentDone: boolean) => {
