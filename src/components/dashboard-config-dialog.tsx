@@ -14,7 +14,7 @@ type Props = {
 function accentFor(name?: string | null): string {
   const bases = BASE_WORKSPACES ?? [];
   const accents = ACCENTS ?? [];
-  const fallback = accents[0]?.hex ?? "#10b981";
+  const fallback = accents[0]?.hex ?? "#d4a03a";
   if (!name || typeof name !== "string") return fallback;
   const base = bases.find((b) => b.nome === name);
   if (base) return base.accent.hex;

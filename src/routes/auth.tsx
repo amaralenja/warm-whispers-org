@@ -105,20 +105,20 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#090d0a] text-foreground flex items-center justify-center p-4 md:p-8">
+    <main className="relative min-h-screen overflow-hidden bg-[#090b0e] text-foreground flex items-center justify-center p-4 md:p-8">
       {/* Background Glows & Ambient Gradients */}
-      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-emerald-500/10 blur-[130px]" />
-      <div className="pointer-events-none absolute -bottom-40 right-10 h-[400px] w-[400px] rounded-full bg-emerald-600/5 blur-[120px]" />
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-amber-500/10 blur-[130px]" />
+      <div className="pointer-events-none absolute -bottom-40 right-10 h-[400px] w-[400px] rounded-full bg-amber-600/5 blur-[120px]" />
 
       <div className="relative z-10 w-full max-w-6xl grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
         {/* Left Side — Brand Showcase & Hero */}
         <section className="hidden lg:flex lg:col-span-7 flex-col justify-center space-y-8 pr-6">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 backdrop-blur-md w-fit">
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-4 py-1.5 backdrop-blur-md w-fit">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
             </span>
-            <span className="text-xs font-medium uppercase tracking-[0.2em] text-emerald-400">
+            <span className="text-xs font-medium uppercase tracking-[0.2em] text-amber-400">
               Plataforma Interna
             </span>
           </div>
@@ -126,41 +126,41 @@ function AuthPage() {
           <div className="space-y-4">
             <h1 className="font-display text-5xl font-extrabold tracking-tight text-white xl:text-6xl leading-[1.1]">
               Onde decisões viram{" "}
-              <span className="bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-200 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-200 bg-clip-text text-transparent">
                 resultado.
               </span>
             </h1>
-            <p className="max-w-lg text-base leading-relaxed text-emerald-100/70">
+            <p className="max-w-lg text-base leading-relaxed text-amber-100/70">
               Centralize vendas, leads, financeiro e operação num só ecossistema inteligente. Pensado para times de alto rendimento.
             </p>
           </div>
 
           {/* Feature Badges */}
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-emerald-200/80 backdrop-blur-sm">
-              <ElectricBoltTwoTone className="!h-4 !w-4 text-emerald-400" />
+            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-amber-200/80 backdrop-blur-sm">
+              <ElectricBoltTwoTone className="!h-4 !w-4 text-amber-400" />
               <span>Operação X1</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-emerald-200/80 backdrop-blur-sm">
-              <AutoGraphTwoTone className="!h-4 !w-4 text-emerald-400" />
+            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-amber-200/80 backdrop-blur-sm">
+              <AutoGraphTwoTone className="!h-4 !w-4 text-amber-400" />
               <span>High Ticket Analytics</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-emerald-200/80 backdrop-blur-sm">
-              <ShieldTwoTone className="!h-4 !w-4 text-emerald-400" />
+            <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2 text-xs font-medium text-amber-200/80 backdrop-blur-sm">
+              <ShieldTwoTone className="!h-4 !w-4 text-amber-400" />
               <span>Gestão de Acessos</span>
             </div>
           </div>
 
           {/* Security & System Status Badge */}
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 to-card/40 p-4 backdrop-blur-xl max-w-md shadow-xl">
+          <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 to-card/40 p-4 backdrop-blur-xl max-w-md shadow-xl">
             <div className="flex items-center gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20">
                 <ShieldTwoTone className="!h-5 !w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Ambiente Seguro</span>
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Ambiente Seguro</span>
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Acesso restrito a colaboradores e parceiros autorizados MULTIUM.
@@ -172,16 +172,16 @@ function AuthPage() {
 
         {/* Right Side — Login Card */}
         <section className="w-full lg:col-span-5">
-          <div className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-card/80 p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+          <div className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-card/80 p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
             {/* Subtle Top Ambient Accent */}
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500/20 via-emerald-400 to-emerald-500/20" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500/20 via-amber-400 to-amber-500/20" />
 
             {/* Logo */}
             <div className="mb-6 flex justify-center">
               <img
                 src={logoMultium}
                 alt="MULTIUM"
-                className="h-12 w-auto object-contain drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-transform hover:scale-105"
+                className="h-12 w-auto object-contain drop-shadow-[0_0_25px_rgba(245,158,11,0.3)] transition-transform hover:scale-105"
               />
             </div>
 
@@ -200,8 +200,8 @@ function AuthPage() {
                     }}
                     className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[0.7rem] font-semibold uppercase tracking-wider transition-all duration-200 ${
                       isActive
-                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                        : "text-muted-foreground hover:bg-emerald-500/10 hover:text-foreground"
+                        ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+                        : "text-muted-foreground hover:bg-amber-500/10 hover:text-foreground"
                     }`}
                   >
                     {r === "admin" && <ShieldTwoTone className="!h-3.5 !w-3.5" />}
@@ -242,7 +242,7 @@ function AuthPage() {
                   </label>
                   <div className="relative flex items-center">
                     <div className="pointer-events-none absolute left-3.5 text-muted-foreground">
-                      <VpnKeyTwoTone className="!h-5 !w-5 text-emerald-400" />
+                      <VpnKeyTwoTone className="!h-5 !w-5 text-amber-400" />
                     </div>
                     <input
                       type="text"
@@ -252,7 +252,7 @@ function AuthPage() {
                       required
                       value={codigo}
                       onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
-                      className="w-full rounded-xl border border-border/80 bg-background/70 py-3.5 pl-11 pr-4 font-mono text-xl tracking-[0.4em] text-white outline-none transition-all focus:border-emerald-500 focus:bg-background focus:ring-2 focus:ring-emerald-500/30"
+                      className="w-full rounded-xl border border-border/80 bg-background/70 py-3.5 pl-11 pr-4 font-mono text-xl tracking-[0.4em] text-white outline-none transition-all focus:border-amber-500 focus:bg-background focus:ring-2 focus:ring-amber-500/30"
                       placeholder="••••••"
                     />
                   </div>
@@ -266,14 +266,14 @@ function AuthPage() {
                     </label>
                     <div className="relative flex items-center">
                       <div className="pointer-events-none absolute left-3.5 text-muted-foreground">
-                        <EmailTwoTone className="!h-5 !w-5 text-emerald-400/80" />
+                        <EmailTwoTone className="!h-5 !w-5 text-amber-400/80" />
                       </div>
                       <input
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-xl border border-border/80 bg-background/70 py-3 pl-11 pr-4 text-sm text-white outline-none transition-all focus:border-emerald-500 focus:bg-background focus:ring-2 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
+                        className="w-full rounded-xl border border-border/80 bg-background/70 py-3 pl-11 pr-4 text-sm text-white outline-none transition-all focus:border-amber-500 focus:bg-background focus:ring-2 focus:ring-amber-500/30 placeholder:text-muted-foreground/50"
                         placeholder="admin@multium.com"
                       />
                     </div>
@@ -286,7 +286,7 @@ function AuthPage() {
                     </label>
                     <div className="relative flex items-center">
                       <div className="pointer-events-none absolute left-3.5 text-muted-foreground">
-                        <LockTwoTone className="!h-5 !w-5 text-emerald-400/80" />
+                        <LockTwoTone className="!h-5 !w-5 text-amber-400/80" />
                       </div>
                       <input
                         type={showPassword ? "text" : "password"}
@@ -294,13 +294,13 @@ function AuthPage() {
                         minLength={6}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full rounded-xl border border-border/80 bg-background/70 py-3 pl-11 pr-11 text-sm text-white outline-none transition-all focus:border-emerald-500 focus:bg-background focus:ring-2 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
+                        className="w-full rounded-xl border border-border/80 bg-background/70 py-3 pl-11 pr-11 text-sm text-white outline-none transition-all focus:border-amber-500 focus:bg-background focus:ring-2 focus:ring-amber-500/30 placeholder:text-muted-foreground/50"
                         placeholder="••••••••"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-3.5 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-emerald-500/10 hover:text-emerald-400"
+                        className="absolute right-3.5 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-amber-500/10 hover:text-amber-400"
                         aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
                       >
                         {showPassword ? (
@@ -321,7 +321,7 @@ function AuthPage() {
                 </div>
               )}
               {info && (
-                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300">
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
                   {info}
                 </div>
               )}
@@ -330,7 +330,7 @@ function AuthPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-500 px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-400 hover:shadow-emerald-500/40 disabled:opacity-60 active:scale-[0.99]"
+                className="group relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-amber-500 px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/25 transition-all hover:bg-amber-400 hover:shadow-amber-500/40 disabled:opacity-60 active:scale-[0.99]"
               >
                 <span>
                   {loading
@@ -352,7 +352,7 @@ function AuthPage() {
             {/* Footer Tag */}
             <div className="mt-6 flex items-center justify-between border-t border-border/40 pt-4 text-xs text-muted-foreground/60">
               <span className="text-[0.65rem] uppercase tracking-widest">Acesso Seguro</span>
-              <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-emerald-500/70">
+              <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-amber-500/70">
                 MULTIUM ©
               </span>
             </div>

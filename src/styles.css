@@ -51,63 +51,63 @@
   --font-sans: "Inter", system-ui, -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
 }
 
-/* MULTIUM Design System — Dark Emerald Theme (Sleek, Premium, Dark Mode Default) */
+/* MULTIUM Design System — Premium Gold / Amber Dark Theme */
 :root, .dark, [data-theme="light"] {
   --radius: 0.75rem;
 
-  --background: oklch(0.12 0.01 160);
-  --foreground: oklch(0.96 0.005 160);
+  --background: oklch(0.14 0.005 270);
+  --foreground: oklch(0.96 0.005 90);
 
-  --card: oklch(0.15 0.012 160);
-  --card-foreground: oklch(0.96 0.005 160);
+  --card: oklch(0.17 0.006 270);
+  --card-foreground: oklch(0.96 0.005 90);
 
-  --popover: oklch(0.15 0.012 160);
-  --popover-foreground: oklch(0.96 0.005 160);
+  --popover: oklch(0.17 0.006 270);
+  --popover-foreground: oklch(0.96 0.005 90);
 
-  --primary: oklch(0.96 0.005 160);
-  --primary-foreground: oklch(0.12 0.01 160);
+  --primary: oklch(0.96 0.005 90);
+  --primary-foreground: oklch(0.14 0.005 270);
 
-  --secondary: oklch(0.20 0.015 160);
-  --secondary-foreground: oklch(0.96 0.005 160);
+  --secondary: oklch(0.22 0.006 270);
+  --secondary-foreground: oklch(0.96 0.005 90);
 
-  --muted: oklch(0.18 0.012 160);
-  --muted-foreground: oklch(0.62 0.015 160);
+  --muted: oklch(0.20 0.006 270);
+  --muted-foreground: oklch(0.62 0.012 90);
 
-  --accent: oklch(0.70 0.17 160);
-  --accent-foreground: oklch(0.12 0.01 160);
+  --accent: oklch(0.78 0.14 75);
+  --accent-foreground: oklch(0.14 0.005 270);
 
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
 
-  --success: oklch(0.70 0.17 160);
+  --success: oklch(0.72 0.16 150);
 
-  --border: oklch(0.22 0.015 160);
-  --input: oklch(0.18 0.015 160);
-  --ring: oklch(0.70 0.17 160);
+  --border: oklch(0.24 0.006 270);
+  --input: oklch(0.20 0.006 270);
+  --ring: oklch(0.78 0.14 75);
 
-  --sidebar-background: #070b08;
-  --sidebar-foreground: #8b9e91;
-  --sidebar-primary: #10b981;
-  --sidebar-accent: #10b981;
-  --sidebar-border: #151f18;
+  --sidebar-background: #0c1017;
+  --sidebar-foreground: #9ca3af;
+  --sidebar-primary: #d4a03a;
+  --sidebar-accent: #d4a03a;
+  --sidebar-border: #1a2230;
 
-  /* Chat & Subsystems */
-  --chat-shell: #0b0f0d;
-  --chat-sidebar: #0d130f;
-  --chat-thread: #0b0f0d;
-  --chat-panel: #111813;
-  --chat-line: #1a251e;
-  --chat-soft: #151f18;
-  --chat-message-in: #141d17;
-  --chat-message-out: #065f46;
-  --chat-message-out-foreground: #ffffff;
-  --chat-accent: #10b981;
-  --chat-accent-foreground: #070b08;
+  /* MULTIUM brand — amber/gold accent on dark */
+  --chat-shell: #0d1117;
+  --chat-sidebar: #111b21;
+  --chat-thread: #0a0f14;
+  --chat-panel: #1a2332;
+  --chat-line: #253341;
+  --chat-soft: #1e2d3d;
+  --chat-message-in: #1c2b3a;
+  --chat-message-out: #3d2e00;
+  --chat-message-out-foreground: #f5ead0;
+  --chat-accent: #d4a03a;
+  --chat-accent-foreground: #1a1200;
 
   /* Premium FX */
-  --gradient-radial: radial-gradient(ellipse at top, oklch(0.20 0.04 160 / 0.3), transparent 60%);
-  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.7), 0 0 0 1px oklch(0.70 0.17 160 / 0.05);
-  --shadow-glow: 0 0 60px -10px oklch(0.70 0.17 160 / 0.2);
+  --gradient-radial: radial-gradient(ellipse at top, oklch(0.20 0.02 75 / 0.4), transparent 60%);
+  --shadow-elegant: 0 30px 80px -20px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.04);
+  --shadow-glow: 0 0 60px -10px oklch(0.78 0.14 75 / 0.25);
 }
 
 @layer base {

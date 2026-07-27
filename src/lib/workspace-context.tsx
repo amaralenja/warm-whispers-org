@@ -32,7 +32,7 @@ export const ACCENTS: WorkspaceAccent[] = [
 ];
 
 const ACCENT_ALL: WorkspaceAccent = {
-  ring: "ring-accent/60", bar: "bg-accent", text: "text-accent", bg: "bg-accent/10", border: "border-accent/30", hex: "#10b981",
+  ring: "ring-accent/60", bar: "bg-accent", text: "text-accent", bg: "bg-accent/10", border: "border-accent/30", hex: "#d4a03a",
 };
 
 export const BASE_WORKSPACES: Workspace[] = [
