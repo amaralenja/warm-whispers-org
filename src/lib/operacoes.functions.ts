@@ -2037,121 +2037,205 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     let showUpsCountToday = 0;
     let noShowsCountToday = 0;
 
-    for (const kb of htKanbanAll) {
-      const isSchedToday = kb.scheduled_at ? toSpDateString(kb.scheduled_at) === todayStr : false;
-      const isUpdToday = toSpDateString(kb.updated_at) === todayStr;
-
-      // Se não foi agendado para hoje e nem atualizado hoje, pula
-      if (!isSchedToday && !isUpdToday) continue;
-      if (!kb.closer_email && !isSchedToday) continue;
-
-      const rawCloser = String(kb.closer_email || kb.closer_name || "Gabriel").trim();
-      const closerName = rawCloser.includes("@") ? rawCloser.split("@")[0] : rawCloser;
-      const capitalizedCloser = closerName.charAt(0).toUpperCase() + closerName.slice(1);
-
-      if (!closersMap.has(capitalizedCloser)) {
-        closersMap.set(capitalizedCloser, { callsToday: 0, pendingToday: 0, showUpsToday: 0, noShowsToday: 0, followupToday: 0, remarcadaToday: 0, descartadoToday: 0 });
+    // Tenta buscar eventos do Google Calendar oficial de HOJE
+    let gcalEventsToday: any[] = [];
+    try {
+      const { gcal } = await import("@/lib/google-calendar.functions");
+      const res = await gcal("/events?singleEvents=true&orderBy=startTime&maxResults=250");
+      if (res?.items && Array.isArray(res.items)) {
+        gcalEventsToday = res.items.filter((ev: any) => {
+          const d = ev.start?.dateTime || ev.start?.date;
+          return d && toSpDateString(d) === todayStr;
+        });
       }
-      const closerStats = closersMap.get(capitalizedCloser)!;
-      if (isSchedToday) closerStats.callsToday++;
+    } catch (err) {
+      console.warn("[LiveMonitoring] Google Calendar fetch skipped:", err);
+    }
 
-      const stageLower = String(kb.closer_stage || kb.sdr_stage || "").toLowerCase();
-      let callStatus: "show_up" | "no_show" | "pendente" | "followup" | "remarcada" | "descartado" = "pendente";
+    if (gcalEventsToday.length > 0) {
+      // Usa os eventos reais do Google Calendar como fonte primária da agenda de HOJE
+      for (const ev of gcalEventsToday) {
+        const d = new Date(ev.start.dateTime || ev.start.date);
+        const horaStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
-      const rawLeadId = String(kb.lead_id || "").trim();
-      const quizLead = quizMapById.get(rawLeadId) || quizMapById.get(rawLeadId.replace(/^htq:/i, "")) || quizMapById.get(rawLeadId.slice(0, 8));
-      const realLeadName = quizLead?.nome || quizLead?.display_name || quizLead?.respostas?.nome || `Lead ${rawLeadId.slice(0, 8) || "Qualificado"}`;
-
-      if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda") || stageLower.includes("fechado") || stageLower.includes("ganho")) {
-        callStatus = "show_up";
-        if (isSchedToday || isUpdToday) {
-          closerStats.showUpsToday++;
-          showUpsCountToday++;
+        let guestEmail = "";
+        let guestName = "";
+        if (ev.attendees && Array.isArray(ev.attendees)) {
+          for (const att of ev.attendees) {
+            if (!att.email) continue;
+            if (att.organizer || att.self || att.email.includes("calendar.google") || att.email.endsWith(".gserviceaccount.com")) continue;
+            guestEmail = att.email.trim();
+            if (att.displayName) guestName = att.displayName.trim();
+            break;
+          }
         }
 
-        if (isUpdToday) {
-          const d = kb.updated_at ? new Date(kb.updated_at) : new Date();
-          const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-          htEvents.push({
-            id: `showup-${kb.lead_id || Math.random()}`,
-            timestamp: timeStr,
-            tipo: "show_up",
-            titulo: `🟢 Show-Up Confirmado (${capitalizedCloser})`,
-            descricao: `Lead ${realLeadName} compareceu à reunião com o Closer ${capitalizedCloser}`,
-            closer: capitalizedCloser,
-          });
-        }
-      } else if (stageLower.includes("no_show") || stageLower.includes("falta") || stageLower.includes("nao_compareceu")) {
-        callStatus = "no_show";
-        if (isSchedToday || isUpdToday) {
-          closerStats.noShowsToday++;
-          noShowsCountToday++;
+        let closerName = "Nicolas";
+        const titleLower = (ev.summary || "").toLowerCase();
+        if (titleLower.includes("pavanello")) closerName = "Pavanello";
+        else if (titleLower.includes("nicolas")) closerName = "Nicolas";
+        else if (titleLower.includes("gabriel")) closerName = "Gabriel";
+        else if (titleLower.includes("vitor") || titleLower.includes("victor")) closerName = "Vitor";
+        else if (ev.attendees) {
+          for (const att of ev.attendees) {
+            const em = (att.email || "").toLowerCase();
+            if (em.includes("nicolas")) closerName = "Nicolas";
+            else if (em.includes("pavanello")) closerName = "Pavanello";
+            else if (em.includes("gabriel")) closerName = "Gabriel";
+          }
         }
 
-        if (isUpdToday) {
-          const d = kb.updated_at ? new Date(kb.updated_at) : new Date();
-          const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-          htEvents.push({
-            id: `noshow-${kb.lead_id || Math.random()}`,
-            timestamp: timeStr,
-            tipo: "no_show",
-            titulo: `🔴 No-Show Registrado (${capitalizedCloser})`,
-            descricao: `Lead ${realLeadName} faltou à reunião agendada com Closer ${capitalizedCloser}`,
-            closer: capitalizedCloser,
-          });
-        }
-      } else if (stageLower.includes("follow") || stageLower.includes("c2")) {
-        callStatus = "followup";
-        if (isSchedToday) closerStats.followupToday++;
-      } else if (stageLower.includes("remarcad") || stageLower.includes("reagend")) {
-        callStatus = "remarcada";
-        if (isSchedToday) closerStats.remarcadaToday++;
-      } else if (stageLower.includes("descartad") || stageLower.includes("fake") || stageLower.includes("lost")) {
-        callStatus = "descartado";
-        if (isSchedToday) closerStats.descartadoToday++;
-      } else {
-        callStatus = "pendente";
-        if (isSchedToday) closerStats.pendingToday++;
-      }
+        const quizLead = guestEmail ? quizMapById.get(guestEmail) : null;
+        const realLeadName = guestName || quizLead?.nome || quizLead?.display_name || ev.summary || "Lead Agendado";
 
-      // Adiciona à lista detalhada de reuniões de HOJE apenas se agendado para HOJE
-      if (isSchedToday) {
-        const schedDate = kb.scheduled_at ? new Date(kb.scheduled_at) : new Date();
-        const horaStr = schedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        let callStatus: "show_up" | "no_show" | "pendente" | "followup" | "remarcada" | "descartado" = "pendente";
+        let matchingKb: any = null;
+        if (quizLead?.id) {
+          matchingKb = htKanbanAll.find((k: any) => String(k.lead_id) === String(quizLead.id) || String(k.lead_id) === `htq:${quizLead.id}`);
+        }
+        if (matchingKb) {
+          const st = String(matchingKb.closer_stage || matchingKb.sdr_stage || "").toLowerCase();
+          if (st.includes("show") || st.includes("compareceu") || st.includes("realizada") || st.includes("venda") || st.includes("fechado") || st.includes("ganho")) callStatus = "show_up";
+          else if (st.includes("no_show") || st.includes("falta")) callStatus = "no_show";
+          else if (st.includes("follow")) callStatus = "followup";
+          else if (st.includes("remarc")) callStatus = "remarcada";
+          else if (st.includes("descart") || st.includes("fake")) callStatus = "descartado";
+        }
+
+        const capitalizedCloser = closerName.charAt(0).toUpperCase() + closerName.slice(1);
+        if (!closersMap.has(capitalizedCloser)) {
+          closersMap.set(capitalizedCloser, { callsToday: 0, pendingToday: 0, showUpsToday: 0, noShowsToday: 0, followupToday: 0, remarcadaToday: 0, descartadoToday: 0 });
+        }
+        const closerStats = closersMap.get(capitalizedCloser)!;
+        closerStats.callsToday++;
+        if (callStatus === "show_up") { closerStats.showUpsToday++; showUpsCountToday++; }
+        else if (callStatus === "no_show") { closerStats.noShowsToday++; noShowsCountToday++; }
+        else if (callStatus === "followup") closerStats.followupToday++;
+        else if (callStatus === "remarcada") closerStats.remarcadaToday++;
+        else if (callStatus === "descartado") closerStats.descartadoToday++;
+        else closerStats.pendingToday++;
 
         const leadData = {
-          id: rawLeadId,
+          id: quizLead?.id || ev.id,
           nome: realLeadName,
-          email: quizLead?.email || quizLead?.respostas?.email || null,
-          whatsapp: quizLead?.whatsapp || quizLead?.respostas?.whatsapp || null,
-          instagram: quizLead?.instagram || quizLead?.respostas?.instagram || null,
-          caixa_letra: quizLead?.caixa_letra || quizLead?.respostas?.caixa_letra || null,
-          caixa_label: quizLead?.caixa_label || quizLead?.respostas?.caixa_label || null,
-          faturamento: quizLead?.faturamento_mensal || quizLead?.faturamento || quizLead?.respostas?.faturamento || null,
-          momento: quizLead?.momento || quizLead?.respostas?.momento || null,
-          objetivo: quizLead?.objetivo || quizLead?.respostas?.objetivo || null,
-          investir: quizLead?.investir || quizLead?.respostas?.investir || null,
-          minicurso: quizLead?.minicurso || quizLead?.respostas?.minicurso || null,
-          socio: quizLead?.socio || quizLead?.respostas?.socio || null,
-          comprometimento: quizLead?.comprometimento || quizLead?.respostas?.comprometimento || null,
-          utm_source: quizLead?.utm_source || quizLead?.respostas?.utm_source || null,
-          utm_medium: quizLead?.utm_medium || quizLead?.respostas?.utm_medium || null,
-          utm_campaign: quizLead?.utm_campaign || quizLead?.respostas?.utm_campaign || null,
-          data_criacao: quizLead?.created_at || quizLead?.data_criacao || quizLead?.received_at || kb.scheduled_at || kb.updated_at,
-          crm_status: kb.closer_stage || kb.sdr_stage || null,
-          crm_data_agendamento: kb.scheduled_at || null,
-          respostas: quizLead?.respostas || quizLead?.respostas_json || quizLead || null,
+          email: guestEmail || quizLead?.email || null,
+          whatsapp: quizLead?.whatsapp || null,
+          instagram: quizLead?.instagram || null,
+          caixa_letra: quizLead?.caixa_letra || null,
+          caixa_label: quizLead?.caixa_label || null,
+          faturamento: quizLead?.faturamento_mensal || null,
+          momento: quizLead?.momento || null,
+          objetivo: quizLead?.objetivo || null,
+          investir: quizLead?.investir || null,
+          respostas: quizLead?.respostas || null,
+          crm_status: matchingKb?.closer_stage || "agendado",
+          crm_data_agendamento: ev.start.dateTime || ev.start.date,
         };
 
         scheduledCallsToday.push({
-          id: String(kb.lead_id || Math.random()),
-          horario: horaStr !== "Invalid Date" ? horaStr : "14:00",
+          id: ev.id,
+          horario: horaStr,
           leadName: realLeadName,
           closerName: capitalizedCloser,
           status: callStatus,
-          stageRaw: kb.closer_stage || kb.sdr_stage || "agendado",
+          stageRaw: matchingKb?.closer_stage || "agendado",
           leadData,
         });
+      }
+    } else {
+      // Fallback: filtra rigorosamente htKanbanAll apenas para leads com agendamento ativo e válido de hoje
+      for (const kb of htKanbanAll) {
+        const isSchedToday = kb.scheduled_at ? toSpDateString(kb.scheduled_at) === todayStr : false;
+        const isUpdToday = toSpDateString(kb.updated_at) === todayStr;
+
+        if (!isSchedToday && !isUpdToday) continue;
+        if (!kb.closer_email && !isSchedToday) continue;
+        if (kb.is_fake) continue;
+
+        const stageLower = String(kb.closer_stage || kb.sdr_stage || "").toLowerCase();
+
+        // Se estiver em estágio inicial (novos, c1) sem ter sido agendado, pula
+        if (stageLower === "novos" || stageLower === "c1") continue;
+
+        const rawCloser = String(kb.closer_email || kb.closer_name || "Gabriel").trim();
+        const closerName = rawCloser.includes("@") ? rawCloser.split("@")[0] : rawCloser;
+        const capitalizedCloser = closerName.charAt(0).toUpperCase() + closerName.slice(1);
+
+        if (!closersMap.has(capitalizedCloser)) {
+          closersMap.set(capitalizedCloser, { callsToday: 0, pendingToday: 0, showUpsToday: 0, noShowsToday: 0, followupToday: 0, remarcadaToday: 0, descartadoToday: 0 });
+        }
+        const closerStats = closersMap.get(capitalizedCloser)!;
+        if (isSchedToday) closerStats.callsToday++;
+
+        let callStatus: "show_up" | "no_show" | "pendente" | "followup" | "remarcada" | "descartado" = "pendente";
+        const rawLeadId = String(kb.lead_id || "").trim();
+        const quizLead = quizMapById.get(rawLeadId) || quizMapById.get(rawLeadId.replace(/^htq:/i, "")) || quizMapById.get(rawLeadId.slice(0, 8));
+        const realLeadName = quizLead?.nome || quizLead?.display_name || quizLead?.respostas?.nome || `Lead ${rawLeadId.slice(0, 8) || "Qualificado"}`;
+
+        if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda") || stageLower.includes("fechado") || stageLower.includes("ganho")) {
+          callStatus = "show_up";
+          if (isSchedToday || isUpdToday) {
+            closerStats.showUpsToday++;
+            showUpsCountToday++;
+          }
+        } else if (stageLower.includes("no_show") || stageLower.includes("falta") || stageLower.includes("nao_compareceu")) {
+          callStatus = "no_show";
+          if (isSchedToday || isUpdToday) {
+            closerStats.noShowsToday++;
+            noShowsCountToday++;
+          }
+        } else if (stageLower.includes("follow") || stageLower.includes("c2")) {
+          callStatus = "followup";
+          if (isSchedToday) closerStats.followupToday++;
+        } else if (stageLower.includes("remarcad") || stageLower.includes("reagend")) {
+          callStatus = "remarcada";
+          if (isSchedToday) closerStats.remarcadaToday++;
+        } else if (stageLower.includes("descartad") || stageLower.includes("fake") || stageLower.includes("lost")) {
+          callStatus = "descartado";
+          if (isSchedToday) closerStats.descartadoToday++;
+        } else {
+          callStatus = "pendente";
+          if (isSchedToday) closerStats.pendingToday++;
+        }
+
+        if (isSchedToday) {
+          const schedDate = kb.scheduled_at ? new Date(kb.scheduled_at) : new Date();
+          const horaStr = schedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+
+          const leadData = {
+            id: rawLeadId,
+            nome: realLeadName,
+            email: quizLead?.email || quizLead?.respostas?.email || null,
+            whatsapp: quizLead?.whatsapp || quizLead?.respostas?.whatsapp || null,
+            instagram: quizLead?.instagram || quizLead?.respostas?.instagram || null,
+            caixa_letra: quizLead?.caixa_letra || quizLead?.respostas?.caixa_letra || null,
+            caixa_label: quizLead?.caixa_label || quizLead?.respostas?.caixa_label || null,
+            faturamento: quizLead?.faturamento_mensal || quizLead?.faturamento || quizLead?.respostas?.faturamento || null,
+            momento: quizLead?.momento || quizLead?.respostas?.momento || null,
+            objetivo: quizLead?.objetivo || quizLead?.respostas?.objetivo || null,
+            investir: quizLead?.investir || quizLead?.respostas?.investir || null,
+            minicurso: quizLead?.minicurso || quizLead?.respostas?.minicurso || null,
+            socio: quizLead?.socio || quizLead?.respostas?.socio || null,
+            comprometimento: quizLead?.comprometimento || quizLead?.respostas?.comprometimento || null,
+            utm_source: quizLead?.utm_source || quizLead?.respostas?.utm_source || null,
+            utm_medium: quizLead?.utm_medium || quizLead?.respostas?.utm_medium || null,
+            utm_campaign: quizLead?.utm_campaign || quizLead?.respostas?.utm_campaign || null,
+            data_criacao: quizLead?.created_at || quizLead?.data_criacao || quizLead?.received_at || kb.scheduled_at || kb.updated_at,
+            crm_status: kb.closer_stage || kb.sdr_stage || null,
+            crm_data_agendamento: kb.scheduled_at || null,
+            respostas: quizLead?.respostas || quizLead?.respostas_json || quizLead || null,
+          };
+
+          scheduledCallsToday.push({
+            id: String(kb.lead_id || Math.random()),
+            horario: horaStr !== "Invalid Date" ? horaStr : "14:00",
+            leadName: realLeadName,
+            closerName: capitalizedCloser,
+            status: callStatus,
+            stageRaw: kb.closer_stage || kb.sdr_stage || "agendado",
+            leadData,
+          });
+        }
       }
     }
 
