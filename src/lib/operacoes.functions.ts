@@ -1775,6 +1775,15 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .select("id, conversation_id, direction, from_me, created_at")
         .or("direction.eq.outbound,from_me.eq.true,direction.eq.sent")
         .limit(3000),
+      supabase
+        .from("ht_quiz_submissions" as any)
+        .select("id, received_at, updated_at, status, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas")
+        .order("updated_at", { ascending: false })
+        .limit(1000),
+      supabase
+        .from("ht_leads" as any)
+        .select("*")
+        .limit(1000),
     ]);
 
     const vendasAll = (vendasRes.data ?? []) as any[];
@@ -1784,6 +1793,19 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const quizAll = (quizRes.data ?? []) as any[];
     const waConvsAll = (waConvRes.data ?? []) as any[];
     const waMessagesAll = (waMessagesRes.data ?? []) as any[];
+    const htQuizAll = ((opts as any)?.htQuizRes?.data ?? (await supabase.from("ht_quiz_submissions" as any).select("id, received_at, updated_at, status, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas").order("updated_at", { ascending: false }).limit(1000)).data ?? []) as any[];
+    const htLeadsAll = ((opts as any)?.htLeadsRes?.data ?? (await supabase.from("ht_leads" as any).select("*").limit(1000)).data ?? []) as any[];
+
+    // Fetch external Quiz Supabase leads if available
+    let extQuizLeadsAll: any[] = [];
+    try {
+      const QUIZ_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
+      const QUIZ_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtdG5xaXBmbGdsdWN2dGRxZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjEwNjQsImV4cCI6MjA5Mjc5NzA2NH0.hO2di_bqlYyjTlmMiyJStq95UssFBNpIb6eOYvym5cs";
+      const { createClient } = await import("@supabase/supabase-js");
+      const quizSbClient = createClient(QUIZ_URL, QUIZ_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+      const { data: extLeads } = await quizSbClient.from("leads").select("*").order("data_criacao", { ascending: false }).limit(500);
+      if (extLeads) extQuizLeadsAll = extLeads;
+    } catch {}
 
     // Map conversation IDs that have outbound vendor messages
     const convsWithOutbound = new Set<string>();
@@ -1977,9 +1999,28 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     }
 
     const quizMapById = new Map<string, any>();
-    for (const q of quizAll) {
-      if (q.id) quizMapById.set(String(q.id), q);
-    }
+    const registerLead = (q: any) => {
+      if (!q) return;
+      const rawId = String(q.id || q.user_id || "").trim();
+      if (rawId) {
+        quizMapById.set(rawId, q);
+        quizMapById.set(`htq:${rawId}`, q);
+        quizMapById.set(rawId.replace(/^htq:/i, ""), q);
+        if (rawId.length >= 8) {
+          quizMapById.set(rawId.slice(0, 8), q);
+          quizMapById.set(rawId.replace(/^htq:/i, "").slice(0, 8), q);
+        }
+      }
+      if (q.whatsapp) {
+        const digits = String(q.whatsapp).replace(/\D/g, "");
+        if (digits) quizMapById.set(digits, q);
+      }
+    };
+
+    for (const q of quizAll) registerLead(q);
+    for (const q of htQuizAll) registerLead(q);
+    for (const q of htLeadsAll) registerLead(q);
+    for (const q of extQuizLeadsAll) registerLead(q);
 
     // ── 3. Agregado de Calls por Closer, Show-ups e No-shows de HOJE ──
     const closersMap = new Map<string, { callsToday: number; showUpsToday: number; noShowsToday: number }>();
@@ -1996,11 +2037,12 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     let noShowsCountToday = 0;
 
     for (const kb of htKanbanAll) {
-      const isSchedToday = toSpDateString(kb.scheduled_at) === todayStr;
+      const isSchedToday = kb.scheduled_at ? toSpDateString(kb.scheduled_at) === todayStr : false;
       const isUpdToday = toSpDateString(kb.updated_at) === todayStr;
 
+      // Se não foi agendado para hoje e nem atualizado hoje, pula
       if (!isSchedToday && !isUpdToday) continue;
-      if (!kb.scheduled_at && !kb.closer_email) continue;
+      if (!kb.closer_email && !isSchedToday) continue;
 
       const rawCloser = String(kb.closer_email || kb.closer_name || "Gabriel").trim();
       const closerName = rawCloser.includes("@") ? rawCloser.split("@")[0] : rawCloser;
@@ -2010,18 +2052,21 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         closersMap.set(capitalizedCloser, { callsToday: 0, showUpsToday: 0, noShowsToday: 0 });
       }
       const closerStats = closersMap.get(capitalizedCloser)!;
-      closerStats.callsToday++;
+      if (isSchedToday) closerStats.callsToday++;
 
       const stageLower = String(kb.closer_stage || "").toLowerCase();
       let callStatus: "show_up" | "no_show" | "pendente" = "pendente";
 
-      const quizLead = quizMapById.get(String(kb.lead_id));
-      const realLeadName = quizLead?.nome || `Lead ${kb.lead_id?.slice(0, 8) || "Qualificado"}`;
+      const rawLeadId = String(kb.lead_id || "").trim();
+      const quizLead = quizMapById.get(rawLeadId) || quizMapById.get(rawLeadId.replace(/^htq:/i, "")) || quizMapById.get(rawLeadId.slice(0, 8));
+      const realLeadName = quizLead?.nome || quizLead?.display_name || quizLead?.respostas?.nome || `Lead ${rawLeadId.slice(0, 8) || "Qualificado"}`;
 
       if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda")) {
         callStatus = "show_up";
-        closerStats.showUpsToday++;
-        showUpsCountToday++;
+        if (isSchedToday || isUpdToday) {
+          closerStats.showUpsToday++;
+          showUpsCountToday++;
+        }
 
         if (isUpdToday) {
           const d = kb.updated_at ? new Date(kb.updated_at) : new Date();
@@ -2037,8 +2082,10 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         }
       } else if (stageLower.includes("no_show") || stageLower.includes("falta") || stageLower.includes("nao_compareceu")) {
         callStatus = "no_show";
-        closerStats.noShowsToday++;
-        noShowsCountToday++;
+        if (isSchedToday || isUpdToday) {
+          closerStats.noShowsToday++;
+          noShowsCountToday++;
+        }
 
         if (isUpdToday) {
           const d = kb.updated_at ? new Date(kb.updated_at) : new Date();
@@ -2054,41 +2101,44 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         }
       }
 
-      const schedDate = kb.scheduled_at ? new Date(kb.scheduled_at) : new Date();
-      const horaStr = schedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      // Adiciona à lista detalhada de reuniões de HOJE apenas se agendado para HOJE
+      if (isSchedToday) {
+        const schedDate = kb.scheduled_at ? new Date(kb.scheduled_at) : new Date();
+        const horaStr = schedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-      const leadData = {
-        id: String(kb.lead_id),
-        nome: realLeadName,
-        email: quizLead?.email || null,
-        whatsapp: quizLead?.whatsapp || null,
-        instagram: quizLead?.instagram || null,
-        caixa_letra: quizLead?.caixa_letra || null,
-        caixa_label: quizLead?.caixa_label || null,
-        faturamento: quizLead?.faturamento_mensal || null,
-        momento: quizLead?.momento || null,
-        objetivo: quizLead?.objetivo || null,
-        investir: quizLead?.investir || null,
-        minicurso: quizLead?.minicurso || null,
-        socio: quizLead?.socio || null,
-        comprometimento: quizLead?.comprometimento || null,
-        utm_source: quizLead?.utm_source || null,
-        utm_medium: quizLead?.utm_medium || null,
-        utm_campaign: quizLead?.utm_campaign || null,
-        data_criacao: quizLead?.created_at || kb.scheduled_at || kb.updated_at,
-        crm_status: kb.closer_stage || null,
-        crm_data_agendamento: kb.scheduled_at || null,
-        respostas: quizLead?.respostas || null,
-      };
+        const leadData = {
+          id: rawLeadId,
+          nome: realLeadName,
+          email: quizLead?.email || quizLead?.respostas?.email || null,
+          whatsapp: quizLead?.whatsapp || quizLead?.respostas?.whatsapp || null,
+          instagram: quizLead?.instagram || quizLead?.respostas?.instagram || null,
+          caixa_letra: quizLead?.caixa_letra || quizLead?.respostas?.caixa_letra || null,
+          caixa_label: quizLead?.caixa_label || quizLead?.respostas?.caixa_label || null,
+          faturamento: quizLead?.faturamento_mensal || quizLead?.faturamento || quizLead?.respostas?.faturamento || null,
+          momento: quizLead?.momento || quizLead?.respostas?.momento || null,
+          objetivo: quizLead?.objetivo || quizLead?.respostas?.objetivo || null,
+          investir: quizLead?.investir || quizLead?.respostas?.investir || null,
+          minicurso: quizLead?.minicurso || quizLead?.respostas?.minicurso || null,
+          socio: quizLead?.socio || quizLead?.respostas?.socio || null,
+          comprometimento: quizLead?.comprometimento || quizLead?.respostas?.comprometimento || null,
+          utm_source: quizLead?.utm_source || quizLead?.respostas?.utm_source || null,
+          utm_medium: quizLead?.utm_medium || quizLead?.respostas?.utm_medium || null,
+          utm_campaign: quizLead?.utm_campaign || quizLead?.respostas?.utm_campaign || null,
+          data_criacao: quizLead?.created_at || quizLead?.data_criacao || quizLead?.received_at || kb.scheduled_at || kb.updated_at,
+          crm_status: kb.closer_stage || null,
+          crm_data_agendamento: kb.scheduled_at || null,
+          respostas: quizLead?.respostas || quizLead?.respostas_json || quizLead || null,
+        };
 
-      scheduledCallsToday.push({
-        id: String(kb.lead_id || Math.random()),
-        horario: horaStr !== "Invalid Date" ? horaStr : "14:00",
-        leadName: realLeadName,
-        closerName: capitalizedCloser,
-        status: callStatus,
-        leadData,
-      });
+        scheduledCallsToday.push({
+          id: String(kb.lead_id || Math.random()),
+          horario: horaStr !== "Invalid Date" ? horaStr : "14:00",
+          leadName: realLeadName,
+          closerName: capitalizedCloser,
+          status: callStatus,
+          leadData,
+        });
+      }
     }
 
     // Sort calls by time
