@@ -1781,7 +1781,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     // X1 Leads de Hoje
     const leadsToday = crmLeadsAll.filter((l) => toSpDateString(l.created_at) === todayStr);
-    const totalLeadsToday = Math.max(leadsToday.length, approvedSalesCount * 4 + 12);
+    const totalLeadsToday = leadsToday.length;
 
     // Contagem de Leads por Operação X1
     const opLeadsMap = new Map<string, number>();
@@ -1836,23 +1836,36 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const vendasHtCount = htVendasToday.length;
     const htRevenueToday = htVendasToday.reduce((a, v) => a + (parseFloat(v.valor_total) || 0), 0);
 
+    // Leads Qualificados do Quiz que ENTRARAM HOJE
     const quizToday = quizAll.filter((q) => toSpDateString(q.created_at) === todayStr);
-    const qualifiedLeadsToday = Math.max(quizToday.length, 14);
+    const qualifiedLeadsToday = quizToday.length;
 
-    let contact1Count = 0, contact2Count = 0, contact3Count = 0, scheduledCount = 0;
+    // Estágios Kanban do SDR movimentados/arrastados HOJE
+    let contact1Count = 0;
+    let contact2Count = 0;
+    let contact3Count = 0;
+    let scheduledCount = 0;
 
     for (const kb of htKanbanAll) {
-      if (toSpDateString(kb.updated_at) === todayStr || toSpDateString(kb.scheduled_at) === todayStr) {
-        if (kb.scheduled_at) scheduledCount++;
-        if (kb.sdr_stage === "contato_1" || kb.sdr_stage === "abordagem") contact1Count++;
-        else if (kb.sdr_stage === "contato_2" || kb.sdr_stage === "followup_1") contact2Count++;
-        else if (kb.sdr_stage === "contato_3" || kb.sdr_stage === "followup_2") contact3Count++;
+      const isUpdatedToday = toSpDateString(kb.updated_at) === todayStr;
+      const isScheduledToday = toSpDateString(kb.scheduled_at) === todayStr;
+
+      // Agendamentos: Reunião agendada HOJE pelo SDR
+      if ((isUpdatedToday || isScheduledToday) && kb.scheduled_at) {
+        scheduledCount++;
+      }
+
+      // Estágios arrastados pelo SDR HOJE
+      if (isUpdatedToday) {
+        if (kb.sdr_stage === "contato_1" || kb.sdr_stage === "abordagem") {
+          contact1Count++;
+        } else if (kb.sdr_stage === "contato_2" || kb.sdr_stage === "followup_1") {
+          contact2Count++;
+        } else if (kb.sdr_stage === "contato_3" || kb.sdr_stage === "followup_2") {
+          contact3Count++;
+        }
       }
     }
-    if (scheduledCount === 0) scheduledCount = Math.min(qualifiedLeadsToday, 5);
-    if (contact1Count === 0) contact1Count = Math.min(qualifiedLeadsToday, 9);
-    if (contact2Count === 0) contact2Count = Math.min(qualifiedLeadsToday, 6);
-    if (contact3Count === 0) contact3Count = Math.min(qualifiedLeadsToday, 3);
 
     // Real HT Events from today's records
     const htEvents: Array<{ id: string; timestamp: string; tipo: string; titulo: string; descricao: string; sdr?: string; closer?: string; valor?: number; horario?: string }> = [];
