@@ -21,6 +21,7 @@ import CalendarTodayTwoTone from "@mui/icons-material/CalendarTodayTwoTone";
 import ArrowDownwardTwoTone from "@mui/icons-material/ArrowDownwardTwoTone";
 import { supabase } from "@/integrations/supabase/client";
 import { getLiveMonitoringTodayStats } from "@/lib/operacoes.functions";
+import { HtLeadDetailDialog } from "@/components/ht-lead-detail-dialog";
 
 export const Route = createFileRoute("/_authenticated/live-monitoring")({
   head: () => ({ meta: [{ title: "Monitoramento ao VIVO — MULTIUM" }] }),
@@ -35,6 +36,10 @@ function LiveMonitoringPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [unattendedModalOpen, setUnattendedModalOpen] = useState(false);
   const [trafficCountdown, setTrafficCountdown] = useState(300);
+
+  // Full Lead Detail Dialog state
+  const [selectedLeadForDetail, setSelectedLeadForDetail] = useState<any>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   // Fetch REAL TODAY data from server with automatic refetch on mount and window focus
   const { data: serverStats, isLoading, refetch } = useQuery({
@@ -485,22 +490,31 @@ function LiveMonitoringPage() {
 
             {/* Tabela Detalhada de Horários e Status das Calls do Dia */}
             <div className="space-y-2 pt-1">
-              <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
-                Lista Detalhada de Reuniões de Hoje
+              <div className="flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
+                <span>Lista Detalhada de Reuniões de Hoje</span>
+                <span className="text-violet-400">Clique para ver respostas do Quiz</span>
               </div>
 
-              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 scrollbar-fancy">
+              <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1 scrollbar-fancy">
                 {(serverStats?.ht?.scheduledCallsToday ?? []).map((call) => (
-                  <div key={call.id} className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 px-3 py-2 text-xs">
+                  <button
+                    key={call.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedLeadForDetail(call.leadData || { id: call.id, nome: call.leadName });
+                      setDetailDialogOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between rounded-xl border border-border/60 bg-background/80 px-3 py-2 text-xs hover:border-violet-500/50 hover:bg-violet-500/10 transition-all text-left group cursor-pointer"
+                  >
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                         ⏰ {call.horario}
                       </span>
-                      <span className="font-bold text-white">{call.leadName}</span>
+                      <span className="font-bold text-white group-hover:text-violet-300 transition-colors">{call.leadName}</span>
                       <span className="text-muted-foreground text-[0.65rem]">Closer: <strong className="text-violet-300">{call.closerName}</strong></span>
                     </div>
 
-                    <div>
+                    <div className="flex items-center gap-2">
                       {call.status === "show_up" && (
                         <span className="rounded-md bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-emerald-300 uppercase">
                           🟢 Show-Up
@@ -516,8 +530,11 @@ function LiveMonitoringPage() {
                           🟡 Agendada
                         </span>
                       )}
+                      <span className="text-[0.65rem] font-semibold text-violet-400 group-hover:translate-x-0.5 transition-transform">
+                        Ver Quiz →
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {(serverStats?.ht?.scheduledCallsToday ?? []).length === 0 && (
                   <div className="py-3 text-center text-xs text-muted-foreground font-semibold">
@@ -791,6 +808,16 @@ function LiveMonitoringPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal de Detalhes Completos do Lead (Quiz + Respostas) ── */}
+      {selectedLeadForDetail && (
+        <HtLeadDetailDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          lead={selectedLeadForDetail}
+          role="closer"
+        />
       )}
     </main>
   );

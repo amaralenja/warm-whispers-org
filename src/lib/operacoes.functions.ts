@@ -1758,9 +1758,9 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         .limit(1000),
       supabase
         .from("quiz_submissions" as any)
-        .select("id, created_at, nome, faturamento_mensal, empresa")
+        .select("id, created_at, nome, email, whatsapp, instagram, faturamento_mensal, caixa_letra, caixa_label, empresa, momento, objetivo, investir, minicurso, socio, comprometimento, respostas, utm_source, utm_medium, utm_campaign")
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(1000),
       supabase
         .from("financeiro" as any)
         .select("valor, tipo, data_ref")
@@ -1976,6 +1976,11 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       });
     }
 
+    const quizMapById = new Map<string, any>();
+    for (const q of quizAll) {
+      if (q.id) quizMapById.set(String(q.id), q);
+    }
+
     // ── 3. Agregado de Calls por Closer, Show-ups e No-shows de HOJE ──
     const closersMap = new Map<string, { callsToday: number; showUpsToday: number; noShowsToday: number }>();
     const scheduledCallsToday: Array<{
@@ -1984,6 +1989,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       leadName: string;
       closerName: string;
       status: "show_up" | "no_show" | "pendente";
+      leadData?: any;
     }> = [];
 
     let showUpsCountToday = 0;
@@ -2009,6 +2015,9 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       const stageLower = String(kb.closer_stage || "").toLowerCase();
       let callStatus: "show_up" | "no_show" | "pendente" = "pendente";
 
+      const quizLead = quizMapById.get(String(kb.lead_id));
+      const realLeadName = quizLead?.nome || `Lead ${kb.lead_id?.slice(0, 8) || "Qualificado"}`;
+
       if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda")) {
         callStatus = "show_up";
         closerStats.showUpsToday++;
@@ -2022,7 +2031,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
             timestamp: timeStr,
             tipo: "show_up",
             titulo: `🟢 Show-Up Confirmado (${capitalizedCloser})`,
-            descricao: `Lead compareceu à reunião com o Closer ${capitalizedCloser}`,
+            descricao: `Lead ${realLeadName} compareceu à reunião com o Closer ${capitalizedCloser}`,
             closer: capitalizedCloser,
           });
         }
@@ -2039,7 +2048,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
             timestamp: timeStr,
             tipo: "no_show",
             titulo: `🔴 No-Show Registrado (${capitalizedCloser})`,
-            descricao: `Lead faltou à reunião agendada com Closer ${capitalizedCloser}`,
+            descricao: `Lead ${realLeadName} faltou à reunião agendada com Closer ${capitalizedCloser}`,
             closer: capitalizedCloser,
           });
         }
@@ -2048,12 +2057,37 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       const schedDate = kb.scheduled_at ? new Date(kb.scheduled_at) : new Date();
       const horaStr = schedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
+      const leadData = {
+        id: String(kb.lead_id),
+        nome: realLeadName,
+        email: quizLead?.email || null,
+        whatsapp: quizLead?.whatsapp || null,
+        instagram: quizLead?.instagram || null,
+        caixa_letra: quizLead?.caixa_letra || null,
+        caixa_label: quizLead?.caixa_label || null,
+        faturamento: quizLead?.faturamento_mensal || null,
+        momento: quizLead?.momento || null,
+        objetivo: quizLead?.objetivo || null,
+        investir: quizLead?.investir || null,
+        minicurso: quizLead?.minicurso || null,
+        socio: quizLead?.socio || null,
+        comprometimento: quizLead?.comprometimento || null,
+        utm_source: quizLead?.utm_source || null,
+        utm_medium: quizLead?.utm_medium || null,
+        utm_campaign: quizLead?.utm_campaign || null,
+        data_criacao: quizLead?.created_at || kb.scheduled_at || kb.updated_at,
+        crm_status: kb.closer_stage || null,
+        crm_data_agendamento: kb.scheduled_at || null,
+        respostas: quizLead?.respostas || null,
+      };
+
       scheduledCallsToday.push({
         id: String(kb.lead_id || Math.random()),
         horario: horaStr !== "Invalid Date" ? horaStr : "14:00",
-        leadName: `Lead ${kb.lead_id?.slice(0, 6) || "Qualificado"}`,
+        leadName: realLeadName,
         closerName: capitalizedCloser,
         status: callStatus,
+        leadData,
       });
     }
 

@@ -95,6 +95,15 @@ export async function processDueRemarketing() {
       const convIds = Array.from(byConv.keys());
       if (convIds.length === 0) continue;
 
+      // Load channels so we can fall back when conversa��o n�o tem operacao_id preenchido
+      const { data: channels } = await db
+        .from("wa_channels" as any)
+        .select("id, operacao_id");
+      const channelToOp = new Map<string, string>();
+      for (const ch of (channels ?? []) as any[]) {
+        if (ch.operacao_id) channelToOp.set(String(ch.id), String(ch.operacao_id));
+      }
+
       // Load conversations for operacao check + validate they still exist.
       const { data: convs } = await db
         .from("wa_conversations" as any)
@@ -103,13 +112,14 @@ export async function processDueRemarketing() {
       const convMap = new Map<string, any>();
       for (const c of (convs ?? []) as any[]) convMap.set(String(c.id), c);
 
-      // Filter by operacao (matches wa_channels.operacao_id via wa_conversations.operacao_id).
+      // Filter by operacao (wa_conversations.operacao_id ou fallback pelo canal).
       const normOp = rule.operacao.trim().toLowerCase();
       const eligible: Array<{ conv: any; msg: any }> = [];
       for (const [convId, msg] of byConv) {
         const conv = convMap.get(convId);
         if (!conv) continue;
-        if (String(conv.operacao_id ?? "").trim().toLowerCase() !== normOp) continue;
+        const convOp = String(conv.operacao_id ?? "").trim().toLowerCase() || String(channelToOp.get(String(conv.channel_id ?? "")) ?? "").trim().toLowerCase();
+        if (convOp !== normOp) continue;
         eligible.push({ conv, msg });
       }
       if (eligible.length === 0) continue;
