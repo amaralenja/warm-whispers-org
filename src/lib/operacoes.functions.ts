@@ -2444,7 +2444,27 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     htEvents.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-    // Traffic Spend & Paid ROAS Calculation for TODAY strictly
+    // Traffic Spend & Paid ROAS Calculation for TODAY strictly (Meta Ads API + Financeiro fallback)
+    let metaAdsTodaySpend = 0;
+    try {
+      const token = process.env.META_ADS_SYSTEM_USER_TOKEN;
+      const rawAcc = process.env.META_ADS_ACCOUNT_ID;
+      if (token && rawAcc) {
+        const accountId = rawAcc.startsWith("act_") ? rawAcc : `act_${rawAcc}`;
+        const url = new URL(`https://graph.facebook.com/v21.0/${accountId}/insights`);
+        url.searchParams.set("access_token", token);
+        url.searchParams.set("date_preset", "today");
+        url.searchParams.set("fields", "spend");
+        const res = await fetch(url.toString());
+        const json: any = await res.json();
+        if (res.ok && Array.isArray(json?.data) && json.data.length > 0) {
+          metaAdsTodaySpend = parseFloat(json.data[0].spend || 0);
+        }
+      }
+    } catch (e) {
+      console.warn("[getLiveMonitoringTodayStats] Erro ao buscar Meta Ads spend de hoje:", e);
+    }
+
     const todayAdsGastos = (financeiroRes.data ?? [])
       .filter((f: any) => {
         if (toSpDateString(f.data_ref) !== todayStr) return false;
@@ -2453,7 +2473,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       })
       .reduce((a: number, f: any) => a + Number(f.valor || 0), 0);
 
-    const gastoTotal = todayAdsGastos; // Real TODAY spend only (0 if none registered today)
+    const gastoTotal = metaAdsTodaySpend > 0 ? metaAdsTodaySpend : todayAdsGastos;
     const cpl = qualifiedLeadsToday > 0 ? Number((gastoTotal / qualifiedLeadsToday).toFixed(2)) : 0;
     const costPerMeeting = scheduledCount > 0 ? Number((gastoTotal / scheduledCount).toFixed(2)) : 0;
     // ROAS is ONLY calculated from paid traffic sales revenue divided by paid ads spend
