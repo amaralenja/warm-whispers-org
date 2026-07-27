@@ -2,7 +2,7 @@
 // Never import this from client modules.
 
 const EVOHUB_BASE = "https://api.evohub.ai";
-const API_TIMEOUT_MS = 60_000;
+const API_TIMEOUT_MS = 30_000;
 
 type Ctx = {
   runId: string;
@@ -231,21 +231,17 @@ export async function sendWA(channelId: string, to: string, body: any, db: any) 
   const toNormalized = normalizeBrWhatsappNumber(to);
   const payload = { messaging_product: "whatsapp", to: toNormalized, ...body };
 
-  // Retry transitório: mídia (vídeo especialmente) volta 5xx/timeout com frequência
-  // quando o Meta demora pra baixar a URL. Tenta até 3 vezes com backoff antes de trocar token.
+  // Single attempt — chunked execution (executeFrom) will retry failed
+  // send nodes in subsequent cron invocations, avoiding duplicate messages
+  // that the old 3x retry loop could cause when Meta silently delivered the
+  // first attempt but the HTTP response was slow/timed out.
   let attempt = { ok: false, status: 0, json: null as any };
   let lastErr: unknown = null;
-  for (let i = 0; i < 3; i++) {
-    try {
-      attempt = await postMetaMessage(token, phoneNumberId, payload);
-    } catch (e) {
-      lastErr = e;
-      attempt = { ok: false, status: 0, json: { error: { message: String((e as any)?.message ?? e) } } };
-    }
-    if (attempt.ok) break;
-    const transient = attempt.status === 0 || attempt.status >= 500;
-    if (!transient) break;
-    await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+  try {
+    attempt = await postMetaMessage(token, phoneNumberId, payload);
+  } catch (e) {
+    lastErr = e;
+    attempt = { ok: false, status: 0, json: { error: { message: String((e as any)?.message ?? e) } } };
   }
 
   let workingToken = token;
@@ -837,6 +833,8 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       await logExecution(ctx.db, ctx.runId, node, "ok", result.log ?? null, undefined, started, ctx.vendor);
 
       nodesProcessed++;
+      // Reset per-node retry counter on successful execution
+      if (ctx.variables._nodeRetries) delete ctx.variables._nodeRetries[node.id];
       if (result.pause) return;
       if (result.end) {
         await updateFlowRun(ctx, {
@@ -847,9 +845,6 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       currentId = nextNodeId(edges, node.id, result.handle);
     } catch (e: any) {
       await logExecution(ctx.db, ctx.runId, node, "error", null, String(e?.message ?? e), started, ctx.vendor);
-      // Envio falhou mesmo após retry/conversão: para o fluxo aqui.
-      // Antes ele seguia para o próximo nó e podia mandar "a primeira e a última"
-      // mensagem do funil, pulando mídias/mensagens do meio.
       const isSendNode =
         node.type === "send_text" ||
         node.type === "send_image" ||
@@ -863,10 +858,27 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
         });
         return;
       }
+      // Send node failed: re-queue with per-node retry counter instead of
+      // failing immediately. Next cron invocation (10s) will retry the send.
+      // After 3 retries, give up and mark as failed.
+      const retryCount: Record<string, number> = ctx.variables._nodeRetries ?? {};
+      retryCount[node.id] = (retryCount[node.id] ?? 0) + 1;
+      ctx.variables._nodeRetries = retryCount;
+      if (retryCount[node.id] >= 3) {
+        await updateFlowRun(ctx, {
+          status: "failed",
+          error: `Envio de ${node.type} falhou 3x: ${String(e?.message ?? e)}`,
+        });
+        return;
+      }
       await updateFlowRun(ctx, {
-        status: "failed", error: String(e?.message ?? e),
+        current_node_id: node.id,
+        context: ctx.variables,
+        status: "queued",
+        waiting_for: null,
+        expires_at: null,
       });
-      return;
+      console.warn(`[flow-engine] send node ${node.type} failed, re-queued (retry ${retryCount[node.id]}/3): ${String(e?.message ?? e).slice(0, 100)}`);
     }
   }
 
