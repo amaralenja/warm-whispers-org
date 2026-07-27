@@ -4078,24 +4078,27 @@ function getOrderedFlowNodes(nodesRaw: any, edgesRaw: any): Array<{ id: string; 
       let label = node.data?.label || node.data?.name || "";
       let preview = "";
 
-      if (type === "text") {
+      if (type === "send_text") {
         label = label || "Texto";
         preview = String(node.data?.text || node.data?.content || "").slice(0, 50);
-      } else if (type === "audio") {
+      } else if (type === "send_audio" || type === "audio") {
         label = label || "Áudio";
         preview = node.data?.seconds ? `Áudio (${node.data.seconds}s)` : node.data?.filename || "Áudio gravado";
-      } else if (type === "image") {
+      } else if (type === "send_image" || type === "image") {
         label = label || "Imagem";
         preview = node.data?.caption || node.data?.filename || "Imagem";
-      } else if (type === "video") {
+      } else if (type === "send_video" || type === "video") {
         label = label || "Vídeo";
         preview = node.data?.caption || node.data?.filename || "Vídeo";
-      } else if (type === "delay" || type === "wait") {
+      } else if (type === "delay" || type === "wait" || type.startsWith("wait_")) {
         label = label || "Aguardar";
         preview = node.data?.seconds ? `Espera ${node.data.seconds}s` : node.data?.time ? `Espera ${node.data.time}` : "Pausa";
-      } else if (type === "document") {
+      } else if (type === "send_document" || type === "document") {
         label = label || "Documento";
         preview = node.data?.filename || "Documento";
+      } else if (type === "send_buttons" || type === "send_list" || type === "buttons") {
+        label = label || (type.startsWith("send_list") ? "Lista" : "Botões");
+        preview = String(node.data?.text || node.data?.title || node.data?.body || "").slice(0, 40);
       } else {
         label = label || type;
         preview = String(node.data?.text || node.data?.caption || "").slice(0, 40);
