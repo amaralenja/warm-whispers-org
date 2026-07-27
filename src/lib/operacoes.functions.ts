@@ -46,6 +46,12 @@ function toSpDateString(raw: unknown): string | null {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
   const ymdMatch = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  const hasTimezone = /[Zz]|\+[0-9]{2}:?[0-9]{2}|-[0-9]{2}:?[0-9]{2}/.test(s);
+
+  // If timestamp string has NO explicit timezone suffix, the YYYY-MM-DD part is ALREADY the local SP date
+  if (ymdMatch && !hasTimezone) {
+    return ymdMatch[1];
+  }
 
   // Numeric timestamp string "1784955079138"
   if (/^\d{10,13}$/.test(s)) {
@@ -55,14 +61,14 @@ function toSpDateString(raw: unknown): string | null {
     }
   }
 
-  // Normalize space separated timestamp "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
+  // Full ISO with explicit timezone
   const normalizedIso = s.replace(/^(\d{4}-\d{2}-\d{2})\s+/, "$1T");
   const d = new Date(normalizedIso);
   if (!isNaN(d.getTime())) {
     return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   }
 
-  // Fallback to YYYY-MM-DD match if JS date constructor failed
+  // Fallback to YYYY-MM-DD match
   if (ymdMatch) return ymdMatch[1];
 
   // Brazilian format "DD/MM/YYYY" or "DD-MM-YYYY"
@@ -1764,7 +1770,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       supabase
         .from("crm_leads" as any)
         .select("id, created_at, data_criacao, updated_at, expert, utm_source, nome, telefone, vendedor")
-        .order("id", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(2000),
       supabase
         .from("ht_vendas" as any)
@@ -1789,6 +1795,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       supabase
         .from("wa_conversations" as any)
         .select("id, contact_wa_id, assigned_vendor_id, updated_at, created_at, contact_name, utm_source")
+        .order("updated_at", { ascending: false })
         .limit(2000),
       supabase
         .from("wa_messages" as any)
