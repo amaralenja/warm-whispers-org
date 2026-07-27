@@ -392,11 +392,6 @@ function Dashboard() {
                               </div>
                             </div>
                           )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
                           {/* Fontes de tráfego (expandível) */}
                           {isExpanded && op.fontes.length > 0 && (
                             <div className="border-t border-border/60 bg-secondary/15 px-6 py-4">
@@ -441,22 +436,6 @@ function Dashboard() {
                         </div>
                         <div className={`px-4 py-4.5 text-right border-r border-border/60 text-base ${NUM} text-amber-400`}>{BRL(tmGeral)}</div>
                         <div className={`px-4 py-4.5 text-right text-base ${NUM} ${totalReemb > 0 ? "text-rose-400" : "text-muted-foreground"}`}>{totalReemb}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
-          </TabsContent>
-                        <div className="text-right">
-                          <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-xs font-bold tabular-nums text-emerald-400">
-                            {conversaoGeral.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className={`text-right text-sm font-bold ${NUM} text-sky-400`}>{BRL(tmGeral)}</div>
-                        <div className={`text-right text-sm font-bold ${NUM} ${totalReemb > 0 ? "text-rose-400" : "text-muted-foreground"}`}>
-                          {totalReemb}
-                        </div>
                       </div>
                     )}
                   </div>

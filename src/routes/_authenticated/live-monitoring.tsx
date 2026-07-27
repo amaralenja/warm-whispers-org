@@ -7,7 +7,7 @@ import WorkspacePremiumTwoTone from "@mui/icons-material/WorkspacePremiumTwoTone
 import WarningTwoTone from "@mui/icons-material/WarningTwoTone";
 import TrendingUpTwoTone from "@mui/icons-material/TrendingUpTwoTone";
 import ShoppingBagTwoTone from "@mui/icons-material/ShoppingBagTwoTone";
-import PersonCheckTwoTone from "@mui/icons-material/PersonCheckTwoTone";
+import HowToRegTwoTone from "@mui/icons-material/HowToRegTwoTone";
 import EventAvailableTwoTone from "@mui/icons-material/EventAvailableTwoTone";
 import MonetizationOnTwoTone from "@mui/icons-material/MonetizationOnTwoTone";
 import CampaignTwoTone from "@mui/icons-material/CampaignTwoTone";
@@ -306,7 +306,7 @@ function LiveMonitoringPage() {
               <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 transition-all hover:border-sky-500/50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sky-400">
-                    <PersonCheckTwoTone className="!h-5 !w-5" />
+                    <HowToRegTwoTone className="!h-5 !w-5" />
                     <span className="text-xs font-bold uppercase tracking-wider">Leads que Chegaram</span>
                   </div>
                   <span className="font-mono text-2xl font-black text-white">3.250</span>
