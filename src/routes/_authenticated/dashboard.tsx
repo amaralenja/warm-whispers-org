@@ -2,12 +2,21 @@ import { useState } from "react";
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  TrendingUp, ShoppingBag, Receipt, AlertTriangle, Coins,
-  Users, Settings, Activity, Bug,
-  BarChart3, UserCheck, Percent, Wallet, Trophy, Sparkles, Crown, Medal,
-  LineChart,
-} from "lucide-react";
+import TrendingUpTwoTone from "@mui/icons-material/TrendingUpTwoTone";
+import ShoppingBagTwoTone from "@mui/icons-material/ShoppingBagTwoTone";
+import ReceiptTwoTone from "@mui/icons-material/ReceiptTwoTone";
+import WarningTwoTone from "@mui/icons-material/WarningTwoTone";
+import MonetizationOnTwoTone from "@mui/icons-material/MonetizationOnTwoTone";
+import PeopleTwoTone from "@mui/icons-material/PeopleTwoTone";
+import SettingsTwoTone from "@mui/icons-material/SettingsTwoTone";
+import AssessmentTwoTone from "@mui/icons-material/AssessmentTwoTone";
+import PersonCheckTwoTone from "@mui/icons-material/PersonCheckTwoTone";
+import PercentTwoTone from "@mui/icons-material/PercentTwoTone";
+import EmojiEventsTwoTone from "@mui/icons-material/EmojiEventsTwoTone";
+import AutoAwesomeTwoTone from "@mui/icons-material/AutoAwesomeTwoTone";
+import ShowChartTwoTone from "@mui/icons-material/ShowChartTwoTone";
+import AccountBalanceWalletTwoTone from "@mui/icons-material/AccountBalanceWalletTwoTone";
+
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell,
@@ -31,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 const BRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-const NUM = "font-sans tabular-nums tracking-tight font-semibold";
+const NUM = "font-sans tabular-nums tracking-tight font-bold";
 
 const OP_ACCENT: Record<string, { bg: string; ring: string; text: string; bar: string }> = {
   Caio:    { bg: "bg-violet-500/10", ring: "ring-violet-500/20", text: "text-violet-400", bar: "bg-violet-400" },
@@ -88,19 +97,19 @@ function Dashboard() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background">
-      <div className="mx-auto max-w-7xl px-8 py-10">
+      <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10 space-y-8">
 
         {/* ── Error Banner ── */}
         {errMsg && (
-          <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4">
+          <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-5 shadow-lg">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-red-400">❌ Erro ao carregar dados do servidor</p>
-                <p className="mt-1 font-mono text-xs text-red-300/80 break-all">{errMsg}</p>
+                <p className="text-sm font-semibold text-rose-400">❌ Erro ao carregar dados do servidor</p>
+                <p className="mt-1 font-mono text-xs text-rose-300/80 break-all">{errMsg}</p>
               </div>
               <button
                 onClick={() => refetch()}
-                className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/30 transition-colors"
+                className="shrink-0 rounded-xl bg-rose-500/20 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition-colors"
               >
                 🔄 Tentar novamente
               </button>
@@ -110,13 +119,13 @@ function Dashboard() {
 
         {/* ── Empty Data Warning ── */}
         {hasNoData && (
-          <div className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 shadow-lg">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-amber-400">⚠️ Dados carregados mas todos zerados</p>
                 <p className="mt-1 text-xs text-amber-300/80">
                   O servidor respondeu mas não retornou nenhum dado para o período selecionado.
-                  Isso pode indicar problema com a chave de acesso ao banco (SUPABASE_SERVICE_ROLE_KEY) ou ausência de dados no banco.
+                  Isso pode indicar ausência de registros ou período sem movimentação.
                 </p>
                 <p className="mt-1 font-mono text-[10px] text-amber-300/60">
                   Período: {range.from} → {range.to} | Workspace: {workspace.id}
@@ -124,7 +133,7 @@ function Dashboard() {
               </div>
               <button
                 onClick={() => refetch()}
-                className="shrink-0 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition-colors"
+                className="shrink-0 rounded-xl bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition-colors"
               >
                 🔄 Recarregar
               </button>
@@ -133,90 +142,156 @@ function Dashboard() {
         )}
 
         {/* ── Header ── */}
-        <div className="flex flex-wrap items-start justify-between gap-6 border-b border-border pb-6">
+        <div className="flex flex-wrap items-start justify-between gap-6 border-b border-border/80 pb-6">
           <div>
-            <p className={`text-[0.65rem] uppercase tracking-[0.28em] ${workspace.accent.text}`}>
-              — {workspace.id === "all" ? "Visão Geral" : `Operação · ${workspace.nome}`}
+            <p className={`text-xs font-bold uppercase tracking-[0.25em] ${workspace.accent.text}`}>
+              — {workspace.id === "all" ? "Visão Geral da Operação" : `Operação · ${workspace.nome}`}
             </p>
-            <h1 className="mt-2 font-display text-3xl leading-tight md:text-4xl">
-              Boa, <em className="text-accent">{user?.email?.split("@")[0]}</em>.
+            <h1 className="mt-2 font-display text-3xl font-bold leading-tight md:text-4xl">
+              Boa, <em className="text-accent not-italic">{user?.email?.split("@")[0]}</em>.
             </h1>
           </div>
-          <div className="flex items-start gap-2">
+          <div className="flex items-center gap-3">
             <DateRangeFilter value={range} onChange={setRange} />
             <button
               type="button"
               onClick={() => setConfigOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/40 px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+              className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card/60 px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground transition-all hover:bg-amber-500/10 hover:border-amber-500/30 hover:text-amber-400"
             >
-              <Settings className="h-3.5 w-3.5" />
-              Config
+              <SettingsTwoTone className="!h-4 !w-4 text-amber-400" />
+              <span>Config</span>
             </button>
           </div>
         </div>
 
-        <Tabs defaultValue="operacoes" className="mt-8">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
-            <TabsTrigger value="operacoes" className="gap-2">
-              <BarChart3 className="h-3.5 w-3.5" />
+        <Tabs defaultValue="operacoes" className="space-y-6">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4 p-1 rounded-xl bg-card/80 border border-border/80">
+            <TabsTrigger value="operacoes" className="gap-2 rounded-lg py-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950">
+              <AssessmentTwoTone className="!h-4 !w-4" />
               Operações
             </TabsTrigger>
-            <TabsTrigger value="ranking" className="gap-2">
-              <Trophy className="h-3.5 w-3.5" />
+            <TabsTrigger value="ranking" className="gap-2 rounded-lg py-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950">
+              <EmojiEventsTwoTone className="!h-4 !w-4" />
               Ranking
             </TabsTrigger>
-            <TabsTrigger value="relatorios" className="gap-2">
-              <LineChart className="h-3.5 w-3.5" />
+            <TabsTrigger value="relatorios" className="gap-2 rounded-lg py-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950">
+              <ShowChartTwoTone className="!h-4 !w-4" />
               Relatórios
             </TabsTrigger>
-            <TabsTrigger value="vendedores" className="gap-2">
-              <Users className="h-3.5 w-3.5" />
+            <TabsTrigger value="vendedores" className="gap-2 rounded-lg py-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950">
+              <PeopleTwoTone className="!h-4 !w-4" />
               Vendedores
             </TabsTrigger>
           </TabsList>
 
           {/* ════════ ABA OPERAÇÕES ════════ */}
-          <TabsContent value="operacoes" className="mt-6 space-y-6">
+          <TabsContent value="operacoes" className="space-y-8">
 
-            {/* ── KPIs Globais ── */}
-            <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <Kpi icon={<TrendingUp className="h-4 w-4 text-emerald-400" />} label="Faturamento" value={isLoading ? "—" : BRL(totalFat)} accent="text-emerald-400" bgGlow="bg-gradient-to-br from-emerald-500/5 to-transparent" />
-              <Kpi icon={<ShoppingBag className="h-4 w-4 text-amber-400" />} label="Vendas" value={isLoading ? "—" : totalVendas.toLocaleString("pt-BR")} accent="text-amber-400" bgGlow="bg-gradient-to-br from-amber-500/5 to-transparent" />
-              <Kpi icon={<UserCheck className="h-4 w-4 text-sky-400" />} label="Leads Únicos" value={isLoading ? "—" : totalLeads.toLocaleString("pt-BR")} accent="text-sky-400" bgGlow="bg-gradient-to-br from-sky-500/5 to-transparent" />
-              <Kpi icon={<Percent className="h-4 w-4 text-violet-400" />} label="Conversão" value={isLoading ? "—" : `${conversaoGeral.toFixed(1)}%`} accent="text-violet-400" bgGlow="bg-gradient-to-br from-violet-500/5 to-transparent" />
-              <Kpi icon={<Receipt className="h-4 w-4 text-indigo-400" />} label="Ticket Médio" value={isLoading ? "—" : BRL(tmGeral)} accent="text-indigo-400" bgGlow="bg-gradient-to-br from-indigo-500/5 to-transparent" />
-              <Kpi icon={<AlertTriangle className="h-4 w-4 text-rose-400" />} label="Reembolsos" value={isLoading ? "—" : String(totalReemb)} accent={totalReemb > 0 ? "text-rose-400" : "text-foreground"} bgGlow={totalReemb > 0 ? "bg-gradient-to-br from-rose-500/5 to-transparent" : ""} />
+            {/* ── KPIs Globais — Ampliados & Detalhados ── */}
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <Kpi
+                icon={<TrendingUpTwoTone className="!h-6 !w-6 text-emerald-400" />}
+                label="Faturamento"
+                value={isLoading ? "—" : BRL(totalFat)}
+                subtitle="Receita total no período"
+                accent="text-emerald-400"
+                bgGlow="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent"
+              />
+              <Kpi
+                icon={<ShoppingBagTwoTone className="!h-6 !w-6 text-amber-400" />}
+                label="Vendas Total"
+                value={isLoading ? "—" : totalVendas.toLocaleString("pt-BR")}
+                subtitle="Transações liquidadas"
+                accent="text-amber-400"
+                bgGlow="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent"
+              />
+              <Kpi
+                icon={<PersonCheckTwoTone className="!h-6 !w-6 text-sky-400" />}
+                label="Leads Únicos"
+                value={isLoading ? "—" : totalLeads.toLocaleString("pt-BR")}
+                subtitle="Novos contatos no funil"
+                accent="text-sky-400"
+                bgGlow="bg-gradient-to-br from-sky-500/10 via-sky-500/5 to-transparent"
+              />
+              <Kpi
+                icon={<PercentTwoTone className="!h-6 !w-6 text-violet-400" />}
+                label="Taxa Conversão"
+                value={isLoading ? "—" : `${conversaoGeral.toFixed(1)}%`}
+                subtitle="Vendas por lead captado"
+                accent="text-violet-400"
+                bgGlow="bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent"
+              />
+              <Kpi
+                icon={<ReceiptTwoTone className="!h-6 !w-6 text-indigo-400" />}
+                label="Ticket Médio"
+                value={isLoading ? "—" : BRL(tmGeral)}
+                subtitle="Média por venda efetuada"
+                accent="text-indigo-400"
+                bgGlow="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent"
+              />
+              <Kpi
+                icon={<WarningTwoTone className="!h-6 !w-6 text-rose-400" />}
+                label="Reembolsos"
+                value={isLoading ? "—" : String(totalReemb)}
+                subtitle="Solicitações no período"
+                accent={totalReemb > 0 ? "text-rose-400" : "text-foreground"}
+                bgGlow={totalReemb > 0 ? "bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" : ""}
+              />
             </section>
 
-            {/* ── Nossa Parte ── */}
+            {/* ── Nossa Parte (Share) — Ampliado ── */}
             {workspace.id === "all" && (
-              <section className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-5">
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <Coins className="h-4 w-4" />
-                  <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">Nossa Parte (Share)</span>
+              <section className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-card/60 p-6 md:p-8 shadow-2xl backdrop-blur-xl">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      <MonetizationOnTwoTone className="!h-7 !w-7" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-[0.25em] text-amber-400">
+                        Nossa Parte (Share Acordado)
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Divisão percentual calculada conforme repasse por especialista
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold text-amber-300">
+                    <span>{visibleOps.length} Operações Integradas</span>
+                  </div>
                 </div>
-                <div className={`mt-2 text-4xl ${NUM} text-emerald-400`}>
+
+                <div className={`mt-6 text-4xl md:text-5xl font-black ${NUM} text-amber-400 tracking-tight`}>
                   {isLoading ? "—" : BRL(nossaParte)}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {visibleOps.length === 0
-                    ? "Sem operações no período"
-                    : visibleOps.map((o) => `${o.nome} ${getShare(o.nome)}%`).join(" · ")}
-                </p>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/20 text-xs text-muted-foreground">
+                  {visibleOps.length === 0 ? (
+                    <span>Sem operações ativas no período</span>
+                  ) : (
+                    visibleOps.map((o) => (
+                      <span key={o.nome} className="rounded-lg bg-background/60 border border-border/60 px-3 py-1 font-medium text-foreground">
+                        <strong className="text-amber-400">{o.nome}:</strong> {getShare(o.nome)}% share ({BRL(o.faturamento * (getShare(o.nome) / 100))})
+                      </span>
+                    ))
+                  )}
+                </div>
               </section>
             )}
 
-            {/* ── Tabela de Operações ── */}
+            {/* ── Tabela de Operações — Linhas Verticais & Visibilidade Ampliada ── */}
             {workspace.id === "all" && (
-              <section className="overflow-hidden rounded-2xl border border-border bg-card/40">
-                <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <section className="overflow-hidden rounded-3xl border border-border/80 bg-card/60 shadow-xl backdrop-blur-xl">
+                <div className="flex items-center justify-between border-b border-border/80 px-6 py-5 bg-card/80">
                   <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-[0.18em]">Performance por Operação</h2>
+                    <h2 className="text-base font-bold uppercase tracking-[0.2em] text-foreground">
+                      Performance por Operação
+                    </h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {ops.length} {ops.length === 1 ? "operação ativa" : "operações ativas"} · Leads, vendas, conversão e fontes de tráfego
+                      {ops.length} {ops.length === 1 ? "operação ativa" : "operações ativas"} · Métricas detalhadas com divisões por origem de tráfego
                     </p>
                   </div>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <AssessmentTwoTone className="!h-6 !w-6 text-amber-400" />
                 </div>
 
                 {isLoading ? (
@@ -226,94 +301,114 @@ function Dashboard() {
                     ))}
                   </div>
                 ) : visibleOps.length === 0 ? (
-                  <div className="px-5 py-10 text-center text-sm text-muted-foreground">Sem dados no período.</div>
+                  <div className="px-6 py-12 text-center text-sm text-muted-foreground">Sem dados no período.</div>
                 ) : (
-                  <div className="divide-y divide-border">
-                    {/* Header row */}
-                    <div className="grid grid-cols-[1fr_75px_90px_80px_75px_90px_85px] gap-2 px-5 py-2.5 text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
-                      <div>Operação</div>
-                      <div className="text-right">Vendas</div>
-                      <div className="text-right">Faturamento</div>
-                      <div className="text-right">Leads Novos</div>
-                      <div className="text-right">Conversão</div>
-                      <div className="text-right">Ticket Médio</div>
-                      <div className="text-right">Reembolsos</div>
+                  <div className="divide-y divide-border/70 overflow-x-auto">
+                    {/* Header row with distinct vertical column dividers */}
+                    <div className="grid grid-cols-[1.2fr_90px_120px_110px_100px_120px_100px] text-[0.65rem] font-bold uppercase tracking-[0.18em] text-muted-foreground bg-background/70 min-w-[800px]">
+                      <div className="px-6 py-4 border-r border-border/60">Operação</div>
+                      <div className="px-4 py-4 text-right border-r border-border/60">Vendas</div>
+                      <div className="px-4 py-4 text-right border-r border-border/60">Faturamento</div>
+                      <div className="px-4 py-4 text-right border-r border-border/60">Leads Novos</div>
+                      <div className="px-4 py-4 text-right border-r border-border/60">Conversão</div>
+                      <div className="px-4 py-4 text-right border-r border-border/60">Ticket Médio</div>
+                      <div className="px-4 py-4 text-right">Reembolsos</div>
                     </div>
 
                     {visibleOps.map((op) => {
                       const ac = accentFor(op.nome);
                       const isExpanded = expandedOp === op.nome;
                       return (
-                        <div key={op.id}>
+                        <div key={op.id} className="min-w-[800px]">
                           <button
                             type="button"
                             onClick={() => setExpandedOp(isExpanded ? null : op.nome)}
-                            className="w-full text-left transition-colors hover:bg-secondary/30"
+                            className="w-full text-left transition-colors hover:bg-amber-500/5 group"
                           >
-                            <div className="grid grid-cols-[1fr_75px_90px_80px_75px_90px_85px] items-center gap-2 px-5 py-4">
-                              <div className="flex items-center gap-3">
-                                <span className={`h-2.5 w-2.5 rounded-full ${ac.bar}`} />
-                                <div>
-                                  <div className="text-sm font-semibold">{op.nome}</div>
-                                  <div className="mt-0.5 flex items-center gap-2">
-                                    <div className="h-1 w-20 overflow-hidden rounded-full bg-secondary/60">
-                                      <div className={`h-full ${ac.bar} transition-all`} style={{ width: `${Math.min(100, Math.max(2, op.pctTotal * 100))}%` }} />
-                                    </div>
-                                    <span className="text-[0.6rem] tabular-nums text-muted-foreground">{(op.pctTotal * 100).toFixed(1)}%</span>
+                            <div className="grid grid-cols-[1.2fr_90px_120px_110px_100px_120px_100px] items-center text-sm">
+                              {/* Operação Column */}
+                              <div className="flex items-center gap-3.5 px-6 py-4.5 border-r border-border/60">
+                                <span className={`h-3.5 w-3.5 rounded-full ${ac.bar} shrink-0`} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-bold text-foreground text-base flex items-center gap-2">
+                                    <span>{op.nome}</span>
+                                    <span className="text-xs text-muted-foreground font-semibold">({(op.pctTotal * 100).toFixed(1)}%)</span>
+                                  </div>
+                                  <div className="mt-1.5 h-1.5 w-full max-w-[130px] overflow-hidden rounded-full bg-secondary/60">
+                                    <div className={`h-full ${ac.bar} transition-all`} style={{ width: `${Math.min(100, Math.max(2, op.pctTotal * 100))}%` }} />
                                   </div>
                                 </div>
                               </div>
-                              <div className={`text-right text-sm ${NUM}`}>{op.vendas}</div>
-                              <div className={`text-right text-sm ${NUM} text-foreground`}>{BRL(op.faturamento)}</div>
-                              <div className={`text-right text-sm ${NUM} text-sky-400`}>{op.leads.toLocaleString("pt-BR")}</div>
-                              <div className="text-right">
-                                <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
-                                  op.conversao >= 5 ? "bg-emerald-500/15 text-emerald-400"
-                                  : op.conversao >= 2 ? "bg-amber-500/15 text-amber-400"
-                                  : "bg-rose-500/15 text-rose-400"
+
+                              {/* Vendas Column */}
+                              <div className={`px-4 py-4.5 text-right border-r border-border/60 font-bold text-base ${NUM}`}>{op.vendas}</div>
+
+                              {/* Faturamento Column */}
+                              <div className={`px-4 py-4.5 text-right border-r border-border/60 font-extrabold text-base ${NUM} text-emerald-400`}>{BRL(op.faturamento)}</div>
+
+                              {/* Leads Column */}
+                              <div className={`px-4 py-4.5 text-right border-r border-border/60 font-bold text-base ${NUM} text-sky-400`}>{op.leads.toLocaleString("pt-BR")}</div>
+
+                              {/* Conversão Column */}
+                              <div className="px-4 py-4.5 text-right border-r border-border/60">
+                                <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums ${
+                                  op.conversao >= 5 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                                  : op.conversao >= 2 ? "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                                  : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
                                 }`}>
                                   {op.conversao.toFixed(1)}%
                                 </span>
                               </div>
-                              <div className={`text-right text-sm ${NUM} text-sky-400`}>{BRL(op.ticketMedio)}</div>
-                              <div className={`text-right text-sm ${NUM} ${op.reembolsos > 0 ? "text-rose-400" : "text-muted-foreground"}`}>
+
+                              {/* Ticket Médio Column */}
+                              <div className={`px-4 py-4.5 text-right border-r border-border/60 font-bold text-base ${NUM} text-amber-400`}>{BRL(op.ticketMedio)}</div>
+
+                              {/* Reembolsos Column */}
+                              <div className={`px-4 py-4.5 text-right font-bold text-base ${NUM} ${op.reembolsos > 0 ? "text-rose-400" : "text-muted-foreground"}`}>
                                 {op.reembolsos}
                               </div>
                             </div>
                           </button>
 
-                          {/* Lead Breakdown (Typebot Org/Pago, Orgânico Direto) */}
+                          {/* Lead Breakdown Cards (Typebot Org/Pago, Orgânico Direto) */}
                           {(op.nome === "Caio" || isExpanded) && op.leadBreakdown.length > 0 && (
-                            <div className="border-t border-border/50 bg-secondary/15 px-5 py-3.5 space-y-2">
-                              <div className="flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                                <span>📊 Detalhamento de Origem dos Leads — {op.nome}</span>
+                            <div className="border-t border-border/60 bg-secondary/20 px-6 py-4 space-y-3">
+                              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.2em] text-amber-400">
+                                <span className="flex items-center gap-2">
+                                  <AssessmentTwoTone className="!h-4 !w-4" />
+                                  Detalhamento de Origem dos Leads — {op.nome}
+                                </span>
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 {op.leadBreakdown.map((lb) => (
-                                  <div key={lb.tipo} className="rounded-xl border border-border/60 bg-card/80 p-3.5 flex flex-col justify-between shadow-sm">
-                                    <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">{lb.tipo}</div>
-                                    <div className={`mt-2 font-mono text-2xl font-black tabular-nums ${ac.text}`}>{lb.leads.toLocaleString("pt-BR")}</div>
-                                    <div className="mt-1 text-[0.65rem] text-muted-foreground font-medium">
-                                      {lb.vendas} {lb.vendas === 1 ? "venda" : "vendas"} · {lb.conversao}% conversão
+                                  <div key={lb.tipo} className="rounded-2xl border border-border/80 bg-card/90 p-4.5 flex flex-col justify-between shadow-md">
+                                    <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lb.tipo}</div>
+                                    <div className={`mt-2 font-mono text-3xl font-black tabular-nums ${ac.text}`}>{lb.leads.toLocaleString("pt-BR")}</div>
+                                    <div className="mt-2 text-xs text-muted-foreground font-semibold border-t border-border/50 pt-2">
+                                      {lb.vendas} {lb.vendas === 1 ? "venda liquidadas" : "vendas liquidadas"} · <span className="text-amber-400 font-bold">{lb.conversao}% conversão</span>
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           )}
-
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                           {/* Fontes de tráfego (expandível) */}
                           {isExpanded && op.fontes.length > 0 && (
-                            <div className="border-t border-border/50 bg-secondary/10 px-5 py-3">
-                              <div className="mb-2 text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                                Fontes de Tráfego
+                            <div className="border-t border-border/60 bg-secondary/15 px-6 py-4">
+                              <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-400">
+                                Fontes de Tráfego — {op.nome}
                               </div>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-3">
                                 {op.fontes.map((f) => (
-                                  <div key={f.fonte} className="flex items-center gap-3 rounded-lg border border-border/40 bg-card/60 px-3 py-2">
-                                    <span className="text-xs font-medium text-foreground">{f.fonte}</span>
-                                    <span className={`text-xs font-semibold tabular-nums ${ac.text}`}>{f.vendas} vendas</span>
-                                    <span className="text-xs tabular-nums text-muted-foreground">{BRL(f.faturamento)}</span>
+                                  <div key={f.fonte} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/80 px-3.5 py-2.5 shadow-sm">
+                                    <span className="text-xs font-bold text-foreground">{f.fonte}</span>
+                                    <span className={`text-xs font-extrabold tabular-nums ${ac.text}`}>{f.vendas} vendas</span>
+                                    <span className="text-xs font-semibold tabular-nums text-muted-foreground">{BRL(f.faturamento)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -321,7 +416,7 @@ function Dashboard() {
                           )}
 
                           {isExpanded && op.fontes.length === 0 && op.leadBreakdown.length === 0 && (
-                            <div className="border-t border-border/50 bg-secondary/10 px-5 py-3">
+                            <div className="border-t border-border/60 bg-secondary/10 px-6 py-3">
                               <span className="text-xs text-muted-foreground">Sem fontes de tráfego registradas.</span>
                             </div>
                           )}
@@ -329,16 +424,30 @@ function Dashboard() {
                       );
                     })}
 
-                    {/* Total row */}
+                    {/* Total row with vertical lines */}
                     {visibleOps.length > 1 && (
-                      <div className="grid grid-cols-[1fr_75px_90px_80px_75px_90px_85px] items-center gap-2 bg-emerald-500/5 px-5 py-4">
-                        <div className="flex items-center gap-2 text-sm font-bold text-emerald-400">
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          Total
+                      <div className="grid grid-cols-[1.2fr_90px_120px_110px_100px_120px_100px] items-center bg-amber-500/10 text-sm font-bold min-w-[800px]">
+                        <div className="flex items-center gap-2.5 px-6 py-4.5 border-r border-border/60 text-amber-400">
+                          <TrendingUpTwoTone className="!h-5 !w-5" />
+                          <span>Total Operações</span>
                         </div>
-                        <div className={`text-right text-sm font-bold ${NUM}`}>{totalVendas}</div>
-                        <div className={`text-right text-sm font-bold ${NUM} text-emerald-400`}>{BRL(totalFat)}</div>
-                        <div className={`text-right text-sm font-bold ${NUM} text-sky-400`}>{totalLeads.toLocaleString("pt-BR")}</div>
+                        <div className={`px-4 py-4.5 text-right border-r border-border/60 text-base ${NUM}`}>{totalVendas}</div>
+                        <div className={`px-4 py-4.5 text-right border-r border-border/60 text-base ${NUM} text-emerald-400`}>{BRL(totalFat)}</div>
+                        <div className={`px-4 py-4.5 text-right border-r border-border/60 text-base ${NUM} text-sky-400`}>{totalLeads.toLocaleString("pt-BR")}</div>
+                        <div className="px-4 py-4.5 text-right border-r border-border/60">
+                          <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            {conversaoGeral.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className={`px-4 py-4.5 text-right border-r border-border/60 text-base ${NUM} text-amber-400`}>{BRL(tmGeral)}</div>
+                        <div className={`px-4 py-4.5 text-right text-base ${NUM} ${totalReemb > 0 ? "text-rose-400" : "text-muted-foreground"}`}>{totalReemb}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+          </TabsContent>
                         <div className="text-right">
                           <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-xs font-bold tabular-nums text-emerald-400">
                             {conversaoGeral.toFixed(1)}%
@@ -406,12 +515,12 @@ function Dashboard() {
 
             {/* ── Financeiro ── */}
             {config.showFinanceiro && workspace.id === "all" && (
-              <section className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-3">
-                <MiniCard icon={<Wallet className="h-4 w-4" />} label="Saldo Estimado" value={isLoading ? "—" : BRL(saldoEstimado)} hint="Faturamento − gastos do mês" accent={saldoEstimado >= 0 ? "text-emerald-400" : "text-rose-400"} />
+              <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <MiniCard icon={<AccountBalanceWalletTwoTone className="!h-5 !w-5 text-amber-400" />} label="Saldo Estimado" value={isLoading ? "—" : BRL(saldoEstimado)} hint="Faturamento − gastos do mês" accent={saldoEstimado >= 0 ? "text-emerald-400" : "text-rose-400"} />
                 {config.showGastosCard && (
-                  <MiniCard icon={<AlertTriangle className="h-4 w-4" />} label="Gastos do Mês" value={isLoading ? "—" : BRL(gastosMes)} hint="Financeiro · mês atual" accent="text-rose-400" />
+                  <MiniCard icon={<WarningTwoTone className="!h-5 !w-5 text-rose-400" />} label="Gastos do Mês" value={isLoading ? "—" : BRL(gastosMes)} hint="Financeiro · mês atual" accent="text-rose-400" />
                 )}
-                <MiniCard icon={<Coins className="h-4 w-4" />} label="Reembolsos" value={isLoading ? "—" : String(totalReemb)} hint="Total contabilizado no período" accent="text-sky-400" />
+                <MiniCard icon={<MonetizationOnTwoTone className="!h-5 !w-5 text-sky-400" />} label="Reembolsos" value={isLoading ? "—" : String(totalReemb)} hint="Total contabilizado no período" accent="text-sky-400" />
               </section>
             )}
 
@@ -423,22 +532,22 @@ function Dashboard() {
           <TabsContent value="vendedores" className="mt-6 space-y-6">
             {/* ── KPIs resumo ── */}
             {!isLoading && (data?.vendedores ?? []).length > 0 && (
-              <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border lg:grid-cols-4">
-                <Kpi icon={<Users className="h-4 w-4" />} label="Vendedores Ativos" value={String((data?.vendedores ?? []).filter((v) => v.vendas > 0).length)} accent="text-sky-400" />
-                <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Top Vendedor" value={data?.vendedores?.[0]?.nome ?? "—"} accent="text-amber-400" />
-                <Kpi icon={<Receipt className="h-4 w-4" />} label="Ticket Médio Top" value={data?.vendedores?.[0] ? BRL(data.vendedores[0].faturamento / Math.max(1, data.vendedores[0].vendas)) : "—"} accent="text-emerald-400" />
-                <Kpi icon={<Percent className="h-4 w-4" />} label="Concentração Top 3" value={(() => { const v = data?.vendedores ?? []; const top3Fat = v.slice(0, 3).reduce((a, x) => a + x.faturamento, 0); return totalFat > 0 ? `${((top3Fat / totalFat) * 100).toFixed(0)}%` : "—"; })()} accent="text-violet-400" />
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Kpi icon={<PeopleTwoTone className="!h-6 !w-6 text-sky-400" />} label="Vendedores Ativos" value={String((data?.vendedores ?? []).filter((v) => v.vendas > 0).length)} accent="text-sky-400" />
+                <Kpi icon={<TrendingUpTwoTone className="!h-6 !w-6 text-amber-400" />} label="Top Vendedor" value={data?.vendedores?.[0]?.nome ?? "—"} accent="text-amber-400" />
+                <Kpi icon={<ReceiptTwoTone className="!h-6 !w-6 text-emerald-400" />} label="Ticket Médio Top" value={data?.vendedores?.[0] ? BRL(data.vendedores[0].faturamento / Math.max(1, data.vendedores[0].vendas)) : "—"} accent="text-emerald-400" />
+                <Kpi icon={<PercentTwoTone className="!h-6 !w-6 text-violet-400" />} label="Concentração Top 3" value={(() => { const v = data?.vendedores ?? []; const top3Fat = v.slice(0, 3).reduce((a, x) => a + x.faturamento, 0); return totalFat > 0 ? `${((top3Fat / totalFat) * 100).toFixed(0)}%` : "—"; })()} accent="text-violet-400" />
               </section>
             )}
 
             {/* ── Grid de cards ── */}
-            <section className="overflow-hidden rounded-2xl border border-border bg-card/40">
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <section className="overflow-hidden rounded-3xl border border-border/80 bg-card/60 shadow-xl">
+              <div className="flex items-center justify-between border-b border-border/80 px-6 py-5 bg-card/80">
                 <div>
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em]">Performance por Vendedor</h2>
+                  <h2 className="text-base font-bold uppercase tracking-[0.2em]">Performance por Vendedor</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">Faturamento, vendas, ticket médio e participação</p>
                 </div>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                <AssessmentTwoTone className="!h-6 !w-6 text-amber-400" />
               </div>
 
               {isLoading ? (
@@ -562,16 +671,22 @@ function Dashboard() {
 
 /* ── Componentes auxiliares ── */
 
-function Kpi({ icon, label, value, accent, bgGlow }: { icon: React.ReactNode; label: string; value: string; accent?: string; bgGlow?: string }) {
+function Kpi({ icon, label, value, subtitle, accent, bgGlow }: { icon: React.ReactNode; label: string; value: string; subtitle?: string; accent?: string; bgGlow?: string }) {
   return (
-    <div className={`group relative overflow-hidden rounded-xl border border-border/60 bg-card/60 p-4 transition-all duration-200 hover:border-border hover:bg-card/90 hover:shadow-lg hover:shadow-emerald-500/5 ${bgGlow ?? ""}`}>
+    <div className={`group relative overflow-hidden rounded-2xl border border-border/80 bg-card/70 p-5 md:p-6 transition-all duration-300 hover:border-amber-500/40 hover:bg-card/90 hover:shadow-xl hover:shadow-amber-500/5 backdrop-blur-md ${bgGlow ?? ""}`}>
       <div className="flex items-center justify-between text-muted-foreground">
-        <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] opacity-80 group-hover:opacity-100 transition-opacity">{label}</span>
-        <div className={`p-1.5 rounded-lg bg-secondary/50 text-foreground group-hover:scale-110 transition-transform ${accent ?? ""}`}>
+        <span className="text-[0.7rem] font-bold uppercase tracking-[0.2em] opacity-80 group-hover:opacity-100 transition-opacity">{label}</span>
+        <div className={`p-2 rounded-xl bg-background/80 border border-border/60 text-foreground group-hover:scale-110 transition-transform ${accent ?? ""}`}>
           {icon}
         </div>
       </div>
-      <div className={`mt-3 text-2xl md:text-3xl font-extrabold tracking-tight ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
+      <div className={`mt-4 text-3xl md:text-4xl font-black tracking-tight ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
+      {subtitle && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground/80 font-medium">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400/80" />
+          <span>{subtitle}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -579,21 +694,21 @@ function Kpi({ icon, label, value, accent, bgGlow }: { icon: React.ReactNode; la
 function StatBlock({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div>
-      <div className="text-[0.55rem] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
-      <div className={`mt-1 text-lg ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
+      <div className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+      <div className={`mt-1.5 text-xl font-bold ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
     </div>
   );
 }
 
 function MiniCard({ icon, label, value, hint, accent }: { icon: React.ReactNode; label: string; value: string; hint: string; accent?: string }) {
   return (
-    <div className="bg-card p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
+    <div className="rounded-2xl border border-border/80 bg-card/80 p-6 shadow-lg backdrop-blur-md">
+      <div className="flex items-center gap-2.5 text-muted-foreground">
         {icon}
-        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.22em]">{label}</span>
+        <span className="text-[0.65rem] font-bold uppercase tracking-[0.22em]">{label}</span>
       </div>
-      <div className={`mt-3 text-2xl ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
-      <div className="mt-1 text-[0.7rem] text-muted-foreground">{hint}</div>
+      <div className={`mt-4 text-3xl font-black ${NUM} ${accent ?? "text-foreground"}`}>{value}</div>
+      <div className="mt-1.5 text-xs text-muted-foreground/80 font-medium">{hint}</div>
     </div>
   );
 }
