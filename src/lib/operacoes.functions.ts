@@ -1813,22 +1813,26 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const supabase = supabaseAdmin ?? (await dbFor(context));
 
     const todayStr = toSpDateString(new Date()) || new Date().toISOString().slice(0, 10);
+    const todayStart = new Date(todayStr + "T00:00:00-03:00").toISOString();
 
     const [vendasRes, crmLeadsRes, htVendasRes, htKanbanRes, quizRes, financeiroRes, waConvRes, waMessagesRes, htQuizRes, htLeadsRes] = await Promise.all([
       supabase
         .from("vendas")
         .select('"Ticket", nome_expert, "Data", "ID de Referência", "UTM", "Produto", "Evento", "Email", "Telefone"')
+        .gte("Data", todayStr)
         .order("id", { ascending: false })
         .limit(2000),
       supabase
         .from("crm_leads" as any)
         .select("id, created_at, data_criacao, updated_at, expert, utm_source, nome, telefone, vendedor")
+        .gte("updated_at", todayStart)
         .order("created_at", { ascending: false })
         .limit(2000),
       supabase
         .from("ht_vendas" as any)
         .select("id, valor_total, data, status, cliente, closer, utm_source, origem, utm")
         .neq("status", "reembolso")
+        .gte("data", todayStr)
         .order("data", { ascending: false })
         .limit(500),
       supabase
@@ -1848,12 +1852,14 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       supabase
         .from("wa_conversations" as any)
         .select("id, contact_wa_id, assigned_vendor_id, operacao_id, updated_at, created_at, contact_name, utm_source")
+        .gte("updated_at", todayStart)
         .order("updated_at", { ascending: false })
         .limit(2000),
       supabase
         .from("wa_messages" as any)
         .select("id, conversation_id, direction, created_at")
         .eq("direction", "out")
+        .gte("created_at", todayStart)
         .limit(3000),
       supabase
         .from("ht_quiz_submissions" as any)
