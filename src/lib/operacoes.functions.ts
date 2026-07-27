@@ -1275,7 +1275,15 @@ export const getDashboardStats = createServerFn({ method: "POST" })
         t.includes("PAGO") ||
         t.includes("ADS") ||
         t.includes("PATROCINADO") ||
-        t.includes("CPC")
+        t.includes("CPC") ||
+        t.includes("META") ||
+        t.includes("FB") ||
+        t.includes("FACEBOOK") ||
+        t.includes("INSTAGRAM") ||
+        t.includes("ANUNCIO") ||
+        t.includes("ANÚNCIO") ||
+        t.includes("IMPULSIONADO") ||
+        t.includes("CAMPANHA")
       );
 
       const hasOrganicTag = leadTags.some((t) =>
