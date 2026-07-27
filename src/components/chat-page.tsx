@@ -128,7 +128,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Archive, ArchiveRestore } from "lucide-react";
-import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun } from "@/lib/flow-engine.functions";
+import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun, getFlow } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
 import { getUserPref, setUserPref } from "@/lib/user-prefs.functions";
@@ -4145,13 +4145,24 @@ function FlowInlineBar({
   const [startFromStep, setStartFromStep] = useState(false);
   const [selectedStartNodeId, setSelectedStartNodeId] = useState<string | null>(null);
   const [reorderOpen, setReorderOpen] = useState(false);
+  const [fullFlowNodes, setFullFlowNodes] = useState<any[] | null>(null);
+  const [fullFlowEdges, setFullFlowEdges] = useState<any[] | null>(null);
+  const [loadingSteps, setLoadingSteps] = useState(false);
+  const getFlowFn = useServerFn(getFlow);
 
   useEffect(() => {
     setFiring(null);
     setConfirm(null);
     setStartFromStep(false);
     setSelectedStartNodeId(null);
+    setFullFlowNodes(null);
+    setFullFlowEdges(null);
   }, [conversation.id]);
+
+  useEffect(() => {
+    setFullFlowNodes(null);
+    setFullFlowEdges(null);
+  }, [confirm?.id]);
 
   const vendorSession = useMemo(() => getVendorSession(), []);
   const vendorKey = vendorSession?.id ?? "admin";
@@ -4186,6 +4197,26 @@ function FlowInlineBar({
     staleTime: 30_000,
   });
 
+  useEffect(() => {
+    if (!startFromStep || !confirm?.id) return;
+    if (fullFlowNodes !== null) return;
+    let cancelled = false;
+    setLoadingSteps(true);
+    getFlowFn({ data: { id: String(confirm.id) } })
+      .then((full: any) => {
+        if (cancelled || !full) return;
+        let nodes = full.nodes;
+        let edges = full.edges;
+        if (typeof nodes === "string") try { nodes = JSON.parse(nodes); } catch { nodes = []; }
+        if (typeof edges === "string") try { edges = JSON.parse(edges); } catch { edges = []; }
+        setFullFlowNodes(Array.isArray(nodes) ? nodes : []);
+        setFullFlowEdges(Array.isArray(edges) ? edges : []);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingSteps(false); });
+    return () => { cancelled = true; };
+  }, [startFromStep, confirm?.id]);
+
   const compatibleAll = useMemo(() => {
     const op = conversation.operacao_id;
     return asArray<any>(flows).filter((f) => {
@@ -4218,8 +4249,11 @@ function FlowInlineBar({
 
   const confirmOrderedNodes = useMemo(() => {
     if (!confirm) return [];
+    if (fullFlowNodes !== null && fullFlowEdges !== null) {
+      return getOrderedFlowNodes(fullFlowNodes, fullFlowEdges);
+    }
     return getOrderedFlowNodes(confirm.nodes, confirm.edges);
-  }, [confirm]);
+  }, [confirm, fullFlowNodes, fullFlowEdges]);
 
   function fire(flowId: string, startNodeId?: string | null) {
     if (firing) return;
@@ -4385,7 +4419,12 @@ function FlowInlineBar({
                   Selecione a etapa de início:
                 </label>
                 <div className="max-h-60 overflow-y-auto space-y-1 scrollbar-fancy p-1 rounded-xl border border-chat-line bg-chat-panel/60">
-                  {confirmOrderedNodes.length === 0 ? (
+                  {loadingSteps ? (
+                    <div className="p-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Carregando etapas...
+                    </div>
+                  ) : confirmOrderedNodes.length === 0 ? (
                     <div className="p-3 text-center text-xs text-muted-foreground">Nenhuma etapa encontrada neste fluxo</div>
                   ) : (
                     confirmOrderedNodes.map((step, idx) => (
