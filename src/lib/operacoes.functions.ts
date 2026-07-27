@@ -1302,18 +1302,17 @@ export const getDashboardStats = createServerFn({ method: "POST" })
       const isPaidSource = /\b(facebook_ads|meta_ads|gads|patrocinado|facebook|fb|meta|ig|instagram_ads|google_ads|tiktok_ads|kwai_ads)\b/i.test(leadSrc) || /(-ads|_ads|ads-|patrocinado)/i.test(leadSrc) || leadSrc === "fb" || leadSrc === "ig" || leadSrc === "meta" || leadSrc === "facebook";
       const hasRealCampaign = !!cleanCp && !organicPattern.test(cleanCp);
 
-      // Verifica texto das mensagens iniciais / preview (ex: "Vim do formulário" vs "Vim do Youtube")
+      const isOrganicBio = leadSrc.includes("link_in_bio") || leadSrc.includes("ig_bio") || leadSrc.includes("instagram_bio") || leadSrc.includes("link_bio") || leadMed.includes("bio");
+      const hasExplicitPaidSignal = hasClickId || isPaidSource || isPaidMedium || hasPaidTag || (hasRealCampaign && !leadSrc.includes("bio"));
+
+      const isPaid = (hasExplicitPaidSignal || hasRealCampaign) && !isOrganicBio;
+
+      // Verifica se veio por Typebot/Quiz/Bot
       const rawText = norm(
         `${lead.last_message_preview || matchedConv?.last_message_preview || ""} ${lead.mensagem || ""} ${lead.notes || ""} ${lead.first_message || ""}`
       );
       const isTextYoutube = rawText.includes("youtube") || rawText.includes("yt") || rawText.includes("instagram") || rawText.includes("tiktok");
       const isTextFormulario = rawText.includes("formulario") || rawText.includes("formulari");
-      const isPaidFormMessage = isTextFormulario && !isTextYoutube;
-
-      const isOrganicBio = leadSrc.includes("link_in_bio") || leadSrc.includes("ig_bio") || leadSrc.includes("instagram_bio") || leadSrc.includes("link_bio") || leadMed.includes("bio");
-      const hasExplicitPaidSignal = hasClickId || isPaidSource || isPaidMedium || hasPaidTag || isPaidFormMessage || (hasRealCampaign && !leadSrc.includes("bio"));
-
-      const isPaid = (hasExplicitPaidSignal || hasRealCampaign) && !isOrganicBio;
 
       const isTypebotOrigin =
         leadSrc.includes("typebot") ||
