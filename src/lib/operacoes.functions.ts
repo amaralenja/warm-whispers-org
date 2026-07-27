@@ -1867,21 +1867,40 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       }
     }
 
-    // Real HT Events from today's records
-    const htEvents: Array<{ id: string; timestamp: string; tipo: string; titulo: string; descricao: string; sdr?: string; closer?: string; valor?: number; horario?: string }> = [];
+    // Real HT Events & Sales Origin (Paid vs Organic)
+    let paidSalesCount = 0;
+    let organicSalesCount = 0;
+    let paidSalesRevenue = 0;
+    let organicSalesRevenue = 0;
 
-    for (const v of htVendasToday.slice(0, 10)) {
+    const htEvents: Array<{ id: string; timestamp: string; tipo: string; titulo: string; descricao: string; sdr?: string; closer?: string; valor?: number; horario?: string; origem?: string }> = [];
+
+    for (const v of htVendasToday.slice(0, 15)) {
       const d = v.data ? new Date(v.data) : new Date();
       const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       const val = parseFloat(v.valor_total) || 0;
+      const rawUtm = String(v.utm_source || v.origem || v.utm || "").toLowerCase();
+      const isPaid = rawUtm.includes("fb") || rawUtm.includes("meta") || rawUtm.includes("ig") || rawUtm.includes("google") || rawUtm.includes("cpc") || rawUtm.includes("ads") || rawUtm.includes("pago");
+
+      if (isPaid) {
+        paidSalesCount++;
+        paidSalesRevenue += val;
+      } else {
+        organicSalesCount++;
+        organicSalesRevenue += val;
+      }
+
+      const origemText = isPaid ? "Tráfego Pago" : "Orgânico";
+
       htEvents.push({
         id: `ht-venda-${v.id || Math.random()}`,
         timestamp: timeStr,
         tipo: "venda_ht",
-        titulo: "🎉 Venda High Ticket Fechada!",
-        descricao: `Closer ${v.closer || "Gabriel"} fechou contrato de R$ ${val.toLocaleString("pt-BR")} com cliente ${v.cliente || "Qualificado"}`,
+        titulo: `🎉 Venda High Ticket (${origemText})`,
+        descricao: `Closer ${v.closer || "Gabriel"} fechou contrato de R$ ${val.toLocaleString("pt-BR")} com cliente ${v.cliente || "Qualificado"} · [${origemText}]`,
         closer: v.closer || "Gabriel",
         valor: val,
+        origem: origemText,
       });
     }
 
@@ -1899,15 +1918,22 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     htEvents.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-    // Traffic Spend Calculation for Today
-    const todayGastos = (financeiroRes.data ?? [])
-      .filter((f: any) => toSpDateString(f.data_ref) === todayStr)
+    // Traffic Spend & Paid ROAS Calculation for TODAY strictly
+    const todayAdsGastos = (financeiroRes.data ?? [])
+      .filter((f: any) => {
+        if (toSpDateString(f.data_ref) !== todayStr) return false;
+        const tipo = String(f.tipo ?? "").toLowerCase();
+        return tipo.includes("ads") || tipo.includes("facebook") || tipo.includes("meta") || tipo.includes("trafego") || tipo.includes("gasto");
+      })
       .reduce((a: number, f: any) => a + Number(f.valor || 0), 0);
 
-    const gastoTotal = todayGastos > 0 ? todayGastos : 3840;
-    const cpl = qualifiedLeadsToday > 0 ? Number((gastoTotal / qualifiedLeadsToday).toFixed(2)) : 4.12;
-    const costPerMeeting = scheduledCount > 0 ? Number((gastoTotal / scheduledCount).toFixed(2)) : 76.80;
-    const roas = gastoTotal > 0 ? Number((htRevenueToday / gastoTotal).toFixed(1)) : 4.8;
+    const gastoTotal = todayAdsGastos; // Real TODAY spend only (0 if none registered today)
+    const cpl = qualifiedLeadsToday > 0 ? Number((gastoTotal / qualifiedLeadsToday).toFixed(2)) : 0;
+    const costPerMeeting = scheduledCount > 0 ? Number((gastoTotal / scheduledCount).toFixed(2)) : 0;
+    // ROAS is ONLY calculated from paid traffic sales revenue divided by paid ads spend
+    const roas = (gastoTotal > 0 && paidSalesRevenue > 0)
+      ? Number((paidSalesRevenue / gastoTotal).toFixed(1))
+      : 0;
 
     return {
       todayStr,
@@ -1929,7 +1955,13 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         scheduledCount,
         vendasHtCount,
         revenueToday: htRevenueToday,
-        trafficSpendToday: { gastoTotal, cpl, costPerMeeting, roas: roas > 0 ? roas : 4.8 },
+        salesOriginBreakdown: {
+          paidCount: paidSalesCount,
+          organicCount: organicSalesCount,
+          paidRevenue: paidSalesRevenue,
+          organicRevenue: organicSalesRevenue,
+        },
+        trafficSpendToday: { gastoTotal, cpl, costPerMeeting, roas },
         recentEvents: htEvents,
       },
     };

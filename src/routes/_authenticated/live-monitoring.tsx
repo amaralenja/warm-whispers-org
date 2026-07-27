@@ -395,7 +395,7 @@ function LiveMonitoringPage() {
             <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
               <div className="flex items-center gap-2 text-emerald-400">
                 <CampaignTwoTone className="!h-5 !w-5" />
-                <span className="text-xs font-bold uppercase tracking-[0.2em]">Investimento em Tráfego (Hoje)</span>
+                <span className="text-xs font-bold uppercase tracking-[0.2em]">Investimento em Ads (Hoje)</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-emerald-300 font-mono font-bold">
                 <TimerTwoTone className="!h-4 !w-4 text-emerald-400 animate-spin" />
@@ -405,28 +405,29 @@ function LiveMonitoringPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               <div className="rounded-2xl border border-border/60 bg-background/70 p-3.5">
-                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Gasto em Ads</div>
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Gasto em Ads (Hoje)</div>
                 <div className="mt-1 font-mono text-lg font-black text-white">
-                  {BRL(serverStats?.ht?.trafficSpendToday?.gastoTotal ?? 3840)}
+                  {BRL(serverStats?.ht?.trafficSpendToday?.gastoTotal ?? 0)}
                 </div>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/70 p-3.5">
-                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">CPL Médio</div>
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">CPL Médio (Hoje)</div>
                 <div className="mt-1 font-mono text-lg font-black text-amber-400">
-                  {BRL(serverStats?.ht?.trafficSpendToday?.cpl ?? 4.12)}
+                  {BRL(serverStats?.ht?.trafficSpendToday?.cpl ?? 0)}
                 </div>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/70 p-3.5">
-                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Custo/Reunião</div>
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Custo/Reunião (Hoje)</div>
                 <div className="mt-1 font-mono text-lg font-black text-sky-400">
-                  {BRL(serverStats?.ht?.trafficSpendToday?.costPerMeeting ?? 76.8)}
+                  {BRL(serverStats?.ht?.trafficSpendToday?.costPerMeeting ?? 0)}
                 </div>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/70 p-3.5">
-                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">ROAS Operacional</div>
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">ROAS Tráfego Pago</div>
                 <div className="mt-1 font-mono text-lg font-black text-emerald-400">
-                  {serverStats?.ht?.trafficSpendToday?.roas ?? 4.8}x
+                  {serverStats?.ht?.trafficSpendToday?.roas ?? 0}x
                 </div>
+                <div className="mt-0.5 text-[0.55rem] text-emerald-300/70 font-semibold">Vendas Tráfego Pago / Gasto Ads</div>
               </div>
             </div>
           </div>
@@ -449,7 +450,7 @@ function LiveMonitoringPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/30 text-[0.65rem] font-bold text-sky-200">1</span>
-                      Leads Qualificados
+                      Leads Qualificados (Quiz Hoje)
                     </span>
                     <span className="font-mono text-xl font-black text-white">
                       {isLoading ? "—" : (serverStats?.ht?.qualifiedLeadsToday ?? 0)}
@@ -509,7 +510,7 @@ function LiveMonitoringPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-teal-300 flex items-center gap-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-500/30 text-[0.65rem] font-bold text-teal-200">5</span>
-                      Agendamentos
+                      Agendamentos (Hoje)
                     </span>
                     <span className="font-mono text-xl font-black text-teal-300">
                       {isLoading ? "—" : (serverStats?.ht?.scheduledCount ?? 0)}
@@ -518,18 +519,29 @@ function LiveMonitoringPage() {
                 </div>
               </div>
 
-              {/* Estágio 6: Vendas HT (65% width) */}
+              {/* Estágio 6: Vendas HT com Origem (65% width) */}
               <div className="w-[65%] relative">
                 <div className="rounded-2xl border border-emerald-500/50 bg-gradient-to-r from-emerald-500/30 via-emerald-500/20 to-emerald-500/30 p-4 shadow-2xl">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/30 text-[0.65rem] font-bold text-emerald-200">6</span>
-                      Vendas HT
+                      Vendas HT (Hoje)
                     </span>
                     <span className="font-mono text-xl font-black text-emerald-400">
                       {isLoading ? "—" : (serverStats?.ht?.vendasHtCount ?? 0)}
                     </span>
                   </div>
+                  {/* Origin Breakdown Pill */}
+                  {serverStats?.ht?.salesOriginBreakdown && (
+                    <div className="mt-2.5 pt-2 border-t border-emerald-500/20 flex flex-wrap gap-2 text-[0.65rem] font-bold">
+                      <span className="rounded-lg bg-emerald-500/25 border border-emerald-500/40 px-2.5 py-1 text-emerald-300">
+                        🎯 Tráfego Pago: {serverStats.ht.salesOriginBreakdown.paidCount} ({BRL(serverStats.ht.salesOriginBreakdown.paidRevenue)})
+                      </span>
+                      <span className="rounded-lg bg-violet-500/25 border border-violet-500/40 px-2.5 py-1 text-violet-300">
+                        🌱 Orgânico: {serverStats.ht.salesOriginBreakdown.organicCount} ({BRL(serverStats.ht.salesOriginBreakdown.organicRevenue)})
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -558,7 +570,18 @@ function LiveMonitoringPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">{item.titulo}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">{item.titulo}</span>
+                      {item.origem && (
+                        <span className={`rounded-md px-2 py-0.5 text-[0.6rem] font-extrabold uppercase ${
+                          item.origem === "Tráfego Pago"
+                            ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/30"
+                            : "bg-violet-500/25 text-violet-300 border border-violet-500/30"
+                        }`}>
+                          {item.origem}
+                        </span>
+                      )}
+                    </div>
                     <span className="font-mono text-[0.65rem] font-semibold text-muted-foreground">{item.timestamp}</span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{item.descricao}</p>
