@@ -1976,6 +1976,95 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
       });
     }
 
+    // ── 3. Agregado de Calls por Closer, Show-ups e No-shows de HOJE ──
+    const closersMap = new Map<string, { callsToday: number; showUpsToday: number; noShowsToday: number }>();
+    const scheduledCallsToday: Array<{
+      id: string;
+      horario: string;
+      leadName: string;
+      closerName: string;
+      status: "show_up" | "no_show" | "pendente";
+    }> = [];
+
+    let showUpsCountToday = 0;
+    let noShowsCountToday = 0;
+
+    for (const kb of htKanbanAll) {
+      const isSchedToday = toSpDateString(kb.scheduled_at) === todayStr;
+      const isUpdToday = toSpDateString(kb.updated_at) === todayStr;
+
+      if (!isSchedToday && !isUpdToday) continue;
+      if (!kb.scheduled_at && !kb.closer_email) continue;
+
+      const rawCloser = String(kb.closer_email || kb.closer_name || "Gabriel").trim();
+      const closerName = rawCloser.includes("@") ? rawCloser.split("@")[0] : rawCloser;
+      const capitalizedCloser = closerName.charAt(0).toUpperCase() + closerName.slice(1);
+
+      if (!closersMap.has(capitalizedCloser)) {
+        closersMap.set(capitalizedCloser, { callsToday: 0, showUpsToday: 0, noShowsToday: 0 });
+      }
+      const closerStats = closersMap.get(capitalizedCloser)!;
+      closerStats.callsToday++;
+
+      const stageLower = String(kb.closer_stage || "").toLowerCase();
+      let callStatus: "show_up" | "no_show" | "pendente" = "pendente";
+
+      if (stageLower.includes("show") || stageLower.includes("compareceu") || stageLower.includes("realizada") || stageLower.includes("venda")) {
+        callStatus = "show_up";
+        closerStats.showUpsToday++;
+        showUpsCountToday++;
+
+        if (isUpdToday) {
+          const d = kb.updated_at ? new Date(kb.updated_at) : new Date();
+          const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+          htEvents.push({
+            id: `showup-${kb.lead_id || Math.random()}`,
+            timestamp: timeStr,
+            tipo: "show_up",
+            titulo: `🟢 Show-Up Confirmado (${capitalizedCloser})`,
+            descricao: `Lead compareceu à reunião com o Closer ${capitalizedCloser}`,
+            closer: capitalizedCloser,
+          });
+        }
+      } else if (stageLower.includes("no_show") || stageLower.includes("falta") || stageLower.includes("nao_compareceu")) {
+        callStatus = "no_show";
+        closerStats.noShowsToday++;
+        noShowsCountToday++;
+
+        if (isUpdToday) {
+          const d = kb.updated_at ? new Date(kb.updated_at) : new Date();
+          const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+          htEvents.push({
+            id: `noshow-${kb.lead_id || Math.random()}`,
+            timestamp: timeStr,
+            tipo: "no_show",
+            titulo: `🔴 No-Show Registrado (${capitalizedCloser})`,
+            descricao: `Lead faltou à reunião agendada com Closer ${capitalizedCloser}`,
+            closer: capitalizedCloser,
+          });
+        }
+      }
+
+      const schedDate = kb.scheduled_at ? new Date(kb.scheduled_at) : new Date();
+      const horaStr = schedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+      scheduledCallsToday.push({
+        id: String(kb.lead_id || Math.random()),
+        horario: horaStr !== "Invalid Date" ? horaStr : "14:00",
+        leadName: `Lead ${kb.lead_id?.slice(0, 6) || "Qualificado"}`,
+        closerName: capitalizedCloser,
+        status: callStatus,
+      });
+    }
+
+    // Sort calls by time
+    scheduledCallsToday.sort((a, b) => a.horario.localeCompare(b.horario));
+
+    const closersSummary = Array.from(closersMap.entries()).map(([name, stats]) => ({
+      name,
+      ...stats,
+    }));
+
     htEvents.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
     // Traffic Spend & Paid ROAS Calculation for TODAY strictly
@@ -2015,6 +2104,10 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
         scheduledCount,
         vendasHtCount,
         revenueToday: htRevenueToday,
+        closersSummary,
+        scheduledCallsToday,
+        showUpsCountToday,
+        noShowsCountToday,
         salesOriginBreakdown: {
           paidCount: paidSalesCount,
           organicCount: organicSalesCount,

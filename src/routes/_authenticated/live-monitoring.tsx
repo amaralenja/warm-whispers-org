@@ -390,6 +390,105 @@ function LiveMonitoringPage() {
             </div>
           </div>
 
+          {/* Cards de Closers, Show-Ups e No-Shows de Hoje */}
+          <div className="rounded-3xl border border-violet-500/30 bg-gradient-to-br from-violet-500/15 via-violet-500/5 to-card/60 p-5 shadow-xl backdrop-blur-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-violet-500/20 pb-3">
+              <div className="flex items-center gap-2 text-violet-300">
+                <WorkspacePremiumTwoTone className="!h-5 !w-5 text-violet-400" />
+                <span className="text-xs font-bold uppercase tracking-[0.2em]">Desempenho de Closers & Reuniões (Hoje)</span>
+              </div>
+              <span className="text-[0.65rem] font-mono font-bold text-violet-300">
+                {serverStats?.ht?.scheduledCallsToday?.length ?? 0} Calls Agendadas
+              </span>
+            </div>
+
+            {/* KPI Cards: Calls por Closer, Show-ups & No-shows */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-sky-500/30 bg-background/70 p-3.5">
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Calls Agendadas</div>
+                <div className="mt-1 font-mono text-xl font-black text-sky-400">
+                  {serverStats?.ht?.scheduledCallsToday?.length ?? 0}
+                </div>
+                {/* Closers list breakdown */}
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {(serverStats?.ht?.closersSummary ?? []).map((c) => (
+                    <span key={c.name} className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[0.55rem] font-bold text-sky-200">
+                      {c.name}: {c.callsToday}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-500/30 bg-background/70 p-3.5">
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">Show-Ups (Hoje)</div>
+                <div className="mt-1 font-mono text-xl font-black text-emerald-400">
+                  {serverStats?.ht?.showUpsCountToday ?? 0}
+                </div>
+                <div className="mt-1.5 text-[0.55rem] font-bold text-emerald-300">
+                  {serverStats?.ht?.scheduledCallsToday?.length
+                    ? `${Math.round(((serverStats.ht.showUpsCountToday ?? 0) / serverStats.ht.scheduledCallsToday.length) * 100)}% de Presença`
+                    : "0%"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-rose-500/30 bg-background/70 p-3.5">
+                <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">No-Shows (Faltas)</div>
+                <div className="mt-1 font-mono text-xl font-black text-rose-400">
+                  {serverStats?.ht?.noShowsCountToday ?? 0}
+                </div>
+                <div className="mt-1.5 text-[0.55rem] font-bold text-rose-300">
+                  {serverStats?.ht?.scheduledCallsToday?.length
+                    ? `${Math.round(((serverStats.ht.noShowsCountToday ?? 0) / serverStats.ht.scheduledCallsToday.length) * 100)}% Faltaram`
+                    : "0%"}
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela Detalhada de Horários e Status das Calls do Dia */}
+            <div className="space-y-2 pt-1">
+              <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
+                Lista Detalhada de Reuniões de Hoje
+              </div>
+
+              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 scrollbar-fancy">
+                {(serverStats?.ht?.scheduledCallsToday ?? []).map((call) => (
+                  <div key={call.id} className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 px-3 py-2 text-xs">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        ⏰ {call.horario}
+                      </span>
+                      <span className="font-bold text-white">{call.leadName}</span>
+                      <span className="text-muted-foreground text-[0.65rem]">Closer: <strong className="text-violet-300">{call.closerName}</strong></span>
+                    </div>
+
+                    <div>
+                      {call.status === "show_up" && (
+                        <span className="rounded-md bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-emerald-300 uppercase">
+                          🟢 Show-Up
+                        </span>
+                      )}
+                      {call.status === "no_show" && (
+                        <span className="rounded-md bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-rose-300 uppercase">
+                          🔴 No-Show
+                        </span>
+                      )}
+                      {call.status === "pendente" && (
+                        <span className="rounded-md bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[0.6rem] font-extrabold text-amber-300 uppercase">
+                          🟡 Agendada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {(serverStats?.ht?.scheduledCallsToday ?? []).length === 0 && (
+                  <div className="py-3 text-center text-xs text-muted-foreground font-semibold">
+                    Nenhuma reunião agendada na agenda dos Closers para hoje.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Ticker de Tráfego Pago — High Ticket (Atualização 5 min) */}
           <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-card/60 p-5 shadow-xl backdrop-blur-xl space-y-3">
             <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
