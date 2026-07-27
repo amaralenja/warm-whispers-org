@@ -60,26 +60,31 @@ function loadLinks(): Record<string, LinkRecord> {
   }
 }
 
+import { setCloserStage } from "@/lib/ht-kanban-state";
+
 export function saveEventLink(eventId: string, lead: QuizLead) {
   const all = loadLinks();
   all[eventId] = { eventId, leadId: lead.id, nome: lead.nome ?? "", email: lead.email ?? "" };
   localStorage.setItem(LINK_KEY, JSON.stringify(all));
-  unmarkNoShow(eventId);
-  window.dispatchEvent(new Event("calendar-showup-updated"));
+  unmarkNoShow(eventId, lead.id);
+  if (lead.id) setCloserStage(lead.id, "show_up");
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("calendar-showup-updated"));
 }
 
 function saveManualEventLink(eventId: string, form: { nome: string; email: string; whatsapp: string; externalId: string }) {
   if (!eventId) return;
+  const targetId = form.externalId || form.email || form.whatsapp || eventId;
   const all = loadLinks();
   all[eventId] = {
     eventId,
-    leadId: form.externalId || form.email || form.whatsapp || eventId,
+    leadId: targetId,
     nome: form.nome || "",
     email: form.email || "",
   };
   localStorage.setItem(LINK_KEY, JSON.stringify(all));
-  unmarkNoShow(eventId);
-  window.dispatchEvent(new Event("calendar-showup-updated"));
+  unmarkNoShow(eventId, targetId);
+  if (targetId) setCloserStage(targetId, "show_up");
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("calendar-showup-updated"));
 }
 
 export function getEventLink(eventId: string): LinkRecord | undefined {
@@ -90,7 +95,7 @@ export function getAllEventLinks(): Record<string, LinkRecord> {
   return loadLinks();
 }
 
-// ---- NoShow marker (localStorage) ----
+// ---- NoShow marker (localStorage + Supabase DB) ----
 const NOSHOW_KEY = "calendar_noshow_v1";
 
 function loadNoShows(): Record<string, { eventId: string; markedAt: string }> {
@@ -102,16 +107,24 @@ function loadNoShows(): Record<string, { eventId: string; markedAt: string }> {
   }
 }
 
-export function markNoShow(eventId: string) {
+export function markNoShow(eventId: string, leadId?: string) {
   const all = loadNoShows();
   all[eventId] = { eventId, markedAt: new Date().toISOString() };
   localStorage.setItem(NOSHOW_KEY, JSON.stringify(all));
+
+  const targetId = leadId || getEventLink(eventId)?.leadId || eventId;
+  if (targetId) setCloserStage(targetId, "no_show");
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("calendar-showup-updated"));
 }
 
-export function unmarkNoShow(eventId: string) {
+export function unmarkNoShow(eventId: string, leadId?: string) {
   const all = loadNoShows();
   delete all[eventId];
   localStorage.setItem(NOSHOW_KEY, JSON.stringify(all));
+
+  const targetId = leadId || getEventLink(eventId)?.leadId || eventId;
+  if (targetId) setCloserStage(targetId, "agendado");
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("calendar-showup-updated"));
 }
 
 export function getNoShow(eventId: string): boolean {

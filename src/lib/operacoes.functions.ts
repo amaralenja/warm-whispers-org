@@ -1918,8 +1918,26 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const vendasHtCount = htVendasToday.length;
     const htRevenueToday = htVendasToday.reduce((a, v) => a + (parseFloat(v.valor_total) || 0), 0);
 
-    // Leads Qualificados do Quiz que ENTRARAM HOJE
-    const quizToday = quizAll.filter((q) => toSpDateString(q.created_at) === todayStr);
+    // Leads Qualificados do Quiz que ENTRARAM HOJE (combina todas as fontes do Quiz + SDR manual)
+    const allQuizCombined: any[] = [];
+    const seenQuizIds = new Set<string>();
+    const addQuizList = (list: any[]) => {
+      for (const item of list || []) {
+        if (!item) continue;
+        const idStr = String(item.id || item.user_id || "").trim();
+        const dateStr = item.created_at || item.data_criacao || item.received_at;
+        if (idStr && !seenQuizIds.has(idStr)) {
+          seenQuizIds.add(idStr);
+          allQuizCombined.push({ ...item, created_at: dateStr });
+        }
+      }
+    };
+    addQuizList(quizAll);
+    addQuizList(htQuizAll);
+    addQuizList(htLeadsAll);
+    addQuizList(extQuizLeadsAll);
+
+    const quizToday = allQuizCombined.filter((q) => toSpDateString(q.created_at) === todayStr);
     const qualifiedLeadsToday = quizToday.length;
 
     // Estágios Kanban do SDR movimentados/arrastados HOJE
@@ -2241,6 +2259,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
 
     // Sort calls by time
     scheduledCallsToday.sort((a, b) => a.horario.localeCompare(b.horario));
+    scheduledCount = scheduledCallsToday.length;
 
     const closersSummary = Array.from(closersMap.entries()).map(([name, stats]) => ({
       name,
