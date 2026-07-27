@@ -966,12 +966,13 @@ export const getDashboardStats = createServerFn({ method: "POST" })
     // IMPORTANTE: wa_conversations.operacao_id é o NOME do expert (ex: "Caio"), não um UUID
     // (confirmado em syncConversationTagsToCrmLead onde é comparado com lead.expert por nome)
     // Busca conversões do WhatsApp (sem filtrar por tags vazias, para contar todos os leads de hoje)
-    const { data: waConvsRawAll } = await supabase
-      .from("wa_conversations" as any)
-      .select("contact_wa_id, tags, operacao_id, created_at, updated_at, last_message_preview")
-      .order("updated_at", { ascending: false })
-      .limit(12000);
-    const waConvsRaw = (waConvsRawAll ?? []) as any[];
+    const waConvsRaw = await fetchAll((from, to) =>
+      supabase
+        .from("wa_conversations" as any)
+        .select("contact_wa_id, tags, operacao_id, created_at, updated_at, last_message_at, last_message_preview")
+        .order("updated_at", { ascending: false })
+        .range(from, to)
+    );
 
     console.log(`[getDashboardStats] wa_conversations carregadas: ${waConvsRaw.length}`);
 
