@@ -455,7 +455,7 @@ export const searchLeadsForShowup = createServerFn({ method: "POST" })
     // 1) Local ht_quiz_submissions via supabaseAdmin (bypass RLS)
     const localQuery = supabaseAdmin
       .from("ht_quiz_submissions")
-      .select("id,nome,email,whatsapp,instagram,utm_source,utm_medium,utm_campaign,respostas")
+      .select("id,nome,email,whatsapp,instagram,utm_source,utm_medium,utm_campaign,respostas,fbc,fbp,fbclid")
       .order("received_at", { ascending: false })
       .limit(20);
     const { data: local } = await (isEmail
@@ -465,7 +465,7 @@ export const searchLeadsForShowup = createServerFn({ method: "POST" })
       const key = (r.email || r.whatsapp || r.id);
       if (key && !seen.has(key)) {
         seen.add(key);
-        all.push({ id: r.id, nome: r.nome, email: r.email, whatsapp: r.whatsapp, fbc: null, fbp: null, fbclid: null, utm_source: r.utm_source, utm_campaign: r.utm_campaign, caixa_letra: null, instagram: r.instagram });
+        all.push({ id: r.id, nome: r.nome, email: r.email, whatsapp: r.whatsapp, fbc: r.fbc ?? null, fbp: r.fbp ?? null, fbclid: r.fbclid ?? null, utm_source: r.utm_source, utm_campaign: r.utm_campaign, caixa_letra: r.respostas?.caixa_letra ?? null, instagram: r.instagram });
       }
     }
 
