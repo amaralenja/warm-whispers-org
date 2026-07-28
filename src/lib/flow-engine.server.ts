@@ -244,25 +244,10 @@ export async function sendWA(channelId: string, to: string, body: any, db: any) 
     attempt = { ok: false, status: 0, json: { error: { message: String((e as any)?.message ?? e) } } };
   }
 
-  let workingToken = token;
   if (!attempt.ok) {
     const msg = attempt.json?.error?.message ?? attempt.json?.message ?? (lastErr ? String((lastErr as any)?.message ?? lastErr) : `HTTP ${attempt.status}`);
-    const msgStr = typeof msg === "string" ? msg : JSON.stringify(msg);
-    const canRetry = /INTERNAL|Meta token|Unsupported|OAuth|missing permissions|\b(400|401|500)\b/i.test(msgStr);
-    if (canRetry) {
-      const altToken = await findUsableMetaToken(phoneNumberId, token);
-      if (altToken && altToken !== token) {
-        attempt = await postMetaMessage(altToken, phoneNumberId, payload);
-        if (attempt.ok) {
-          workingToken = altToken;
-          // Cacheia pra sempre: próximas mensagens já partem desse token.
-          await persistWorkingToken(db, phoneNumberId, altToken, channelId);
-        }
-      }
-    }
-    if (!attempt.ok) throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
-  void workingToken;
   return { waMsgId: attempt.json?.messages?.[0]?.id ?? null, phoneNumberId, toNormalized };
 }
 
