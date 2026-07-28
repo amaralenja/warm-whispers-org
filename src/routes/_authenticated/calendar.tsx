@@ -753,6 +753,12 @@ export function CalendarPage() {
         defaultName={showUpEvent ? guestOf(showUpEvent)?.displayName : undefined}
         onSendShowUp={sendShowUpEvent}
         onSaved={() => refreshMarkers((n) => n + 1)}
+        onRegisterSale={(lead) => {
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("ht_register_sale_lead", JSON.stringify({ id: lead.id, nome: lead.nome, email: lead.email, whatsapp: lead.whatsapp }));
+            window.open("/ht-analytics?tab=closer", "_self");
+          }
+        }}
       />
     </div>
   );

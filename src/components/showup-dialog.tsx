@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-import { Search, Zap, CheckCircle2, Loader2, User, X } from "lucide-react";
+import { Search, Zap, CheckCircle2, Loader2, User, X, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -178,6 +178,7 @@ export function ShowUpDialog({
   defaultName,
   onSendShowUp,
   onSaved,
+  onRegisterSale,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -186,6 +187,7 @@ export function ShowUpDialog({
   defaultName?: string;
   onSendShowUp: SendShowUpEvent;
   onSaved?: () => void;
+  onRegisterSale?: (lead: QuizLead) => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<QuizLead[]>([]);
@@ -496,8 +498,24 @@ export function ShowUpDialog({
           </div>
         </div>
 
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end flex-wrap">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          {onRegisterSale && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (selected) {
+                  saveEventLink(eventId, selected);
+                  onOpenChange(false);
+                  onRegisterSale(selected);
+                }
+              }}
+              disabled={!selected}
+              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+            >
+              <><DollarSign className="mr-2 h-4 w-4" /> Registrar Venda</>
+            </Button>
+          )}
           <Button
             onClick={handleSendShowUp}
             disabled={(!form.email && !form.whatsapp) || sending}
