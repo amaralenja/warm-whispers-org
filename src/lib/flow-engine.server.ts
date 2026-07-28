@@ -795,7 +795,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
   let safety = 0;
   let nodesProcessed = 0;
 
-  while (currentId && safety++ < 50) {
+    while (currentId && safety++ < 50) {
     if (nodesProcessed >= maxNodes) {
       // Chunk limit: save state and re-queue for next cron tick
       await updateFlowRun(ctx, {
@@ -805,6 +805,11 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
         waiting_for: null,
         expires_at: null,
       });
+      // Auto-trigger dispatch worker via HTTP — não espera o cron de 60s
+      try {
+        const baseUrl = process.env.VERCEL_URL || process.env.VITE_SITE_URL || "";
+        if (baseUrl) fetch(`https://${baseUrl}/api/public/hooks/dispatch-worker`, { method: "POST" }).catch(() => {});
+      } catch {}
       return;
     }
     if (await shouldStopFlowRun(ctx)) return;
@@ -1143,9 +1148,12 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       }
       // Delays >8s: salva no DB, cron retoma
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
-      if (secs <= 600) {
+      // Agenda HTTP call pro dispatch-worker após o delay expirar
+      const baseUrl = process.env.VERCEL_URL || process.env.VITE_SITE_URL || "";
+      if (baseUrl && secs <= 600) {
+        const workerUrl = `https://${baseUrl}/api/public/hooks/dispatch-worker`;
         setTimeout(() => {
-          processExpiredTimerRuns(20).catch(() => undefined);
+          fetch(workerUrl, { method: "POST" }).catch(() => {});
         }, secs * 1000);
       }
       return {
