@@ -1738,7 +1738,19 @@ export async function advanceWaitingRun(args: {
     return { runId: r.id, completed: true };
   }
 
-  await updateFlowRun(ctx, { status: "running", waiting_for: null });
+  // Claim atômico: só um processo consegue tirar a execução de "waiting".
+  // Sem isso, duas mensagens do lead chegando juntas fazem dois executores
+  // avançarem o mesmo fluxo e o contato recebe tudo duplicado.
+  const { data: claimed } = await db
+    .from("wa_flow_runs" as any)
+    .update({ status: "running", waiting_for: null, updated_at: new Date().toISOString() })
+    .eq("id", r.id)
+    .eq("status", "waiting")
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return null;
+
+  await takeFlowRunLease(ctx);
   await executeFrom(ctx, nextId, { maxNodes: 5 });
   return { runId: r.id };
 }
