@@ -625,7 +625,7 @@ function FlowsListPage() {
               </div>
               <DialogFooter>
                 <Button
-                  disabled={!name.trim() || createMut.isPending}
+                  disabled={createMut.isPending}
                   onClick={() => createMut.mutate({ nome: name.trim(), operacao_id: op || null, folder: folder.trim() || null })}
                 >Criar</Button>
               </DialogFooter>
