@@ -330,6 +330,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
         const serverData = await listSubmissionsFn();
         const qzData = serverData?.submissions || [];
         const crmData = serverData?.crmLeads || [];
+        const kbData = serverData?.kanbanState || [];
 
         for (const s of (qzData as any[]) || []) {
           let r: Record<string, any> = {};
@@ -400,6 +401,28 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             crm_data_agendamento: null,
             respostas: meta,
           } as QLead);
+        }
+
+        // Popula cache ht_kanban_state com dados do servidor (bypass RLS)
+        if (kbData.length > 0) {
+          const { upsertCache, saveLocalBackup } = await import("@/lib/ht-kanban-state");
+          for (const r of kbData) {
+            upsertCache({
+              lead_id: r.lead_id,
+              scheduled_at: r.scheduled_at ?? null,
+              closer_email: r.closer_email ?? null,
+              sdr_stage: r.sdr_stage ?? null,
+              closer_stage: r.closer_stage ?? null,
+              is_fake: r.is_fake ?? false,
+            });
+          }
+          saveLocalBackup();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("ht-sdr-updated"));
+            window.dispatchEvent(new Event("ht-sched-updated"));
+            window.dispatchEvent(new Event("ht-closer-email-updated"));
+            window.dispatchEvent(new Event("ht-closer-updated"));
+          }
         }
       } catch { }
 

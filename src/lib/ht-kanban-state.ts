@@ -35,7 +35,7 @@ function loadLocalBackup(): Record<string, HtKanbanRow> {
   }
 }
 
-function saveLocalBackup() {
+export function saveLocalBackup() {
   if (typeof window === "undefined") return;
   try {
     const obj: Record<string, HtKanbanRow> = {};
@@ -46,7 +46,7 @@ function saveLocalBackup() {
   } catch {}
 }
 
-function upsertCache(row: HtKanbanRow) {
+export function upsertCache(row: HtKanbanRow) {
   cache.set(row.lead_id, {
     lead_id: row.lead_id,
     scheduled_at: row.scheduled_at ?? null,

@@ -422,7 +422,7 @@ export const listAllKanbanSubmissions = createServerFn({ method: "POST" })
       console.error("Falha ao sincronizar leads do Criar SaaS em listAllKanbanSubmissions:", err);
     }
 
-    const [qzRes, crmRes] = await Promise.all([
+    const [qzRes, crmRes, kbRes] = await Promise.all([
       client
         .from("ht_quiz_submissions" as any)
         .select("id, received_at, nome, email, whatsapp, instagram, utm_source, utm_medium, utm_campaign, respostas")
@@ -433,11 +433,15 @@ export const listAllKanbanSubmissions = createServerFn({ method: "POST" })
         .select("id, created_at, nome, email, whatsapp, telefone, instagram, expert, metadata")
         .order("created_at", { ascending: false })
         .limit(5000),
+      client
+        .from("ht_kanban_state")
+        .select("lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake, updated_at"),
     ]);
 
     return {
       submissions: qzRes.data || [],
       crmLeads: crmRes.data || [],
+      kanbanState: kbRes.data || [],
     };
   });
 
