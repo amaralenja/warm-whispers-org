@@ -1744,6 +1744,8 @@ function useClosersList(): ClosersOption[] {
 
 function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }> }) {
   const scheduleCall = useServerFn(createEvent);
+  const htSession = useMemo(() => getHtTeamSession(), []);
+  const sdrEmail = htSession?.email ?? null;
   const [stageMap, setStageMap] = useState<Record<string, string>>({});
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
   const [utmFilter, setUtmFilter] = useState<string>("all");
@@ -1983,7 +1985,7 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
               toast.error("Erro GCal: " + err.message);
             }
           }
-          dbSetScheduleAndCloser(selectedLead.id, iso, email ?? null);
+          dbSetScheduleAndCloser(selectedLead.id, iso, email ?? null, sdrEmail);
           if (iso) {
             moveTo(selectedLead.id, "agendado");
             setSelectedLead(null);

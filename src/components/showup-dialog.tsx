@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 // ---- Quiz Supabase (external, somente leitura) ----
 const QUIZ_SUPABASE_URL = "https://fmtnqipflglucvtdqehh.supabase.co";
@@ -239,18 +240,52 @@ export function ShowUpDialog({
     setSearching(true);
     try {
       const isEmail = t.includes("@");
-      let q = getQuizSb()
+      const seen = new Set<string>();
+      const all: QuizLead[] = [];
+
+      // 1) Busca no quiz externo
+      let qExt = getQuizSb()
         .from("leads")
         .select("id,nome,email,whatsapp,fbc,fbp,fbclid,utm_source,utm_campaign,caixa_letra")
         .order("data_criacao", { ascending: false })
         .limit(20);
-      if (isEmail) q = q.ilike("email", `%${t}%`);
-      else q = q.or(`nome.ilike.*${t}*,whatsapp.ilike.*${t}*,email.ilike.*${t}*`);
-      const { data, error } = await q;
-      if (error) throw error;
-      const rows = (data ?? []) as QuizLead[];
-      setResults(rows);
-      const exact = rows.find((r) => (r.email ?? "").toLowerCase() === t.toLowerCase());
+      if (isEmail) qExt = qExt.ilike("email", `%${t}%`);
+      else qExt = qExt.or(`nome.ilike.*${t}*,whatsapp.ilike.*${t}*,email.ilike.*${t}*`);
+      const { data: extData } = await qExt;
+      for (const r of (extData ?? []) as QuizLead[]) {
+        const key = r.email || r.whatsapp || r.id;
+        if (key && !seen.has(key)) { seen.add(key); all.push(r); }
+      }
+
+      // 2) Busca no ht_quiz_submissions (banco principal)
+      let qLocal = supabase
+        .from("ht_quiz_submissions")
+        .select("id,nome,email,whatsapp,instagram,utm_source,utm_medium,utm_campaign")
+        .order("received_at", { ascending: false })
+        .limit(20);
+      if (isEmail) qLocal = qLocal.ilike("email", `%${t}%`);
+      else qLocal = qLocal.or(`nome.ilike.*${t}*,whatsapp.ilike.*${t}*,email.ilike.*${t}*`);
+      const { data: localData } = await qLocal;
+      for (const r of (localData ?? []) as any[]) {
+        const mapped: QuizLead = {
+          id: r.id,
+          nome: r.nome ?? null,
+          email: r.email ?? null,
+          whatsapp: r.whatsapp ?? null,
+          fbc: null,
+          fbp: null,
+          fbclid: null,
+          utm_source: r.utm_source ?? null,
+          utm_campaign: r.utm_campaign ?? null,
+          caixa_letra: null,
+        };
+        const key = mapped.email || mapped.whatsapp || mapped.id;
+        if (key && !seen.has(key)) { seen.add(key); all.push(mapped); }
+      }
+
+      all.sort((a, b) => (b.nome ?? "").localeCompare(a.nome ?? ""));
+      setResults(all.slice(0, 20));
+      const exact = all.find((r) => (r.email ?? "").toLowerCase() === t.toLowerCase());
       if (exact && !selected) setSelected(exact);
     } catch (e: any) {
       toast.error("Erro ao buscar leads: " + e.message);
