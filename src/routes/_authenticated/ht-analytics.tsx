@@ -2255,18 +2255,12 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
       return hay.includes(q);
     };
     for (const l of leads || []) {
-      // Filtro de período: só mostra leads do período selecionado
-      if (pStart || pEnd) {
-        const schedDate = schedMap[l.id] || l.crm_data_agendamento;
-        const createDate = l.data_criacao;
-        const relevantDate = schedDate || createDate;
-        if (relevantDate) {
-          const d = new Date(relevantDate).getTime();
-          if (pStart && d < pStart.getTime()) continue;
-          if (pEnd && d >= pEnd.getTime()) continue;
-        } else if (pStart) {
-          continue; // sem data relevante, não mostra em filtro de período
-        }
+      // Filtro de período: só exclui se tem data FORA do período
+      const schedDate = schedMap[l.id] || l.crm_data_agendamento;
+      if (schedDate) {
+        const d = new Date(schedDate).getTime();
+        if (pStart && d < pStart.getTime()) continue;
+        if (pEnd && d >= pEnd.getTime()) continue;
       }
       const caixa = (l.caixa_letra ?? "").toUpperCase();
       const sdr = sdrStageOf(l);
