@@ -245,7 +245,7 @@ export function ShowUpDialog({
         .order("data_criacao", { ascending: false })
         .limit(20);
       if (isEmail) q = q.ilike("email", `%${t}%`);
-      else q = q.or(`nome.ilike.%${t}%,whatsapp.ilike.%${t}%,email.ilike.%${t}%`);
+      else q = q.or(`nome.ilike.*${t}*,whatsapp.ilike.*${t}*,email.ilike.*${t}*`);
       const { data, error } = await q;
       if (error) throw error;
       const rows = (data ?? []) as QuizLead[];
