@@ -2284,7 +2284,6 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period, kbSc
   const cards: CloserCard[] = useMemo(() => {
     const list: CloserCard[] = [];
     const q = (search || "").trim().toLowerCase();
-    const { start: pStart, end: pEnd } = periodRange(period);
     // Mescla maps do cache local com os do servidor (bypass RLS)
     const mergedSched = { ...kbSchedMap, ...schedMap };
     const mergedStage = { ...kbStageMap, ...stageMap };
@@ -2298,18 +2297,6 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period, kbSc
       const cardId = `qlead-${l.id}`;
       const finalizado = isFinalizado(l);
       const caixa = (l.caixa_letra ?? "").toUpperCase();
-      // Filtro de período: usa mergedSched (servidor + cache)
-      if (pStart || pEnd) {
-        const schedDate = mergedSched[l.id] || l.crm_data_agendamento;
-        const hasStage = !!mergedStage[l.id] || !!mergedStage[cardId];
-        if (schedDate) {
-          const d = new Date(schedDate).getTime();
-          if (pStart && d < pStart.getTime()) continue;
-          if (pEnd && d >= pEnd.getTime()) continue;
-        } else if (!finalizado && !hasStage) {
-          continue;
-        }
-      }
       const sdr = sdrStageOf(l);
       const def = sdrToCloser(sdr);
       const isScheduled = sdr === "agendado" || !!mergedSched[l.id] || !!l.crm_data_agendamento;
