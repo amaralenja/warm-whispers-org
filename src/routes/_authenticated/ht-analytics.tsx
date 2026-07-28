@@ -1746,7 +1746,7 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
   const scheduleCall = useServerFn(createEvent);
   const htSession = useMemo(() => getHtTeamSession(), []);
   const sdrEmail = htSession?.email ?? null;
-  const [stageMap, setStageMap] = useState<Record<string, string>>({});
+  const [stageMap, setStageMap] = useState<Record<string, string>>(snapshotSdrStages);
   const [caixaFilter, setCaixaFilter] = useState<string>("all"); // all | B | C | D | E | F | G
   const [utmFilter, setUtmFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -1758,6 +1758,12 @@ function KanbanSDR({ leads, loading, onReload, notesMap }: { leads: QLead[]; loa
   const [closerEmailMap, setCloserEmail] = useCloserEmailMap();
   const closersList = useClosersList();
   const [addOpen, setAddOpen] = useState(false);
+
+  useEffect(() => {
+    const refresh = () => setStageMap({ ...snapshotSdrStages() });
+    window.addEventListener("ht-sdr-updated", refresh);
+    return () => window.removeEventListener("ht-sdr-updated", refresh);
+  }, []);
 
 
 
@@ -2172,7 +2178,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
     () => (isCloserSession ? (vendas || []).filter((v) => matchesHtCloser(htSession, { nome: v.closer })) : vendas),
     [vendas, htSession, isCloserSession],
   );
-  const [stageMap, setStageMap] = useState<Record<string, string>>({});
+  const [stageMap, setStageMap] = useState<Record<string, string>>(snapshotCloserStages);
   const [closerFilter, setCloserFilter] = useState<string>(isCloserSession ? (htSession?.nome ?? "all") : "all");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -2186,6 +2192,12 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
   // Track highlighted cards after a sale is registered
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
   const sdrStageMap = useSdrStageMap();
+
+  useEffect(() => {
+    const refresh = () => setStageMap({ ...snapshotCloserStages() });
+    window.addEventListener("ht-closer-updated", refresh);
+    return () => window.removeEventListener("ht-closer-updated", refresh);
+  }, []);
 
 
 
