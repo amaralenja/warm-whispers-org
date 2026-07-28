@@ -818,6 +818,10 @@ export const triggerFlowManually = createServerFn({ method: "POST" })
       queueOnly: true,
     });
 
+    // Processa imediatamente (não espera o cron de 1 minuto)
+    const { processQueuedFlowRuns } = await import("@/lib/flow-engine.server");
+    void processQueuedFlowRuns(20).catch(() => undefined);
+
     return res;
   });
 

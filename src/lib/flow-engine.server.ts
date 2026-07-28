@@ -1488,7 +1488,7 @@ export async function processQueuedFlowRuns(limit = 20) {
         return { runId: ctx.runId, completed: true };
       }
       try {
-        await executeFrom(ctx, startId, { maxNodes: 5 });
+        await executeFrom(ctx, startId, { maxNodes: 10 });
         return { runId: ctx.runId, ok: true };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
