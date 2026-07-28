@@ -441,3 +441,51 @@ export const listAllKanbanSubmissions = createServerFn({ method: "POST" })
     };
   });
 
+export const searchLeadsForShowup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { query: string }) => ({ query: String(d?.query ?? "").trim() }))
+  .handler(async ({ context, data }) => {
+    const q = data.query;
+    if (!q) return { leads: [] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const isEmail = q.includes("@");
+    const seen = new Set<string>();
+    const all: any[] = [];
+
+    // 1) Local ht_quiz_submissions via supabaseAdmin (bypass RLS)
+    const localQuery = supabaseAdmin
+      .from("ht_quiz_submissions")
+      .select("id,nome,email,whatsapp,instagram,utm_source,utm_medium,utm_campaign,respostas")
+      .order("received_at", { ascending: false })
+      .limit(20);
+    const { data: local } = await (isEmail
+      ? localQuery.ilike("email", `%${q}%`)
+      : localQuery.or(`nome.ilike.*${q}*,whatsapp.ilike.*${q}*,email.ilike.*${q}*`));
+    for (const r of (local ?? []) as any[]) {
+      const key = (r.email || r.whatsapp || r.id);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        all.push({ id: r.id, nome: r.nome, email: r.email, whatsapp: r.whatsapp, fbc: null, fbp: null, fbclid: null, utm_source: r.utm_source, utm_campaign: r.utm_campaign, caixa_letra: null, instagram: r.instagram });
+      }
+    }
+
+    // 2) crm_leads via supabaseAdmin
+    const crmQuery = supabaseAdmin
+      .from("crm_leads" as any)
+      .select("id,nome,email,telefone")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const { data: crm } = await (isEmail
+      ? crmQuery.ilike("email", `%${q}%`)
+      : crmQuery.or(`nome.ilike.*${q}*,email.ilike.*${q}*`));
+    for (const r of (crm ?? []) as any[]) {
+      const key = (r.email || r.telefone || r.id);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        all.push({ id: r.id, nome: r.nome, email: r.email, whatsapp: r.telefone || null, fbc: null, fbp: null, fbclid: null, utm_source: null, utm_campaign: null, caixa_letra: null, instagram: null });
+      }
+    }
+
+    return { leads: all.slice(0, 20) };
+  });
+
