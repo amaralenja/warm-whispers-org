@@ -2330,9 +2330,9 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
     const m: Record<string, CloserCard[]> = {};
     for (const s of CLOSER_STAGES) m[s.id] = [];
     for (const c of filtered) {
-      // defaultStage já reflete o SDR. stageMap só sobrescreve para colunas
-      // exclusivas do closer (followup, remarcada, sinal, fechado manual).
-      const st = stageMap[c.id] || c.defaultStage;
+      const leadId = (c as any).lead?.id || c.id;
+      const rawId = String(leadId).replace(/^qlead-/, "").replace(/^htq:/, "");
+      const st = stageMap[c.id] || stageMap[rawId] || stageMap[leadId] || c.defaultStage;
       (m[st] || m.agendado).push(c);
     }
     for (const s of CLOSER_STAGES) {
@@ -2449,7 +2449,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
                       key={c.id}
                       lead={leadObj}
                       ig={handle ? igMap.get(handle) : null}
-                      scheduledAt={(c as any).scheduledAt ?? schedMap[c.id] ?? null}
+                      scheduledAt={schedMap[leadObj.id] ?? (c as any).scheduledAt ?? null}
                       lastNote={notesMap[c.id]}
                       dragging={draggingId === c.id}
                       onClick={() => setSelectedLead(leadObj as any)}
