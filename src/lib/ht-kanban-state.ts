@@ -66,24 +66,22 @@ export function ensureHtKanbanState(): Promise<void> {
       if (row?.lead_id) upsertCache(row);
     }
 
-    // 2. Busca do Supabase e mescla
+    // 2. Busca do Supabase (via server function que bypassa RLS)
     try {
-      const { data, error } = await supabase
-        .from("ht_kanban_state")
-        .select("lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake");
-      if (!error && data) {
-        for (const r of data as any[]) {
-          const localRow = localMap[r.lead_id];
-          const merged: HtKanbanRow = {
-            lead_id: r.lead_id,
-            scheduled_at: r.scheduled_at ?? localRow?.scheduled_at ?? null,
-            closer_email: r.closer_email ?? localRow?.closer_email ?? null,
-            sdr_stage: r.sdr_stage ?? localRow?.sdr_stage ?? null,
-            closer_stage: r.closer_stage ?? localRow?.closer_stage ?? null,
-            is_fake: r.is_fake ?? localRow?.is_fake ?? false,
-          };
-          upsertCache(merged);
-        }
+      const { loadKanbanState } = await import("@/lib/ht-api.functions");
+      const res = await loadKanbanState();
+      const data = res?.rows ?? [];
+      for (const r of data as any[]) {
+        const localRow = localMap[r.lead_id];
+        const merged: HtKanbanRow = {
+          lead_id: r.lead_id,
+          scheduled_at: r.scheduled_at ?? localRow?.scheduled_at ?? null,
+          closer_email: r.closer_email ?? localRow?.closer_email ?? null,
+          sdr_stage: r.sdr_stage ?? localRow?.sdr_stage ?? null,
+          closer_stage: r.closer_stage ?? localRow?.closer_stage ?? null,
+          is_fake: r.is_fake ?? localRow?.is_fake ?? false,
+        };
+        upsertCache(merged);
       }
     } catch {}
 

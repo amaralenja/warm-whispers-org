@@ -489,3 +489,13 @@ export const searchLeadsForShowup = createServerFn({ method: "POST" })
     return { leads: all.slice(0, 20) };
   });
 
+export const loadKanbanState = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("ht_kanban_state")
+      .select("lead_id, scheduled_at, closer_email, sdr_stage, closer_stage, is_fake, updated_at");
+    return { rows: (data ?? []) as any[] };
+  });
+
