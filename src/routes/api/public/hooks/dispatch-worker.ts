@@ -4,12 +4,12 @@ async function runWorkerTasks() {
   const { processQueuedFlowRuns, processExpiredTimerRuns, processStaleRunningDelayRuns, processExpiredWaitingRuns, processStaleRunningSendRuns } = await import("@/lib/flow-engine.server");
   const { processDueBulkDispatchItems } = await import("@/lib/crm-bulk-dispatch.server");
   const { processDueRemarketing } = await import("@/lib/remarketing.server");
-  const stale = await processStaleRunningDelayRuns(10, 20);
+  const stale = await processStaleRunningDelayRuns(180, 20);
   const [queued, timers, expiredWaiting, staleSend, bulk, remarketing] = await Promise.all([
     processQueuedFlowRuns(20),
     processExpiredTimerRuns(20),
     processExpiredWaitingRuns(60, 100),
-    processStaleRunningSendRuns(180, 20),
+    processStaleRunningSendRuns(300, 20),
     processDueBulkDispatchItems(10),
     processDueRemarketing(),
   ]);
