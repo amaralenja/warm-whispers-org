@@ -94,6 +94,13 @@ function isRecordFromToday(raw: unknown, todayStr: string): boolean {
   return spDate === todayStr;
 }
 
+function normalizeBrPhone(raw: string): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (digits.startsWith("55") && digits.length >= 12) return digits.substring(0, 13);
+  if (digits.length >= 10 && digits.length <= 11) return "55" + digits;
+  return digits;
+}
+
 /**
  * Converte campo de data (string ou número) para timestamp UTC em ms.
  * Datas simples "YYYY-MM-DD" são tratadas como meia-noite em São Paulo.
@@ -1906,8 +1913,8 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const contactToConvMap = new Map<string, string>();
     for (const conv of waConvsAll) {
       if (conv.contact_wa_id) {
-        const digits = String(conv.contact_wa_id).replace(/\D/g, "");
-        if (digits) contactToConvMap.set(digits, String(conv.id));
+        const phone = normalizeBrPhone(String(conv.contact_wa_id));
+        if (phone) contactToConvMap.set(phone, String(conv.id));
       }
     }
 
@@ -1968,7 +1975,7 @@ export const getLiveMonitoringTodayStats = createServerFn({ method: "GET" })
     const nowMs = Date.now();
 
     for (const lead of leadsToday) {
-      const rawPhone = String(lead.telefone || "").replace(/\D/g, "");
+      const rawPhone = normalizeBrPhone(String(lead.telefone || ""));
       const convId = rawPhone ? contactToConvMap.get(rawPhone) : null;
       const hasVendorChatted = convId ? convsWithOutbound.has(convId) : false;
 
