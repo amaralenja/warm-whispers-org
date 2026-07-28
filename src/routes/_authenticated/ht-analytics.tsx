@@ -2340,6 +2340,27 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
 
   return (
     <div className="px-6 md:px-10 py-6 space-y-4">
+      {isCloserSession && (() => {
+        const closerVendas = vendasScoped || [];
+        const totalFat = closerVendas.reduce((a: number, v: any) => a + (Number(v.valor_total) || 0), 0);
+        if (totalFat === 0) return null;
+        return (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+              <div className="text-[0.6rem] font-bold uppercase tracking-wider text-emerald-400">Minhas Vendas</div>
+              <div className="mt-1 font-mono text-xl font-black text-emerald-300">{closerVendas.length}</div>
+            </div>
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+              <div className="text-[0.6rem] font-bold uppercase tracking-wider text-amber-400">Total Vendido</div>
+              <div className="mt-1 font-mono text-xl font-black text-amber-300">{fmtBRL(totalFat)}</div>
+            </div>
+            <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4">
+              <div className="text-[0.6rem] font-bold uppercase tracking-wider text-violet-400">Comissão (10%)</div>
+              <div className="mt-1 font-mono text-xl font-black text-violet-300">{fmtBRL(totalFat * 0.1)}</div>
+            </div>
+          </div>
+        );
+      })()}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black tracking-tight">

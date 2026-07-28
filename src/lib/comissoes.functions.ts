@@ -411,8 +411,8 @@ export const getHtComissoes = createServerFn({ method: "POST" })
       let comissaoPercentual = 0;
 
       if (m.tipo === "sdr") {
-        // SDR: só conta calls a partir de hoje (26/07/2026), hist�rico anterior n�o aparece
-        const sdrTodayTs = new Date("2026-07-26").getTime();
+        // SDR: conta calls com base no periodo selecionado e nos ultimos 90 dias
+        const sdrMinTs = Date.now() - 90 * 24 * 60 * 60 * 1000;
         // SDR: count comparecimentos from quiz leads that have scheduled_at in range
         // date grouping uses ks.updated_at (when SDR agendou/interagiu), not scheduled_at (data futura)
         for (const lead of quizLeads) {
@@ -429,7 +429,7 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           const sdrActionDate = ks.updated_at || lead.data_criacao || "";
           const sdrActionTs = new Date(sdrActionDate).getTime();
           // S� conta se a a��o do SDR foi a partir de 26/07/2026
-          if (sdrActionTs < sdrTodayTs) continue;
+          if (sdrActionTs < sdrMinTs) continue;
           const fmtD = sdrActionDate.slice(0, 10);
 
           // Comparecimento / Show Up check (R$ 30 fixo APENAS se o lead compareceu à reunião)
@@ -480,7 +480,7 @@ export const getHtComissoes = createServerFn({ method: "POST" })
           if (!inRange(schedDate) && !inRange(lead.data_criacao)) continue;
           const sdrActionDate = ks.updated_at || lead.data_criacao || "";
           const sdrActionTs = new Date(sdrActionDate).getTime();
-          if (sdrActionTs < sdrTodayTs) continue;
+          if (sdrActionTs < sdrMinTs) continue;
           const closerStage = (ks.closer_stage || "").toLowerCase();
           const crmStatus = (lead.crm_status || "").toLowerCase().trim();
           if (
@@ -507,7 +507,9 @@ export const getHtComissoes = createServerFn({ method: "POST" })
         for (const v of htVendas) {
           if (!inRange(v.data)) continue;
           const vCloser = (v.closer || "").toLowerCase().trim();
-          if (vCloser !== nome && vCloser !== email) continue;
+          if (vCloser !== nome && vCloser !== email && 
+              !vCloser.includes(nome) && !nome.includes(vCloser) &&
+              !vCloser.includes(email) && !email.includes(vCloser)) continue;
           const val = Number(v.valor_total || 0);
           if (val <= 0) continue;
           vendas++;
