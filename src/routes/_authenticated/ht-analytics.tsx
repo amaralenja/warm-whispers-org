@@ -2291,12 +2291,6 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
   }, [cards]);
 
   const filtered = useMemo(() => cards.filter((c) => {
-    if (isCloserSession) {
-      // Allow leads in the closer pipeline even without explicit assignment
-      if (c.closer && !matchesHtCloser(htSession, c.closer)) return false;
-    } else {
-      if (closerFilter !== "all" && c.closer !== closerFilter) return false;
-    }
     if (search) {
       const q = search.toLowerCase();
       const l: any = (c as any).lead || {};
@@ -2304,7 +2298,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
       if (!hay.includes(q)) return false;
     }
     return true;
-  }), [cards, closerFilter, search]);
+  }), [cards, search]);
 
   const byStage = useMemo(() => {
     const m: Record<string, CloserCard[]> = {};
