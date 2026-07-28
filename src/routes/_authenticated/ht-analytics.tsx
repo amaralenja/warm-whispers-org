@@ -608,9 +608,15 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
                 onClick={() => setNonce((n) => n + 1)} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </Button>
-            </div>
           </div>
         </div>
+        <LancarVendaDialog
+          open={lancarVendaOpen}
+          onOpenChange={setLancarVendaOpen}
+          leads={allKanbanLeads}
+          onReload={() => setNonce((n) => n + 1)}
+        />
+      </div>
       </div>
 
       {/* Tabs */}
@@ -2284,7 +2290,8 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
 
   const filtered = useMemo(() => cards.filter((c) => {
     if (isCloserSession) {
-      if (!matchesHtCloser(htSession, c.closer)) return false;
+      // Allow leads in the closer pipeline even without explicit assignment
+      if (c.closer && !matchesHtCloser(htSession, c.closer)) return false;
     } else {
       if (closerFilter !== "all" && c.closer !== closerFilter) return false;
     }
@@ -2428,8 +2435,8 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                   </div>
                 )}
               </div>
-            </div>
-          );
+    </div>
+  );
         })}
       </DragScroll>
       <HtLeadDetailDialog
@@ -2614,9 +2621,9 @@ function SdrDashboard({ leads, notesMap, onReload }: SdrDashboardProps) {
                   </div>
                   <div className="h-2 w-full bg-border/20 rounded-full overflow-hidden">
                     <div className={`h-full ${item.color} rounded-full`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
+      </div>
+    </div>
+  );
             })}
           </CardContent>
         </Card>

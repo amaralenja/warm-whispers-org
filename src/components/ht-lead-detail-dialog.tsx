@@ -233,18 +233,20 @@ export function HtLeadDetailDialog({
       dataRest = dataRestante || null;
     }
     setSavingSale(true);
-    const { error } = await quizSb
-      .from("leads")
-      .update({
-        crm_status: "fechado",
-        crm_valor: total,
-        crm_valor_recebido: recebido,
-        crm_data_pagamento_restante: dataRest,
-      })
-      .eq("id", cleanId);
+    // Tentar sync no quiz externo (não bloqueia se falhar)
+    try {
+      await quizSb
+        .from("leads")
+        .update({
+          crm_status: "fechado",
+          crm_valor: total,
+          crm_valor_recebido: recebido,
+          crm_data_pagamento_restante: dataRest,
+        })
+        .eq("id", cleanId);
+    } catch {}
     
-    if (!error) {
-      try {
+    try {
         const nowIso = new Date().toISOString();
         const { data: existingVenda } = (await supabase
           .from("ht_vendas" as any)
@@ -300,13 +302,13 @@ export function HtLeadDetailDialog({
           window.dispatchEvent(new Event("ht-closer-updated"));
           window.dispatchEvent(new Event("calendar-showup-updated"));
         }
-      } catch (err) {
-        console.error("Erro ao sincronizar venda com banco Supabase:", err);
-      }
+    } catch (e: any) {
+      toast.error("Erro ao registrar venda: " + (e?.message ?? e));
+      setSavingSale(false);
+      return;
     }
 
     setSavingSale(false);
-    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
     toast.success(saleType === "direta" ? "Venda registrada 🚀" : "Sinal registrado 💰");
     setSaleOpen(false);
     onSaleSaved?.();
