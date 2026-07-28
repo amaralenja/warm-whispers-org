@@ -2240,7 +2240,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
       const cardId = `qlead-${l.id}`;
       const finalizado = isFinalizado(l);
       const isScheduled = sdr === "agendado" || !!schedMap[l.id] || !!l.crm_data_agendamento;
-      const hasCloser = !!closerEmailMap[l.id] || !!stageMap[cardId];
+      const hasCloser = !!closerEmailMap[l.id] || !!stageMap[l.id] || !!stageMap[cardId];
       const inPipeline = hasCloser || isScheduled || (finalizado && "BCDEFG".includes(caixa));
       const bySearch = matchesSearch(l);
       if (!inPipeline && !bySearch) continue;
