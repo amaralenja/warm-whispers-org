@@ -2293,13 +2293,17 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period, kbSc
       const hay = `${l?.nome ?? ""} ${l?.whatsapp ?? ""} ${l?.email ?? ""} ${l?.instagram ?? ""}`.toLowerCase();
       return hay.includes(q);
     };
+    const { start: pStart } = periodRange(period);
+    const todayStr = pStart?.toISOString().slice(0, 10) ?? "";
     for (const l of leads || []) {
       const cardId = `qlead-${l.id}`;
       const finalizado = isFinalizado(l);
       const caixa = (l.caixa_letra ?? "").toUpperCase();
       const sdr = sdrStageOf(l);
       const def = sdrToCloser(sdr);
-      const isScheduled = sdr === "agendado" || !!mergedSched[l.id] || !!l.crm_data_agendamento;
+      const schedRaw = mergedSched[l.id] || l.crm_data_agendamento;
+      const schedToday = schedRaw ? String(schedRaw).slice(0, 10) === todayStr : false;
+      const isScheduled = sdr === "agendado" || schedToday;
       const hasCloser = !!mergedEmail[l.id] || !!mergedStage[l.id] || !!mergedStage[cardId];
       // Closer: só vê leads agendados. Admin: vê todos os do pipeline.
       const inPipeline = isCloserSession ? isScheduled : (hasCloser || isScheduled || (finalizado && "BCDEFG".includes(caixa)));
