@@ -988,6 +988,8 @@ export type Database = {
           is_fake: boolean
           lead_id: string
           scheduled_at: string | null
+          sdr_email: string | null
+          sdr_nome: string | null
           sdr_stage: string | null
           updated_at: string
         }
@@ -997,6 +999,8 @@ export type Database = {
           is_fake?: boolean
           lead_id: string
           scheduled_at?: string | null
+          sdr_email?: string | null
+          sdr_nome?: string | null
           sdr_stage?: string | null
           updated_at?: string
         }
@@ -1006,6 +1010,8 @@ export type Database = {
           is_fake?: boolean
           lead_id?: string
           scheduled_at?: string | null
+          sdr_email?: string | null
+          sdr_nome?: string | null
           sdr_stage?: string | null
           updated_at?: string
         }
