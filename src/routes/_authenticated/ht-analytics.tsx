@@ -166,6 +166,9 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
   const [loadingKanban, setLoadingKanban] = useState(true);
   const [notesMap, setNotesMap] = useState<Record<string, { body: string; author: string | null; role: string }>>({});
   const [vendas, setVendas] = useState<any[]>([]);
+  const [kbSchedMap, setKbSchedMap] = useState<Record<string, string>>({});
+  const [kbStageMap, setKbStageMap] = useState<Record<string, string>>({});
+  const [kbEmailMap, setKbEmailMap] = useState<Record<string, string>>({});
 
   const [htLeads, setHtLeads] = useState<any[]>([]);
   const [reunioes, setReunioes] = useState<any[]>([]);
@@ -403,7 +406,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
           } as QLead);
         }
 
-        // Popula cache ht_kanban_state com dados do servidor (bypass RLS)
+        // Popula cache e prepara maps para passar como props
+        let kbSchedMap: Record<string, string> = {};
+        let kbStageMap: Record<string, string> = {};
+        let kbEmailMap: Record<string, string> = {};
         if (kbData.length > 0) {
           const { upsertCache, saveLocalBackup } = await import("@/lib/ht-kanban-state");
           for (const r of kbData) {
@@ -415,6 +421,9 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
               closer_stage: r.closer_stage ?? null,
               is_fake: r.is_fake ?? false,
             });
+            if (r.scheduled_at) kbSchedMap[r.lead_id] = r.scheduled_at;
+            if (r.closer_stage) kbStageMap[r.lead_id] = r.closer_stage;
+            if (r.closer_email) kbEmailMap[r.lead_id] = r.closer_email;
           }
           saveLocalBackup();
           if (typeof window !== "undefined") {
@@ -424,6 +433,10 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
             window.dispatchEvent(new Event("ht-closer-updated"));
           }
         }
+        // Store for passing to kanban components
+        setKbSchedMap(kbSchedMap);
+        setKbStageMap(kbStageMap);
+        setKbEmailMap(kbEmailMap);
       } catch { }
 
       if (cancel) return;
@@ -672,7 +685,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       {tab === "kanban" && <KanbanSDR leads={allKanbanLeads} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />}
       {tab === "closer" && (
         <>
-          <KanbanCloser leads={allKanbanLeads} vendas={vendas} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} period={period} />
+          <KanbanCloser leads={allKanbanLeads} vendas={vendas} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} period={period} kbSchedMap={kbSchedMap} kbStageMap={kbStageMap} kbEmailMap={kbEmailMap} />
 
           <div className="border-t border-border/50 mt-6">
             <div className="px-6 md:px-10 pt-6 pb-2">
@@ -2193,7 +2206,7 @@ const CAIXA_VALOR: Record<string, number> = {
   D: 3000, E: 5000, F: 8000, G: 15000,
 };
 
-function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }>; period: Period }) {
+function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period, kbSchedMap, kbStageMap, kbEmailMap }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }>; period: Period; kbSchedMap: Record<string, string>; kbStageMap: Record<string, string>; kbEmailMap: Record<string, string> }) {
   const scheduleCall = useServerFn(createEvent);
   const htSession = useMemo(() => getHtTeamSession(), []);
   const isCloserSession = htSession?.tipo === "closer";
@@ -2272,6 +2285,10 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
     const list: CloserCard[] = [];
     const q = (search || "").trim().toLowerCase();
     const { start: pStart, end: pEnd } = periodRange(period);
+    // Mescla maps do cache local com os do servidor (bypass RLS)
+    const mergedSched = { ...kbSchedMap, ...schedMap };
+    const mergedStage = { ...kbStageMap, ...stageMap };
+    const mergedEmail = { ...kbEmailMap, ...closerEmailMap };
     const matchesSearch = (l: any) => {
       if (!q) return false;
       const hay = `${l?.nome ?? ""} ${l?.whatsapp ?? ""} ${l?.email ?? ""} ${l?.instagram ?? ""}`.toLowerCase();
@@ -2281,10 +2298,10 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
       const cardId = `qlead-${l.id}`;
       const finalizado = isFinalizado(l);
       const caixa = (l.caixa_letra ?? "").toUpperCase();
-      // Filtro de período
+      // Filtro de período: usa mergedSched (servidor + cache)
       if (pStart || pEnd) {
-        const schedDate = schedMap[l.id] || l.crm_data_agendamento;
-        const hasStage = !!stageMap[l.id] || !!stageMap[cardId];
+        const schedDate = mergedSched[l.id] || l.crm_data_agendamento;
+        const hasStage = !!mergedStage[l.id] || !!mergedStage[cardId];
         if (schedDate) {
           const d = new Date(schedDate).getTime();
           if (pStart && d < pStart.getTime()) continue;
@@ -2295,13 +2312,13 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
       }
       const sdr = sdrStageOf(l);
       const def = sdrToCloser(sdr);
-      const isScheduled = sdr === "agendado" || !!schedMap[l.id] || !!l.crm_data_agendamento;
-      const hasCloser = !!closerEmailMap[l.id] || !!stageMap[l.id] || !!stageMap[cardId];
+      const isScheduled = sdr === "agendado" || !!mergedSched[l.id] || !!l.crm_data_agendamento;
+      const hasCloser = !!mergedEmail[l.id] || !!mergedStage[l.id] || !!mergedStage[cardId];
       const inPipeline = hasCloser || isScheduled || (finalizado && "BCDEFG".includes(caixa));
       const bySearch = matchesSearch(l);
       if (!inPipeline && !bySearch) continue;
-      const closerEmail = closerEmailMap[l.id];
-      const closerName = closerEmail 
+      const closerEmail = mergedEmail[l.id];
+      const closerName = closerEmail
         ? (closersList.find((c) => (c.email && c.email.toLowerCase() === closerEmail.toLowerCase()) || (c.nome && c.nome.toLowerCase() === closerEmail.toLowerCase()))?.nome || closerEmail)
         : null;
 
@@ -2330,7 +2347,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
       });
     }
     return list;
-  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search, closerEmailMap, closersList, period]);
+  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search, closerEmailMap, closersList, period, kbSchedMap, kbStageMap, kbEmailMap]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
@@ -2471,7 +2488,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { 
                       key={c.id}
                       lead={leadObj}
                       ig={handle ? igMap.get(handle) : null}
-                      scheduledAt={schedMap[leadObj.id] ?? (c as any).scheduledAt ?? null}
+                      scheduledAt={kbSchedMap[leadObj.id] || schedMap[leadObj.id] || ((c as any).scheduledAt ?? null)}
                       lastNote={notesMap[c.id]}
                       dragging={draggingId === c.id}
                       onClick={() => setSelectedLead(leadObj as any)}
