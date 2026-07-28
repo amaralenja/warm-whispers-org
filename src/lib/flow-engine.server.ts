@@ -1803,6 +1803,10 @@ export async function dispatchIncomingForFlows(args: {
     }
   }
 
+  // Bloqueio global de gatilhos automáticos — apenas disparos manuais são permitidos.
+  // Para reativar, remova este return.
+  return null;
+
   // 2. Look up active triggers
   const { data: triggers } = await db
     .from("wa_flow_triggers" as any)
