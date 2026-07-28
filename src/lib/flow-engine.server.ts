@@ -702,14 +702,18 @@ async function hasLostLease(ctx: Ctx): Promise<boolean> {
   try {
     const { data } = await ctx.db
       .from("wa_flow_runs" as any)
-      .select("executor_id")
+      .select("status,executor_id")
       .eq("id", ctx.runId)
       .maybeSingle();
-    if (!data) return false;
+    if (!data) return true;
+    const status = String((data as any).status ?? "");
+    if (status === "cancelled" || status === "completed" || status === "failed") return true;
     const current = (data as any).executor_id ?? null;
     return current !== ctx.executorId;
   } catch {
-    return false;
+    // Fail-safe: se não conseguimos confirmar a posse, parar é mais seguro do
+    // que continuar e arriscar enviar mensagem duplicada.
+    return true;
   }
 }
 
@@ -851,27 +855,35 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
         });
         return;
       }
-      // Send node failed: re-queue with per-node retry counter instead of
-      // failing immediately. Next cron invocation (10s) will retry the send.
-      // After 3 retries, give up and mark as failed.
-      const retryCount: Record<string, number> = ctx.variables._nodeRetries ?? {};
-      retryCount[node.id] = (retryCount[node.id] ?? 0) + 1;
-      ctx.variables._nodeRetries = retryCount;
-      if (retryCount[node.id] >= 3) {
+      // Nunca reexecuta automaticamente um nó de envio: timeout/erro de gateway
+      // pode acontecer depois da Meta já ter aceitado a mensagem. Reenviar o
+      // mesmo node é a principal causa de duplicação no chat ao vivo.
+      const nextId = nextNodeId(edges, node.id);
+      ctx.variables._sendErrors = {
+        ...(ctx.variables._sendErrors ?? {}),
+        [node.id]: String(e?.message ?? e).slice(0, 500),
+      };
+      if (!nextId) {
         await updateFlowRun(ctx, {
-          status: "failed",
-          error: `Envio de ${node.type} falhou 3x: ${String(e?.message ?? e)}`,
+          status: "completed",
+          waiting_for: null,
+          expires_at: null,
+          context: ctx.variables,
+          error: `Envio de ${node.type} falhou; fluxo finalizado sem retry para evitar duplicidade: ${String(e?.message ?? e)}`,
         });
         return;
       }
       await updateFlowRun(ctx, {
-        current_node_id: node.id,
+        current_node_id: nextId,
         context: ctx.variables,
-        status: "queued",
+        status: "running",
         waiting_for: null,
         expires_at: null,
+        error: `Envio de ${node.type} falhou; avançado sem retry para evitar duplicidade: ${String(e?.message ?? e)}`,
       });
-      console.warn(`[flow-engine] send node ${node.type} failed, re-queued (retry ${retryCount[node.id]}/3): ${String(e?.message ?? e).slice(0, 100)}`);
+      console.warn(`[flow-engine] send node ${node.type} failed, advanced without retry to avoid duplicate: ${String(e?.message ?? e).slice(0, 160)}`);
+      currentId = nextId;
+      nodesProcessed++;
     }
   }
 
@@ -1125,13 +1137,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      // Delays acima de 8s vão pro DB (timer cron) para não estourar
-      // timeout da Vercel (60s). Delays de 1-8s rodam inline.
-      if (secs <= 8) {
-        await new Promise((resolve) => setTimeout(resolve, secs * 1000));
-        return {};
-      }
-      // Delays >8s: salva no DB, cron retoma
+      // Todo delay vai para timer no banco. Delay inline deixava runs presas em
+      // "running" se a execução fosse encerrada no meio do sleep.
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
       // Agenda HTTP call pro dispatch-worker após o delay expirar
       const baseUrl = process.env.VERCEL_URL || process.env.VITE_SITE_URL || "";
@@ -1573,9 +1580,10 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
 
 // Recupera runs travados em nós de envio/ação com status "running" mas sem
 // waiting_for (Worker morreu no meio do loop).
-// Se estava num nó de envio (send_*): marca como failed — envio provavelmente silhou.
+// Se estava num nó de envio (send_*): avança sem reenviar. Uma resposta lenta do
+// provedor pode significar que a mensagem já foi entregue; reenviar duplica.
 // Se estava em outro tipo de nó: avança pro próximo.
-export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit = 20) {
+export async function processStaleRunningSendRuns(olderThanSeconds = 900, limit = 20) {
   const db = await getAdminDb();
   const { data: stale, error } = await db.rpc("claim_stale_running_send_flow_runs" as any, {
     _older_than_seconds: olderThanSeconds,
@@ -1608,8 +1616,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 60, limit =
         const currentNode = nodes.find((n) => n.id === String(run.current_node_id));
 
         // Se estava num nó de envio e o worker morreu: o envio pode ter sido
-        // enviado ou não. Avança pro próximo nó em vez de marcar failed —
-        // melhor arriscar duplicar uma mensagem do que travar o fluxo inteiro.
+        // aceito pela Meta antes da queda. Avança pro próximo nó sem reenviar.
         if (currentNode && SEND_NODE_TYPES.has(currentNode.type)) {
           const nextId = nextNodeId(edges, String(run.current_node_id));
           if (!nextId) {
