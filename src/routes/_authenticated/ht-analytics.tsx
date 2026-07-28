@@ -2301,8 +2301,8 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period, kbSc
       const def = sdrToCloser(sdr);
       const isScheduled = sdr === "agendado" || !!mergedSched[l.id] || !!l.crm_data_agendamento;
       const hasCloser = !!mergedEmail[l.id] || !!mergedStage[l.id] || !!mergedStage[cardId];
-      // Closer só vê leads com agendamento/stage. Admin vê todos os finalizados.
-      const inPipeline = hasCloser || isScheduled || (!isCloserSession && finalizado && "BCDEFG".includes(caixa));
+      // Closer: só vê leads agendados. Admin: vê todos os do pipeline.
+      const inPipeline = isCloserSession ? isScheduled : (hasCloser || isScheduled || (finalizado && "BCDEFG".includes(caixa)));
       const bySearch = matchesSearch(l);
       if (!inPipeline && !bySearch) continue;
       const closerEmail = mergedEmail[l.id];
