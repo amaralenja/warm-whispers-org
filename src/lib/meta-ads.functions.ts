@@ -232,7 +232,7 @@ export const sendMetaEvent = createServerFn({ method: "POST" })
     const { data: cfg, error } = await context.supabase
       .from("meta_ads_config")
       .select("pixel_id, access_token, test_event_code")
-      .eq("user_id", context.userId)
+      .limit(1)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!cfg?.pixel_id || !cfg?.access_token) {
