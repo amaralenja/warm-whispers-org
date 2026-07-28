@@ -2445,15 +2445,23 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
                       }}
                       onDragEnd={() => setDraggingId(null)}
                       footer={
-                        <select
-                          value={stageMap[c.id] || s.id}
-                          onChange={(e) => moveTo(c.id, e.target.value)}
-                          className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
-                        >
-                          {CLOSER_STAGES.map((ks) => (
-                            <option key={ks.id} value={ks.id}>{ks.label}</option>
-                          ))}
-                        </select>
+                        <div className="space-y-1.5">
+                          <select
+                            value={stageMap[c.id] || s.id}
+                            onChange={(e) => moveTo(c.id, e.target.value)}
+                            className="w-full text-[10px] h-6 px-1 rounded bg-card/60 border border-border/50 focus:outline-none focus:border-accent/60"
+                          >
+                            {CLOSER_STAGES.map((ks) => (
+                              <option key={ks.id} value={ks.id}>{ks.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedLead(leadObj as QLead); }}
+                            className="w-full rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2 py-1.5 text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/25 transition-colors flex items-center justify-center gap-1"
+                          >
+                            💰 Registrar Venda
+                          </button>
+                        </div>
                       }
                     />
                   );
