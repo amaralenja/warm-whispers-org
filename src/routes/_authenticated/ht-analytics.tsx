@@ -156,7 +156,7 @@ const SCORE_GROUPS: { id: string; label: string; letras: string[] }[] = [
 export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab } = {}) {
   const getLocalDataFn = useServerFn(getKanbanLocalData);
   const listSubmissionsFn = useServerFn(listAllKanbanSubmissions);
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = useState<Period>("today");
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<QLead[]>([]);
@@ -649,7 +649,7 @@ export function HTAnalytics({ initialTab = "dashboard" }: { initialTab?: HTTab }
       {tab === "kanban" && <KanbanSDR leads={allKanbanLeads} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />}
       {tab === "closer" && (
         <>
-          <KanbanCloser leads={allKanbanLeads} vendas={vendas} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} />
+          <KanbanCloser leads={allKanbanLeads} vendas={vendas} loading={loadingKanban} onReload={() => setNonce((n) => n + 1)} notesMap={notesMap} period={period} />
 
           <div className="border-t border-border/50 mt-6">
             <div className="px-6 md:px-10 pt-6 pb-2">
@@ -2170,7 +2170,7 @@ const CAIXA_VALOR: Record<string, number> = {
   D: 3000, E: 5000, F: 8000, G: 15000,
 };
 
-function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }> }) {
+function KanbanCloser({ leads, vendas, loading, onReload, notesMap, period }: { leads: QLead[]; vendas: any[]; loading: boolean; onReload?: () => void; notesMap: Record<string, { body: string; author: string | null; role: string }>; period: Period }) {
   const scheduleCall = useServerFn(createEvent);
   const htSession = useMemo(() => getHtTeamSession(), []);
   const isCloserSession = htSession?.tipo === "closer";
@@ -2248,12 +2248,26 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
   const cards: CloserCard[] = useMemo(() => {
     const list: CloserCard[] = [];
     const q = (search || "").trim().toLowerCase();
+    const { start: pStart, end: pEnd } = periodRange(period);
     const matchesSearch = (l: any) => {
       if (!q) return false;
       const hay = `${l?.nome ?? ""} ${l?.whatsapp ?? ""} ${l?.email ?? ""} ${l?.instagram ?? ""}`.toLowerCase();
       return hay.includes(q);
     };
     for (const l of leads || []) {
+      // Filtro de período: só mostra leads do período selecionado
+      if (pStart || pEnd) {
+        const schedDate = schedMap[l.id] || l.crm_data_agendamento;
+        const createDate = l.data_criacao;
+        const relevantDate = schedDate || createDate;
+        if (relevantDate) {
+          const d = new Date(relevantDate).getTime();
+          if (pStart && d < pStart.getTime()) continue;
+          if (pEnd && d >= pEnd.getTime()) continue;
+        } else if (pStart) {
+          continue; // sem data relevante, não mostra em filtro de período
+        }
+      }
       const caixa = (l.caixa_letra ?? "").toUpperCase();
       const sdr = sdrStageOf(l);
       const def = sdrToCloser(sdr);
@@ -2294,7 +2308,7 @@ function KanbanCloser({ leads, vendas, loading, onReload, notesMap }: { leads: Q
       });
     }
     return list;
-  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search, closerEmailMap, closersList]);
+  }, [leads, vendasScoped, fakeSet, schedMap, sdrStageMap, stageMap, search, closerEmailMap, closersList, period]);
 
   const closerOptions = useMemo(() => {
     const s = new Set<string>();
