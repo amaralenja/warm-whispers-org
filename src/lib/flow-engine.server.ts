@@ -840,8 +840,24 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
 
     try {
       // Save pointer BEFORE executing — prevents re-send if Vercel kills
-      // the function between sendWA succeeding and updateFlowRun being called.
-      await updateFlowRun(ctx, { current_node_id: node.id });
+      // the function between runNode succeeding and updateFlowRun being called.
+      // For delay nodes, also pre-set waiting_for so timer recovery works.
+      const isDelay = node.type === "delay";
+      if (isDelay) {
+        const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
+        if (secs > 8) {
+          await updateFlowRun(ctx, {
+            current_node_id: node.id,
+            status: "waiting",
+            waiting_for: "timer",
+            expires_at: new Date(Date.now() + secs * 1000).toISOString(),
+          });
+        } else {
+          await updateFlowRun(ctx, { current_node_id: node.id });
+        }
+      } else {
+        await updateFlowRun(ctx, { current_node_id: node.id });
+      }
       const result = await runNode(node, ctx);
       if (await shouldStopFlowRun(ctx)) return;
 
