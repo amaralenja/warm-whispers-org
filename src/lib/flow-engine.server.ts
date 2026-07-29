@@ -821,8 +821,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "paused", currentId, null, `Chunk limit (${nodesProcessed} nós), re-enfileirado`);
       // Auto-trigger dispatch worker via HTTP — não espera o cron de 60s
       try {
-        const baseUrl = process.env.VERCEL_URL || process.env.VITE_SITE_URL || "";
-        if (baseUrl) fetch(`https://${baseUrl}/api/public/hooks/dispatch-worker`, { method: "POST" }).catch(() => {});
+        fetch(`https://multium.vercel.app/api/public/hooks/dispatch-worker`, { method: "POST" }).catch(() => {});
       } catch {}
       return;
     }
@@ -1176,9 +1175,8 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
       // "running" se a execução fosse encerrada no meio do sleep.
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
       // Agenda HTTP call pro dispatch-worker após o delay expirar
-      const baseUrl = process.env.VERCEL_URL || process.env.VITE_SITE_URL || "";
-      if (baseUrl && secs <= 600) {
-        const workerUrl = `https://${baseUrl}/api/public/hooks/dispatch-worker`;
+      if (secs <= 600) {
+        const workerUrl = "https://multium.vercel.app/api/public/hooks/dispatch-worker";
         setTimeout(() => {
           fetch(workerUrl, { method: "POST" }).catch(() => {});
         }, secs * 1000);
