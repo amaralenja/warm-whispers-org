@@ -1171,10 +1171,13 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      // Todo delay vai para timer no banco. Delay inline deixava runs presas em
-      // "running" se a execução fosse encerrada no meio do sleep.
+      // Delays ≤8s rodam inline (seguro no timeout 60s da Vercel)
+      if (secs <= 8) {
+        await new Promise((resolve) => setTimeout(resolve, secs * 1000));
+        return {};
+      }
+      // Delays >8s vão pro DB timer. Worker HTTP self-trigger garante retomada rápida.
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
-      // Agenda HTTP call pro dispatch-worker após o delay expirar
       if (secs <= 600) {
         const workerUrl = "https://multium.vercel.app/api/public/hooks/dispatch-worker";
         setTimeout(() => {
