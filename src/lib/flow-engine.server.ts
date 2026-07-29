@@ -1064,9 +1064,40 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
       let sendResult: { waMsgId: string | null; phoneNumberId: string; toNormalized: string } | null = null;
 
-      try {
-        sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-      } catch (firstSendErr: any) {
+      // Para áudio e vídeo: upload direto pra Meta (media_id) em vez de URL.
+      // Evita timeout do EvoHub baixando arquivos grandes do Supabase Storage.
+      if (mediaType === "audio" || mediaType === "video") {
+        const urlBody = { ...body };
+        try {
+          const { token, phoneNumberId } = await fetchChannelToken(ctx.channelId, ctx.db);
+          const mime = mediaType === "audio" ? (getAudioFileInfo(mirroredUrl, filename).mime || "audio/ogg") : "video/mp4";
+          const ext = mediaType === "audio" ? (getAudioFileInfo(mirroredUrl, filename).ext || "ogg") : "mp4";
+          const mediaId = await uploadMediaToMeta(token, phoneNumberId, mirroredUrl, mime, filename || `arquivo.${ext}`);
+          const mediaInner: any = { id: mediaId };
+          if (mediaType === "audio" && inner.voice) mediaInner.voice = true;
+          if (caption) mediaInner.caption = caption;
+          body = { type: mediaType, [mediaType]: mediaInner, ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}) };
+          sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+        } catch (mediaIdErr: any) {
+          console.warn("[flow-engine] uploadMediaToMeta falhou, tentando URL:", mediaIdErr?.message);
+          // Fallback: tenta por URL
+          try {
+            sendResult = await sendWA(ctx.channelId, ctx.contactWaId, urlBody, ctx.db);
+          } catch (urlErr: any) {
+            if (mediaType === "audio" && inner.voice) {
+              delete inner.voice;
+              urlBody[mediaType] = inner;
+              sendResult = await sendWA(ctx.channelId, ctx.contactWaId, urlBody, ctx.db);
+            } else {
+              throw urlErr;
+            }
+          }
+        }
+      } else {
+        // Imagem/documento: envia por URL (arquivos menores, EvoHub lida bem)
+        try {
+          sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+        } catch (firstSendErr: any) {
         // Fallback único: se audio com voice:true falhou, tenta sem voice
         if (mediaType === "audio" && inner.voice) {
           console.warn("[flow-engine] Meta rejeitou voice:true, tentando sem voice...", firstSendErr?.message);
