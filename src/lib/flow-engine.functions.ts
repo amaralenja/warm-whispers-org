@@ -924,6 +924,15 @@ export const listActiveFlowConversationIds = createServerFn({ method: "GET" })
   .inputValidator(() => undefined)
   .handler(async ({ context }) => {
     const db = await dbFor(context);
+
+    // Auto-resume any expired timer delays and queued runs every time vendor chat list polls
+    try {
+      const { processExpiredTimerRuns, processQueuedFlowRuns, processStaleRunningDelayRuns } = await import("@/lib/flow-engine.server");
+      void processStaleRunningDelayRuns(45, 50).catch(() => undefined);
+      void processExpiredTimerRuns(50).catch(() => undefined);
+      void processQueuedFlowRuns(50).catch(() => undefined);
+    } catch {}
+
     const vendor = (context as any)?.vendor;
     const vendorId = Number(vendor?.id);
     const codigo = String(vendor?.codigo ?? "").trim();
