@@ -2,7 +2,7 @@
 // Never import this from client modules.
 
 const EVOHUB_BASE = "https://api.evohub.ai";
-const API_TIMEOUT_MS = 30_000;
+const API_TIMEOUT_MS = 50_000;
 
 // ── Flow Logging ──
 async function logFlowEvent(db: any, runId: string, conversationId: string | null, event: string, nodeId?: string | null, nodeType?: string | null, detail?: string | null) {
