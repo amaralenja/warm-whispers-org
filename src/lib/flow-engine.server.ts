@@ -263,6 +263,12 @@ export async function sendWA(channelId: string, to: string, body: any, db: any) 
   }
 
   if (!attempt.ok) {
+    // Meta pode ter entregue a mensagem mesmo com HTTP não-200 do EvoHub.
+    // Se tem wamid no response, a mensagem foi entregue — não retentar.
+    const wamid = attempt.json?.messages?.[0]?.id;
+    if (wamid) {
+      return { waMsgId: wamid, phoneNumberId, toNormalized };
+    }
     const msg = attempt.json?.error?.message ?? attempt.json?.message ?? (lastErr ? String((lastErr as any)?.message ?? lastErr) : `HTTP ${attempt.status}`);
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
