@@ -9,7 +9,7 @@ async function logFlowEvent(db: any, runId: string, conversationId: string | nul
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const adminDb = supabaseAdmin ?? db;
-    await adminDb.from("wa_flow_logs").insert({
+    await adminDb.from("wa_flow_logs" as any).insert({
       flow_run_id: runId,
       conversation_id: conversationId,
       event,
