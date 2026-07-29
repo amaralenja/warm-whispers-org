@@ -4,6 +4,20 @@
 const EVOHUB_BASE = "https://api.evohub.ai";
 const API_TIMEOUT_MS = 30_000;
 
+// ── Flow Logging ──
+async function logFlowEvent(db: any, runId: string, conversationId: string | null, event: string, nodeId?: string | null, nodeType?: string | null, detail?: string | null) {
+  try {
+    await db.from("wa_flow_logs").insert({
+      flow_run_id: runId,
+      conversation_id: conversationId,
+      event,
+      node_id: nodeId ?? null,
+      node_type: nodeType ?? null,
+      detail: detail ? String(detail).slice(0, 1000) : null,
+    });
+  } catch {}
+}
+
 type Ctx = {
   runId: string;
   flowId: string;
@@ -794,6 +808,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
         waiting_for: null,
         expires_at: null,
       });
+      await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "paused", currentId, null, `Chunk limit (${nodesProcessed} nós), re-enfileirado`);
       // Auto-trigger dispatch worker via HTTP — não espera o cron de 60s
       try {
         const baseUrl = process.env.VERCEL_URL || process.env.VITE_SITE_URL || "";
@@ -801,7 +816,10 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       } catch {}
       return;
     }
-    if (await shouldStopFlowRun(ctx)) return;
+    if (await shouldStopFlowRun(ctx)) {
+      await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "failed", currentId, null, "Fluxo interrompido (cancelado ou lease perdido)");
+      return;
+    }
     const node = nodes.find((n) => n.id === currentId);
     if (!node) {
       // Node não existe mais (fluxo editado). Não deixa o run preso em "running".
@@ -832,12 +850,25 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       nodesProcessed++;
       // Reset per-node retry counter on successful execution
       if (ctx.variables._nodeRetries) delete ctx.variables._nodeRetries[node.id];
-      if (result.pause) return;
+      if (result.pause) { 
+        await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "paused", node.id, node.type, result.waitingFor === "timer" ? `Aguardando ${node.data?.seconds ?? "?"}s` : `Aguardando ${result.waitingFor ?? "resposta"}`);
+        return; 
+      }
       if (result.end) {
         await updateFlowRun(ctx, {
           status: "completed", waiting_for: null,
         });
+        await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "completed", node.id, node.type, "Fluxo finalizado");
         return;
+      }
+      // Log de envio bem-sucedido
+      const isSend =
+        node.type === "send_text" || node.type === "send_image" ||
+        node.type === "send_video" || node.type === "send_audio" ||
+        node.type === "send_document" || node.type === "send_buttons";
+      if (isSend) {
+        const preview = result.log?.text ?? result.log?.url ?? `[${node.type}]`;
+        await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "node_sent", node.id, node.type, String(preview).slice(0, 200));
       }
       currentId = nextNodeId(edges, node.id, result.handle);
     } catch (e: any) {
@@ -876,6 +907,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
         expires_at: null,
       });
       console.warn(`[flow-engine] send node ${node.type} failed, re-queued (retry ${retryCount[node.id]}/3): ${String(e?.message ?? e).slice(0, 100)}`);
+      await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "node_failed", node.id, node.type, `Falha (retry ${retryCount[node.id]}/3): ${String(e?.message ?? e).slice(0, 200)}`);
     }
   }
 
@@ -883,6 +915,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
     await updateFlowRun(ctx, {
       status: "completed", waiting_for: null,
     });
+    await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "completed", null, null, `Fluxo finalizado com sucesso (${nodesProcessed} nós executados)`);
   }
 }
 
@@ -1457,7 +1490,8 @@ export async function runFlowAdmin(args: {
     return { runId: ctx.runId, completed: true, reason: "no_next_node" };
   }
   await takeFlowRunLease(ctx);
-  await executeFrom(ctx, startId, { maxNodes: 5 });
+  await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "started", startId, null, `Fluxo iniciado`);
+  await executeFrom(ctx, startId, { maxNodes: 10 });
   return { runId: ctx.runId };
 }
 
@@ -1758,7 +1792,8 @@ export async function advanceWaitingRun(args: {
   if (!claimed) return null;
 
   await takeFlowRunLease(ctx);
-  await executeFrom(ctx, nextId, { maxNodes: 5 });
+  await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "resumed", nextId, null, `Fluxo retomado após resposta`);
+  await executeFrom(ctx, nextId, { maxNodes: 10 });
   return { runId: r.id };
 }
 
