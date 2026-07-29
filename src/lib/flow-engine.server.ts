@@ -1744,11 +1744,8 @@ export async function advanceWaitingRun(args: {
     return null;
   }
 
-  // 2. Se está aguardando um BOTÃO (waiting_for === "button") mas o lead mandou texto simples (sem buttonId),
-  // mantém o fluxo aguardando o clique do botão.
-  if (r.waiting_for === "button" && !args.input.buttonId) {
-    return null;
-  }
+  // 2. Se está aguardando um BOTÃO (waiting_for === "button") e o lead mandou texto/áudio simples sem clicar no botão:
+  // Avança pela saída padrão do nó em vez de travar o fluxo para sempre.
 
   const flow = await loadFlow(r.flow_id, db);
   const edges: Edge[] = jsonArray<Edge>(flow.edges);
