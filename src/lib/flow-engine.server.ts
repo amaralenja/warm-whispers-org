@@ -1098,19 +1098,20 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
         try {
           sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
         } catch (firstSendErr: any) {
-        // Fallback único: se audio com voice:true falhou, tenta sem voice
-        if (mediaType === "audio" && inner.voice) {
-          console.warn("[flow-engine] Meta rejeitou voice:true, tentando sem voice...", firstSendErr?.message);
-          delete inner.voice;
-          body[mediaType] = inner;
-          try {
-            sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
-          } catch (retryNoVoiceErr: any) {
-            // Ambos falharam — deixa executeFrom re-enfileirar com retry counter
-            throw retryNoVoiceErr;
+          // Fallback único: se audio com voice:true falhou, tenta sem voice
+          if (mediaType === "audio" && inner.voice) {
+            console.warn("[flow-engine] Meta rejeitou voice:true, tentando sem voice...", firstSendErr?.message);
+            delete inner.voice;
+            body[mediaType] = inner;
+            try {
+              sendResult = await sendWA(ctx.channelId, ctx.contactWaId, body, ctx.db);
+            } catch (retryNoVoiceErr: any) {
+              // Ambos falharam — deixa executeFrom re-enfileirar com retry counter
+              throw retryNoVoiceErr;
+            }
+          } else {
+            throw firstSendErr;
           }
-        } else {
-          throw firstSendErr;
         }
       }
 
