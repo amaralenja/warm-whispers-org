@@ -9,7 +9,7 @@ async function runWorkerTasks() {
     processQueuedFlowRuns(20),
     processExpiredTimerRuns(20),
     processExpiredWaitingRuns(60, 100),
-    processStaleRunningSendRuns(900, 20),
+    processStaleRunningSendRuns(180, 20),
     processDueBulkDispatchItems(10),
     processDueRemarketing(),
   ]);

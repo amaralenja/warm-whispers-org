@@ -711,9 +711,9 @@ async function hasLostLease(ctx: Ctx): Promise<boolean> {
     const current = (data as any).executor_id ?? null;
     return current !== ctx.executorId;
   } catch {
-    // Fail-safe: se não conseguimos confirmar a posse, parar é mais seguro do
-    // que continuar e arriscar enviar mensagem duplicada.
-    return true;
+    // Se não conseguimos verificar o lease, assumimos que ainda temos posse.
+    // Parar aqui mataria o fluxo em qualquer erro transitório de rede/DB.
+    return false;
   }
 }
 
@@ -855,35 +855,27 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
         });
         return;
       }
-      // Nunca reexecuta automaticamente um nó de envio: timeout/erro de gateway
-      // pode acontecer depois da Meta já ter aceitado a mensagem. Reenviar o
-      // mesmo node é a principal causa de duplicação no chat ao vivo.
-      const nextId = nextNodeId(edges, node.id);
-      ctx.variables._sendErrors = {
-        ...(ctx.variables._sendErrors ?? {}),
-        [node.id]: String(e?.message ?? e).slice(0, 500),
-      };
-      if (!nextId) {
+      // Send node failed: re-queue with per-node retry counter instead of
+      // failing immediately. Next cron invocation will retry the send.
+      // After 3 retries, give up and mark as failed.
+      const retryCount: Record<string, number> = ctx.variables._nodeRetries ?? {};
+      retryCount[node.id] = (retryCount[node.id] ?? 0) + 1;
+      ctx.variables._nodeRetries = retryCount;
+      if (retryCount[node.id] >= 3) {
         await updateFlowRun(ctx, {
-          status: "completed",
-          waiting_for: null,
-          expires_at: null,
-          context: ctx.variables,
-          error: `Envio de ${node.type} falhou; fluxo finalizado sem retry para evitar duplicidade: ${String(e?.message ?? e)}`,
+          status: "failed",
+          error: `Envio de ${node.type} falhou 3x: ${String(e?.message ?? e)}`,
         });
         return;
       }
       await updateFlowRun(ctx, {
-        current_node_id: nextId,
+        current_node_id: node.id,
         context: ctx.variables,
-        status: "running",
+        status: "queued",
         waiting_for: null,
         expires_at: null,
-        error: `Envio de ${node.type} falhou; avançado sem retry para evitar duplicidade: ${String(e?.message ?? e)}`,
       });
-      console.warn(`[flow-engine] send node ${node.type} failed, advanced without retry to avoid duplicate: ${String(e?.message ?? e).slice(0, 160)}`);
-      currentId = nextId;
-      nodesProcessed++;
+      console.warn(`[flow-engine] send node ${node.type} failed, re-queued (retry ${retryCount[node.id]}/3): ${String(e?.message ?? e).slice(0, 100)}`);
     }
   }
 
