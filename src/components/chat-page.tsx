@@ -1606,9 +1606,9 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
     queryFn: () => activeId ? listMsgFn({ data: { conversationId: activeId } }) : Promise.resolve([]),
     enabled: !!activeId,
     // Vendedor não recebe realtime (RLS); poll agressivo pra ver mensagens do fluxo entrarem na thread.
-    refetchInterval: activeId ? (vendorSession ? 3_000 : 20_000) : false,
-    refetchOnWindowFocus: false,
-    staleTime: vendorSession ? 1_000 : 30_000,
+    refetchInterval: activeId ? (vendorSession ? 3_000 : 4_000) : false,
+    refetchOnWindowFocus: true,
+    staleTime: vendorSession ? 1_000 : 2_000,
     gcTime: 10 * 60_000,
   });
 
