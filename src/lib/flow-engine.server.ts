@@ -845,7 +845,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       const isDelay = node.type === "delay";
       if (isDelay) {
         const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-        if (secs > 8) {
+        if (secs > 45) {
           await updateFlowRun(ctx, {
             current_node_id: node.id,
             status: "waiting",
@@ -1187,12 +1187,12 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      // Delays ≤8s rodam inline (seguro no timeout 60s da Vercel)
-      if (secs <= 8) {
+      // Delays ≤45s rodam inline (seguro no timeout 60s da Vercel)
+      if (secs <= 45) {
         await new Promise((resolve) => setTimeout(resolve, secs * 1000));
         return {};
       }
-      // Delays >8s vão pro DB timer. Worker HTTP self-trigger garante retomada rápida.
+      // Delays >45s vão pro DB timer. Worker HTTP self-trigger garante retomada.
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
       if (secs <= 600) {
         const workerUrl = "https://multium.vercel.app/api/public/hooks/dispatch-worker";
