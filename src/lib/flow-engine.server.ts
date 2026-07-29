@@ -1475,6 +1475,7 @@ export async function runFlowAdmin(args: {
       vendor: args.vendor ?? null,
     };
     await updateFlowRun(queueCtx, { status: "queued", waiting_for: null, expires_at: null });
+    await logFlowEvent(db, queueCtx.runId, queueCtx.conversationId, "started", startId ?? entryId, null, `Fluxo enfileirado (queueOnly)`);
     return { runId: (run as any).id, queued: true };
   }
 
