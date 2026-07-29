@@ -128,7 +128,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Archive, ArchiveRestore } from "lucide-react";
-import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun, getFlow } from "@/lib/flow-engine.functions";
+import { listFlows, listActiveFlowRuns, listActiveFlowConversationIds, triggerFlowManually, cancelFlowRun, getFlow, getFlowLogs } from "@/lib/flow-engine.functions";
 import { listCrmTags, listCrmLeads, listCrmStages } from "@/lib/crm.functions";
 import { listHtQuizSubmissions } from "@/lib/ht-api.functions";
 import { getUserPref, setUserPref } from "@/lib/user-prefs.functions";
@@ -1691,6 +1691,29 @@ function ChatPage({ searchOverride }: { searchOverride?: ChatSearchParams } = {}
 
   const [showLogConsole, setShowLogConsole] = useState(false);
   const [inspectingErrorMsg, setInspectingErrorMsg] = useState<Msg | null>(null);
+
+  // Poll flow logs for this conversation every 3s
+  const getFlowLogsFn = useServerFn(getFlowLogs);
+  const seenLogIds = useRef(new Set<string>());
+  useEffect(() => {
+    if (!active?.id) return;
+    const poll = async () => {
+      try {
+        const res = await getFlowLogsFn({ data: { conversationId: active.id } });
+        for (const l of (res?.logs ?? [])) {
+          const key = `${l.flow_run_id}-${l.event}-${l.node_id}-${l.created_at}`;
+          if (seenLogIds.current.has(key)) continue;
+          seenLogIds.current.add(key);
+          const emoji = l.event === "started" ? "🚀" : l.event === "completed" ? "✅" : l.event === "node_sent" ? "📤" : l.event === "node_failed" ? "❌" : l.event === "paused" ? "⏸️" : l.event === "resumed" ? "▶️" : "📋";
+          const level = l.event === "node_failed" ? "error" : l.event === "completed" ? "success" : "info";
+          addSendLog(`${emoji} Fluxo: ${l.event} | ${l.node_type || ""}`, l.detail || undefined, level);
+        }
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [active?.id]);
 
   const sendMut = useMutation({
     mutationFn: (vars: SendVars) => sendFn({ data: vars }),

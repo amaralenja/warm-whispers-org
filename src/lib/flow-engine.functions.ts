@@ -1127,3 +1127,18 @@ export const inspectFlowExecutionLogs = createServerFn({ method: "POST" })
       messages: msgs ?? [],
     };
   });
+
+export const getFlowLogs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { conversationId: string }) => ({ conversationId: String(d?.conversationId ?? "") }))
+  .handler(async ({ context, data }) => {
+    if (!data.conversationId) return { logs: [] };
+    const db = await dbFor(context);
+    const { data: logs } = await db
+      .from("wa_flow_logs")
+      .select("event, node_type, detail, created_at, flow_run_id")
+      .eq("conversation_id", data.conversationId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    return { logs: (logs ?? []) as any[] };
+  });
