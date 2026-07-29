@@ -1415,61 +1415,25 @@ export async function runFlowAdmin(args: {
     }
   }
 
-  // Idempotency guard: se já existe uma run do MESMO fluxo pra este contato,
-  // cancela a antiga e cria a nova. Disparo manual sempre vence.
+  // Idempotency: apenas evita duplo clique no mesmo fluxo em 5 segundos.
+  // Cancela runs antigas do mesmo fluxo para o mesmo contato.
   {
     const contactCandidates = whatsappNumberVariants(String(args.contactWaId ?? ""));
     const isManual = (args.triggerContext as any)?.manual === true;
 
     if (isManual) {
-      // Previne duplo clique nos últimos 10 segundos
-      const tenSecondsAgo = new Date(Date.now() - 10_000).toISOString();
+      const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
       const { data: recentRun } = await db
-        .from("wa_flow_runs" as any)
-        .select("id, created_at")
-        .eq("flow_id", args.flowId)
-        .eq("channel_id", args.channelId)
-        .in("contact_wa_id", contactCandidates.length > 0 ? contactCandidates : [String(args.contactWaId ?? "")])
-        .gte("created_at", tenSecondsAgo)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (recentRun) {
-        return { runId: (recentRun as any).id, deduped: true };
-      }
-
-      // Cancela runs ativas do mesmo fluxo
-      const { data: activeRuns } = await db
         .from("wa_flow_runs" as any)
         .select("id")
         .eq("flow_id", args.flowId)
         .eq("channel_id", args.channelId)
         .in("contact_wa_id", contactCandidates.length > 0 ? contactCandidates : [String(args.contactWaId ?? "")])
-        .in("status", ["queued", "running", "waiting"]);
-
-      if (activeRuns && activeRuns.length > 0) {
-        const idsToCancel = activeRuns.map((r: any) => String(r.id));
-        await db.from("wa_flow_runs" as any).update({
-          status: "cancelled",
-          waiting_for: null,
-          expires_at: null,
-          error: "Substituído por novo disparo manual do mesmo fluxo",
-          updated_at: new Date().toISOString(),
-        }).in("id", idsToCancel);
-      }
-    } else {
-      const { data: existingActive } = await db
-        .from("wa_flow_runs" as any)
-        .select("id, status")
-        .eq("flow_id", args.flowId)
-        .eq("channel_id", args.channelId)
-        .in("contact_wa_id", contactCandidates)
-        .in("status", ["queued", "running", "waiting"])
+        .gte("created_at", fiveSecondsAgo)
         .limit(1)
         .maybeSingle();
-      if (existingActive) {
-        return { runId: (existingActive as any).id, deduped: true };
+      if (recentRun) {
+        return { runId: (recentRun as any).id, deduped: true };
       }
     }
   }
