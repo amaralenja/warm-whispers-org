@@ -534,7 +534,7 @@ function popInitialQuotedMessageId(ctx: Ctx): string | null {
 async function persistOutMessage(ctx: Ctx, type: string, body: any, waMsgId: string | null, phoneNumberId: string, toWaId?: string, quotedMsgId?: string | null) {
   if (!ctx.conversationId) return;
   const textBody = body?.text?.body ?? body?.interactive?.body?.text ?? null;
-  const mediaUrl = body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? null;
+  const mediaUrl = body?.image?.link ?? body?.video?.link ?? body?.audio?.link ?? body?.document?.link ?? body?.image?.originalUrl ?? body?.video?.originalUrl ?? body?.audio?.originalUrl ?? null;
   const mediaFilename = body?.document?.filename ?? null;
   const caption = body?.image?.caption ?? body?.video?.caption ?? body?.document?.caption ?? null;
   const toNormalized = toWaId ?? normalizeBrWhatsappNumber(ctx.contactWaId);
@@ -1073,7 +1073,7 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
           const mime = mediaType === "audio" ? (getAudioFileInfo(mirroredUrl, filename).mime || "audio/ogg") : "video/mp4";
           const ext = mediaType === "audio" ? (getAudioFileInfo(mirroredUrl, filename).ext || "ogg") : "mp4";
           const mediaId = await uploadMediaToMeta(token, phoneNumberId, mirroredUrl, mime, filename || `arquivo.${ext}`);
-          const mediaInner: any = { id: mediaId };
+          const mediaInner: any = { id: mediaId, originalUrl: mirroredUrl };
           if (mediaType === "audio" && inner.voice) mediaInner.voice = true;
           if (caption) mediaInner.caption = caption;
           body = { type: mediaType, [mediaType]: mediaInner, ...(initialQuotedId ? { context: { message_id: initialQuotedId } } : {}) };
