@@ -7,7 +7,9 @@ const API_TIMEOUT_MS = 30_000;
 // ── Flow Logging ──
 async function logFlowEvent(db: any, runId: string, conversationId: string | null, event: string, nodeId?: string | null, nodeType?: string | null, detail?: string | null) {
   try {
-    await db.from("wa_flow_logs").insert({
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const adminDb = supabaseAdmin ?? db;
+    await adminDb.from("wa_flow_logs").insert({
       flow_run_id: runId,
       conversation_id: conversationId,
       event,
@@ -15,7 +17,9 @@ async function logFlowEvent(db: any, runId: string, conversationId: string | nul
       node_type: nodeType ?? null,
       detail: detail ? String(detail).slice(0, 1000) : null,
     });
-  } catch {}
+  } catch (e) {
+    console.warn("[flow-engine] logFlowEvent failed", e);
+  }
 }
 
 type Ctx = {
