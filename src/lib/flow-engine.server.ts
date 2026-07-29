@@ -845,7 +845,7 @@ async function executeFrom(ctx: Ctx, startNodeId: string, opts?: { maxNodes?: nu
       const isDelay = node.type === "delay";
       if (isDelay) {
         const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-        if (secs > 45) {
+        if (secs > 3) {
           await updateFlowRun(ctx, {
             current_node_id: node.id,
             status: "waiting",
@@ -1219,19 +1219,13 @@ async function runNode(node: Node, ctx: Ctx): Promise<NodeResult> {
 
     case "delay": {
       const secs = Math.max(1, Math.min(86400, Number(node.data?.seconds ?? 2)));
-      // Delays ≤45s rodam inline (seguro no timeout 60s da Vercel)
-      if (secs <= 45) {
+      // Apenas micro-delays ≤3s rodam inline. Delays ≥4s viram timer no DB (evita congelamento Vercel)
+      if (secs <= 3) {
         await new Promise((resolve) => setTimeout(resolve, secs * 1000));
         return {};
       }
-      // Delays >45s vão pro DB timer. Worker HTTP self-trigger garante retomada.
+      // Delays ≥4s vão pro DB timer
       const expiresAt = new Date(Date.now() + secs * 1000).toISOString();
-      if (secs <= 600) {
-        const workerUrl = "https://multium.vercel.app/api/public/hooks/dispatch-worker";
-        setTimeout(() => {
-          fetch(workerUrl, { method: "POST" }).catch(() => {});
-        }, secs * 1000);
-      }
       return {
         pause: true,
         waitingFor: "timer",
@@ -1496,7 +1490,7 @@ export async function runFlowAdmin(args: {
   }
   await takeFlowRunLease(ctx);
   await logFlowEvent(ctx.db, ctx.runId, ctx.conversationId, "started", startId, null, `Fluxo iniciado`);
-  await executeFrom(ctx, startId, { maxNodes: 10 });
+  await executeFrom(ctx, startId, { maxNodes: 50 });
   return { runId: ctx.runId };
 }
 
@@ -1527,7 +1521,7 @@ export async function processQueuedFlowRuns(limit = 20) {
         return { runId: ctx.runId, completed: true };
       }
       try {
-        await executeFrom(ctx, startId, { maxNodes: 10 });
+        await executeFrom(ctx, startId, { maxNodes: 50 });
         return { runId: ctx.runId, ok: true };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
@@ -1581,7 +1575,7 @@ export async function processExpiredTimerRuns(limit = 20) {
           expires_at: null,
           current_node_id: nextId,
         });
-        await executeFrom(ctx, nextId, { maxNodes: 5 });
+        await executeFrom(ctx, nextId, { maxNodes: 50 });
         return { runId: ctx.runId, ok: true };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
@@ -1598,7 +1592,7 @@ export async function processExpiredTimerRuns(limit = 20) {
 
 // Recovers delay nodes that were left as `running` before the worker could mark
 // them as queued/waiting. This prevents manual vendor triggers from staying stuck.
-export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit = 20) {
+export async function processStaleRunningDelayRuns(olderThanSeconds = 45, limit = 20) {
   const db = await getAdminDb();
   const { data: stale, error } = await db.rpc("claim_stale_running_delay_flow_runs" as any, {
     _older_than_seconds: olderThanSeconds,
@@ -1622,7 +1616,7 @@ export async function processStaleRunningDelayRuns(olderThanSeconds = 90, limit 
 // Se estava num nó de envio (send_*): avança sem reenviar. Uma resposta lenta do
 // provedor pode significar que a mensagem já foi entregue; reenviar duplica.
 // Se estava em outro tipo de nó: avança pro próximo.
-export async function processStaleRunningSendRuns(olderThanSeconds = 900, limit = 20) {
+export async function processStaleRunningSendRuns(olderThanSeconds = 45, limit = 20) {
   const db = await getAdminDb();
   const { data: stale, error } = await db.rpc("claim_stale_running_send_flow_runs" as any, {
     _older_than_seconds: olderThanSeconds,
@@ -1668,7 +1662,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 900, limit 
             expires_at: null,
             current_node_id: nextId,
           });
-          await executeFrom(ctx, nextId, { maxNodes: 5 });
+          await executeFrom(ctx, nextId, { maxNodes: 50 });
           console.warn(`[flow-engine] stale send run ${ctx.runId} recovered past ${currentNode.type}, resumed from ${nextId}`);
           return { runId: ctx.runId, ok: true, recoveredPast: currentNode.type };
         }
@@ -1685,7 +1679,7 @@ export async function processStaleRunningSendRuns(olderThanSeconds = 900, limit 
           expires_at: null,
           current_node_id: nextId,
         });
-        await executeFrom(ctx, nextId, { maxNodes: 5 });
+        await executeFrom(ctx, nextId, { maxNodes: 50 });
         return { runId: ctx.runId, ok: true, resumedFrom: nextId };
       } catch (err: any) {
         await updateFlowRun(ctx, { status: "failed", error: String(err?.message ?? err) });
