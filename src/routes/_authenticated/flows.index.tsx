@@ -718,6 +718,36 @@ function FlowsListPage() {
             <Trash2 className="h-4 w-4 sm:mr-1.5" />
             <span className="hidden sm:inline">Apagar selecionados</span>
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={selected.size === 0}
+            onClick={async () => {
+              const codes: string[] = [];
+              let ok = 0;
+              let fail = 0;
+              for (const id of selected) {
+                try {
+                  const res = await exportFn({ data: { id } });
+                  if (res?.code) {
+                    codes.push(`# ${res.nome || id}\n${res.code}`);
+                    ok++;
+                  } else {
+                    fail++;
+                  }
+                } catch { fail++; }
+              }
+              if (codes.length > 0) {
+                const text = codes.join("\n\n");
+                await navigator.clipboard.writeText(text);
+                toast.success(`${ok} fluxos copiados! ✅`);
+              }
+              if (fail > 0) toast.error(`${fail} falhas ao exportar`);
+            }}
+          >
+            <Download className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Exportar selecionados</span>
+          </Button>
         </div>
       </div>
 
