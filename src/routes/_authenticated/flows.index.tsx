@@ -723,7 +723,6 @@ function FlowsListPage() {
             variant="outline"
             disabled={selected.size === 0}
             onClick={async () => {
-              toast.loading(`Exportando ${selected.size} fluxos...`);
               const codes: string[] = [];
               let ok = 0;
               let fail = 0;
@@ -736,26 +735,20 @@ function FlowsListPage() {
                   } else {
                     fail++;
                   }
-                } catch { fail++; }
+                } catch (e) { console.error("export fail", id, e); fail++; }
               }
               if (codes.length > 0) {
                 const text = codes.join("\n\n");
-                try {
-                  await navigator.clipboard.writeText(text);
-                } catch {
-                  const ta = document.createElement("textarea");
-                  ta.value = text;
-                  ta.style.position = "fixed"; ta.style.opacity = "0";
-                  document.body.appendChild(ta);
-                  ta.select();
-                  document.execCommand("copy");
-                  document.body.removeChild(ta);
+                try { await navigator.clipboard.writeText(text); } catch {
+                  const ta = document.createElement("textarea"); ta.value = text;
+                  ta.style.cssText = "position:fixed;opacity:0";
+                  document.body.appendChild(ta); ta.select();
+                  document.execCommand("copy"); document.body.removeChild(ta);
                 }
-                toast.success(`${ok} fluxos exportados e copiados! 📋`);
+                toast.success(`${ok} fluxos copiados!`);
               } else {
-                toast.error("Nenhum fluxo exportado");
+                toast.error(fail > 0 ? `${fail} falhas` : "Nenhum exportado");
               }
-              if (fail > 0) toast.error(`${fail} falhas ao exportar`);
             }}
           >
             <Download className="h-4 w-4 sm:mr-1.5" />
