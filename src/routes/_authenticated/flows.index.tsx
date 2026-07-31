@@ -723,20 +723,25 @@ function FlowsListPage() {
             variant="outline"
             disabled={selected.size === 0}
             onClick={async () => {
+              console.log("[bulk-export] starting", selected.size, [...selected]);
+              toast.info(`Exportando ${selected.size}...`);
               const codes: string[] = [];
               let ok = 0;
               let fail = 0;
               for (const id of selected) {
                 try {
+                  console.log("[bulk-export] exporting", id);
                   const res = await exportFn({ data: { id } });
+                  console.log("[bulk-export] result", id, res);
                   if (res?.code) {
                     codes.push(`# ${res.nome || id}\n${res.code}`);
                     ok++;
                   } else {
                     fail++;
                   }
-                } catch (e) { console.error("export fail", id, e); fail++; }
+                } catch (e) { console.error("[bulk-export] fail", id, e); fail++; }
               }
+              console.log("[bulk-export] done", ok, fail, codes.length);
               if (codes.length > 0) {
                 const text = codes.join("\n\n");
                 try { await navigator.clipboard.writeText(text); } catch {
